@@ -12,7 +12,7 @@ This roadmap delivers a two-robot autonomous exploration and 3D reconstruction s
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Simulation Bridge and Single-Robot SLAM** - Connect to SimWorld, extract sensor data, and produce a local 3D map from one Go2 robot
+- [x] **Phase 1: Simulation Bridge and Single-Robot SLAM** - Connect to SimWorld, extract sensor data, and produce a local 3D map from one Go2 robot
 - [ ] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
 - [ ] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress
@@ -33,8 +33,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Test infrastructure, shared data types, and SimWorld API discovery
 - [x] 01-02-PLAN.md — SimWorld gym bridge and three control modes (teleop, waypoints, random walk)
-- [ ] 01-03-PLAN.md — SLAM pipeline (ICP odometry), OctoMap builder, and drift metrics
-- [ ] 01-04-PLAN.md — Rerun visualization, main.py wiring, and end-to-end verification
+- [x] 01-03-PLAN.md — SLAM pipeline (ICP odometry), OctoMap builder, and drift metrics
+- [x] 01-04-PLAN.md — Rerun visualization, main.py wiring, and end-to-end verification
 
 ### Phase 2: Autonomous Exploration
 **Goal**: A single robot autonomously explores the environment using frontier-based navigation, building its map without any human commands
@@ -87,7 +87,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Simulation Bridge and Single-Robot SLAM | 2/4 | Executing | - |
+| 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete | 2026-03-17 |
 | 2. Autonomous Exploration | 0/2 | Planned | - |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
