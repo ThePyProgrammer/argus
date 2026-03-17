@@ -76,10 +76,11 @@ Plans:
   1. The merged 3D map is displayed in real-time via Rerun or RViz2 and updates live as robots explore
   2. Both robots' current positions and historical trajectories are visible as overlays on the merged map
   3. A coverage heatmap distinguishes explored regions from unexplored regions
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — MultiRobotVisualizer class: split-panel Rerun dashboard, merged 3D map, robot overlays, coverage heatmap, stats HUD
+- [ ] 04-02-PLAN.md — Wire visualization into Coordinator and main.py --control multi mode, integration tests, human verification
 
 ## Progress
 
@@ -91,4 +92,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
 | 3. Multi-Robot Coordination and Map Merging | 2/3 | In progress | - |
-| 4. Visualization and Integration | 0/? | Not started | - |
+| 4. Visualization and Integration | 0/2 | Not started | - |
