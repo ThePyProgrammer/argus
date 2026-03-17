@@ -20,7 +20,7 @@ Data flow (per user decision -- DimOS pLCM transport):
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 
@@ -29,7 +29,9 @@ from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.coordination.multi_robot_config import MultiRobotConfig
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.coordination.map_merger import MapMerger
-from src.viz.multi_robot_viz import MultiRobotVisualizer
+
+if TYPE_CHECKING:
+    from src.viz.multi_robot_viz import MultiRobotVisualizer
 try:
     from dimos.core.transport import pLCMTransport
 except (ImportError, OSError):
