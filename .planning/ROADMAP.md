@@ -47,7 +47,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Frontier detection, goal selection, 2D occupancy projection, and A* path planning
+- [x] 02-01-PLAN.md — Frontier detection, goal selection, 2D occupancy projection, and A* path planning
 - [ ] 02-02-PLAN.md — Exploration loop orchestrator, coverage tracking, and integration tests
 - [ ] 02-03-PLAN.md — MuJoCo wiring: --control explore mode in main.py and end-to-end integration test
 
@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
-| 2. Autonomous Exploration | 0/3 | Planned | - |
+| 2. Autonomous Exploration | 1/3 | In Progress | - |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |

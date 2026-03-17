@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-04-PLAN (Rerun visualization and end-to-end integration) -- Phase 1 complete
-last_updated: "2026-03-17T06:44:16.961Z"
-last_activity: 2026-03-17 - Completed 01-04-PLAN (Rerun visualization and end-to-end integration) -- Phase 1 complete
+stopped_at: Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
+last_updated: "2026-03-17T07:03:07Z"
+last_activity: 2026-03-17 - Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 25
+  completed_plans: 5
+  percent: 38
 ---
 
 # Project State
@@ -26,27 +26,28 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 2 of 4 (Autonomous Exploration)
-Plan: 1 of 2 in current phase
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-03-17 - Completed 01-04-PLAN (Rerun visualization and end-to-end integration) -- Phase 1 complete
+Last activity: 2026-03-17 - Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
 
-Progress: [#####░░░░░] 25%
+Progress: [#######░░░] 38%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 7 min
-- Total execution time: 0.4 hours
+- Total execution time: 0.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 4 | 26 min | 7 min |
+| 2 | 1 | 7 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 6, 6, 6, 8 min
+- Last 5 plans: 6, 6, 8, 7 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -77,6 +78,10 @@ Recent decisions affecting current work:
 - [01-03]: evo library for ATE/RPE drift metrics computation
 - [01-04]: Rerun viz updates every 10 frames for performance; OctoMap insertion every 5 frames
 - [01-04]: End-to-end verified: 3627 pts/100 frames, 886 voxels, ATE=0.21m, RPE=0.005m
+- [02-01]: np.round for float-to-int grid index conversion prevents truncation bugs at 0.1m resolution
+- [02-01]: Dilation-based free-space model (not ray-casting) for OccupancyGrid2D
+- [02-01]: UNKNOWN cells traversable in A* with 5x cost penalty
+- [02-01]: Path simplification at ~1m intervals for discrete action compatibility
 
 ### Pending Todos
 
@@ -98,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T12:00:00.000Z
-Stopped at: Completed 01-04-PLAN (Rerun visualization and end-to-end integration) -- Phase 1 complete
+Last session: 2026-03-17T07:03:07Z
+Stopped at: Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
 Resume file: .planning/phases/02-autonomous-exploration/02-CONTEXT.md
