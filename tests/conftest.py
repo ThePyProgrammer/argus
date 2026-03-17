@@ -105,3 +105,72 @@ def mock_robot_positions() -> np.ndarray:
 def mock_exploration_config() -> ExplorationConfig:
     """Return a default ExplorationConfig for testing."""
     return ExplorationConfig()
+
+
+# ---------- Phase 2: MuJoCo mock fixtures ----------
+
+
+class MockMuJoCoBridge:
+    """Simulates MuJoCoBridge for testing without MuJoCo installed.
+
+    Returns synthetic SensorFrames with:
+    - RGB: 320x240 black image
+    - Depth: 320x240 float32 with uniform 2.0m depth
+    - Ground-truth pose: advances position by 0.05m in X per step
+    - sim_time: step_count * 0.02
+    """
+
+    def __init__(self) -> None:
+        self._step_count = 0
+        self._position = np.array([0.0, 0.0, 0.3])
+        self._linear_vel = np.zeros(2)
+        self._angular_vel = 0.0
+
+    def start(self) -> SensorFrame:
+        self._step_count = 0
+        return self._make_frame()
+
+    def step(self, action=None) -> SensorFrame:
+        self._position[0] += self._linear_vel[0] * 0.02
+        self._position[1] += self._linear_vel[1] * 0.02
+        self._step_count += 1
+        return self._make_frame()
+
+    def set_velocity(self, linear: np.ndarray, angular: float) -> None:
+        self._linear_vel = np.asarray(linear)
+        self._angular_vel = angular
+
+    def stop(self) -> None:
+        pass
+
+    @property
+    def step_count(self) -> int:
+        return self._step_count
+
+    @property
+    def is_running(self) -> bool:
+        return True
+
+    def _make_frame(self) -> SensorFrame:
+        pose = np.eye(4)
+        pose[:3, 3] = self._position
+        return SensorFrame(
+            rgb=np.zeros((240, 320, 3), dtype=np.uint8),
+            depth=np.full((240, 320), 2.0, dtype=np.float32),
+            ground_truth_pose=pose,
+            sim_time=self._step_count * 0.02,
+        )
+
+
+@pytest.fixture
+def mock_mujoco_bridge() -> MockMuJoCoBridge:
+    """Return a fresh MockMuJoCoBridge instance."""
+    return MockMuJoCoBridge()
+
+
+@pytest.fixture
+def mock_mujoco_intrinsics() -> CameraIntrinsics:
+    """Return CameraIntrinsics matching MuJoCo's 45-deg FOV at 320x240."""
+    return CameraIntrinsics(
+        fx=386.0, fy=386.0, cx=160.0, cy=120.0, width=320, height=240
+    )
