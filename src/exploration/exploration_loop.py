@@ -6,14 +6,20 @@ environment without human input.
 
 The loop repeats: sense -> detect frontiers -> select goal -> plan path
 -> navigate -> until no reachable frontiers remain or max steps reached.
+
+Supports two modes:
+- run(): Full autonomous loop for single-robot exploration.
+- step_once(): Single-step mode for multi-robot coordination (Coordinator calls).
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 import numpy as np
 
+from src.bridge.sensor_types import SensorFrame
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector
@@ -30,6 +36,10 @@ class ExplorationLoop:
 
     Manages the full exploration cycle: sense the environment via bridge/SLAM,
     detect frontiers, select goals, plan paths, and navigate until termination.
+
+    Supports two operating modes:
+    - run(): Full lifecycle -- calls bridge.start/step/set_velocity.
+    - step_once(): Per-frame processing -- caller manages bridge lifecycle.
 
     Args:
         bridge: Simulation bridge providing start/step/set_velocity/stop.
@@ -54,110 +64,140 @@ class ExplorationLoop:
             voxel_resolution=self._config.voxel_resolution,
         )
 
-    def run(self) -> ExplorationResult:
-        """Run the full autonomous exploration loop.
+        # Per-step state (shared between run() and step_once())
+        self._robot_positions: list[np.ndarray] = []
+        self._current_waypoint_runner: WaypointRunner | None = None
+        self._last_rescan_pos = np.zeros(3, dtype=np.float64)
+        self._last_voxel_count = 0
+        self._stuck_counter = 0
+        self._last_position = np.zeros(3, dtype=np.float64)
+        self._last_coverage = 0.0
+        self._last_bbox_coverage = 0.0
+        self._last_frontier_count = 0
+
+    def step_once(
+        self,
+        frame: SensorFrame,
+        step: int,
+        score_fn: Callable[[np.ndarray], float] | None = None,
+    ) -> tuple[np.ndarray, float, dict]:
+        """Process one exploration step without owning the bridge lifecycle.
+
+        This is the multi-robot entry point. The Coordinator calls this per-robot
+        per-step, providing the SensorFrame from the shared MultiRobotBridge.
+
+        Does NOT call bridge.start(), bridge.step(), or bridge.set_velocity().
+        The caller (Coordinator) manages those.
+
+        Args:
+            frame: Current sensor frame (from bridge.step()[robot_id]).
+            step: Current global step count (for logging and stuck detection).
+            score_fn: Optional frontier scoring function for Voronoi bias.
 
         Returns:
-            ExplorationResult with final coverage metrics, step count,
-            termination reason, and coverage history.
+            (linear_vel, angular_vel, metrics) where:
+                linear_vel: (2,) float64 velocity command
+                angular_vel: float
+                metrics: dict with keys:
+                    "frontiers": int (number of frontier clusters detected)
+                    "coverage": float (coverage percentage)
+                    "terminated": bool (True if no frontiers remain)
+                    "voxels": int (number of occupied voxels)
+                    "rescan_triggered": bool -- True if this step triggered a
+                        frontier rescan (distance or voxel-delta threshold met).
+                        CRITICAL: Coordinator uses this to trigger map merge
+                        per user decision (merge on same event as frontier rescan).
         """
         config = self._config
-        frame = self._bridge.start()
 
-        robot_positions: list[np.ndarray] = []
-        current_waypoint_runner: WaypointRunner | None = None
-        last_rescan_pos = np.zeros(3, dtype=np.float64)
-        last_voxel_count = 0
-        stuck_counter = 0
-        last_position = np.zeros(3, dtype=np.float64)
-        terminated_reason = "max_steps"
+        # ----------------------------------------------------------
+        # a. Update SLAM and OctoMap
+        # ----------------------------------------------------------
+        pose = self._slam.process_frame(frame)
+        current_pos = pose[:3, 3].copy()
 
-        # Coverage state for logging
-        last_coverage = 0.0
-        last_bbox_coverage = 0.0
-        last_frontier_count = 0
+        cloud_points = self._slam.get_cloud_points()
+        if len(cloud_points) > 0:
+            recent = cloud_points[-min(len(cloud_points), 500):]
+            self._octomap.insert_scan(recent, current_pos)
 
-        for step in range(config.max_steps):
-            # ----------------------------------------------------------
-            # a. Update SLAM and OctoMap
-            # ----------------------------------------------------------
-            pose = self._slam.process_frame(frame)
-            current_pos = pose[:3, 3].copy()
+        self._robot_positions.append(current_pos)
 
-            cloud_points = self._slam.get_cloud_points()
-            if len(cloud_points) > 0:
-                # Insert recent points (last batch)
-                recent = cloud_points[-min(len(cloud_points), 500):]
-                self._octomap.insert_scan(recent, current_pos)
+        # ----------------------------------------------------------
+        # b. Stuck detection
+        # ----------------------------------------------------------
+        if step > 0:
+            dist_moved = float(np.linalg.norm(current_pos - self._last_position))
+            if dist_moved < config.stuck_distance_m:
+                self._stuck_counter += 1
+            else:
+                self._stuck_counter = 0
 
-            robot_positions.append(current_pos)
+        force_rescan = False
+        if self._stuck_counter >= config.stuck_threshold_steps:
+            logger.warning(
+                "[Step %d] Stuck detected (%d steps without movement). Forcing re-scan.",
+                step, self._stuck_counter,
+            )
+            force_rescan = True
+            self._stuck_counter = 0
+            self._current_waypoint_runner = None
 
-            # ----------------------------------------------------------
-            # b. Stuck detection
-            # ----------------------------------------------------------
-            if step > 0:
-                dist_moved = float(np.linalg.norm(current_pos - last_position))
-                if dist_moved < config.stuck_distance_m:
-                    stuck_counter += 1
-                else:
-                    stuck_counter = 0
+        # ----------------------------------------------------------
+        # c. Check re-evaluation trigger
+        # ----------------------------------------------------------
+        should_rescan = force_rescan
+        if not should_rescan:
+            dist_from_last_scan = float(np.linalg.norm(current_pos - self._last_rescan_pos))
+            voxel_delta = self._octomap.num_occupied - self._last_voxel_count
+            waypoint_done = (
+                self._current_waypoint_runner is None
+                or self._current_waypoint_runner.is_complete
+            )
 
-            force_rescan = False
-            if stuck_counter >= config.stuck_threshold_steps:
-                logger.warning(
-                    "[Step %d] Stuck detected (%d steps without movement). Forcing re-scan.",
-                    step, stuck_counter,
-                )
-                force_rescan = True
-                stuck_counter = 0
-                current_waypoint_runner = None
+            if (dist_from_last_scan > config.rescan_distance_m
+                    or voxel_delta > config.rescan_voxel_delta
+                    or waypoint_done):
+                should_rescan = True
 
-            # ----------------------------------------------------------
-            # c. Check re-evaluation trigger
-            # ----------------------------------------------------------
-            should_rescan = force_rescan
-            if not should_rescan:
-                dist_from_last_scan = float(np.linalg.norm(current_pos - last_rescan_pos))
-                voxel_delta = self._octomap.num_occupied - last_voxel_count
-                waypoint_done = (
-                    current_waypoint_runner is None
-                    or current_waypoint_runner.is_complete
-                )
+        # ----------------------------------------------------------
+        # d. Frontier re-evaluation
+        # ----------------------------------------------------------
+        linear_vel = np.zeros(2, dtype=np.float64)
+        angular_vel = 0.0
+        terminated = False
+        frontier_count = self._last_frontier_count
 
-                if (dist_from_last_scan > config.rescan_distance_m
-                        or voxel_delta > config.rescan_voxel_delta
-                        or waypoint_done):
-                    should_rescan = True
+        if should_rescan:
+            occupied = self._octomap.get_occupied_voxels()
+            frontiers = self._frontier_detector.detect(
+                occupied, np.array(self._robot_positions),
+            )
 
-            # ----------------------------------------------------------
-            # d. Frontier re-evaluation
-            # ----------------------------------------------------------
-            if should_rescan:
-                occupied = self._octomap.get_occupied_voxels()
-                frontiers = self._frontier_detector.detect(
-                    occupied, np.array(robot_positions),
-                )
+            grid_2d = project_voxels_to_2d(
+                occupied,
+                config.voxel_resolution,
+                config.z_min,
+                config.z_max,
+            )
 
-                # Build 2D grid for path planning
-                grid_2d = project_voxels_to_2d(
-                    occupied,
-                    config.voxel_resolution,
-                    config.z_min,
-                    config.z_max,
-                )
+            frontier_count = len(frontiers)
 
-                if not frontiers:
-                    terminated_reason = "no_frontiers"
-                    logger.info("[Step %d] No frontiers remaining. Exploration complete.", step)
-                    break
-
+            if not frontiers:
+                terminated = True
+            else:
                 # Try to find a reachable frontier
                 remaining = list(frontiers)
                 goal = None
                 path = None
 
                 while remaining:
-                    candidate = self._goal_selector.select(remaining, pose)
+                    if score_fn is not None:
+                        candidate = self._goal_selector.select_with_bias(
+                            remaining, pose, score_fn,
+                        )
+                    else:
+                        candidate = self._goal_selector.select(remaining, pose)
                     if candidate is None:
                         break
 
@@ -169,66 +209,95 @@ class ExplorationLoop:
                         path = planned_path
                         break
 
-                    # Remove unreachable frontier and try next
                     remaining = [
                         f for f in remaining
                         if not np.allclose(f.centroid, candidate)
                     ]
 
                 if goal is None or path is None:
-                    terminated_reason = "all_unreachable"
-                    logger.info(
-                        "[Step %d] All frontiers unreachable. Exploration complete.", step,
+                    terminated = True
+                else:
+                    self._current_waypoint_runner = WaypointRunner(
+                        path,
+                        linear_speed=config.linear_speed,
+                        angular_speed=config.angular_speed,
+                        arrival_threshold=config.waypoint_arrival_threshold,
                     )
-                    break
 
-                # Create waypoint runner for the planned path
-                current_waypoint_runner = WaypointRunner(
-                    path,
-                    linear_speed=config.linear_speed,
-                    angular_speed=config.angular_speed,
-                    arrival_threshold=config.waypoint_arrival_threshold,
-                )
+            self._last_rescan_pos = current_pos.copy()
+            self._last_voxel_count = self._octomap.num_occupied
 
-                last_rescan_pos = current_pos.copy()
-                last_voxel_count = self._octomap.num_occupied
+            # Update coverage
+            cov, bbox_cov = self._coverage_tracker.update(
+                self._octomap.get_occupied_voxels(), frontier_count,
+            )
+            self._last_coverage = cov
+            self._last_bbox_coverage = bbox_cov
+            self._last_frontier_count = frontier_count
 
-                # Update coverage
-                cov, bbox_cov = self._coverage_tracker.update(
-                    occupied, len(frontiers),
-                )
-                last_coverage = cov
-                last_bbox_coverage = bbox_cov
-                last_frontier_count = len(frontiers)
+        # ----------------------------------------------------------
+        # e. Execute navigation
+        # ----------------------------------------------------------
+        if (self._current_waypoint_runner is not None
+                and not self._current_waypoint_runner.is_complete):
+            linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
 
-            # ----------------------------------------------------------
-            # e. Execute navigation
-            # ----------------------------------------------------------
-            if current_waypoint_runner is not None and not current_waypoint_runner.is_complete:
-                linear, angular = current_waypoint_runner.get_velocity(pose)
-                self._bridge.set_velocity(linear, angular)
+        # ----------------------------------------------------------
+        # f. Periodic logging
+        # ----------------------------------------------------------
+        if step % config.log_interval_steps == 0:
+            self._coverage_tracker.log(
+                step, self._last_coverage, self._last_bbox_coverage,
+                self._last_frontier_count,
+            )
 
-            # ----------------------------------------------------------
-            # f. Step simulation
-            # ----------------------------------------------------------
+        # ----------------------------------------------------------
+        # g. Update last_position for stuck detection
+        # ----------------------------------------------------------
+        self._last_position = current_pos.copy()
+
+        metrics = {
+            "frontiers": frontier_count,
+            "coverage": self._last_coverage,
+            "terminated": terminated,
+            "voxels": self._octomap.num_occupied,
+            "rescan_triggered": should_rescan,
+        }
+
+        return linear_vel, angular_vel, metrics
+
+    def run(self) -> ExplorationResult:
+        """Run the full autonomous exploration loop.
+
+        Returns:
+            ExplorationResult with final coverage metrics, step count,
+            termination reason, and coverage history.
+        """
+        config = self._config
+        frame = self._bridge.start()
+
+        terminated_reason = "max_steps"
+
+        for step in range(config.max_steps):
+            linear_vel, angular_vel, metrics = self.step_once(frame, step)
+
+            self._bridge.set_velocity(linear_vel, angular_vel)
+
+            if metrics["terminated"]:
+                # Determine specific termination reason from frontier state
+                if metrics["frontiers"] == 0:
+                    terminated_reason = "no_frontiers"
+                else:
+                    terminated_reason = "all_unreachable"
+                break
+
+            # Step simulation
             frame = self._bridge.step()
-
-            # ----------------------------------------------------------
-            # g. Periodic logging
-            # ----------------------------------------------------------
-            if step % config.log_interval_steps == 0:
-                self._coverage_tracker.log(
-                    step, last_coverage, last_bbox_coverage, last_frontier_count,
-                )
-
-            # ----------------------------------------------------------
-            # h. Update last_position for stuck detection
-            # ----------------------------------------------------------
-            last_position = current_pos.copy()
 
         else:
             # Loop completed without break -- max_steps reached
             terminated_reason = "max_steps"
             logger.info("Max steps (%d) reached. Exploration terminated.", config.max_steps)
+            step = config.max_steps - 1
 
         return self._coverage_tracker.result(step + 1, terminated_reason)
