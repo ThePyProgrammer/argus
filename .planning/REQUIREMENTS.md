@@ -25,7 +25,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **EXPL-01**: System detects frontier boundaries (unexplored regions adjacent to explored space)
 - [x] **EXPL-02**: Each robot autonomously selects frontier goals and navigates to them without human input
-- [ ] **EXPL-03**: System tracks and reports exploration completeness (% of navigable area covered)
+- [x] **EXPL-03**: System tracks and reports exploration completeness (% of navigable area covered)
 
 ### Multi-Robot Coordination
 
@@ -98,7 +98,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SLAM-04 | Phase 1 | Complete |
 | EXPL-01 | Phase 2 | Complete (02-01) |
 | EXPL-02 | Phase 2 | Complete (02-01) |
-| EXPL-03 | Phase 2 | Pending |
+| EXPL-03 | Phase 2 | Complete |
 | COORD-01 | Phase 3 | Pending |
 | COORD-02 | Phase 3 | Pending |
 | COORD-03 | Phase 3 | Pending |

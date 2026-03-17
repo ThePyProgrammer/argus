@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
-| 2. Autonomous Exploration | 1/3 | In Progress | - |
+| 2. Autonomous Exploration | 2/3 | In Progress|  |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |

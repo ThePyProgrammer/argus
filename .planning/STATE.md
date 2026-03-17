@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
-last_updated: "2026-03-17T07:03:07Z"
-last_activity: 2026-03-17 - Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
+stopped_at: Completed 02-02-PLAN (Exploration loop -- autonomous detect-select-plan-navigate cycle with coverage tracking)
+last_updated: "2026-03-17T07:12:16Z"
+last_activity: 2026-03-17 - Completed 02-02-PLAN (Exploration loop -- autonomous detect-select-plan-navigate cycle with coverage tracking)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 5
-  percent: 38
+  completed_plans: 6
+  percent: 46
 ---
 
 # Project State
@@ -26,28 +26,28 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 2 of 4 (Autonomous Exploration)
-Plan: 2 of 3 in current phase
+Plan: 3 of 3 in current phase
 Status: Executing
-Last activity: 2026-03-17 - Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
+Last activity: 2026-03-17 - Completed 02-02-PLAN (Exploration loop -- autonomous detect-select-plan-navigate cycle with coverage tracking)
 
-Progress: [#######░░░] 38%
+Progress: [########░░] 46%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: 7 min
-- Total execution time: 0.5 hours
+- Total execution time: 0.6 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 4 | 26 min | 7 min |
-| 2 | 1 | 7 min | 7 min |
+| 2 | 2 | 12 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 6, 6, 8, 7 min
+- Last 5 plans: 6, 6, 8, 7, 5 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -82,6 +82,9 @@ Recent decisions affecting current work:
 - [02-01]: Dilation-based free-space model (not ray-casting) for OccupancyGrid2D
 - [02-01]: UNKNOWN cells traversable in A* with 5x cost penalty
 - [02-01]: Path simplification at ~1m intervals for discrete action compatibility
+- [02-02]: Dual coverage metrics: frontier exhaustion ratio (primary) + bounding box fill (secondary)
+- [02-02]: Stuck detection via position-delta check over N steps, forces frontier re-scan
+- [02-02]: Frontier re-evaluation gated by distance moved (2m) or voxel count delta (500)
 
 ### Pending Todos
 
@@ -103,6 +106,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T07:03:07Z
-Stopped at: Completed 02-01-PLAN (Exploration algorithms -- frontier detection, goal selection, A* path planning)
+Last session: 2026-03-17T07:12:16Z
+Stopped at: Completed 02-02-PLAN (Exploration loop -- autonomous detect-select-plan-navigate cycle with coverage tracking)
 Resume file: .planning/phases/02-autonomous-exploration/02-CONTEXT.md
