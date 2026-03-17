@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 Phase: 1 of 4 (Simulation Bridge and Single-Robot SLAM)
 Plan: 0 of ? in current phase
 Status: Ready to plan
-Last activity: 2026-03-17 -- Roadmap created
+Last activity: 2026-03-17 - Completed quick task 260317-hat: Update README.md with proper project plan
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -55,6 +55,12 @@ None yet.
 - SimWorld gym API format is LOW confidence -- must be discovered empirically in Phase 1
 - Available sensors on simulated Go2 unknown -- determines SLAM algorithm viability
 - SimWorld multi-agent stepping semantics undocumented
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260317-hat | Update README.md with proper project plan | 2026-03-17 | 776fb8c | [260317-hat-update-readme-md-with-proper-project-pla](./quick/260317-hat-update-readme-md-with-proper-project-pla/) |
 
 ## Session Continuity
 
