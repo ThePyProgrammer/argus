@@ -61,12 +61,12 @@ Plans:
   3. When one robot finishes its zone, regions are re-partitioned so the other robot receives help in unexplored areas
   4. A unified 3D occupancy grid and point cloud are produced by merging both robots' local maps in real-time as they explore
   5. The merged map grows continuously during exploration, not as a batch operation after exploration ends
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Multi-robot MuJoCo bridge, scene builder, config, and Voronoi partitioner
+- [ ] 03-02-PLAN.md — MapMerger (voxel fusion + point cloud merge), RobotInstance, Coordinator lifecycle
+- [ ] 03-03-PLAN.md — main.py --control multi wiring and end-to-end integration test
 
 ### Phase 4: Visualization and Integration
 **Goal**: A real-time dashboard displays the merged 3D reconstruction with robot tracking and exploration progress
@@ -90,5 +90,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
-| 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
+| 3. Multi-Robot Coordination and Map Merging | 0/3 | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
