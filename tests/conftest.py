@@ -53,3 +53,48 @@ def sample_poses() -> list[np.ndarray]:
         pose[:3, 3] = rng.random(3) * 10.0  # random position 0-10m
         poses.append(pose)
     return poses
+
+
+# ---------- Phase 2: Exploration fixtures ----------
+
+
+@pytest.fixture
+def mock_occupied_cube() -> np.ndarray:
+    """Return (1000, 3) float64 voxel centers for a 10x10x10 cube at 0.1m resolution.
+
+    Voxels from (0,0,0) to (0.9, 0.9, 0.9).
+    """
+    coords = []
+    for x in range(10):
+        for y in range(10):
+            for z in range(10):
+                coords.append([x * 0.1, y * 0.1, z * 0.1])
+    return np.array(coords, dtype=np.float64)
+
+
+@pytest.fixture
+def mock_two_blobs() -> np.ndarray:
+    """Return (250, 3) float64 for two separated 5x5x5 cubes.
+
+    Blob 1: voxels from (0,0,0) to (0.4,0.4,0.4).
+    Blob 2: voxels from (5,0,0) to (5.4,0.4,0.4).
+    """
+    coords = []
+    for x in range(5):
+        for y in range(5):
+            for z in range(5):
+                coords.append([x * 0.1, y * 0.1, z * 0.1])
+                coords.append([5.0 + x * 0.1, y * 0.1, z * 0.1])
+    return np.array(coords, dtype=np.float64)
+
+
+@pytest.fixture
+def mock_robot_positions() -> np.ndarray:
+    """Return (5, 3) float64 positions along a line from (0,0,0) to (0.4,0,0)."""
+    return np.array([
+        [0.0, 0.0, 0.0],
+        [0.1, 0.0, 0.0],
+        [0.2, 0.0, 0.0],
+        [0.3, 0.0, 0.0],
+        [0.4, 0.0, 0.0],
+    ], dtype=np.float64)
