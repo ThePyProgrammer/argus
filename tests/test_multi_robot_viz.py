@@ -18,6 +18,11 @@ import pytest
 mock_rr = MagicMock()
 mock_rrb = MagicMock()
 
+# Wire mock_rrb as the .blueprint attribute of mock_rr so that
+# `import rerun.blueprint as rrb` inside the module under test
+# resolves to the same mock_rrb we inspect in tests.
+mock_rr.blueprint = mock_rrb
+
 # Ensure rr.MediaType.MARKDOWN resolves to a stable sentinel
 mock_rr.MediaType.MARKDOWN = "text/markdown"
 
@@ -78,7 +83,8 @@ def _reset_mocks():
     """Reset all mock call records before each test."""
     mock_rr.reset_mock()
     mock_rrb.reset_mock()
-    # Re-set sentinel that reset_mock clears
+    # Re-wire after reset_mock clears attributes
+    mock_rr.blueprint = mock_rrb
     mock_rr.MediaType.MARKDOWN = "text/markdown"
 
 
