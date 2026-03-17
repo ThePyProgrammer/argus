@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-17T07:31:47.796Z"
-last_activity: 2026-03-17 - Completed 02-03-PLAN (MuJoCo explore mode wiring and integration tests)
+status: in-progress
+stopped_at: Completed 03-01-PLAN (multi-robot foundation)
+last_updated: "2026-03-17T08:10:36Z"
+last_activity: 2026-03-17 - Completed 03-01-PLAN (multi-robot MuJoCo foundation and Voronoi partitioner)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 54
+  total_plans: 8
+  completed_plans: 8
+  percent: 62
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** Two simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 2 - Autonomous Exploration
+**Current focus:** Phase 3 - Multi-Robot Coordination and Map Merging
 
 ## Current Position
 
-Phase: 2 of 4 (Autonomous Exploration) -- PHASE COMPLETE
-Plan: 3 of 3 in current phase (all complete)
-Status: Phase 2 Complete
-Last activity: 2026-03-17 - Completed 02-03-PLAN (MuJoCo explore mode wiring and integration tests)
+Phase: 3 of 4 (Multi-Robot Coordination and Map Merging)
+Plan: 1 of 3 in current phase (1 complete)
+Status: In Progress
+Last activity: 2026-03-17 - Completed 03-01-PLAN (multi-robot MuJoCo foundation and Voronoi partitioner)
 
-Progress: [##########░░░░░░] 54%
+Progress: [############░░░░] 62%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 7 min
-- Total execution time: 0.7 hours
+- Total execution time: 0.8 hours
 
 **By Phase:**
 
@@ -45,9 +45,10 @@ Progress: [##########░░░░░░] 54%
 |-------|-------|-------|----------|
 | 1 | 4 | 26 min | 7 min |
 | 2 | 3 | 19 min | 6 min |
+| 3 | 1 | 6 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 6, 8, 7, 5, 7 min
+- Last 5 plans: 8, 7, 5, 7, 6 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -87,6 +88,10 @@ Recent decisions affecting current work:
 - [02-02]: Frontier re-evaluation gated by distance moved (2m) or voxel count delta (500)
 - [02-03]: Lazy import of ExplorationLoop/ExplorationConfig in run_explore_mode to avoid import errors
 - [02-03]: MockMuJoCoBridge with uniform 2m depth for MuJoCo-free integration testing
+- [03-01]: mj_name2id for dynamic qpos/ctrl index discovery -- no hardcoded joint indices
+- [03-01]: Perpendicular bisector instead of scipy.spatial.Voronoi (degenerate for 2 robots)
+- [03-01]: Soft Voronoi constraint: in_region_weight=2.0 bias, not hard boundary
+- [03-01]: Shared default classes in XML (not prefixed) to reuse joint limits and motor ranges
 
 ### Pending Todos
 
@@ -108,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T07:31:47.790Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-multi-robot-coordination-and-map-merging/03-CONTEXT.md
+Last session: 2026-03-17T08:10:36Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: .planning/phases/03-multi-robot-coordination-and-map-merging/03-01-SUMMARY.md

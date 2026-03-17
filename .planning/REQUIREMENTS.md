@@ -29,8 +29,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Multi-Robot Coordination
 
-- [ ] **COORD-01**: Two Go2 robots operate as separate DimOS blueprint instances with namespaced streams
-- [ ] **COORD-02**: System partitions the environment into regions using Voronoi splitting, assigning each robot a coverage zone
+- [x] **COORD-01**: Two Go2 robots operate as separate DimOS blueprint instances with namespaced streams
+- [x] **COORD-02**: System partitions the environment into regions using Voronoi splitting, assigning each robot a coverage zone
 - [ ] **COORD-03**: System dynamically re-partitions regions when one robot's assigned area is fully explored
 
 ### Map Merging
@@ -99,8 +99,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPL-01 | Phase 2 | Complete (02-01) |
 | EXPL-02 | Phase 2 | Complete (02-01) |
 | EXPL-03 | Phase 2 | Complete |
-| COORD-01 | Phase 3 | Pending |
-| COORD-02 | Phase 3 | Pending |
+| COORD-01 | Phase 3 | Complete (03-01) |
+| COORD-02 | Phase 3 | Complete (03-01) |
 | COORD-03 | Phase 3 | Pending |
 | MERGE-01 | Phase 3 | Pending |
 | MERGE-02 | Phase 3 | Pending |
