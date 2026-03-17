@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Simulation Bridge and Single-Robot SLAM** - Connect to SimWorld, extract sensor data, and produce a local 3D map from one Go2 robot
 - [x] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
-- [ ] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time
+- [x] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time (completed 2026-03-17)
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress
 
 ## Phase Details
@@ -91,5 +91,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
-| 3. Multi-Robot Coordination and Map Merging | 2/3 | In progress | - |
+| 3. Multi-Robot Coordination and Map Merging | 2/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 0/2 | Not started | - |
