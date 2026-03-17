@@ -42,9 +42,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Visualization
 
-- [ ] **VIZ-01**: System displays the merged 3D map in real-time via Rerun or RViz2
-- [ ] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
-- [ ] **VIZ-03**: System displays a coverage heatmap showing explored vs unexplored regions
+- [x] **VIZ-01**: System displays the merged 3D map in real-time via Rerun or RViz2
+- [x] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
+- [x] **VIZ-03**: System displays a coverage heatmap showing explored vs unexplored regions
 
 ## v2 Requirements
 
@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MERGE-02 | Phase 3 | Complete (03-02) |
 | MERGE-03 | Phase 3 | Complete (03-02) |
 | MERGE-04 | Phase 3 | Complete |
-| VIZ-01 | Phase 4 | Pending |
-| VIZ-02 | Phase 4 | Pending |
-| VIZ-03 | Phase 4 | Pending |
+| VIZ-01 | Phase 4 | Complete |
+| VIZ-02 | Phase 4 | Complete |
+| VIZ-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

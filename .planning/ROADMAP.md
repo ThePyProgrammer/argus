@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Simulation Bridge and Single-Robot SLAM** - Connect to SimWorld, extract sensor data, and produce a local 3D map from one Go2 robot
 - [x] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
 - [x] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time (completed 2026-03-17)
-- [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress
+- [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress (1/2 plans complete)
 
 ## Phase Details
 
@@ -66,7 +66,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Multi-robot MuJoCo bridge, scene builder, config, and Voronoi partitioner
 - [x] 03-02-PLAN.md — MapMerger (voxel fusion + point cloud merge), RobotInstance, Coordinator lifecycle
-- [ ] 03-03-PLAN.md — main.py --control multi wiring and end-to-end integration test
+- [x] 03-03-PLAN.md — main.py --control multi wiring and end-to-end integration test
 
 ### Phase 4: Visualization and Integration
 **Goal**: A real-time dashboard displays the merged 3D reconstruction with robot tracking and exploration progress
@@ -79,7 +79,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — MultiRobotVisualizer class: split-panel Rerun dashboard, merged 3D map, robot overlays, coverage heatmap, stats HUD
+- [x] 04-01-PLAN.md — MultiRobotVisualizer class: split-panel Rerun dashboard, merged 3D map, robot overlays, coverage heatmap, stats HUD
 - [ ] 04-02-PLAN.md — Wire visualization into Coordinator and main.py --control multi mode, integration tests, human verification
 
 ## Progress
@@ -91,5 +91,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
-| 3. Multi-Robot Coordination and Map Merging | 2/3 | Complete    | 2026-03-17 |
-| 4. Visualization and Integration | 0/2 | Not started | - |
+| 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
+| 4. Visualization and Integration | 1/2 | In progress | - |

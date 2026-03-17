@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 03-03-PLAN.md (checkpoint approved)
-last_updated: "2026-03-17T09:00:08.051Z"
-last_activity: 2026-03-17 - Completed 03-03-PLAN (--control multi mode, integration test)
+status: in-progress
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-17T09:07:42Z"
+last_activity: 2026-03-17 - Completed 04-01-PLAN (MultiRobotVisualizer with Rerun dashboard)
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
-  percent: 77
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** Two simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 3 - Multi-Robot Coordination and Map Merging
+**Current focus:** Phase 4 - Visualization and Integration
 
 ## Current Position
 
-Phase: 3 of 4 (Multi-Robot Coordination and Map Merging)
-Plan: 3 of 3 in current phase (3 complete)
-Status: Phase Complete
-Last activity: 2026-03-17 - Completed 03-03-PLAN (--control multi mode, integration test)
+Phase: 4 of 4 (Visualization and Integration)
+Plan: 1 of 2 in current phase (1 complete)
+Status: In Progress
+Last activity: 2026-03-17 - Completed 04-01-PLAN (MultiRobotVisualizer with Rerun dashboard)
 
-Progress: [################] 77%
+Progress: [################### ] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 7 min
-- Total execution time: 1.1 hours
+- Total execution time: 1.2 hours
 
 **By Phase:**
 
@@ -46,9 +46,10 @@ Progress: [################] 77%
 | 1 | 4 | 26 min | 7 min |
 | 2 | 3 | 19 min | 6 min |
 | 3 | 3 | 20 min | 7 min |
+| 4 | 1 | 6 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 5, 7, 6, 9, 5 min
+- Last 5 plans: 7, 6, 9, 5, 6 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -97,6 +98,9 @@ Recent decisions affecting current work:
 - [03-02]: Graceful dimos import fallback for testing without full dimos runtime
 - [03-02]: ExplorationLoop.run() refactored to delegate to step_once() for backward compatibility
 - [03-03]: Mock pLCMTransport via unittest.mock.patch at module level for integration tests (no dimos required)
+- [04-01]: Module-level sys.modules mock with mock_rr.blueprint = mock_rrb for correct rerun import resolution in tests
+- [04-01]: Points3D with radii for heatmap (not Boxes3D) -- simpler, consistent with existing patterns
+- [04-01]: Set-based grid lookup for heatmap cell classification -- O(1) per cell
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T08:50:01.120Z
-Stopped at: Completed 03-03-PLAN.md (checkpoint approved)
+Last session: 2026-03-17T09:07:42Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
