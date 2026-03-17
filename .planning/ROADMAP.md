@@ -28,11 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A manually driven Go2 produces a growing 3D point cloud and occupancy grid as it moves through the environment
   3. Movement commands sent to the Go2 result in observable position changes in the simulation
   4. SLAM pose drift metrics are computed against ground-truth poses and printed per step
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Test infrastructure, shared data types, and SimWorld API discovery
+- [ ] 01-02-PLAN.md — SimWorld gym bridge and three control modes (teleop, waypoints, random walk)
+- [ ] 01-03-PLAN.md — SLAM pipeline (ICP odometry), OctoMap builder, and drift metrics
+- [ ] 01-04-PLAN.md — Rerun visualization, main.py wiring, and end-to-end verification
 
 ### Phase 2: Autonomous Exploration
 **Goal**: A single robot autonomously explores the environment using frontier-based navigation, building its map without any human commands
@@ -84,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Simulation Bridge and Single-Robot SLAM | 0/? | Not started | - |
+| 1. Simulation Bridge and Single-Robot SLAM | 0/4 | Planning complete | - |
 | 2. Autonomous Exploration | 0/? | Not started | - |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
