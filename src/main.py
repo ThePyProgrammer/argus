@@ -14,6 +14,7 @@ Control modes:
   --control waypoint  : Scripted waypoint following
   --control random    : Random exploration
   --control explore   : Autonomous frontier-based exploration
+  --control multi     : Two-robot coordinated exploration with map merging
 """
 
 import argparse
@@ -40,7 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
     parser.add_argument(
         "--control",
-        choices=["teleop", "waypoint", "random", "explore"],
+        choices=["teleop", "waypoint", "random", "explore", "multi"],
         default="teleop",
         help="Control mode (default: teleop)",
     )
@@ -78,6 +79,18 @@ def parse_args():
         type=float,
         default=2.0,
         help="Frontier rescan distance in meters (default: 2.0)",
+    )
+    parser.add_argument(
+        "--multi-max-steps",
+        type=int,
+        default=10000,
+        help="Max steps for multi-robot mode (default: 10000)",
+    )
+    parser.add_argument(
+        "--multi-boot-steps",
+        type=int,
+        default=200,
+        help="Boot phase steps for multi-robot mode (default: 200)",
     )
     return parser.parse_args()
 
@@ -180,9 +193,77 @@ def run_explore_mode(args):
     print("Done.")
 
 
+def run_multi_mode(args):
+    """Run two-robot coordinated exploration with map merging."""
+    import math
+
+    from src.coordination.multi_robot_config import MultiRobotConfig
+    from src.bridge.multi_bridge import MultiRobotBridge
+    from src.coordination.robot_instance import RobotInstance
+    from src.coordination.coordinator import Coordinator
+    from src.bridge.sensor_types import CameraIntrinsics
+    from src.exploration.config import ExplorationConfig
+
+    config = MultiRobotConfig(boot_phase_steps=args.multi_boot_steps)
+    bridge = MultiRobotBridge(config)
+
+    # Camera intrinsics (same as single-robot mode)
+    w, h = config.resolution
+    fov_rad = math.radians(45.0)
+    fx = (w / 2.0) / math.tan(fov_rad / 2.0)
+    intrinsics = CameraIntrinsics(fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h)
+
+    explore_config = ExplorationConfig(
+        max_steps=args.multi_max_steps,
+        rescan_distance_m=args.explore_rescan_distance,
+        voxel_resolution=args.octomap_resolution,
+    )
+
+    robots = {}
+    for rid in config.robot_ids:
+        robots[rid] = RobotInstance.create(
+            robot_id=rid,
+            bridge=bridge,
+            intrinsics=intrinsics,
+            config=explore_config,
+            spawn_position=config.spawn_positions[rid],
+        )
+
+    coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
+
+    print(f"Starting multi-robot exploration...")
+    print(f"Robots: {config.robot_ids}")
+    print(f"Spawn positions: {config.spawn_positions}")
+    print(f"Boot phase: {config.boot_phase_steps} steps")
+    print(f"Max steps: {args.multi_max_steps}")
+    print("Press Ctrl+C to stop\n")
+
+    try:
+        result = coordinator.run(max_steps=args.multi_max_steps)
+    except KeyboardInterrupt:
+        print("\nMulti-robot exploration interrupted.")
+        result = None
+
+    if result is not None:
+        print(f"\n=== Multi-Robot Exploration Complete ===")
+        print(f"Terminated: {result['terminated_reason']}")
+        print(f"Total steps: {result['total_steps']}")
+        print(f"Merge count: {result['merge_count']}")
+        print(f"Merged voxels: {result['merged_voxel_count']}")
+        for rid, count in result['per_robot_voxels'].items():
+            print(f"  {rid}: {count} voxels")
+
+    bridge.stop()
+    print("Done.")
+
+
 def main():
     """Run the single-robot SLAM loop."""
     args = parse_args()
+
+    if args.control == "multi":
+        run_multi_mode(args)
+        return
 
     if args.control == "explore":
         run_explore_mode(args)
