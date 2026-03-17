@@ -31,13 +31,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **COORD-01**: Two Go2 robots operate as separate DimOS blueprint instances with namespaced streams
 - [x] **COORD-02**: System partitions the environment into regions using Voronoi splitting, assigning each robot a coverage zone
-- [ ] **COORD-03**: System dynamically re-partitions regions when one robot's assigned area is fully explored
+- [x] **COORD-03**: System dynamically re-partitions regions when one robot's assigned area is fully explored
 
 ### Map Merging
 
-- [ ] **MERGE-01**: System aligns robot-local maps to a shared global frame using known spawn transforms
-- [ ] **MERGE-02**: System fuses two 3D occupancy grids into a single unified navigation map via voxel merging
-- [ ] **MERGE-03**: System merges point clouds from both robots into a unified 3D reconstruction
+- [x] **MERGE-01**: System aligns robot-local maps to a shared global frame using known spawn transforms
+- [x] **MERGE-02**: System fuses two 3D occupancy grids into a single unified navigation map via voxel merging
+- [x] **MERGE-03**: System merges point clouds from both robots into a unified 3D reconstruction
 - [ ] **MERGE-04**: Map merging operates incrementally in real-time as robots explore (not batch post-processing)
 
 ### Visualization
@@ -101,10 +101,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPL-03 | Phase 2 | Complete |
 | COORD-01 | Phase 3 | Complete (03-01) |
 | COORD-02 | Phase 3 | Complete (03-01) |
-| COORD-03 | Phase 3 | Pending |
-| MERGE-01 | Phase 3 | Pending |
-| MERGE-02 | Phase 3 | Pending |
-| MERGE-03 | Phase 3 | Pending |
+| COORD-03 | Phase 3 | Complete (03-02) |
+| MERGE-01 | Phase 3 | Complete (03-02) |
+| MERGE-02 | Phase 3 | Complete (03-02) |
+| MERGE-03 | Phase 3 | Complete (03-02) |
 | MERGE-04 | Phase 3 | Pending |
 | VIZ-01 | Phase 4 | Pending |
 | VIZ-02 | Phase 4 | Pending |

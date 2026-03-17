@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 03-01-PLAN (multi-robot foundation)
-last_updated: "2026-03-17T08:10:36Z"
-last_activity: 2026-03-17 - Completed 03-01-PLAN (multi-robot MuJoCo foundation and Voronoi partitioner)
+stopped_at: Completed 03-02-PLAN (MapMerger, RobotInstance, Coordinator)
+last_updated: "2026-03-17T08:23:54Z"
+last_activity: 2026-03-17 - Completed 03-02-PLAN (MapMerger, RobotInstance, Coordinator with pLCM)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 8
-  completed_plans: 8
-  percent: 62
+  completed_plans: 9
+  percent: 69
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 3 of 4 (Multi-Robot Coordination and Map Merging)
-Plan: 1 of 3 in current phase (1 complete)
+Plan: 2 of 3 in current phase (2 complete)
 Status: In Progress
-Last activity: 2026-03-17 - Completed 03-01-PLAN (multi-robot MuJoCo foundation and Voronoi partitioner)
+Last activity: 2026-03-17 - Completed 03-02-PLAN (MapMerger, RobotInstance, Coordinator with pLCM)
 
-Progress: [############░░░░] 62%
+Progress: [##############░░] 69%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 7 min
-- Total execution time: 0.8 hours
+- Total execution time: 1.0 hours
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [############░░░░] 62%
 |-------|-------|-------|----------|
 | 1 | 4 | 26 min | 7 min |
 | 2 | 3 | 19 min | 6 min |
-| 3 | 1 | 6 min | 6 min |
+| 3 | 2 | 15 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 8, 7, 5, 7, 6 min
+- Last 5 plans: 7, 5, 7, 6, 9 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -92,6 +92,10 @@ Recent decisions affecting current work:
 - [03-01]: Perpendicular bisector instead of scipy.spatial.Voronoi (degenerate for 2 robots)
 - [03-01]: Soft Voronoi constraint: in_region_weight=2.0 bias, not hard boundary
 - [03-01]: Shared default classes in XML (not prefixed) to reuse joint limits and motor ranges
+- [03-02]: pLCM transport for robot-to-robot data sharing (per locked user decision)
+- [03-02]: Merge triggers on rescan events (same as frontier rescan), NOT fixed step intervals
+- [03-02]: Graceful dimos import fallback for testing without full dimos runtime
+- [03-02]: ExplorationLoop.run() refactored to delegate to step_once() for backward compatibility
 
 ### Pending Todos
 
@@ -113,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T08:10:36Z
-Stopped at: Completed 03-01-PLAN.md
-Resume file: .planning/phases/03-multi-robot-coordination-and-map-merging/03-01-SUMMARY.md
+Last session: 2026-03-17T08:23:54Z
+Stopped at: Completed 03-02-PLAN.md
+Resume file: .planning/phases/03-multi-robot-coordination-and-map-merging/03-02-SUMMARY.md

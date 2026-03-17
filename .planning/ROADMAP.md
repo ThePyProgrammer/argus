@@ -65,7 +65,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Multi-robot MuJoCo bridge, scene builder, config, and Voronoi partitioner
-- [ ] 03-02-PLAN.md — MapMerger (voxel fusion + point cloud merge), RobotInstance, Coordinator lifecycle
+- [x] 03-02-PLAN.md — MapMerger (voxel fusion + point cloud merge), RobotInstance, Coordinator lifecycle
 - [ ] 03-03-PLAN.md — main.py --control multi wiring and end-to-end integration test
 
 ### Phase 4: Visualization and Integration
@@ -90,5 +90,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
-| 3. Multi-Robot Coordination and Map Merging | 1/3 | In progress | - |
+| 3. Multi-Robot Coordination and Map Merging | 2/3 | In progress | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
