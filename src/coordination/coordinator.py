@@ -107,10 +107,16 @@ class Coordinator:
         for rid in robot_ids:
             robot = self._robots[rid]
             occupied = robot.octomap.get_occupied_voxels()
+            if len(occupied) == 0:
+                continue
             sensor_pos = robot.slam.slam_poses[-1][:3, 3] if robot.slam.slam_poses else np.zeros(3)
+            resolution = robot.exploration._frontier_detector._resolution
+            grid_min = occupied.min(axis=0) - resolution * 5
             frontiers = robot.exploration._frontier_detector.detect(occupied, np.array([sensor_pos]))
             for f in frontiers:
-                all_cells.append(f.cells)
+                # Convert grid indices back to world coordinates
+                world_coords = grid_min + f.voxels * resolution
+                all_cells.append(world_coords)
         if all_cells:
             return np.concatenate(all_cells, axis=0)
         return None
