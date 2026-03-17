@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Test infrastructure, shared data types, and SimWorld API discovery
+- [x] 01-01-PLAN.md — Test infrastructure, shared data types, and SimWorld API discovery
 - [ ] 01-02-PLAN.md — SimWorld gym bridge and three control modes (teleop, waypoints, random walk)
 - [ ] 01-03-PLAN.md — SLAM pipeline (ICP odometry), OctoMap builder, and drift metrics
 - [ ] 01-04-PLAN.md — Rerun visualization, main.py wiring, and end-to-end verification
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Simulation Bridge and Single-Robot SLAM | 0/4 | Planning complete | - |
+| 1. Simulation Bridge and Single-Robot SLAM | 1/4 | Executing | - |
 | 2. Autonomous Exploration | 0/? | Not started | - |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |

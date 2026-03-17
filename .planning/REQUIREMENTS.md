@@ -88,10 +88,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIM-01 | Phase 1 | Pending |
-| SIM-02 | Phase 1 | Pending |
+| SIM-01 | Phase 1 | In Progress (test stub + API discovered) |
+| SIM-02 | Phase 1 | In Progress (test stub + API discovered) |
 | SIM-03 | Phase 1 | Pending |
-| SIM-04 | Phase 1 | Pending |
+| SIM-04 | Phase 1 | In Progress (test stub + API discovered) |
 | SLAM-01 | Phase 1 | Pending |
 | SLAM-02 | Phase 1 | Pending |
 | SLAM-03 | Phase 1 | Pending |
