@@ -29,6 +29,7 @@ from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.coordination.multi_robot_config import MultiRobotConfig
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.coordination.map_merger import MapMerger
+from src.viz.multi_robot_viz import MultiRobotVisualizer
 try:
     from dimos.core.transport import pLCMTransport
 except (ImportError, OSError):
@@ -55,6 +56,7 @@ class Coordinator:
         config: MultiRobotConfig with spawn positions and boot phase length.
         partitioner: VoronoiPartitioner for frontier assignment (optional).
         merger: MapMerger for voxel fusion (optional).
+        viz: MultiRobotVisualizer for dashboard display (optional).
     """
 
     def __init__(
@@ -64,6 +66,7 @@ class Coordinator:
         config: MultiRobotConfig,
         partitioner: VoronoiPartitioner | None = None,
         merger: MapMerger | None = None,
+        viz: MultiRobotVisualizer | None = None,
     ):
         self._bridge = bridge
         self._robots = robots
@@ -75,6 +78,7 @@ class Coordinator:
                 rid: robots[rid].spawn_transform for rid in robots
             },
         )
+        self._viz = viz
         self._partitioned = False
         self._step_count = 0
         self._merge_count = 0
@@ -82,6 +86,32 @@ class Coordinator:
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}
         self._subscribers: list[pLCMTransport] = []
+
+    def _get_voronoi_geometry(self) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Extract Voronoi midpoint and direction for visualization."""
+        positions = self._partitioner._robot_positions
+        if len(positions) < 2:
+            return None, None
+        keys = list(positions.keys())
+        pos_a = positions[keys[0]]
+        pos_b = positions[keys[1]]
+        midpoint = (pos_a + pos_b) / 2.0
+        direction = pos_b - pos_a
+        return midpoint, direction
+
+    def _gather_frontier_cells(self, robot_ids: tuple[str, ...]) -> np.ndarray | None:
+        """Gather frontier cells from all robots for heatmap visualization."""
+        all_cells = []
+        for rid in robot_ids:
+            robot = self._robots[rid]
+            occupied = robot.octomap.get_occupied_voxels()
+            sensor_pos = robot.slam.slam_poses[-1][:3, 3] if robot.slam.slam_poses else np.zeros(3)
+            frontiers = robot.exploration._frontier_detector.detect(occupied, np.array([sensor_pos]))
+            for f in frontiers:
+                all_cells.append(f.cells)
+        if all_cells:
+            return np.concatenate(all_cells, axis=0)
+        return None
 
     def _setup_subscriptions(self) -> None:
         """Subscribe to each robot's pLCM occupancy channel.
@@ -176,6 +206,31 @@ class Coordinator:
             # NOT step % 50 or any fixed interval
             if any_rescan_triggered:
                 self._do_merge(robot_ids)
+
+            # Visualization update (every 10 frames, per established pattern)
+            if step % 10 == 0 and self._viz is not None:
+                robot_data = {}
+                for rid in robot_ids:
+                    robot = self._robots[rid]
+                    robot_data[rid] = {
+                        "frame": frames[rid],
+                        "local_voxels": robot.octomap.get_occupied_voxels(),
+                        "pose": robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
+                        "trajectory": list(robot.slam.slam_poses),
+                        "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
+                    }
+                voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
+                frontier_cells = self._gather_frontier_cells(robot_ids)
+                total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
+                self._viz.update(
+                    merged_voxels=self._merger.last_merged_voxels,
+                    robot_data=robot_data,
+                    frontier_cells=frontier_cells,
+                    voronoi_midpoint=voronoi_mid,
+                    voronoi_direction=voronoi_dir,
+                    total_coverage=total_cov,
+                    merge_count=self._merge_count,
+                )
 
             if all_terminated:
                 terminated_reason = "all_explored"

@@ -203,6 +203,7 @@ def run_multi_mode(args):
     from src.coordination.coordinator import Coordinator
     from src.bridge.sensor_types import CameraIntrinsics
     from src.exploration.config import ExplorationConfig
+    from src.viz.multi_robot_viz import MultiRobotVisualizer
 
     config = MultiRobotConfig(boot_phase_steps=args.multi_boot_steps)
     bridge = MultiRobotBridge(config)
@@ -229,7 +230,8 @@ def run_multi_mode(args):
             spawn_position=config.spawn_positions[rid],
         )
 
-    coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
+    viz = MultiRobotVisualizer(app_name="multi_robot_viz")
+    coordinator = Coordinator(bridge=bridge, robots=robots, config=config, viz=viz)
 
     print(f"Starting multi-robot exploration...")
     print(f"Robots: {config.robot_ids}")
