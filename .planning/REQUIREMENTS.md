@@ -88,33 +88,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIM-01 | — | Pending |
-| SIM-02 | — | Pending |
-| SIM-03 | — | Pending |
-| SIM-04 | — | Pending |
-| SLAM-01 | — | Pending |
-| SLAM-02 | — | Pending |
-| SLAM-03 | — | Pending |
-| SLAM-04 | — | Pending |
-| EXPL-01 | — | Pending |
-| EXPL-02 | — | Pending |
-| EXPL-03 | — | Pending |
-| COORD-01 | — | Pending |
-| COORD-02 | — | Pending |
-| COORD-03 | — | Pending |
-| MERGE-01 | — | Pending |
-| MERGE-02 | — | Pending |
-| MERGE-03 | — | Pending |
-| MERGE-04 | — | Pending |
-| VIZ-01 | — | Pending |
-| VIZ-02 | — | Pending |
-| VIZ-03 | — | Pending |
+| SIM-01 | Phase 1 | Pending |
+| SIM-02 | Phase 1 | Pending |
+| SIM-03 | Phase 1 | Pending |
+| SIM-04 | Phase 1 | Pending |
+| SLAM-01 | Phase 1 | Pending |
+| SLAM-02 | Phase 1 | Pending |
+| SLAM-03 | Phase 1 | Pending |
+| SLAM-04 | Phase 1 | Pending |
+| EXPL-01 | Phase 2 | Pending |
+| EXPL-02 | Phase 2 | Pending |
+| EXPL-03 | Phase 2 | Pending |
+| COORD-01 | Phase 3 | Pending |
+| COORD-02 | Phase 3 | Pending |
+| COORD-03 | Phase 3 | Pending |
+| MERGE-01 | Phase 3 | Pending |
+| MERGE-02 | Phase 3 | Pending |
+| MERGE-03 | Phase 3 | Pending |
+| MERGE-04 | Phase 3 | Pending |
+| VIZ-01 | Phase 4 | Pending |
+| VIZ-02 | Phase 4 | Pending |
+| VIZ-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 after roadmap creation*
