@@ -174,3 +174,65 @@ def mock_mujoco_intrinsics() -> CameraIntrinsics:
     return CameraIntrinsics(
         fx=386.0, fy=386.0, cx=160.0, cy=120.0, width=320, height=240
     )
+
+
+# ---------- Phase 3: Multi-robot fixtures ----------
+
+
+class MockMultiRobotBridge:
+    """Mock MultiRobotBridge for testing without MuJoCo."""
+
+    def __init__(self, robot_ids=("robot_a", "robot_b")):
+        self._robot_ids = robot_ids
+        self._step_count = 0
+        self._positions = {
+            "robot_a": np.array([0.0, 0.0, 0.3]),
+            "robot_b": np.array([10.0, 0.0, 0.3]),
+        }
+        self._velocities = {rid: (np.zeros(2), 0.0) for rid in robot_ids}
+
+    def start(self) -> dict[str, SensorFrame]:
+        self._step_count = 0
+        return {rid: self._make_frame(rid) for rid in self._robot_ids}
+
+    def step(self) -> dict[str, SensorFrame]:
+        for rid in self._robot_ids:
+            lin, ang = self._velocities[rid]
+            self._positions[rid][0] += lin[0] * 0.02
+            self._positions[rid][1] += lin[1] * 0.02
+        self._step_count += 1
+        return {rid: self._make_frame(rid) for rid in self._robot_ids}
+
+    def set_velocity(self, robot_id: str, linear: np.ndarray, angular: float):
+        self._velocities[robot_id] = (np.asarray(linear), angular)
+
+    def stop(self):
+        pass
+
+    @property
+    def step_count(self):
+        return self._step_count
+
+    @property
+    def robot_ids(self):
+        return self._robot_ids
+
+    @property
+    def is_running(self):
+        return True
+
+    def _make_frame(self, robot_id: str) -> SensorFrame:
+        pose = np.eye(4)
+        pose[:3, 3] = self._positions[robot_id]
+        return SensorFrame(
+            rgb=np.zeros((240, 320, 3), dtype=np.uint8),
+            depth=np.full((240, 320), 2.0, dtype=np.float32),
+            ground_truth_pose=pose,
+            sim_time=self._step_count * 0.02,
+        )
+
+
+@pytest.fixture
+def mock_multi_bridge():
+    """Return a fresh MockMultiRobotBridge instance."""
+    return MockMultiRobotBridge()
