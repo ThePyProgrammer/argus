@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 1 of 4 (Simulation Bridge and Single-Robot SLAM)
-Plan: 1 of 4 in current phase
+Plan: 4 of 4 in current phase
 Status: Executing
-Last activity: 2026-03-17 - Completed 01-01-PLAN (test infrastructure + SimWorld discovery)
+Last activity: 2026-03-17 - Completed 01-03-PLAN (SLAM pipeline + mapping stack)
 
-Progress: [##░░░░░░░░] 6%
+Progress: [####░░░░░░] 19%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
+- Total plans completed: 3
 - Average duration: 6 min
-- Total execution time: 0.1 hours
+- Total execution time: 0.3 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 | 1 | 6 min | 6 min |
+| 1 | 3 | 18 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 6 min
-- Trend: baseline
+- Last 5 plans: 6, 6, 6 min
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -51,6 +51,14 @@ Recent decisions affecting current work:
 - [01-01]: Ground-truth rotation in info dict is cardinal string only -- raw rotation needs internal access
 - [01-01]: Camera FOV is 120 degrees; computed intrinsics: fx=fy~92.38 at 320x240
 - [01-01]: Go/no-go: conditional GO at estimated 3-6 Hz (needs runtime verification)
+- [01-02]: Continuous velocity mapped to Discrete(6) in bridge -- controllers stay continuous for reusability
+- [01-02]: Cardinal direction strings mapped to yaw radians for pose matrix construction
+- [01-02]: Position converted from Unreal cm to meters in bridge
+- [01-02]: sim_time computed as step_count * dt (no SimWorld timestamp exposed)
+- [01-02]: Angular velocity takes priority over linear in discrete action selection
+- [01-03]: Used Open3D VoxelGrid instead of octomap-python (build failure in nix)
+- [01-03]: Used ICP odometry instead of RTAB-Map standalone (Python bindings limited)
+- [01-03]: evo library for ATE/RPE drift metrics computation
 
 ### Pending Todos
 
@@ -73,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-17
-Stopped at: Completed 01-01-PLAN.md (test infrastructure + SimWorld discovery)
+Stopped at: Completed 01-03-PLAN.md (SLAM pipeline + mapping stack)
 Resume file: None

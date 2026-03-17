@@ -9,17 +9,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Simulation Bridge
 
-- [ ] **SIM-01**: System connects to SimWorld-Robotics gym environment and manages lifecycle (start/stop/reset)
-- [ ] **SIM-02**: System extracts depth and RGB sensor data per robot per gym step
-- [ ] **SIM-03**: System dispatches independent movement commands to each of two Go2 robots
-- [ ] **SIM-04**: System extracts ground-truth pose (position + orientation) per robot per step
+- [x] **SIM-01**: System connects to SimWorld-Robotics gym environment and manages lifecycle (start/stop/reset)
+- [x] **SIM-02**: System extracts depth and RGB sensor data per robot per gym step
+- [x] **SIM-03**: System dispatches independent movement commands to each of two Go2 robots
+- [x] **SIM-04**: System extracts ground-truth pose (position + orientation) per robot per step
 
 ### SLAM Pipeline
 
-- [ ] **SLAM-01**: Each robot runs RTAB-Map RGB-D SLAM producing a local pose graph and map
-- [ ] **SLAM-02**: Each robot's SLAM pipeline outputs a 3D point cloud of explored area
-- [ ] **SLAM-03**: Each robot's SLAM pipeline outputs an OctoMap 3D occupancy grid for navigation
-- [ ] **SLAM-04**: System compares SLAM pose estimates to ground-truth and reports drift metrics
+- [x] **SLAM-01**: Each robot runs RTAB-Map RGB-D SLAM producing a local pose graph and map
+- [x] **SLAM-02**: Each robot's SLAM pipeline outputs a 3D point cloud of explored area
+- [x] **SLAM-03**: Each robot's SLAM pipeline outputs an OctoMap 3D occupancy grid for navigation
+- [x] **SLAM-04**: System compares SLAM pose estimates to ground-truth and reports drift metrics
 
 ### Autonomous Exploration
 
@@ -88,14 +88,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIM-01 | Phase 1 | In Progress (test stub + API discovered) |
-| SIM-02 | Phase 1 | In Progress (test stub + API discovered) |
-| SIM-03 | Phase 1 | Pending |
-| SIM-04 | Phase 1 | In Progress (test stub + API discovered) |
-| SLAM-01 | Phase 1 | Pending |
-| SLAM-02 | Phase 1 | Pending |
-| SLAM-03 | Phase 1 | Pending |
-| SLAM-04 | Phase 1 | Pending |
+| SIM-01 | Phase 1 | Complete (01-02) |
+| SIM-02 | Phase 1 | Complete (01-02) |
+| SIM-03 | Phase 1 | Complete (01-02) |
+| SIM-04 | Phase 1 | Complete (01-02) |
+| SLAM-01 | Phase 1 | Complete |
+| SLAM-02 | Phase 1 | Complete |
+| SLAM-03 | Phase 1 | Complete |
+| SLAM-04 | Phase 1 | Complete |
 | EXPL-01 | Phase 2 | Pending |
 | EXPL-02 | Phase 2 | Pending |
 | EXPL-03 | Phase 2 | Pending |
