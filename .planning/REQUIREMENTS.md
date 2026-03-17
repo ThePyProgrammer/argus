@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MERGE-01**: System aligns robot-local maps to a shared global frame using known spawn transforms
 - [x] **MERGE-02**: System fuses two 3D occupancy grids into a single unified navigation map via voxel merging
 - [x] **MERGE-03**: System merges point clouds from both robots into a unified 3D reconstruction
-- [ ] **MERGE-04**: Map merging operates incrementally in real-time as robots explore (not batch post-processing)
+- [x] **MERGE-04**: Map merging operates incrementally in real-time as robots explore (not batch post-processing)
 
 ### Visualization
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MERGE-01 | Phase 3 | Complete (03-02) |
 | MERGE-02 | Phase 3 | Complete (03-02) |
 | MERGE-03 | Phase 3 | Complete (03-02) |
-| MERGE-04 | Phase 3 | Pending |
+| MERGE-04 | Phase 3 | Complete |
 | VIZ-01 | Phase 4 | Pending |
 | VIZ-02 | Phase 4 | Pending |
 | VIZ-03 | Phase 4 | Pending |
