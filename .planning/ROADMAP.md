@@ -13,7 +13,7 @@ This roadmap delivers a two-robot autonomous exploration and 3D reconstruction s
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Simulation Bridge and Single-Robot SLAM** - Connect to SimWorld, extract sensor data, and produce a local 3D map from one Go2 robot
-- [ ] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
+- [x] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
 - [ ] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress
 
@@ -48,8 +48,8 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Frontier detection, goal selection, 2D occupancy projection, and A* path planning
-- [ ] 02-02-PLAN.md — Exploration loop orchestrator, coverage tracking, and integration tests
-- [ ] 02-03-PLAN.md — MuJoCo wiring: --control explore mode in main.py and end-to-end integration test
+- [x] 02-02-PLAN.md — Exploration loop orchestrator, coverage tracking, and integration tests
+- [x] 02-03-PLAN.md — MuJoCo wiring: --control explore mode in main.py and end-to-end integration test
 
 ### Phase 3: Multi-Robot Coordination and Map Merging
 **Goal**: Two Go2 robots operate independently with coordinated region assignments and produce a single unified 3D map in real-time
@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
-| 2. Autonomous Exploration | 2/3 | In Progress|  |
+| 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
