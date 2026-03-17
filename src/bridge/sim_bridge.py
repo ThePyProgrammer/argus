@@ -1,158 +1,137 @@
-"""SimWorld gym bridge -- owns the gym env handle and publishes SensorFrame data.
+"""MuJoCo bridge -- loads Unitree Go2 and publishes SensorFrame data.
 
-Bridges the SimWorld gym environment (legacy ``gym``) to typed SensorFrame
-outputs consumed by SLAM, visualization, and metrics modules.
+Uses MuJoCo's native renderer for RGB and depth images, and extracts
+ground-truth poses directly from the simulation state. This replaces the
+SimWorld gym bridge after pivoting to MuJoCo (no GPU required).
 
-Key discoveries from Plan 01-01 (docs/simworld_discovery.md):
-- SimWorld uses legacy ``gym`` (not ``gymnasium``)
-- Env ID: ``simworld_gym/SimpleWorld``
-- Action space: Discrete(6) -- 0-3 movement, 4-5 rotation
-- Observation keys: ``rgb`` (H,W,3 uint8), ``depth`` (H,W,1 uint8 JET)
-- Ground-truth pose: ``info["agent"]["agent_location"]`` (xyz in cm),
-  ``info["agent"]["agent_rotation"]`` (cardinal string)
-- No simulation timestamp exposed; computed as step_count * dt
+The Go2 model comes from mujoco_menagerie (models/unitree_go2/).
 """
 
 from __future__ import annotations
 
 import logging
 import math
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from src.bridge.env_config import SimWorldEnvConfig
+from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import SensorFrame
 
 logger = logging.getLogger(__name__)
 
-# Cardinal direction string -> yaw in radians (counterclockwise from +X)
-_CARDINAL_TO_YAW: dict[str, float] = {
-    "North": math.pi / 2,
-    "South": -math.pi / 2,
-    "East": 0.0,
-    "West": math.pi,
-    "NorthEast": math.pi / 4,
-    "NorthWest": 3 * math.pi / 4,
-    "SouthEast": -math.pi / 4,
-    "SouthWest": -3 * math.pi / 4,
-}
-
-# Discrete action indices (from simworld_gym action_config.json)
-ACTION_MOVE_FORWARD = 0
-ACTION_MOVE_BACKWARD = 1
-ACTION_MOVE_LEFT = 2
-ACTION_MOVE_RIGHT = 3
-ACTION_TURN_RIGHT = 4
-ACTION_TURN_LEFT = 5
+# Action mapping: we command joint velocities to move the robot.
+# The Go2 has 12 actuators (4 legs x 3 joints: hip, thigh, calf).
+# For locomotion, we use a simple gait pattern.
+_STANDING_QPOS = np.array([
+    0.0, 0.8, -1.5,   # FR: hip, thigh, calf
+    0.0, 0.8, -1.5,   # FL
+    0.0, 0.8, -1.5,   # RR
+    0.0, 0.8, -1.5,   # RL
+])
 
 
-class SimWorldGymBridge:
-    """Bridge between the SimWorld gym environment and typed SensorFrame output.
+class MuJoCoBridge:
+    """Bridge between MuJoCo simulation and typed SensorFrame output.
 
     Lifecycle:
-        1. ``bridge = SimWorldGymBridge(config)``
-        2. ``frame = bridge.start()``   -- creates env, calls reset
-        3. ``frame = bridge.step()``    -- steps env, returns SensorFrame
-        4. ``bridge.set_velocity(...)`` -- buffers next action
-        5. ``bridge.stop()``            -- closes env
+        1. ``bridge = MuJoCoBridge(config)``
+        2. ``frame = bridge.start()``   -- loads model, steps to settle
+        3. ``frame = bridge.step()``    -- steps sim, returns SensorFrame
+        4. ``bridge.set_velocity(...)`` -- buffers velocity command
+        5. ``bridge.stop()``            -- cleans up
 
-    The bridge translates high-level velocity intentions into the discrete
-    action space that SimWorld actually supports (Discrete(6): forward,
-    backward, left, right, turn-right, turn-left).
+    MuJoCo provides:
+    - RGB rendering via offscreen renderer
+    - Metric depth (float32, meters) via depth buffer
+    - Exact ground-truth pose from qpos (position + quaternion)
     """
 
-    def __init__(self, config: SimWorldEnvConfig | None = None) -> None:
-        self._config = config or SimWorldEnvConfig()
-        self._env: Any = None
-        self._current_action: int = 0  # default: move forward (idle would be better but no noop)
+    def __init__(self, config: MuJoCoEnvConfig | None = None) -> None:
+        self._config = config or MuJoCoEnvConfig()
+        self._model: Any = None
+        self._data: Any = None
+        self._renderer: Any = None
         self._step_count: int = 0
-        self._dt: float = 1.0 / self._config.target_step_hz  # simulated dt per step
+        self._dt: float = 0.0
+        self._linear_vel: np.ndarray = np.zeros(2)
+        self._angular_vel: float = 0.0
+        # Camera ID (added programmatically)
+        self._cam_id: int = -1
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
-    def start(self, reset_options: dict | None = None) -> SensorFrame:
-        """Create the gym environment and reset it.
-
-        Args:
-            reset_options: Optional dict passed to ``env.reset(options=...)``.
-                SimWorld's SimpleEnv expects ``task_path``, ``world_json``,
-                ``agent_json`` keys.  If *None*, the env's built-in defaults
-                are used (which may or may not work depending on SimWorld
-                installation).
+    def start(self) -> SensorFrame:
+        """Load the MuJoCo model and initialize the simulation.
 
         Returns:
             The first SensorFrame from the environment.
         """
-        try:
-            import gym  # legacy gym used by SimWorld
-        except ImportError:
-            import gymnasium as gym  # fallback for testing without SimWorld
+        import mujoco
 
-        env_kwargs: dict[str, Any] = {**self._config.env_kwargs}
-        if self._config.observation_type:
-            env_kwargs["observation_type"] = self._config.observation_type
-        if self._config.render_mode is not None:
-            env_kwargs["render_mode"] = self._config.render_mode
+        model_path = Path(self._config.model_path)
+        if not model_path.exists():
+            raise FileNotFoundError(f"MuJoCo model not found: {model_path}")
 
-        self._env = gym.make(
-            self._config.env_id,
-            max_episode_steps=self._config.max_episode_steps,
-            **env_kwargs,
-        )
+        self._model = mujoco.MjModel.from_xml_path(str(model_path))
+        self._data = mujoco.MjData(self._model)
+        self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
+
+        # Set initial standing pose (skip the 7 free-joint qpos: 3 pos + 4 quat)
+        if self._model.nq >= 19:  # 7 (freejoint) + 12 (actuators)
+            self._data.qpos[7:19] = _STANDING_QPOS
+
+        # Settle the robot (let it land on ground)
+        for _ in range(200):
+            self._data.ctrl[:] = _STANDING_QPOS
+            mujoco.mj_step(self._model, self._data)
+
+        # Create offscreen renderer
+        w, h = self._config.resolution
+        self._renderer = mujoco.Renderer(self._model, height=h, width=w)
+
         self._step_count = 0
+        return self._capture_frame()
 
-        if reset_options is not None:
-            obs, info = self._env.reset(options=reset_options)
-        else:
-            obs, info = self._env.reset()
-
-        return self._parse_observation(obs, info)
-
-    def step(self, action: int | None = None) -> SensorFrame:
-        """Step the environment with an action.
+    def step(self, action: np.ndarray | None = None) -> SensorFrame:
+        """Step the simulation and return a new SensorFrame.
 
         Args:
-            action: Discrete action index (0-5).  If *None*, uses the
-                buffered action from the most recent ``set_velocity`` call.
+            action: Optional 12-element joint position target. If None,
+                uses the velocity command from set_velocity().
 
         Returns:
-            SensorFrame for the new observation.
-
-        Raises:
-            RuntimeError: If the bridge has not been started.
+            SensorFrame with RGB, depth, and ground-truth pose.
         """
-        if self._env is None:
+        import mujoco
+
+        if self._model is None:
             raise RuntimeError("Bridge not started -- call start() first")
 
-        if action is None:
-            action = self._current_action
-
-        result = self._env.step(action)
-        # SimWorld step() may return 4 values (legacy gym) or 5 (gymnasium)
-        if len(result) == 5:
-            obs, _reward, terminated, truncated, info = result
+        if action is not None:
+            self._data.ctrl[:] = action
         else:
-            obs, _reward, done, info = result
-            terminated = done
-            truncated = False
+            # Convert velocity command to joint targets for a simple walk
+            ctrl = self._velocity_to_ctrl()
+            self._data.ctrl[:] = ctrl
+
+        # Step physics multiple times per frame
+        for _ in range(self._config.sim_steps_per_frame):
+            mujoco.mj_step(self._model, self._data)
 
         self._step_count += 1
-
-        if terminated or truncated:
-            logger.info("Episode ended (terminated=%s, truncated=%s) -- auto-resetting", terminated, truncated)
-            obs, info = self._env.reset()
-            self._step_count = 0
-
-        return self._parse_observation(obs, info)
+        return self._capture_frame()
 
     def stop(self) -> None:
-        """Close the gym environment and release resources."""
-        if self._env is not None:
-            self._env.close()
-            self._env = None
+        """Clean up MuJoCo resources."""
+        if self._renderer is not None:
+            self._renderer.close()
+            self._renderer = None
+        self._model = None
+        self._data = None
         self._step_count = 0
 
     # ------------------------------------------------------------------
@@ -160,184 +139,118 @@ class SimWorldGymBridge:
     # ------------------------------------------------------------------
 
     def set_velocity(self, linear: np.ndarray, angular: float) -> None:
-        """Buffer a velocity command, translated to the nearest discrete action.
-
-        SimWorld uses Discrete(6) actions, so continuous velocity is mapped
-        to the closest discrete movement/rotation command.
+        """Buffer a velocity command for the next step.
 
         Args:
             linear: np.ndarray of shape (2,) representing [vx, vy].
-                Positive vx = forward, positive vy = strafe left.
             angular: Angular velocity (positive = turn left).
         """
-        # Priority: rotation commands take precedence over translation
-        if abs(angular) > 0.1:
-            self._current_action = ACTION_TURN_LEFT if angular > 0 else ACTION_TURN_RIGHT
-            return
+        self._linear_vel = np.asarray(linear, dtype=np.float64)
+        self._angular_vel = float(angular)
 
-        vx = linear[0] if len(linear) > 0 else 0.0
-        vy = linear[1] if len(linear) > 1 else 0.0
+    def _velocity_to_ctrl(self) -> np.ndarray:
+        """Convert buffered velocity to joint position targets.
 
-        # Pick the dominant direction
-        if abs(vx) >= abs(vy):
-            if abs(vx) < 0.01:
-                # Near-zero velocity -- default to forward (no noop action)
-                self._current_action = ACTION_MOVE_FORWARD
-            elif vx > 0:
-                self._current_action = ACTION_MOVE_FORWARD
-            else:
-                self._current_action = ACTION_MOVE_BACKWARD
-        else:
-            if vy > 0:
-                self._current_action = ACTION_MOVE_LEFT
-            else:
-                self._current_action = ACTION_MOVE_RIGHT
-
-    # ------------------------------------------------------------------
-    # Observation parsing
-    # ------------------------------------------------------------------
-
-    def _parse_observation(self, obs: Any, info: dict) -> SensorFrame:
-        """Convert raw gym observation + info into a typed SensorFrame.
-
-        Uses exact keys discovered in docs/simworld_discovery.md.
+        Uses a simple sinusoidal gait pattern modulated by the velocity
+        command. This is a crude but functional locomotion controller
+        sufficient for SLAM testing.
         """
-        # --- RGB ---
-        rgb = self._extract_rgb(obs)
+        t = self._step_count * self._dt
+        speed = float(np.linalg.norm(self._linear_vel))
+        turn = self._angular_vel
 
-        # --- Depth ---
-        depth = self._extract_depth(obs)
+        # Base standing pose
+        ctrl = _STANDING_QPOS.copy()
 
-        # --- Ground-truth pose ---
-        ground_truth_pose = self._extract_pose(info)
+        if speed > 0.01 or abs(turn) > 0.01:
+            # Simple trot gait: diagonal legs move together
+            freq = 4.0  # gait frequency Hz
+            amplitude = 0.3 * min(speed + abs(turn), 1.0)
+            phase = 2 * math.pi * freq * t
 
-        # --- Simulation time ---
+            # FR and RL move together (phase 0), FL and RR (phase pi)
+            for leg_idx in [0, 3]:  # FR, RL
+                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase)      # thigh
+                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase) * 0.5  # calf
+            for leg_idx in [1, 2]:  # FL, RR
+                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase + math.pi)
+                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase + math.pi) * 0.5
+
+            # Turning: offset hip joints
+            if abs(turn) > 0.01:
+                hip_offset = 0.2 * turn
+                ctrl[0] += hip_offset   # FR hip
+                ctrl[3] -= hip_offset   # FL hip
+                ctrl[6] += hip_offset   # RR hip
+                ctrl[9] -= hip_offset   # RL hip
+
+        return ctrl
+
+    # ------------------------------------------------------------------
+    # Observation capture
+    # ------------------------------------------------------------------
+
+    def _capture_frame(self) -> SensorFrame:
+        """Render RGB + depth and extract ground-truth pose."""
+        import mujoco
+
+        self._renderer.update_scene(self._data, camera=self._config.camera_name)
+
+        # RGB
+        rgb = self._renderer.render().copy()  # (H, W, 3) uint8
+
+        # Depth (metric, in meters)
+        self._renderer.enable_depth_rendering()
+        depth_raw = self._renderer.render().copy()  # (H, W) float32
+        self._renderer.disable_depth_rendering()
+
+        # MuJoCo depth is distance from near plane; convert to metric
+        # The renderer returns linear depth in [0, 1] mapped to [znear, zfar]
+        extent = self._model.stat.extent
+        znear = self._model.vis.map.znear * extent
+        zfar = self._model.vis.map.zfar * extent
+        # Convert from [0,1] buffer to metric meters
+        depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
+        # Clip max distance
+        depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
+
+        # Ground-truth pose from freejoint qpos
+        pose = self._extract_pose()
+
         sim_time = self._step_count * self._dt
 
         return SensorFrame(
             rgb=rgb,
             depth=depth,
-            ground_truth_pose=ground_truth_pose,
+            ground_truth_pose=pose,
             sim_time=sim_time,
         )
 
-    def _extract_rgb(self, obs: Any) -> np.ndarray:
-        """Extract RGB image from observation dict or raw array."""
-        if isinstance(obs, dict):
-            if "rgb" in obs:
-                img = obs["rgb"]
-                if img.dtype != np.uint8:
-                    logger.warning("RGB dtype is %s, expected uint8", img.dtype)
-                # Ensure (H, W, 3) -- SimWorld returns (H, W, 3) already
-                if img.ndim == 3 and img.shape[2] == 3:
-                    return img.astype(np.uint8)
-                logger.warning("Unexpected RGB shape: %s", img.shape)
-                return img.astype(np.uint8)
-            else:
-                available = list(obs.keys())
-                logger.warning("No 'rgb' key in observation; available keys: %s", available)
-                # Return a placeholder black image
-                h, w = self._config.resolution[1], self._config.resolution[0]
-                return np.zeros((h, w, 3), dtype=np.uint8)
-        elif isinstance(obs, np.ndarray):
-            # Raw array observation -- assume it is the image
-            return obs.astype(np.uint8)
-        else:
-            logger.warning("Unexpected observation type: %s", type(obs))
-            h, w = self._config.resolution[1], self._config.resolution[0]
-            return np.zeros((h, w, 3), dtype=np.uint8)
-
-    def _extract_depth(self, obs: Any) -> np.ndarray | None:
-        """Extract depth from observation dict.
-
-        NOTE: SimWorld's default pipeline returns JET-colormapped uint8
-        depth, NOT raw metric depth.  For SLAM we ideally need raw float32
-        depth.  This method returns whatever is available; the caller must
-        handle the format difference.  A future enhancement would patch
-        ``_decode_npy`` to return raw values.
-        """
-        if not isinstance(obs, dict):
-            return None
-
-        if "depth" not in obs:
-            logger.debug("No 'depth' key in observation -- monocular fallback")
-            return None
-
-        depth_raw = obs["depth"]
-
-        # SimWorld depth comes as (H, W, 1) uint8 -- squeeze last dim
-        if depth_raw.ndim == 3 and depth_raw.shape[2] == 1:
-            depth_raw = depth_raw.squeeze(axis=2)
-
-        # If it's already float, great (means we got raw metric depth somehow)
-        if np.issubdtype(depth_raw.dtype, np.floating):
-            return depth_raw.astype(np.float32)
-
-        # Otherwise it's the JET-colormapped uint8 -- return as-is with warning
-        if depth_raw.ndim == 3 and depth_raw.shape[2] == 3:
-            # JET colormap (H, W, 3) uint8 -- cannot do metric depth
-            logger.warning(
-                "Depth is JET-colormapped uint8 (H,W,3) -- not metric. "
-                "SLAM depth accuracy will be limited."
-            )
-            return depth_raw
-
-        # (H, W) uint8 single-channel -- could be grayscale encoded depth
-        return depth_raw
-
-    def _extract_pose(self, info: dict) -> np.ndarray:
-        """Build 4x4 homogeneous transform from info dict.
-
-        Position comes from ``info["agent"]["agent_location"]`` (Unreal cm).
-        Rotation comes from cardinal direction string in
-        ``info["agent"]["agent_rotation"]`` or, if available, raw
-        ``[roll, pitch, yaw]`` from the agent controller.
-
-        The position is converted from centimeters to meters.
-        """
+    def _extract_pose(self) -> np.ndarray:
+        """Extract 4x4 homogeneous transform from the robot's freejoint."""
         pose = np.eye(4, dtype=np.float64)
 
-        agent_info = info.get("agent", {})
+        if self._data is None:
+            return pose
 
-        # --- Position ---
-        location = agent_info.get("agent_location", None)
-        if location is not None:
-            loc = np.asarray(location, dtype=np.float64)
-            # Convert Unreal centimeters to meters
-            pose[:3, 3] = loc / 100.0
-        else:
-            logger.warning("No agent_location in info dict")
+        # Position: first 3 elements of qpos (freejoint)
+        pose[:3, 3] = self._data.qpos[:3]
 
-        # --- Rotation ---
-        # Try raw rotation first (if SimWorld exposes it)
-        raw_rotation = agent_info.get("agent_raw_rotation", None)
-        if raw_rotation is not None:
-            # raw_rotation expected as [roll, pitch, yaw] in degrees
-            roll, pitch, yaw = np.radians(raw_rotation)
-            pose[:3, :3] = self._euler_to_rotation_matrix(roll, pitch, yaw)
-        else:
-            # Fall back to cardinal direction string
-            cardinal = agent_info.get("agent_rotation", None)
-            if cardinal is not None and isinstance(cardinal, str):
-                yaw = _CARDINAL_TO_YAW.get(cardinal, 0.0)
-                pose[:3, :3] = self._euler_to_rotation_matrix(0.0, 0.0, yaw)
-            # else: identity rotation (already set)
+        # Orientation: quaternion in qpos[3:7] (w, x, y, z in MuJoCo convention)
+        quat = self._data.qpos[3:7]
+        pose[:3, :3] = self._quat_to_rotation_matrix(quat)
 
         return pose
 
     @staticmethod
-    def _euler_to_rotation_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
-        """Convert roll-pitch-yaw (radians) to 3x3 rotation matrix (ZYX convention)."""
-        cr, sr = math.cos(roll), math.sin(roll)
-        cp, sp = math.cos(pitch), math.sin(pitch)
-        cy, sy = math.cos(yaw), math.sin(yaw)
-
-        R = np.array([
-            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-            [-sp,     cp * sr,                cp * cr               ],
+    def _quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
+        """Convert MuJoCo quaternion (w, x, y, z) to 3x3 rotation matrix."""
+        w, x, y, z = q
+        return np.array([
+            [1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
+            [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+            [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
         ], dtype=np.float64)
-        return R
 
     # ------------------------------------------------------------------
     # Properties
@@ -345,10 +258,10 @@ class SimWorldGymBridge:
 
     @property
     def is_running(self) -> bool:
-        """True if the gym environment is active."""
-        return self._env is not None
+        """True if the simulation is active."""
+        return self._model is not None
 
     @property
     def step_count(self) -> int:
-        """Number of steps taken since last reset."""
+        """Number of steps taken since start."""
         return self._step_count

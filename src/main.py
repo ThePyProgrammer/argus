@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Main entry point: SimWorld bridge -> SLAM -> OctoMap -> Rerun visualization.
+"""Main entry point: MuJoCo bridge -> SLAM -> OctoMap -> Rerun visualization.
 
 Wires all Phase 1 modules into a single run loop:
-  1. SimWorldGymBridge produces SensorFrames each step
+  1. MuJoCoBridge produces SensorFrames each step (Go2 in MuJoCo)
   2. SLAMPipeline estimates poses via ICP odometry
   3. OctoMapBuilder accumulates occupancy grid
   4. GroundTruthCollector records GT for drift comparison
@@ -10,20 +10,21 @@ Wires all Phase 1 modules into a single run loop:
   6. At shutdown, compute_drift_metrics prints ATE/RPE
 
 Control modes:
-  --control teleop    : WASD keyboard control (default)
+  --control teleop    : WASD keyboard control (default, requires pynput)
   --control waypoint  : Scripted waypoint following
   --control random    : Random exploration
 """
 
 import argparse
+import math
 import sys
 import time
 
 import numpy as np
 
-from src.bridge.env_config import SimWorldEnvConfig
+from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import CameraIntrinsics
-from src.bridge.sim_bridge import SimWorldGymBridge
+from src.bridge.sim_bridge import MuJoCoBridge
 from src.control.random_walk import RandomWalkController
 from src.control.waypoint_runner import WaypointRunner
 from src.metrics.drift_metrics import compute_drift_metrics
@@ -35,7 +36,7 @@ from src.viz.rerun_viz import RerunVisualizer
 
 def parse_args():
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Single-robot SLAM in SimWorld")
+    parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
     parser.add_argument(
         "--control",
         choices=["teleop", "waypoint", "random"],
@@ -103,13 +104,17 @@ def main():
     # ------------------------------------------------------------------
     # Initialize components
     # ------------------------------------------------------------------
-    config = SimWorldEnvConfig()
-    bridge = SimWorldGymBridge(config)
+    config = MuJoCoEnvConfig()
+    bridge = MuJoCoBridge(config)
 
-    # Camera intrinsics from discovery (FOV 120 deg, 320x240)
-    # fx = fy = (width/2) / tan(fov/2) = 160 / tan(60 deg) ~= 92.38
+    # Camera intrinsics for MuJoCo renderer
+    # MuJoCo default FOV is 45 degrees; fx = (width/2) / tan(fov/2)
+    # fx = 160 / tan(22.5 deg) ~= 386.37
+    w, h = config.resolution
+    fov_rad = math.radians(45.0)
+    fx = (w / 2.0) / math.tan(fov_rad / 2.0)
     intrinsics = CameraIntrinsics(
-        fx=92.376, fy=92.376, cx=160.0, cy=120.0, width=320, height=240
+        fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h
     )
 
     slam = SLAMPipeline(intrinsics)

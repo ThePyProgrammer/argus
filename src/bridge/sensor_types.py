@@ -1,7 +1,8 @@
 """Shared data types for sensor frames and camera intrinsics.
 
-These types define the interface between the SimWorld gym bridge and all
+These types define the interface between the simulation bridge and all
 downstream consumers (SLAM pipeline, visualization, metrics).
+Backend-agnostic: works with MuJoCo, SimWorld, or any future sim.
 """
 
 from dataclasses import dataclass

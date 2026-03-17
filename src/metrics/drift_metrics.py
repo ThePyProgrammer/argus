@@ -25,13 +25,22 @@ def compute_drift_metrics(
     Returns:
         Dict with keys: ate_rmse, ate_mean, rpe_rmse, rpe_mean.
     """
+    # Truncate to shortest common length
+    min_len = min(len(slam_poses), len(gt_poses), len(timestamps))
+    if min_len < 2:
+        raise ValueError(f"Need at least 2 poses, got {min_len}")
+
+    slam_poses = slam_poses[:min_len]
+    gt_poses = gt_poses[:min_len]
+    ts = np.array(timestamps[:min_len])
+
     slam_traj = PoseTrajectory3D(
         poses_se3=slam_poses,
-        timestamps=np.array(timestamps),
+        timestamps=ts,
     )
     gt_traj = PoseTrajectory3D(
         poses_se3=gt_poses,
-        timestamps=np.array(timestamps),
+        timestamps=ts,
     )
 
     # Sync trajectories by timestamp
