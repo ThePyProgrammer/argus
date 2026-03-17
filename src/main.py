@@ -13,6 +13,7 @@ Control modes:
   --control teleop    : WASD keyboard control (default, requires pynput)
   --control waypoint  : Scripted waypoint following
   --control random    : Random exploration
+  --control explore   : Autonomous frontier-based exploration
 """
 
 import argparse
@@ -39,7 +40,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
     parser.add_argument(
         "--control",
-        choices=["teleop", "waypoint", "random"],
+        choices=["teleop", "waypoint", "random", "explore"],
         default="teleop",
         help="Control mode (default: teleop)",
     )
@@ -65,6 +66,18 @@ def parse_args():
         "--no-viz",
         action="store_true",
         help="Disable Rerun visualization",
+    )
+    parser.add_argument(
+        "--explore-max-steps",
+        type=int,
+        default=10000,
+        help="Max steps for explore mode (default: 10000)",
+    )
+    parser.add_argument(
+        "--explore-rescan-distance",
+        type=float,
+        default=2.0,
+        help="Frontier rescan distance in meters (default: 2.0)",
     )
     return parser.parse_args()
 
@@ -97,9 +110,83 @@ def create_controller(mode: str):
         raise ValueError(f"Unknown control mode: {mode}")
 
 
+def run_explore_mode(args):
+    """Run autonomous frontier-based exploration."""
+    import math
+
+    from src.exploration.config import ExplorationConfig
+    from src.exploration.exploration_loop import ExplorationLoop
+
+    config = MuJoCoEnvConfig()
+    bridge = MuJoCoBridge(config)
+
+    # Camera intrinsics (same as main())
+    w, h = config.resolution
+    fov_rad = math.radians(45.0)
+    fx = (w / 2.0) / math.tan(fov_rad / 2.0)
+    intrinsics = CameraIntrinsics(
+        fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h
+    )
+
+    slam = SLAMPipeline(intrinsics)
+    octomap = OctoMapBuilder(resolution=args.octomap_resolution)
+
+    explore_config = ExplorationConfig(
+        max_steps=args.explore_max_steps,
+        rescan_distance_m=args.explore_rescan_distance,
+        voxel_resolution=args.octomap_resolution,
+    )
+
+    loop = ExplorationLoop(bridge=bridge, slam=slam, octomap=octomap, config=explore_config)
+
+    print(f"Starting autonomous exploration...")
+    print(f"Max steps: {explore_config.max_steps}")
+    print(f"Rescan distance: {explore_config.rescan_distance_m}m")
+    print(f"Voxel resolution: {explore_config.voxel_resolution}m")
+    print("Press Ctrl+C to stop\n")
+
+    try:
+        result = loop.run()
+    except KeyboardInterrupt:
+        print("\nExploration interrupted by user.")
+        result = None
+
+    # Print results
+    if result is not None:
+        print(f"\n=== Exploration Complete ===")
+        print(f"Terminated: {result.terminated_reason}")
+        print(f"Total steps: {result.total_steps}")
+        print(f"Coverage (frontier exhaustion): {result.final_coverage_pct:.1f}%")
+        print(f"Coverage (bounding box): {result.final_bbox_coverage_pct:.1f}%")
+        print(f"Remaining frontiers: {result.final_frontier_count}")
+
+    # Drift metrics
+    if len(slam.slam_poses) >= 2:
+        print("\n=== Drift Metrics ===")
+        try:
+            # Full GT collection happens inside ExplorationLoop
+            # For now just report SLAM stats
+            pass
+        except Exception as e:
+            print(f"Could not compute drift metrics: {e}")
+
+    print(
+        f"\nFinal stats: {slam.num_frames_processed} frames, "
+        f"{len(slam.get_cloud_points())} cloud points, "
+        f"{octomap.num_occupied} occupied voxels"
+    )
+
+    bridge.stop()
+    print("Done.")
+
+
 def main():
     """Run the single-robot SLAM loop."""
     args = parse_args()
+
+    if args.control == "explore":
+        run_explore_mode(args)
+        return
 
     # ------------------------------------------------------------------
     # Initialize components
