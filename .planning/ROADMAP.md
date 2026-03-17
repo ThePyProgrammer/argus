@@ -44,11 +44,12 @@ Plans:
   1. Robot identifies frontier cells (boundary between explored and unexplored space) from its current occupancy grid
   2. Robot autonomously selects a frontier goal and navigates to it, then repeats the explore-map-navigate cycle without human input
   3. Exploration completeness percentage increases over time and is reported as the robot covers new area
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 - [ ] 02-01-PLAN.md — Frontier detection, goal selection, 2D occupancy projection, and A* path planning
 - [ ] 02-02-PLAN.md — Exploration loop orchestrator, coverage tracking, and integration tests
+- [ ] 02-03-PLAN.md — MuJoCo wiring: --control explore mode in main.py and end-to-end integration test
 
 ### Phase 3: Multi-Robot Coordination and Map Merging
 **Goal**: Two Go2 robots operate independently with coordinated region assignments and produce a single unified 3D map in real-time
@@ -88,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Simulation Bridge and Single-Robot SLAM | 4/4 | Complete    | 2026-03-17 |
-| 2. Autonomous Exploration | 0/2 | Planned | - |
+| 2. Autonomous Exploration | 0/3 | Planned | - |
 | 3. Multi-Robot Coordination and Map Merging | 0/? | Not started | - |
 | 4. Visualization and Integration | 0/? | Not started | - |
