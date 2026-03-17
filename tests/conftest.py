@@ -9,6 +9,7 @@ import pytest
 from scipy.spatial.transform import Rotation
 
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
+from src.exploration.config import ExplorationConfig
 
 
 @pytest.fixture
@@ -98,3 +99,9 @@ def mock_robot_positions() -> np.ndarray:
         [0.3, 0.0, 0.0],
         [0.4, 0.0, 0.0],
     ], dtype=np.float64)
+
+
+@pytest.fixture
+def mock_exploration_config() -> ExplorationConfig:
+    """Return a default ExplorationConfig for testing."""
+    return ExplorationConfig()
