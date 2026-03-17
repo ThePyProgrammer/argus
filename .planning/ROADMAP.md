@@ -93,3 +93,13 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
 | 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 1/2 | In progress | - |
+
+### Phase 5: Make sure the robots do not get stuck at one place without being able to move off
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 4
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 5 to break down)

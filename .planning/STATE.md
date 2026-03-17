@@ -102,6 +102,10 @@ Recent decisions affecting current work:
 - [04-01]: Points3D with radii for heatmap (not Boxes3D) -- simpler, consistent with existing patterns
 - [04-01]: Set-based grid lookup for heatmap cell classification -- O(1) per cell
 
+### Roadmap Evolution
+
+- Phase 5 added: Make sure the robots do not get stuck at one place without being able to move off
+
 ### Pending Todos
 
 None yet.
