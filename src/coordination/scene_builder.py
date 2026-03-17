@@ -19,8 +19,11 @@ from pathlib import Path
 # Attributes that contain names which must be prefixed
 _NAME_ATTRS = frozenset({
     "name", "joint", "target", "body1", "body2", "site",
-    "tendon", "class",
+    "tendon",
 })
+# NOTE: "class" is deliberately excluded -- class attributes reference
+# shared <default> classes (visual, collision, go2, etc.) that are NOT
+# prefixed per-robot.
 
 
 def _prefix_element(elem: ET.Element, prefix: str) -> None:
