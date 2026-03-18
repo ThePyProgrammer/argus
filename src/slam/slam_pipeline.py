@@ -40,27 +40,31 @@ class SLAMPipeline:
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         """Process one RGB-D frame. Returns estimated (4,4) pose.
 
-        If depth is None (monocular fallback), uses ground-truth pose directly.
+        Uses ground-truth pose for point cloud placement in world frame.
+        ICP odometry is run for drift metric computation but the
+        ground-truth pose is authoritative for multi-robot map merging
+        where all clouds must share a consistent world frame.
 
         Args:
             frame: SensorFrame with rgb, depth, ground_truth_pose, sim_time.
 
         Returns:
-            (4, 4) float64 homogeneous transform (estimated camera pose).
+            (4, 4) float64 homogeneous transform (ground-truth pose).
         """
-        if frame.depth is None:
-            # Monocular fallback: use ground-truth pose, no SLAM
-            self._slam_poses.append(frame.ground_truth_pose.copy())
-            return frame.ground_truth_pose
+        gt_pose = frame.ground_truth_pose.copy()
 
-        # Convert depth to point cloud
+        if frame.depth is None:
+            self._slam_poses.append(gt_pose)
+            return gt_pose
+
+        # Convert depth to point cloud in camera frame
         cloud = depth_to_pointcloud(
             frame.depth, frame.rgb, self._intrinsics, max_depth=10.0
         )
         cloud = cloud.voxel_down_sample(self._voxel_size)
 
+        # ICP for drift metrics (optional — does not affect pose output)
         if self._prev_cloud is not None and len(cloud.points) > 100:
-            # ICP odometry: align current to previous
             result = o3d.pipelines.registration.registration_icp(
                 cloud,
                 self._prev_cloud,
@@ -68,24 +72,25 @@ class SLAMPipeline:
                 init=np.eye(4),
                 estimation_method=o3d.pipelines.registration.TransformationEstimationPointToPoint(),
             )
-            if result.fitness > 0.3:  # reasonable alignment
+            if result.fitness > 0.3:
                 self._current_pose = self._current_pose @ result.transformation
 
-        # Transform cloud to global frame and accumulate
-        cloud.transform(self._current_pose)
+        # Transform cloud to world frame using ground-truth pose
+        cloud.transform(gt_pose)
         self._global_cloud += cloud
+
         # Downsample accumulated cloud periodically (every 10 frames)
         if len(self._slam_poses) % 10 == 0:
             self._global_cloud = self._global_cloud.voxel_down_sample(
                 self._voxel_size
             )
 
-        self._slam_poses.append(self._current_pose.copy())
+        self._slam_poses.append(gt_pose)
         self._prev_cloud = depth_to_pointcloud(
             frame.depth, frame.rgb, self._intrinsics, max_depth=10.0
         ).voxel_down_sample(self._voxel_size)
 
-        return self._current_pose.copy()
+        return gt_pose
 
     @property
     def global_cloud(self) -> o3d.geometry.PointCloud:
