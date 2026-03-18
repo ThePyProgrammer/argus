@@ -95,8 +95,8 @@ def parse_args():
     parser.add_argument(
         "--scene",
         choices=["flat", "office"],
-        default="office",
-        help="Scene type for multi-robot mode (default: office)",
+        default="flat",
+        help="Scene type for multi-robot mode (default: flat)",
     )
     return parser.parse_args()
 

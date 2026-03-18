@@ -23,8 +23,8 @@ def test_multi_robot_config_defaults():
     assert config.robot_ids == ("robot_a", "robot_b")
     assert "robot_a" in config.spawn_positions
     assert "robot_b" in config.spawn_positions
-    assert config.spawn_positions["robot_a"] == (-2.5, 3.5, 0.3)
-    assert config.spawn_positions["robot_b"] == (6.5, -8.5, 0.3)
+    assert config.spawn_positions["robot_a"] == (0.0, 0.0, 0.3)
+    assert config.spawn_positions["robot_b"] == (5.0, 0.0, 0.3)
     assert config.resolution == (320, 240)
     assert config.boot_phase_steps == 200
     assert config.sim_steps_per_frame == 10

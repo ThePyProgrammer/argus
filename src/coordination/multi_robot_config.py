@@ -26,13 +26,13 @@ class MultiRobotConfig:
     robot_ids: tuple[str, str] = ("robot_a", "robot_b")
     spawn_positions: dict[str, tuple[float, float, float]] = field(
         default_factory=lambda: {
-            "robot_a": (-2.5, 3.5, 0.3),
-            "robot_b": (6.5, -8.5, 0.3),
+            "robot_a": (0.0, 0.0, 0.3),
+            "robot_b": (5.0, 0.0, 0.3),
         }
     )
     resolution: tuple[int, int] = (320, 240)
     sim_steps_per_frame: int = 10
     model_dir: str = "models/unitree_go2"
     boot_phase_steps: int = 200
-    scene: str = "office"
+    scene: str = "flat"
     step_delay: float = 0.05  # seconds to sleep between steps (slows sim for visualization)
