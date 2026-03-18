@@ -237,9 +237,9 @@ class ExplorationLoop:
         # ----------------------------------------------------------
         # c. Check re-evaluation trigger
         # ----------------------------------------------------------
-        # Don't rescan in first 20 steps -- drive forward to build initial
+        # Don't rescan in first 30 steps -- drive forward to build initial
         # map data before frontier detection has enough to work with
-        min_scan_step = 20
+        min_scan_step = 30
         should_rescan = force_rescan and step >= min_scan_step
         if not should_rescan and step >= min_scan_step:
             dist_from_last_scan = float(np.linalg.norm(current_pos - self._last_rescan_pos))
@@ -387,7 +387,7 @@ class ExplorationLoop:
 
             self._bridge.set_velocity(linear_vel, angular_vel)
 
-            if metrics["terminated"] and step >= 20:
+            if metrics["terminated"] and step >= 50:
                 # Determine specific termination reason from frontier state
                 if metrics["frontiers"] == 0:
                     terminated_reason = "no_frontiers"

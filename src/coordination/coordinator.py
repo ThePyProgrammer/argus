@@ -199,7 +199,7 @@ class Coordinator:
 
             # Don't trust early termination — robots need time to build maps
             # before "no frontiers" is a meaningful signal
-            min_explore_steps = max(self._config.boot_phase_steps // self._config.sim_steps_per_frame, 20)
+            min_explore_steps = max(self._config.boot_phase_steps // self._config.sim_steps_per_frame, 50)
             if step < min_explore_steps:
                 all_terminated = False
 
