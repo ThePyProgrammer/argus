@@ -28,8 +28,8 @@ class ExplorationConfig:
 
     # Termination
     max_steps: int = 10000                # safety net step limit
-    stuck_threshold_steps: int = 20       # steps without position change = stuck
-    stuck_distance_m: float = 0.3         # minimum movement to not be stuck
+    stuck_threshold_steps: int = 50       # steps without meaningful position change = stuck
+    stuck_distance_m: float = 0.05        # minimum movement per step to not be stuck
 
     # Frontier detection
     voxel_resolution: float = 0.1         # must match OctoMapBuilder
