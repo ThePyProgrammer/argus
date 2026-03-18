@@ -181,3 +181,140 @@ class TestTrajectoryMessage:
         assert len(payload["alphas"]) == 5
         assert payload["alphas"][-1] == 255
         assert payload["positions"][0] == [0.0, 0.0, 0.0]
+
+
+# ---------- WebStreamingViz tests (Task 2) ----------
+
+
+def _make_robot_data(
+    robot_ids: list[str],
+) -> dict:
+    """Helper: create mock robot_data dict for testing WebStreamingViz."""
+    data = {}
+    for i, rid in enumerate(robot_ids):
+        pose = np.eye(4)
+        pose[:3, 3] = [float(i), 0.0, 0.0]
+        frame = MagicMock()
+        frame.rgb = np.zeros((64, 64, 3), dtype=np.uint8)
+        data[rid] = {
+            "frame": frame,
+            "local_voxels": np.random.rand(10, 3),
+            "pose": pose,
+            "trajectory": [pose],
+            "coverage_pct": 25.0 + i * 10,
+        }
+    return data
+
+
+class TestWebStreamingViz:
+    def _make_viz(self):
+        from src.web.streaming_viz import WebStreamingViz
+
+        cm = MagicMock()
+        robot_ids = ["robot_a", "robot_b"]
+        viz = WebStreamingViz(cm, robot_ids)
+        return viz, cm
+
+    def test_update_produces_cloud_delta(self):
+        viz, cm = self._make_viz()
+        merged = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
+        assert len(cloud_deltas) == 1
+        assert "positions" in cloud_deltas[0]["payload"]
+
+    def test_update_second_call_sends_delta_only(self):
+        viz, cm = self._make_viz()
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+            _ = viz.get_pending_messages()  # drain
+            viz.update(merged, robot_data)  # same voxels
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
+        # No new voxels => no cloud_delta message
+        assert len(cloud_deltas) == 0
+
+    def test_update_sends_pose_per_robot(self):
+        viz, cm = self._make_viz()
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        poses = [m for m in json_msgs if m.get("type") == POSE_UPDATE]
+        assert len(poses) == 2
+        assert poses[0]["payload"]["position"] == [0.0, 0.0, 0.0]
+        assert len(poses[0]["payload"]["rotation"]) == 9  # 3x3 flattened
+
+    def test_update_sends_stats(self):
+        viz, cm = self._make_viz()
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data, total_coverage=50.0, merge_count=3)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        stats = [m for m in json_msgs if m.get("type") == STATS]
+        assert len(stats) == 1
+        assert stats[0]["payload"]["total_coverage"] == 50.0
+        assert stats[0]["payload"]["merge_count"] == 3
+
+    def test_update_sends_trajectory_per_robot(self):
+        viz, cm = self._make_viz()
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        # Add more poses to trajectory
+        for rid in robot_data:
+            poses = []
+            for j in range(5):
+                p = np.eye(4)
+                p[:3, 3] = [float(j), 0.0, 0.0]
+                poses.append(p)
+            robot_data[rid]["trajectory"] = poses
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        trajs = [m for m in json_msgs if m.get("type") == TRAJECTORY]
+        assert len(trajs) == 2
+        assert "positions" in trajs[0]["payload"]
+        assert "alphas" in trajs[0]["payload"]
+
+    def test_true_rgb_color_mode(self):
+        viz, cm = self._make_viz()
+        viz.set_color_mode("true_rgb")
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
+        assert len(cloud_deltas) == 1
+        # true_rgb mode: colors should be white placeholder (255,255,255)
+        colors = cloud_deltas[0]["payload"]["colors"]
+        assert colors[0] == [255, 255, 255]
+
+    def test_full_sync_after_interval(self):
+        import time
+
+        viz, cm = self._make_viz()
+        viz._full_sync_interval = 0.0  # trigger immediately
+        viz._last_full_sync = 0.0
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data)
+        msgs = viz.get_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        full_syncs = [m for m in json_msgs if m.get("type") == CLOUD_FULL]
+        assert len(full_syncs) == 1
+        assert "positions" in full_syncs[0]["payload"]
