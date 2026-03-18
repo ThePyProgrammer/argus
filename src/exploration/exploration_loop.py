@@ -31,6 +31,52 @@ from src.control.waypoint_runner import WaypointRunner
 logger = logging.getLogger(__name__)
 
 
+class StuckRecovery:
+    """Turn-in-place recovery when robot is physically stuck.
+
+    When triggered, commands a 90-degree turn with randomized direction
+    (left or right). The recovery runs for the required angular displacement,
+    then completes and signals the caller to rescan frontiers.
+    """
+
+    def __init__(
+        self, turn_angle: float = np.pi / 2, angular_speed: float = 1.0,
+    ) -> None:
+        self._turn_angle = turn_angle
+        self._angular_speed = angular_speed
+        self._remaining: float = 0.0
+        self._active: bool = False
+
+    def trigger(self) -> None:
+        """Start a turn recovery. Randomizes direction (left/right)."""
+        direction = 1.0 if np.random.random() > 0.5 else -1.0
+        self._remaining = self._turn_angle * direction
+        self._active = True
+
+    def step(self, dt: float) -> tuple[float, float, float] | None:
+        """Get recovery velocity command (vx, vy, omega), or None if complete.
+
+        Returns:
+            (vx, vy, omega) while recovery is active, None when done.
+        """
+        if not self._active:
+            return None
+
+        turn = np.sign(self._remaining) * self._angular_speed
+        self._remaining -= turn * dt
+
+        if abs(self._remaining) < 0.1:
+            self._active = False
+            return None
+
+        return (0.0, 0.0, turn)  # zero linear, only angular
+
+    @property
+    def is_active(self) -> bool:
+        """True while a recovery turn is in progress."""
+        return self._active
+
+
 class ExplorationLoop:
     """Autonomous exploration loop orchestrator.
 
@@ -70,6 +116,7 @@ class ExplorationLoop:
         self._last_rescan_pos = np.zeros(3, dtype=np.float64)
         self._last_voxel_count = 0
         self._stuck_counter = 0
+        self._stuck_recovery = StuckRecovery()
         self._last_position = np.zeros(3, dtype=np.float64)
         self._last_coverage = 0.0
         self._last_bbox_coverage = 0.0
@@ -134,14 +181,40 @@ class ExplorationLoop:
                 self._stuck_counter = 0
 
         force_rescan = False
+
+        # If stuck recovery is active, execute recovery turn instead of normal logic
+        if self._stuck_recovery.is_active:
+            dt = 0.2  # approximate frame dt
+            recovery_cmd = self._stuck_recovery.step(dt)
+            if recovery_cmd is not None:
+                vx, vy, omega = recovery_cmd
+                return (
+                    np.array([vx, vy], dtype=np.float64),
+                    omega,
+                    {
+                        "frontiers": self._last_frontier_count,
+                        "coverage": self._last_coverage,
+                        "terminated": False,
+                        "voxels": self._octomap.num_occupied,
+                        "rescan_triggered": False,
+                    },
+                )
+            else:
+                # Recovery just completed -- force rescan for new frontier
+                logger.info(
+                    "[Step %d] Stuck recovery complete. Forcing frontier rescan.",
+                    step,
+                )
+                self._current_waypoint_runner = None
+                force_rescan = True
+
         if self._stuck_counter >= config.stuck_threshold_steps:
             logger.warning(
-                "[Step %d] Stuck detected (%d steps without movement). Forcing re-scan.",
+                "[Step %d] Stuck detected (%d steps). Triggering turn recovery.",
                 step, self._stuck_counter,
             )
-            force_rescan = True
+            self._stuck_recovery.trigger()
             self._stuck_counter = 0
-            self._current_waypoint_runner = None
 
         # ----------------------------------------------------------
         # c. Check re-evaluation trigger

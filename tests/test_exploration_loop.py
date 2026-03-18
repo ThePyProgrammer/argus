@@ -14,7 +14,7 @@ import pytest
 from src.bridge.sensor_types import SensorFrame
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import ExplorationResult
-from src.exploration.exploration_loop import ExplorationLoop
+from src.exploration.exploration_loop import ExplorationLoop, StuckRecovery
 from src.exploration.frontier_detector import FrontierCluster
 
 
@@ -314,3 +314,96 @@ class TestExplorationLoop:
             result = loop.run()
 
         assert isinstance(result, ExplorationResult)
+
+
+# ---------------------------------------------------------------------------
+# StuckRecovery tests
+# ---------------------------------------------------------------------------
+
+class TestStuckRecovery:
+    """Tests for the StuckRecovery turn-in-place mechanism."""
+
+    def test_stuck_recovery_triggers(self) -> None:
+        """Stuck detection triggers StuckRecovery after threshold steps."""
+        bridge = MockBridge(move_per_step=0.0)  # no movement
+        slam = MockSLAM()
+        octomap = MockOctoMap()
+        config = ExplorationConfig(
+            max_steps=30,
+            stuck_threshold_steps=5,
+            rescan_distance_m=0.5,
+            rescan_voxel_delta=50,
+            log_interval_steps=100,
+        )
+
+        loop = ExplorationLoop(bridge, slam, octomap, config)
+
+        # Mock frontier detection to return frontiers (keep loop alive)
+        def fake_detect(occupied, robot_positions):
+            return [_make_cluster([5.0, 0.0, 0.0])]
+
+        with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
+             patch.object(loop._path_planner, "plan", return_value=[
+                 np.array([2.0, 0.0, 0.0]),
+                 np.array([5.0, 0.0, 0.0]),
+             ]):
+            # Run enough steps to trigger stuck detection
+            frame = bridge.start()
+            for step in range(10):
+                linear_vel, angular_vel, metrics = loop.step_once(frame, step)
+                bridge.set_velocity(linear_vel, angular_vel)
+                frame = bridge.step()
+
+            # After stuck_threshold_steps (5), recovery should have been triggered
+            # The angular velocity should be non-zero during recovery
+            # Check that at some point we got a recovery angular velocity
+            recovery_commands = [
+                cmd for cmd in bridge._velocity_commands
+                if abs(cmd[1]) > 0.5  # angular > 0.5 indicates recovery turn
+            ]
+            assert len(recovery_commands) > 0, (
+                "Expected recovery turn commands with significant angular velocity"
+            )
+
+    def test_stuck_recovery_completes(self) -> None:
+        """StuckRecovery.step() returns None after turning the required angle."""
+        recovery = StuckRecovery(turn_angle=np.pi / 2, angular_speed=1.0)
+
+        # Not active initially
+        assert recovery.is_active is False
+        assert recovery.step(0.1) is None
+
+        # Trigger recovery
+        np.random.seed(42)
+        recovery.trigger()
+        assert recovery.is_active is True
+
+        # Step until recovery completes
+        step_count = 0
+        while recovery.is_active and step_count < 100:
+            result = recovery.step(0.1)
+            step_count += 1
+
+        assert recovery.is_active is False, "Recovery should complete"
+        assert step_count > 5, "Recovery should take multiple steps"
+        assert step_count < 50, "Recovery should not take too many steps"
+
+    def test_stuck_recovery_randomizes_direction(self) -> None:
+        """StuckRecovery alternates between left and right turns."""
+        recovery = StuckRecovery(turn_angle=np.pi / 2, angular_speed=1.0)
+
+        directions = []
+        for seed in range(20):
+            np.random.seed(seed)
+            recovery.trigger()
+            result = recovery.step(0.01)
+            if result is not None:
+                directions.append(np.sign(result[2]))  # sign of omega
+            # Reset for next trial
+            recovery._active = False
+            recovery._remaining = 0.0
+
+        unique_directions = set(directions)
+        assert len(unique_directions) >= 2, (
+            f"Expected both positive and negative turns, got {unique_directions}"
+        )
