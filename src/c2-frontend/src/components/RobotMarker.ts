@@ -104,20 +104,39 @@ export class RobotMarkerManager {
 
   /**
    * Apply a flat 9-element 3x3 rotation matrix (row-major, Z-up MuJoCo frame)
-   * to a Three.js object. The parent scene already handles Z-up → Y-up
-   * conversion via the worldRoot -90° X rotation.
+   * to a Three.js object that lives inside the worldRoot (which has -90° X
+   * rotation for Z-up → Y-up conversion).
+   *
+   * Since the parent worldRoot already rotates the coordinate system, the
+   * marker's local rotation must compensate: we pre-multiply by +90° X
+   * (inverse of the parent's -90° X) so the final world rotation is correct.
    */
   private applyRotation(obj: THREE.Object3D, rotation: number[]): void {
     if (rotation.length !== 9) return;
-    // Row-major 3x3: [r00, r01, r02, r10, r11, r12, r20, r21, r22]
-    const m = new THREE.Matrix4();
-    m.set(
+
+    // MuJoCo Z-up rotation matrix
+    const mujoco = new THREE.Matrix4();
+    mujoco.set(
       rotation[0], rotation[1], rotation[2], 0,
       rotation[3], rotation[4], rotation[5], 0,
       rotation[6], rotation[7], rotation[8], 0,
       0, 0, 0, 1,
     );
-    obj.quaternion.setFromRotationMatrix(m);
+
+    // Undo parent's -90° X rotation: pre-multiply by +90° X
+    // Rx(+90°) swaps Y↔Z: [x, y, z] → [x, z, -y]
+    // As a matrix: [[1,0,0],[0,0,-1],[0,1,0]]
+    const undoParent = new THREE.Matrix4();
+    undoParent.set(
+      1, 0, 0, 0,
+      0, 0, 1, 0,
+      0, -1, 0, 0,
+      0, 0, 0, 1,
+    );
+
+    // Local rotation = undoParent * mujocoRotation
+    const local = undoParent.multiply(mujoco);
+    obj.quaternion.setFromRotationMatrix(local);
   }
 
   /**
