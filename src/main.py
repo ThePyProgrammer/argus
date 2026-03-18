@@ -255,10 +255,21 @@ def run_multi_mode(args):
         for rid, count in result['per_robot_voxels'].items():
             print(f"  {rid}: {count} voxels")
 
+    # Keep MuJoCo viewer open until user closes it
+    import time
+    viewer_handle = getattr(bridge, '_viewer_handle', None)
+    if viewer_handle is not None:
+        print("\nExploration complete. Close the MuJoCo viewer window to exit.")
+        try:
+            while viewer_handle.is_running():
+                viewer_handle.sync()
+                time.sleep(0.03)  # ~30fps
+        except (AttributeError, Exception):
+            pass
+
     bridge.stop()
 
     # Clean shutdown of Rerun to avoid gRPC segfault on exit
-    import time
     import rerun as rr
     rr.disconnect()
     time.sleep(0.5)
