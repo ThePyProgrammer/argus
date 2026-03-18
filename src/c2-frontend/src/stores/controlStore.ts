@@ -23,7 +23,7 @@ export interface ControlStoreState {
 }
 
 export const useControlStore = create<ControlStoreState>((set) => ({
-  isRunning: false,
+  isRunning: true,
   isPaused: false,
   simSpeed: 1.0,
   sendCommand: null,
