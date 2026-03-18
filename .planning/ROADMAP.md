@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
 - [x] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time (completed 2026-03-17)
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress (1/2 plans complete)
-- [ ] **Phase 5: Robot Locomotion Fix** - Fix actuator mismatch and replace sinusoidal gait with proper trot locomotion so robots actually walk
+- [x] **Phase 5: Robot Locomotion Fix** - Fix actuator mismatch and replace sinusoidal gait with proper trot locomotion so robots actually walk (completed 2026-03-18)
 
 ## Phase Details
 
@@ -110,14 +110,14 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
 | 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 1/2 | In progress | - |
-| 5. Robot Locomotion Fix | 2/2 | Complete | 2026-03-18 |
+| 5. Robot Locomotion Fix | 2/2 | Complete    | 2026-03-18 |
 
 ### Phase 6: React C2 Web Interface for Multi-Robot Visualization and Control
 
 **Goal:** [To be planned]
 **Requirements**: TBD
 **Depends on:** Phase 5
-**Plans:** 0 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 6 to break down)
