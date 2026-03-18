@@ -118,9 +118,12 @@ export class RobotMarkerManager {
     // In Z-up frame, yaw = atan2(R[1][0], R[0][0]) = atan2(rotation[3], rotation[0])
     const yaw = Math.atan2(rotation[3], rotation[0]);
 
+    // Mesh orientation offset: the Go2 GLB model's forward direction may not
+    // align with MuJoCo's body +X axis. Adjust by ~30° (empirically tuned).
+    const meshOffset = -Math.PI / 6; // -30 degrees
+
     // In the worldRoot's local frame (Z-up), yaw is rotation around Z axis.
-    // Three.js Euler with order 'ZYX' where Z is up in the worldRoot.
-    obj.rotation.set(0, 0, yaw);
+    obj.rotation.set(0, 0, yaw + meshOffset);
   }
 
   /**
