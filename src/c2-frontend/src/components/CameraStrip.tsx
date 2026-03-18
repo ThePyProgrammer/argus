@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRobotStore } from '../stores/robotStore';
 import CameraFeed from './CameraFeed';
 
 export default function CameraStrip() {
   const [collapsed, setCollapsed] = useState(false);
-  const robotIds = useRobotStore((s) => [...s.robots.keys()]);
+  const prevRef = useRef<string[]>([]);
+  const robotIds = useRobotStore((s) => {
+    const next = [...s.robots.keys()];
+    const prev = prevRef.current;
+    if (prev.length === next.length && prev.every((id, i) => id === next[i])) {
+      return prev;
+    }
+    prevRef.current = next;
+    return next;
+  });
 
   return (
     <div

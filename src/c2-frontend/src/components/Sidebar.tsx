@@ -1,9 +1,28 @@
-import { useRobotStore } from '../stores/robotStore';
+import { useRef } from 'react';
+import { useRobotStore, type RobotInfo } from '../stores/robotStore';
 import RobotCard from './RobotCard';
 import ControlPanel from './ControlPanel';
 
+/** Shallow-compare two arrays of robots by id + key fields to avoid re-render storms. */
+function useStableRobotList(): RobotInfo[] {
+  const prevRef = useRef<RobotInfo[]>([]);
+  const robots = useRobotStore((s) => {
+    const next = [...s.robots.values()];
+    const prev = prevRef.current;
+    if (
+      prev.length === next.length &&
+      prev.every((r, i) => r.id === next[i].id && r.coveragePct === next[i].coveragePct && r.action === next[i].action && r.voxelCount === next[i].voxelCount)
+    ) {
+      return prev;
+    }
+    prevRef.current = next;
+    return next;
+  });
+  return robots;
+}
+
 export default function Sidebar() {
-  const robots = useRobotStore((s) => [...s.robots.values()]);
+  const robots = useStableRobotList();
   const totalCoverage = useRobotStore((s) => s.totalCoverage);
   const mergeCount = useRobotStore((s) => s.mergeCount);
   const elapsed = useRobotStore((s) => s.elapsed);
