@@ -121,6 +121,22 @@ def project_voxels_to_2d(
     mask = (occupied_voxels[:, 2] >= z_min) & (occupied_voxels[:, 2] <= z_max)
     filtered = occupied_voxels[mask]
 
+    # Ground plane filter: remove the dominant horizontal layer (floor/ground)
+    # The ground plane shows up as many voxels at similar z values.
+    # Bin z values by resolution and remove the most populated bin.
+    if len(filtered) > 50:
+        z_vals = filtered[:, 2]
+        z_bins = np.round(z_vals / resolution).astype(int)
+        unique_bins, counts = np.unique(z_bins, return_counts=True)
+        if len(unique_bins) > 1:
+            # Remove the most populated z-layer (ground plane)
+            dominant_bin = unique_bins[np.argmax(counts)]
+            ground_mask = z_bins != dominant_bin
+            non_ground = filtered[ground_mask]
+            # Only filter if ground was a significant fraction (>30% of voxels)
+            if len(non_ground) > 0 and counts.max() > 0.3 * len(filtered):
+                filtered = non_ground
+
     if len(filtered) == 0:
         return OccupancyGrid2D(
             grid=np.full((1, 1), CELL_UNKNOWN, dtype=np.int8),

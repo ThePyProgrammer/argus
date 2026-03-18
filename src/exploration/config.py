@@ -38,5 +38,6 @@ class ExplorationConfig:
 
     # Coverage and logging
     log_interval_steps: int = 50          # log every N steps
-    z_min: float = 0.15                   # above ground plane (~robot ankle height)
-    z_max: float = 2.0
+    z_min: float = -100.0                  # auto-adapt: ground plane filtered dynamically
+    z_max: float = 100.0
+    ground_filter: bool = True             # remove dominant ground plane from occupancy grid
