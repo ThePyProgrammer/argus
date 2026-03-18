@@ -118,6 +118,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 5 added: Make sure the robots do not get stuck at one place without being able to move off
+- Phase 6 added: React C2 Web Interface for Multi-Robot Visualization and Control
 
 ### Pending Todos
 
