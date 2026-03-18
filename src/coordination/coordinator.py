@@ -279,15 +279,11 @@ class Coordinator:
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
-                    # Use body pose (not camera pose) for visualization --
-                # the robot marker should be on the ground, not at camera height
-                body_pose = self._bridge._extract_pose(rid)
-                self._body_trajectories.setdefault(rid, []).append(body_pose)
-                robot_data[rid] = {
+                    robot_data[rid] = {
                         "frame": frames[rid],
                         "local_voxels": robot.octomap.get_occupied_voxels(),
-                        "pose": body_pose,
-                        "trajectory": list(self._body_trajectories[rid]),
+                        "pose": robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
+                        "trajectory": list(robot.slam.slam_poses),
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
                     }
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
