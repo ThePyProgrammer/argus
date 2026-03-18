@@ -104,39 +104,23 @@ export class RobotMarkerManager {
 
   /**
    * Apply a flat 9-element 3x3 rotation matrix (row-major, Z-up MuJoCo frame)
-   * to a Three.js object that lives inside the worldRoot (which has -90° X
-   * rotation for Z-up → Y-up conversion).
+   * to a Three.js object inside the Z-up worldRoot.
    *
-   * Since the parent worldRoot already rotates the coordinate system, the
-   * marker's local rotation must compensate: we pre-multiply by +90° X
-   * (inverse of the parent's -90° X) so the final world rotation is correct.
+   * The worldRoot already handles Z-up → Y-up for positions. For rotations,
+   * we extract just the yaw (rotation around Z in MuJoCo = rotation around
+   * Y in the worldRoot's local frame) since the robot moves on a ground plane
+   * and pitch/roll are mostly noise from the trot gait.
    */
   private applyRotation(obj: THREE.Object3D, rotation: number[]): void {
     if (rotation.length !== 9) return;
 
-    // MuJoCo Z-up rotation matrix
-    const mujoco = new THREE.Matrix4();
-    mujoco.set(
-      rotation[0], rotation[1], rotation[2], 0,
-      rotation[3], rotation[4], rotation[5], 0,
-      rotation[6], rotation[7], rotation[8], 0,
-      0, 0, 0, 1,
-    );
+    // Extract yaw from the Z-up rotation matrix.
+    // In Z-up frame, yaw = atan2(R[1][0], R[0][0]) = atan2(rotation[3], rotation[0])
+    const yaw = Math.atan2(rotation[3], rotation[0]);
 
-    // Undo parent's -90° X rotation: pre-multiply by +90° X
-    // Rx(+90°) swaps Y↔Z: [x, y, z] → [x, z, -y]
-    // As a matrix: [[1,0,0],[0,0,-1],[0,1,0]]
-    const undoParent = new THREE.Matrix4();
-    undoParent.set(
-      1, 0, 0, 0,
-      0, 0, 1, 0,
-      0, -1, 0, 0,
-      0, 0, 0, 1,
-    );
-
-    // Local rotation = undoParent * mujocoRotation
-    const local = undoParent.multiply(mujoco);
-    obj.quaternion.setFromRotationMatrix(local);
+    // In the worldRoot's local frame (Z-up), yaw is rotation around Z axis.
+    // Three.js Euler with order 'ZYX' where Z is up in the worldRoot.
+    obj.rotation.set(0, 0, yaw);
   }
 
   /**
