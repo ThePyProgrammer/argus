@@ -19,11 +19,11 @@ import { useSceneLoader } from '../hooks/useSceneLoader';
  */
 export default function SceneViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
+  const worldRootRef = useRef<THREE.Group | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
 
-  // GLB scene loader (fires once scene is created)
-  useSceneLoader(sceneReady ? sceneRef.current : null);
+  // GLB scene loader (adds to worldRoot so Z-up rotation applies)
+  useSceneLoader(sceneReady ? worldRootRef.current : null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -38,7 +38,14 @@ export default function SceneViewer() {
     // --- Scene ---
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0d0d1a);
-    sceneRef.current = scene;
+
+    // --- Z-up to Y-up conversion ---
+    // MuJoCo uses Z-up; Three.js uses Y-up. Rotate the world root
+    // by -90° around X so all data (point cloud, markers, GLB) renders correctly.
+    const worldRoot = new THREE.Group();
+    worldRoot.rotation.x = -Math.PI / 2;
+    scene.add(worldRoot);
+    worldRootRef.current = worldRoot;
     setSceneReady(true);
 
     // --- Camera ---
@@ -66,10 +73,10 @@ export default function SceneViewer() {
     controls.maxDistance = 50;
     controls.target.set(0, 0, 0);
 
-    // --- Managers ---
-    const pointCloudManager = new PointCloudManager(scene);
-    const robotMarkerManager = new RobotMarkerManager(scene);
-    const trailManager = new TrajectoryTrailManager(scene);
+    // --- Managers (added to worldRoot so Z-up rotation applies) ---
+    const pointCloudManager = new PointCloudManager(worldRoot);
+    const robotMarkerManager = new RobotMarkerManager(worldRoot);
+    const trailManager = new TrajectoryTrailManager(worldRoot);
 
     // --- Zustand subscription (imperative, no React re-renders) ---
     const unsub = useRobotStore.subscribe((state, prevState) => {

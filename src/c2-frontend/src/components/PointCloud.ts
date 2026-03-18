@@ -13,7 +13,7 @@ export class PointCloudManager {
   private maxPoints = 200_000;
   private currentCount = 0;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Object3D) {
     this.geometry = new THREE.BufferGeometry();
 
     const positions = new Float32Array(this.maxPoints * 3);

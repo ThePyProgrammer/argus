@@ -11,9 +11,9 @@ import { OKABE_ITO_RGB } from '../utils/palette';
  */
 export class TrajectoryTrailManager {
   private trails: Map<string, THREE.LineSegments> = new Map();
-  private scene: THREE.Scene;
+  private scene: THREE.Object3D;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Object3D) {
     this.scene = scene;
   }
 

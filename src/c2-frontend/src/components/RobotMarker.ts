@@ -9,10 +9,10 @@ import { OKABE_ITO } from '../utils/palette';
  */
 export class RobotMarkerManager {
   private markers: Map<string, THREE.Mesh> = new Map();
-  private scene: THREE.Scene;
+  private scene: THREE.Object3D;
   private sharedGeometry: THREE.SphereGeometry;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Object3D) {
     this.scene = scene;
     // Shared geometry: radius 0.15, 16x16 segments
     this.sharedGeometry = new THREE.SphereGeometry(0.15, 16, 16);

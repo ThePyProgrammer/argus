@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  * Attempts to load a GLB scene file into the provided Three.js scene.
  * Gracefully handles 404 (scene.glb may not exist yet).
  */
-export function useSceneLoader(scene: THREE.Scene | null): {
+export function useSceneLoader(scene: THREE.Object3D | null): {
   loading: boolean;
   error: string | null;
 } {
