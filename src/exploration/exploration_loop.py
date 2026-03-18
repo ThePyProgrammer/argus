@@ -249,6 +249,7 @@ class ExplorationLoop:
                 config.voxel_resolution,
                 config.z_min,
                 config.z_max,
+                robot_positions=np.array(self._robot_positions),
             )
 
             frontiers = self._frontier_detector.detect(

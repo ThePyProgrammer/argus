@@ -85,11 +85,14 @@ def project_voxels_to_2d(
     z_min: float = 0.0,
     z_max: float = 2.0,
     padding: int = 10,
+    robot_positions: np.ndarray | None = None,
 ) -> OccupancyGrid2D:
     """Project 3D occupied voxels to a 2D occupancy grid for navigation.
 
     Filters voxels by height range, projects to XY plane, marks cells as
     OCCUPIED where voxels exist, and dilates FREE space around obstacles.
+    Robot trajectory positions are also stamped as FREE to ensure the
+    robot's known-navigable path is always connected.
 
     Args:
         occupied_voxels: (N, 3) float64 voxel centers.
@@ -97,6 +100,9 @@ def project_voxels_to_2d(
         z_min: Minimum height to include.
         z_max: Maximum height to include.
         padding: Extra cells on each side of bounding box.
+        robot_positions: (M, 3) float64 positions the robot has visited.
+            These are stamped as FREE cells with a small dilation radius,
+            ensuring the robot's path is always navigable.
 
     Returns:
         OccupancyGrid2D with FREE/OCCUPIED/UNKNOWN cells.
@@ -147,6 +153,25 @@ def project_voxels_to_2d(
 
     for r, c in zip(grid_rows, grid_cols):
         grid[r, c] = CELL_OCCUPIED
+
+    # Stamp robot trajectory as FREE -- the robot was physically there
+    # Use a small dilation (robot width ~0.3m = 3 cells at 0.1m) to create
+    # a navigable corridor along the robot's path
+    if robot_positions is not None and len(robot_positions) > 0:
+        rob_xy = robot_positions[:, :2]
+        rob_cols = np.round((rob_xy[:, 0] - origin[0]) / resolution).astype(int)
+        rob_rows = np.round((rob_xy[:, 1] - origin[1]) / resolution).astype(int)
+        rob_cols = np.clip(rob_cols, 0, cols - 1)
+        rob_rows = np.clip(rob_rows, 0, rows - 1)
+
+        robot_radius = max(1, int(0.3 / resolution))  # ~robot half-width
+        for r, c in zip(rob_rows, rob_cols):
+            for dr in range(-robot_radius, robot_radius + 1):
+                for dc in range(-robot_radius, robot_radius + 1):
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < rows and 0 <= nc < cols:
+                        if grid[nr, nc] != CELL_OCCUPIED:
+                            grid[nr, nc] = CELL_FREE
 
     # Dilate FREE space around obstacles
     # For each occupied cell, mark nearby UNKNOWN cells as FREE
