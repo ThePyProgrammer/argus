@@ -384,11 +384,17 @@ class MultiRobotBridge:
             max_range = 20.0
             depth = np.where(depth_raw > max_range, 0.0, depth_raw).astype(np.float32)
 
-        # Camera pose with transposed rotation matrix (config G verified)
-        cam_id = self._cam_ids[robot_id]
-        pose = np.eye(4, dtype=np.float64)
-        pose[:3, 3] = self._data.cam_xpos[cam_id]
-        pose[:3, :3] = self._data.cam_xmat[cam_id].reshape(3, 3).T
+        # Pose transform depends on active cloud config
+        from src.slam.depth_to_cloud import get_pose_mode
+        pose_mode = get_pose_mode()
+        if pose_mode == "body":
+            pose = self._extract_pose(robot_id)
+        else:
+            cam_id = self._cam_ids[robot_id]
+            pose = np.eye(4, dtype=np.float64)
+            pose[:3, 3] = self._data.cam_xpos[cam_id]
+            cam_mat = self._data.cam_xmat[cam_id].reshape(3, 3)
+            pose[:3, :3] = cam_mat.T if pose_mode == "cam_T" else cam_mat
         sim_time = self._step_count * self._dt
 
         return SensorFrame(

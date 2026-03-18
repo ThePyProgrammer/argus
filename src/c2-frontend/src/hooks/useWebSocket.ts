@@ -32,7 +32,13 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
             ws.send(JSON.stringify({ type: 'command', payload: cmd }));
           }
         };
+        const sendRaw = (msg: Record<string, unknown>) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(msg));
+          }
+        };
         useControlStore.getState().setSendCommand(sendCommand);
+        useControlStore.getState().setSendRaw(sendRaw);
       };
 
       ws.onmessage = (event: MessageEvent) => {
@@ -96,6 +102,18 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
               payload.alphas,
             );
           }
+          break;
+        }
+        case 'cloud_configs': {
+          const payload = msg.payload as { configs: Record<string, string>; active: string };
+          useControlStore.getState().setCloudConfigs(payload.configs, payload.active);
+          break;
+        }
+        case 'cloud_config_ack': {
+          const payload = msg.payload as { config: string };
+          useControlStore.getState().setActiveCloudConfig(payload.config);
+          // Clear existing cloud so new config data replaces it
+          store.setCloudFull([], []);
           break;
         }
       }

@@ -85,6 +85,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             "type": "robot_list",
             "payload": {"robots": _robot_ids},
         })
+        # Send available cloud configs
+        from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config
+        await websocket.send_json({
+            "type": "cloud_configs",
+            "payload": {
+                "configs": {k: v["label"] for k, v in CLOUD_CONFIGS.items()},
+                "active": get_active_config(),
+            },
+        })
         while True:
             message = await websocket.receive()
             if message.get("type") == "websocket.disconnect":
@@ -95,6 +104,20 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     data = json.loads(message["text"])
                     if data.get("type") == "command" and command_callback is not None:
                         command_callback(data.get("payload", {}))
+                    elif data.get("type") == "set_cloud_config":
+                        from src.slam.depth_to_cloud import set_active_config, get_active_config, CLOUD_CONFIGS
+                        key = data.get("config", "G")
+                        set_active_config(key)
+                        label = CLOUD_CONFIGS.get(key, {}).get("label", key)
+                        logger.info("Cloud config switched to %s: %s", key, label)
+                        # Clear accumulated SLAM data so new config takes effect
+                        if streaming_viz is not None:
+                            streaming_viz._last_voxel_set = set()
+                        # Send acknowledgment
+                        await websocket.send_json({
+                            "type": "cloud_config_ack",
+                            "payload": {"config": key, "label": label},
+                        })
                 except (json.JSONDecodeError, TypeError):
                     pass
             elif "bytes" in message:
