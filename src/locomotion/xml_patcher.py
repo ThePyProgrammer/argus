@@ -116,7 +116,7 @@ def patch_actuators_to_position_with_floor(xml_path: str) -> str:
                 cam = ET.SubElement(base_body, "camera")
                 cam.set("name", "front_cam")
                 cam.set("pos", "0.3 0 0.05")  # front of robot, slightly above center
-                cam.set("euler", "0 -1.5708 0")  # rotate -90° around Y so camera looks along body +X
+                cam.set("euler", "0 1.5708 0")  # rotate +90° around Y so camera looks along body +X
                 cam.set("fovy", "45")
 
     # Add visual settings for depth rendering (znear/zfar)
