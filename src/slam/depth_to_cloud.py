@@ -35,7 +35,10 @@ def depth_to_pointcloud(
     x = (u[valid] - intrinsics.cx) * z / intrinsics.fx
     y = (v[valid] - intrinsics.cy) * z / intrinsics.fy
 
-    points = np.stack([x, y, z], axis=-1)
+    # MuJoCo camera convention: X-right, Y-up, Z-back (looking along -Z)
+    # OpenCV/pinhole convention: X-right, Y-down, Z-forward
+    # Convert: flip Y (down->up) and flip Z (forward->back)
+    points = np.stack([x, -y, -z], axis=-1)
     colors = rgb[valid].astype(np.float64) / 255.0
 
     pcd = o3d.geometry.PointCloud()

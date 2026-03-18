@@ -194,52 +194,21 @@ class TestFadingTrail:
 
 
 class TestHeatmap:
-    def test_heatmap_colors(self):
-        """Coverage heatmap uses green/red/yellow color scheme."""
+    def test_heatmap_removed(self):
+        """Coverage heatmap is no longer rendered (removed for performance)."""
         viz = MultiRobotVisualizer.__new__(MultiRobotVisualizer)
         viz._start_time = 0.0
         robot_data = _make_robot_data()
-        frontier_cells = np.array([[1.0, 1.0, 0.0], [1.1, 1.1, 0.0], [1.2, 1.2, 0.0]])
 
         viz.update(
             merged_voxels=np.random.rand(10, 3),
             robot_data=robot_data,
-            frontier_cells=frontier_cells,
             total_coverage=65.0,
             merge_count=3,
         )
 
         call = _find_log_call("/merged/heatmap")
-        assert call is not None, "Expected rr.log to /merged/heatmap"
-
-        # Points3D should have been called for heatmap
-        mock_rr.Points3D.assert_called()
-
-    def test_heatmap_resolution(self):
-        """Heatmap grid spacing matches 0.1m resolution."""
-        viz = MultiRobotVisualizer.__new__(MultiRobotVisualizer)
-        viz._start_time = 0.0
-        robot_data = _make_robot_data()
-
-        # Create a small known grid of voxels
-        voxels = np.array([
-            [0.0, 0.0, 0.5],
-            [0.1, 0.0, 0.5],
-            [0.2, 0.0, 0.5],
-            [0.0, 0.1, 0.5],
-        ])
-
-        viz.update(
-            merged_voxels=voxels,
-            robot_data=robot_data,
-            total_coverage=65.0,
-            merge_count=3,
-        )
-
-        call = _find_log_call("/merged/heatmap")
-        assert call is not None, "Expected rr.log to /merged/heatmap"
-        # Verify Points3D was called (the heatmap renderer)
-        mock_rr.Points3D.assert_called()
+        assert call is None, "Heatmap should no longer be rendered"
 
 
 class TestStatsHUD:
