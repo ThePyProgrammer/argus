@@ -77,9 +77,9 @@ class PathPlanner:
         start_row, start_col = grid.world_to_grid(start_xy)
         goal_row, goal_col = grid.world_to_grid(goal_xy)
 
-        # Check if start or goal is on an OCCUPIED cell
-        if grid.grid[start_row, start_col] == CELL_OCCUPIED:
-            return None
+        # The robot's current position is always navigable (it's physically there),
+        # even if the grid marks it as OCCUPIED due to ground voxels.
+        # Only reject if the GOAL is occupied (can't drive into a wall).
         if grid.grid[goal_row, goal_col] == CELL_OCCUPIED:
             return None
 
