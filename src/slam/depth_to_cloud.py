@@ -31,14 +31,25 @@ def depth_to_pointcloud(
     u, v = np.meshgrid(np.arange(w), np.arange(h))
 
     valid = (depth > 0) & (depth < max_depth)
-    z = depth[valid]
-    x = (u[valid] - intrinsics.cx) * z / intrinsics.fx
-    y = (v[valid] - intrinsics.cy) * z / intrinsics.fy
+    z_depth = depth[valid]
+    # Pinhole unprojection in camera frame (OpenGL: X-right, Y-up, Z-back)
+    cam_x = (u[valid] - intrinsics.cx) * z_depth / intrinsics.fx
+    cam_y = (v[valid] - intrinsics.cy) * z_depth / intrinsics.fy
 
-    # MuJoCo camera convention: X-right, Y-up, Z-back (looking along -Z)
-    # OpenCV/pinhole convention: X-right, Y-down, Z-forward
-    # Convert: flip Y (down->up) and flip Z (forward->back)
-    points = np.stack([x, -y, -z], axis=-1)
+    # Camera frame: looking along -Z, X-right, Y-down (image convention)
+    # MuJoCo camera: X-right, Y-up, Z-back (OpenGL convention)
+    # The front_cam has xyaxes="0 -1 0 0 0 1" meaning:
+    #   cam_X = body (0, -1, 0)   (right)
+    #   cam_Y = body (0,  0, 1)   (up)
+    #   cam_Z = body (-1, 0, 0)   (back, so looking along body +X)
+    #
+    # Points in camera frame (x_c, y_c, z_c) where z_c = -depth (behind camera = in front):
+    #   body_x = -z_c = depth (forward)
+    #   body_y = -x_c          (left)
+    #   body_z = -y_c + offset (up, flipped from image Y-down)
+    #
+    # This places the ground plane at body_z ≈ -camera_height ≈ -0.25m (correct)
+    points = np.stack([z_depth, -cam_x, -cam_y], axis=-1)
     colors = rgb[valid].astype(np.float64) / 255.0
 
     pcd = o3d.geometry.PointCloud()
