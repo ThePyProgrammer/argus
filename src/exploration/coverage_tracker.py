@@ -79,7 +79,8 @@ class CoverageTracker:
 
         # Primary metric: frontier exhaustion ratio
         if self._initial_frontier_count is not None and self._initial_frontier_count > 0:
-            coverage = (1.0 - frontier_count / self._initial_frontier_count) * 100.0
+            raw = (1.0 - frontier_count / self._initial_frontier_count) * 100.0
+            coverage = max(0.0, min(raw, 100.0))
         else:
             coverage = 0.0
 
