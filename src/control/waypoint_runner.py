@@ -68,17 +68,33 @@ class WaypointRunner:
         self._arrival_threshold = arrival_threshold
         self._current_index = 0
 
-    def get_velocity(self, current_pose: np.ndarray) -> tuple[np.ndarray, float]:
+    def get_velocity(
+        self,
+        current_pose: np.ndarray,
+        depth: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, float]:
         """Compute velocity command to drive toward the current waypoint.
+
+        When depth is provided, performs reactive obstacle avoidance:
+        if the center strip of the depth image shows an obstacle within
+        0.4m, the robot stops forward motion and steers away from the
+        closer side.
 
         Args:
             current_pose: (4, 4) homogeneous transform of the robot.
+            depth: Optional (H, W) float32 depth image in meters. 0 = invalid.
 
         Returns:
             Tuple of (linear_vel as np.ndarray([vx, vy]), angular_vel as float).
         """
         if self.is_complete:
             return np.zeros(2), 0.0
+
+        # Reactive depth avoidance — check center strip for close obstacles
+        if depth is not None:
+            avoidance = self._check_depth_avoidance(depth)
+            if avoidance is not None:
+                return avoidance
 
         # Extract current position and heading from pose
         position = current_pose[:3, 3]
@@ -129,6 +145,56 @@ class WaypointRunner:
         linear_vel = np.array([self._linear_speed * heading_factor, 0.0])
 
         return linear_vel, float(angular_vel)
+
+    def _check_depth_avoidance(
+        self, depth: np.ndarray, danger_dist: float = 0.4
+    ) -> tuple[np.ndarray, float] | None:
+        """Check depth image for close obstacles and return avoidance command.
+
+        Splits the center band of the depth image into left and right halves.
+        If either half has obstacles within danger_dist, returns a velocity
+        command that stops forward motion and steers away from the obstacle.
+
+        Args:
+            depth: (H, W) float32 depth in meters. 0 = invalid.
+            danger_dist: Distance threshold in meters.
+
+        Returns:
+            (linear_vel, angular_vel) if avoidance needed, else None.
+        """
+        h, w = depth.shape
+        # Check center vertical band (middle 60% of image, middle 80% of height)
+        y_lo, y_hi = int(h * 0.1), int(h * 0.9)
+        x_lo, x_hi = int(w * 0.2), int(w * 0.8)
+        center = depth[y_lo:y_hi, x_lo:x_hi]
+
+        valid = center[(center > 0.05) & (center < danger_dist)]
+        if len(valid) == 0:
+            return None  # No close obstacles
+
+        # Obstacle detected — steer away from the closer side
+        mid_x = center.shape[1] // 2
+        left_strip = center[:, :mid_x]
+        right_strip = center[:, mid_x:]
+
+        left_close = left_strip[(left_strip > 0.05) & (left_strip < danger_dist)]
+        right_close = right_strip[(right_strip > 0.05) & (right_strip < danger_dist)]
+
+        left_danger = np.mean(left_close) if len(left_close) > 0 else danger_dist
+        right_danger = np.mean(right_close) if len(right_close) > 0 else danger_dist
+
+        # Steer away from the closer side (positive = turn left)
+        if left_danger < right_danger:
+            turn = -self._angular_speed  # Turn right (away from left obstacle)
+        else:
+            turn = self._angular_speed   # Turn left (away from right obstacle)
+
+        # Slow down or stop — the closer the obstacle, the slower we go
+        min_dist = float(np.min(valid))
+        speed_factor = max(0.0, (min_dist - 0.15) / (danger_dist - 0.15))
+        linear = np.array([self._linear_speed * speed_factor * 0.3, 0.0])
+
+        return linear, float(turn)
 
     @property
     def is_complete(self) -> bool:

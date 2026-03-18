@@ -337,7 +337,9 @@ class ExplorationLoop:
         # ----------------------------------------------------------
         if (self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
-            linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
+            linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(
+                pose, depth=frame.depth,
+            )
         elif self._current_waypoint_runner is None:
             # No waypoints yet (e.g., empty map during boot phase, or all
             # frontiers unreachable) -- drive forward to build initial map

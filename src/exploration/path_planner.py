@@ -42,17 +42,61 @@ class PathPlanner:
     """A* path planner on 2D occupancy grid.
 
     Plans paths avoiding OCCUPIED cells, penalizing UNKNOWN cells,
-    and returning world-coordinate waypoints.
+    and inflating obstacle costs so paths maintain clearance from walls
+    and furniture (robot body is ~30cm wide).
     """
 
-    def __init__(self, unknown_cost: float = 5.0):
+    def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.4):
         """Initialize planner.
 
         Args:
             unknown_cost: Cost multiplier for traversing UNKNOWN cells.
                 Higher values discourage exploration through unknown space.
+            inflation_radius: Distance in meters around obstacles where
+                traversal cost is increased. Should be >= robot half-width.
         """
         self._unknown_cost = unknown_cost
+        self._inflation_radius = inflation_radius
+        self._inflation_cache: np.ndarray | None = None
+        self._inflation_grid_id: int | None = None
+
+    def _get_inflation_cost(self, grid: OccupancyGrid2D) -> np.ndarray:
+        """Compute per-cell inflation cost based on proximity to obstacles.
+
+        Cells near OCCUPIED cells get extra traversal cost that decays with
+        distance. Cells within robot half-width are treated as impassable
+        (cost = inf). This ensures paths keep clearance from walls/furniture.
+
+        Returns:
+            (H, W) float array of extra cost per cell. 0.0 = no penalty.
+        """
+        from scipy.ndimage import distance_transform_edt
+
+        grid_id = id(grid.grid)
+        if self._inflation_grid_id == grid_id and self._inflation_cache is not None:
+            return self._inflation_cache
+
+        occupied_mask = grid.grid == CELL_OCCUPIED
+        # Distance from each cell to nearest occupied cell (in grid units)
+        dist = distance_transform_edt(~occupied_mask)
+
+        radius_cells = max(1, int(self._inflation_radius / grid.resolution))
+        # Hard lethal zone: within half robot width (~15cm)
+        lethal_cells = max(1, int(0.15 / grid.resolution))
+
+        cost = np.zeros_like(dist, dtype=np.float32)
+        # Lethal zone: effectively impassable
+        cost[dist <= lethal_cells] = 1e6
+        # Inflation zone: decaying cost
+        inflation_mask = (dist > lethal_cells) & (dist <= radius_cells)
+        if np.any(inflation_mask):
+            # Linear decay from 50x to 1x within inflation zone
+            normalized = (radius_cells - dist[inflation_mask]) / (radius_cells - lethal_cells)
+            cost[inflation_mask] = 50.0 * normalized
+
+        self._inflation_cache = cost
+        self._inflation_grid_id = grid_id
+        return cost
 
     def plan(
         self,
@@ -87,6 +131,9 @@ class PathPlanner:
         if start_row == goal_row and start_col == goal_col:
             xy = grid.grid_to_world(start_row, start_col)
             return [np.array([xy[0], xy[1], 0.0], dtype=np.float64)]
+
+        # Compute inflation costmap
+        inflation_cost = self._get_inflation_cost(grid)
 
         # A* search
         # Priority queue: (f_cost, counter, row, col)
@@ -130,10 +177,14 @@ class PathPlanner:
                     continue
 
                 # Compute cost for this cell
+                extra = float(inflation_cost[nr, nc])
+                if extra >= 1e5:
+                    continue  # Lethal zone — treat as impassable
+
                 if cell_val == CELL_UNKNOWN:
-                    step_cost = move_cost * self._unknown_cost
+                    step_cost = move_cost * self._unknown_cost + extra
                 else:
-                    step_cost = move_cost
+                    step_cost = move_cost + extra
 
                 tentative_g = g_cost[current] + step_cost
 
