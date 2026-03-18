@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-18T04:56:47Z"
-last_activity: 2026-03-18 - Completed 05-01-PLAN (Locomotion module with trot gait controller)
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-18T06:00:00Z"
+last_activity: 2026-03-18 - Completed 05-02-PLAN (Bridge integration, stuck recovery, locomotion verified)
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 5 of 5 (Robot Locomotion Fix)
-Plan: 1 of 1 in current phase (1 complete)
+Plan: 2 of 2 in current phase (2 complete)
 Status: Complete
-Last activity: 2026-03-18 - Completed 05-01-PLAN (Locomotion module with trot gait controller)
+Last activity: 2026-03-18 - Completed 05-02-PLAN (Bridge integration, stuck recovery, locomotion verified)
 
 Progress: [####################] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 8 min
-- Total execution time: 1.5 hours
+- Total plans completed: 13
+- Average duration: 9 min
+- Total execution time: 2.5 hours
 
 **By Phase:**
 
@@ -47,11 +47,11 @@ Progress: [####################] 100%
 | 2 | 3 | 19 min | 6 min |
 | 3 | 3 | 20 min | 7 min |
 | 4 | 1 | 6 min | 6 min |
-| 5 | 1 | 17 min | 17 min |
+| 5 | 2 | 77 min | 39 min |
 
 **Recent Trend:**
-- Last 5 plans: 6, 9, 5, 6, 17 min
-- Trend: phase 5 longer due to physics tuning
+- Last 5 plans: 9, 5, 6, 17, 60 min
+- Trend: phase 5 plans longer due to physics tuning and integration debugging
 
 *Updated after each plan completion*
 
@@ -107,6 +107,13 @@ Recent decisions affecting current work:
 - [05-01]: Differential stride turning instead of hip-abduction-only (produces actual yaw torque)
 - [05-01]: Calf tucking (more negative) during swing for ground clearance -- corrected from plan
 - [05-01]: stride_length=0.4 and swing_height=0.15 (joint-angle scale, not meters)
+- [05-02]: Body-attached front_cam replaces free camera for correct point cloud transforms
+- [05-02]: Ground plane filter at z_min=0.15m to exclude floor from occupancy grid
+- [05-02]: Frontier detector rewritten to use FREE-to-UNKNOWN boundaries on 2D grid
+- [05-02]: A* allows starting from OCCUPIED cells (robot stands on ground voxels)
+- [05-02]: Waypoint runner always drives forward (no turn-in-place stalling)
+- [05-02]: Stuck detection thresholds relaxed for continuous gait locomotion
+- [05-02]: Multi-robot early termination disabled to run full max_steps
 
 ### Roadmap Evolution
 
@@ -132,5 +139,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T04:56:47Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-18T06:00:00Z
+Stopped at: Completed 05-02-PLAN.md
