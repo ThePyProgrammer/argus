@@ -21,7 +21,7 @@ MAX_TRAIL_SEGMENTS = 50
 VORONOI_PLANE_HEIGHT = 5.0
 VORONOI_PLANE_HALF_WIDTH = 20.0
 VORONOI_PLANE_ALPHA = 80
-HEATMAP_RESOLUTION = 0.1
+HEATMAP_RESOLUTION = 0.5
 
 
 class MultiRobotVisualizer:
@@ -262,53 +262,43 @@ class MultiRobotVisualizer:
         grid_min = grid_occupied.min(axis=0) - 1
         grid_max = grid_occupied.max(axis=0) + 1
 
-        # Create set of occupied grid indices for fast lookup
-        occupied_set = set(map(tuple, grid_occupied))
-
-        # Create frontier set if provided
+        # Build frontier set for fast lookup
         frontier_set = set()
         if frontier_cells is not None and len(frontier_cells) > 0:
             xy_frontier = frontier_cells[:, :2]
             grid_frontier = np.round(xy_frontier / res).astype(int)
             frontier_set = set(map(tuple, grid_frontier))
 
-        # Generate all grid cells within bounding box
-        xs = np.arange(grid_min[0], grid_max[0] + 1)
-        ys = np.arange(grid_min[1], grid_max[1] + 1)
-        grid_xx, grid_yy = np.meshgrid(xs, ys)
-        grid_indices = np.column_stack([grid_xx.ravel(), grid_yy.ravel()])
+        # Only render explored (green) and frontier (yellow) cells — skip
+        # unexplored (red) to avoid flooding Rerun with tens of thousands
+        # of points across the entire bounding box.
+        occupied_set = set(map(tuple, grid_occupied))
+        all_keys = occupied_set | frontier_set
 
-        # Classify each cell
+        if not all_keys:
+            return
+
         positions = []
         cell_colors = []
-        for gx, gy in grid_indices:
-            key = (gx, gy)
+        for gx, gy in all_keys:
             center_x = gx * res
             center_y = gy * res
-
-            if key in frontier_set:
-                # Yellow for frontier
+            if (gx, gy) in frontier_set:
                 cell_colors.append([200, 200, 0, 180])
-            elif key in occupied_set:
-                # Green for explored
-                cell_colors.append([0, 200, 0, 180])
             else:
-                # Red for unexplored
-                cell_colors.append([200, 0, 0, 100])
-
+                cell_colors.append([0, 200, 0, 180])
             positions.append([center_x, center_y, -0.05])
 
-        if positions:
-            positions = np.array(positions)
-            cell_colors = np.array(cell_colors, dtype=np.uint8)
-            rr.log(
-                "/merged/heatmap",
-                rr.Points3D(
-                    positions=positions,
-                    colors=cell_colors,
-                    radii=res / 2,
-                ),
-            )
+        positions = np.array(positions)
+        cell_colors = np.array(cell_colors, dtype=np.uint8)
+        rr.log(
+            "/merged/heatmap",
+            rr.Points3D(
+                positions=positions,
+                colors=cell_colors,
+                radii=res / 2,
+            ),
+        )
 
     def _log_voronoi_plane(
         self, midpoint_2d: np.ndarray, direction_2d: np.ndarray

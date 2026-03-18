@@ -227,7 +227,7 @@ class Coordinator:
                 self._do_merge(robot_ids)
 
             # Visualization update (every 10 frames, per established pattern)
-            if step % 10 == 0 and self._viz is not None:
+            if step % 20 == 0 and self._viz is not None:
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
