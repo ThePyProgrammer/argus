@@ -105,4 +105,21 @@ def patch_actuators_to_position_with_floor(xml_path: str) -> str:
             light.set("dir", "0 0 -1")
             light.set("directional", "true")
 
+    # Add visual settings for depth rendering (znear/zfar)
+    # Without these, MuJoCo's depth buffer returns all zeros
+    visual = root.find("visual")
+    if visual is None:
+        visual = ET.SubElement(root, "visual")
+    map_elem = visual.find("map")
+    if map_elem is None:
+        map_elem = ET.SubElement(visual, "map")
+    map_elem.set("znear", "0.01")
+    map_elem.set("zfar", "50")
+
+    # Add statistic extent for proper depth scaling
+    stat = root.find("statistic")
+    if stat is None:
+        stat = ET.SubElement(root, "statistic")
+    stat.set("extent", "2")
+
     return ET.tostring(root, encoding="unicode")
