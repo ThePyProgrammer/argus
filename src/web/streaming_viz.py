@@ -78,7 +78,7 @@ class WebStreamingViz:
             total_coverage: Combined coverage percentage.
             merge_count: Number of map merges performed.
         """
-        self._update_cloud(merged_voxels)
+        self._update_cloud(merged_voxels, robot_data)
         self._update_robots(robot_data)
         self._update_stats(robot_data, total_coverage, merge_count)
 
@@ -100,17 +100,20 @@ class WebStreamingViz:
         self._message_queue = []
         return msgs
 
-    def _update_cloud(self, merged_voxels: np.ndarray) -> None:
-        """Compute and queue cloud delta/full messages."""
+    def _update_cloud(self, merged_voxels: np.ndarray, robot_data: dict) -> None:
+        """Compute and queue cloud delta/full messages with per-robot colors."""
         if len(merged_voxels) == 0:
             return
+
+        # Build per-robot voxel ownership for coloring
+        robot_voxel_sets = self._build_robot_voxel_sets(robot_data)
 
         # Delta tracking
         delta, updated_set = compute_cloud_delta(merged_voxels, self._last_voxel_set)
         self._last_voxel_set = updated_set
 
         if len(delta) > 0:
-            colors = self._compute_colors(delta)
+            colors = self._compute_colors(delta, robot_voxel_sets)
             self._message_queue.append({
                 "type": CLOUD_DELTA,
                 "payload": {
@@ -123,7 +126,7 @@ class WebStreamingViz:
         now = time.monotonic()
         if now - self._last_full_sync > self._full_sync_interval:
             self._last_full_sync = now
-            full_colors = self._compute_colors(merged_voxels)
+            full_colors = self._compute_colors(merged_voxels, robot_voxel_sets)
             self._message_queue.append({
                 "type": CLOUD_FULL,
                 "payload": {
@@ -132,23 +135,48 @@ class WebStreamingViz:
                 },
             })
 
-    def _compute_colors(self, voxels: np.ndarray) -> list[list[int]]:
-        """Compute per-voxel colors based on current color mode.
+    def _build_robot_voxel_sets(
+        self, robot_data: dict
+    ) -> list[tuple[int, set[tuple[float, float, float]]]]:
+        """Build per-robot voxel ownership sets for coloring.
 
-        Args:
-            voxels: (N, 3) voxel positions.
-
-        Returns:
-            List of [R, G, B] per voxel.
+        Returns list of (robot_index, set_of_voxel_tuples) ordered by robot.
         """
-        n = len(voxels)
-        if self._color_mode == "true_rgb":
-            # Placeholder: white since merged voxels don't carry color
-            return [[255, 255, 255]] * n
-        else:
-            # robot_tint: use first robot's color as default for merged cloud
-            color = list(color_for_robot(0))
-            return [color] * n
+        result = []
+        for i, (rid, data) in enumerate(robot_data.items()):
+            local = data.get("local_voxels")
+            if local is not None and len(local) > 0:
+                # Round to 2 decimal places for matching (0.1m grid)
+                voxel_set = set(
+                    tuple(round(float(c), 2) for c in v)
+                    for v in local
+                )
+                result.append((i, voxel_set))
+        return result
+
+    def _compute_colors(
+        self,
+        voxels: np.ndarray,
+        robot_voxel_sets: list[tuple[int, set[tuple[float, float, float]]]],
+    ) -> list[list[int]]:
+        """Compute per-voxel colors based on robot ownership.
+
+        Each voxel is colored by the robot that contributed it.
+        If a voxel is claimed by multiple robots, the first one wins.
+        Unclaimed voxels get a neutral gray.
+        """
+        colors = []
+        for v in voxels:
+            key = tuple(round(float(c), 2) for c in v)
+            assigned = False
+            for robot_idx, voxel_set in robot_voxel_sets:
+                if key in voxel_set:
+                    colors.append(list(color_for_robot(robot_idx)))
+                    assigned = True
+                    break
+            if not assigned:
+                colors.append([180, 180, 180])  # Gray for unclaimed
+        return colors
 
     def _update_robots(self, robot_data: dict) -> None:
         """Queue per-robot pose, trajectory, and camera frame messages."""
