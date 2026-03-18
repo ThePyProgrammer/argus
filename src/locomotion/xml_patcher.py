@@ -105,6 +105,20 @@ def patch_actuators_to_position_with_floor(xml_path: str) -> str:
             light.set("dir", "0 0 -1")
             light.set("directional", "true")
 
+    # Add a forward-facing camera attached to the robot base body
+    worldbody = root.find("worldbody")
+    if worldbody is not None:
+        base_body = worldbody.find("body")  # first body = robot base
+        if base_body is not None:
+            # Check if camera already exists
+            has_cam = any(c.get("name") == "front_cam" for c in base_body.findall("camera"))
+            if not has_cam:
+                cam = ET.SubElement(base_body, "camera")
+                cam.set("name", "front_cam")
+                cam.set("pos", "0.3 0 0.05")  # front of robot, slightly above center
+                cam.set("xyaxes", "0 -1 0 0 0 1")  # looking forward
+                cam.set("fovy", "45")
+
     # Add visual settings for depth rendering (znear/zfar)
     # Without these, MuJoCo's depth buffer returns all zeros
     visual = root.find("visual")
