@@ -77,7 +77,9 @@ def encode_camera_frame(
     """
     import cv2
 
-    success, buf = cv2.imencode(".jpg", rgb, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    # MuJoCo renders RGB but cv2.imencode expects BGR
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    success, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise RuntimeError("JPEG encoding failed")
     jpeg_bytes = buf.tobytes()
