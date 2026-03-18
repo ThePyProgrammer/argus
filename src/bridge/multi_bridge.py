@@ -15,7 +15,7 @@ import numpy as np
 
 from src.bridge.sensor_types import SensorFrame
 from src.coordination.multi_robot_config import MultiRobotConfig
-from src.coordination.scene_builder import build_two_robot_scene
+from src.coordination.scene_builder import build_two_robot_office_scene, build_two_robot_scene
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +82,18 @@ class MultiRobotBridge:
         import mujoco
 
         # Generate combined XML
-        xml_str = build_two_robot_scene(
-            self._config.model_dir,
-            self._config.spawn_positions,
-        )
-
-        self._model = mujoco.MjModel.from_xml_string(xml_str)
+        if self._config.scene == "office":
+            xml_str, assets = build_two_robot_office_scene(
+                self._config.model_dir,
+                self._config.spawn_positions,
+            )
+            self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
+        else:
+            xml_str = build_two_robot_scene(
+                self._config.model_dir,
+                self._config.spawn_positions,
+            )
+            self._model = mujoco.MjModel.from_xml_string(xml_str)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
 

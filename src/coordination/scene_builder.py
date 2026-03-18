@@ -4,6 +4,10 @@ Reads the single-robot go2.xml model, duplicates and prefixes all named
 elements for robot_a and robot_b, then assembles them into a combined
 scene XML with floor, lighting, and per-robot cameras.
 
+Supports two scene modes:
+- Flat: Simple checkerboard floor (default, for testing).
+- Office: DimOS office1 scene with walls, rooms, furniture.
+
 CRITICAL: The generated XML uses named joints/actuators so that
 MultiRobotBridge can discover qpos/ctrl indices via mj_name2id()
 instead of hardcoding them.
@@ -14,6 +18,7 @@ from __future__ import annotations
 import copy
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 
 
 # Attributes that contain names which must be prefixed
@@ -157,3 +162,160 @@ def build_two_robot_scene(
             act_section.append(new_motor)
 
     return ET.tostring(scene, encoding="unicode")
+
+
+def _find_dimos_scene_data() -> Path:
+    """Locate the DimOS mujoco_sim data directory.
+
+    Checks for extracted data at dimos/data/mujoco_sim/. If not found,
+    attempts to extract from the LFS archive.
+
+    Returns:
+        Path to the mujoco_sim directory containing scene XMLs and assets.
+
+    Raises:
+        FileNotFoundError: If data cannot be found or extracted.
+    """
+    # Relative to project root
+    project_root = Path(__file__).parent.parent.parent
+    data_dir = project_root / "dimos" / "data" / "mujoco_sim"
+    if data_dir.exists():
+        return data_dir
+
+    # Try extracting from LFS archive
+    archive = project_root / "dimos" / "data" / ".lfs" / "mujoco_sim.tar.gz"
+    if archive.exists():
+        import tarfile
+        with tarfile.open(str(archive), "r:gz") as tar:
+            tar.extractall(archive.parent.parent)
+        if data_dir.exists():
+            return data_dir
+
+    raise FileNotFoundError(
+        f"DimOS mujoco_sim data not found at {data_dir}. "
+        "Run: cd dimos && git lfs pull --include 'data/.lfs/mujoco_sim.tar.gz'"
+    )
+
+
+def build_two_robot_office_scene(
+    model_dir: str,
+    spawn_positions: dict[str, tuple[float, float, float]],
+) -> tuple[str, dict[str, bytes]]:
+    """Build a MuJoCo XML with two Go2 robots in the DimOS office scene.
+
+    Loads scene_office1.xml from the DimOS data, injects two prefixed
+    Go2 robot bodies and actuators, and returns the XML along with the
+    asset dictionary needed for mujoco.MjModel.from_xml_string().
+
+    Args:
+        model_dir: Path to directory containing go2.xml and assets/.
+        spawn_positions: Mapping from robot_id to (x, y, z) world position.
+
+    Returns:
+        Tuple of (xml_string, assets_dict) where assets_dict maps
+        filenames to bytes for all scene + robot mesh/texture assets.
+    """
+    scene_data_dir = _find_dimos_scene_data()
+    model_path = Path(model_dir)
+
+    # Parse the office scene XML
+    scene_xml_path = scene_data_dir / "scene_office1.xml"
+    scene_tree = ET.parse(str(scene_xml_path))
+    scene_root = scene_tree.getroot()
+
+    # Parse the Go2 robot XML
+    go2_tree = ET.parse(str(model_path / "go2.xml"))
+    go2_root = go2_tree.getroot()
+
+    # Extract Go2 sections
+    go2_default = go2_root.find("default")
+    go2_asset = go2_root.find("asset")
+    go2_worldbody = go2_root.find("worldbody")
+    go2_actuator = go2_root.find("actuator")
+    robot_body = go2_worldbody.find("body")
+
+    # Merge Go2 defaults into scene
+    if go2_default is not None:
+        existing_default = scene_root.find("default")
+        if existing_default is None:
+            scene_root.insert(0, copy.deepcopy(go2_default))
+        else:
+            for child in go2_default:
+                existing_default.append(copy.deepcopy(child))
+
+    # Merge Go2 mesh/material assets into scene assets
+    scene_asset = scene_root.find("asset")
+    if scene_asset is not None and go2_asset is not None:
+        # Track existing asset names to avoid duplicates
+        existing_names = {elem.get("name") for elem in scene_asset}
+        for asset_child in go2_asset:
+            name = asset_child.get("name")
+            if name not in existing_names:
+                scene_asset.append(copy.deepcopy(asset_child))
+
+    # Inject robots into worldbody
+    worldbody = scene_root.find("worldbody")
+
+    for robot_id, prefix in [("robot_a", "robot_a_"), ("robot_b", "robot_b_")]:
+        body = copy.deepcopy(robot_body)
+        _prefix_element(body, prefix)
+        sx, sy, sz = spawn_positions.get(robot_id, (0.0, 0.0, 0.3))
+        body.attrib["pos"] = f"{sx} {sy} {sz}"
+        ET.SubElement(body, "camera", name=f"{robot_id}_cam",
+                      pos="0.3 0 0.1", xyaxes="0 -1 0 0 0 1", fovy="45")
+        worldbody.append(body)
+
+    # Add actuators for both robots
+    act_section = scene_root.find("actuator")
+    if act_section is None:
+        act_section = ET.SubElement(scene_root, "actuator")
+    for prefix in ("robot_a_", "robot_b_"):
+        for motor in go2_actuator:
+            new_motor = copy.deepcopy(motor)
+            for attr in ("name", "joint", "tendon", "site"):
+                if attr in new_motor.attrib:
+                    new_motor.attrib[attr] = prefix + new_motor.attrib[attr]
+            act_section.append(new_motor)
+
+    # Remove compiler meshdir/texturedir since we'll provide assets dict
+    compiler = scene_root.find("compiler")
+    if compiler is not None:
+        compiler.attrib.pop("meshdir", None)
+        compiler.attrib.pop("texturedir", None)
+
+    # Ensure visual znear/zfar for depth rendering
+    visual = scene_root.find("visual")
+    if visual is None:
+        visual = ET.SubElement(scene_root, "visual")
+    map_elem = visual.find("map")
+    if map_elem is None:
+        map_elem = ET.SubElement(visual, "map")
+    map_elem.set("znear", "0.01")
+    map_elem.set("zfar", "100")
+
+    xml_str = ET.tostring(scene_root, encoding="unicode")
+
+    # Build assets dictionary: scene assets + robot mesh assets
+    assets: dict[str, bytes] = {}
+
+    # Office scene assets (meshes from office_split, textures)
+    mesh_dir = scene_data_dir / "scene_office1" / "office_split"
+    if mesh_dir.exists():
+        for f in mesh_dir.iterdir():
+            if f.is_file():
+                assets[f.name] = f.read_bytes()
+
+    tex_dir = scene_data_dir / "scene_office1" / "textures"
+    if tex_dir.exists():
+        for f in tex_dir.iterdir():
+            if f.is_file():
+                assets[f.name] = f.read_bytes()
+
+    # Go2 robot mesh assets
+    go2_asset_dir = model_path / "assets"
+    if go2_asset_dir.exists():
+        for f in go2_asset_dir.iterdir():
+            if f.is_file() and f.name not in assets:
+                assets[f.name] = f.read_bytes()
+
+    return xml_str, assets
