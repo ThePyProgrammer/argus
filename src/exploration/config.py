@@ -22,14 +22,14 @@ class ExplorationConfig:
 
     # Navigation
     waypoint_arrival_threshold: float = 0.3   # tighter threshold for continuous gait
-    linear_speed: float = 0.5
+    linear_speed: float = 1.0
     angular_speed: float = 1.0
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
 
     # Termination
     max_steps: int = 10000                # safety net step limit
-    stuck_threshold_steps: int = 50       # steps without meaningful position change = stuck
-    stuck_distance_m: float = 0.05        # minimum movement per step to not be stuck
+    stuck_threshold_steps: int = 100      # steps without meaningful position change = stuck
+    stuck_distance_m: float = 0.02        # minimum movement per step to not be stuck
 
     # Frontier detection
     voxel_resolution: float = 0.1         # must match OctoMapBuilder
