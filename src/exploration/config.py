@@ -21,10 +21,10 @@ class ExplorationConfig:
     rescan_voxel_delta: int = 500         # re-evaluate when map grows by this many voxels
 
     # Navigation
-    waypoint_arrival_threshold: float = 1.0   # coarse navigation (discrete actions)
+    waypoint_arrival_threshold: float = 0.3   # tighter threshold for continuous gait
     linear_speed: float = 0.5
     angular_speed: float = 1.0
-    path_simplify_interval: float = 1.0       # keep waypoints ~1m apart
+    path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
 
     # Termination
     max_steps: int = 10000                # safety net step limit
