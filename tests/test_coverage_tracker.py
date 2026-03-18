@@ -19,15 +19,15 @@ class TestExplorationConfig:
         assert cfg.rescan_distance_m == 2.0
         assert cfg.rescan_voxel_delta == 500
         assert cfg.max_steps == 10000
-        assert cfg.stuck_threshold_steps == 20
-        assert cfg.stuck_distance_m == 0.3
+        assert cfg.stuck_threshold_steps == 100
+        assert cfg.stuck_distance_m == 0.02
         assert cfg.log_interval_steps == 50
         assert cfg.voxel_resolution == 0.1
         assert cfg.min_cluster_size == 5
         assert cfg.goal_strategy == "nearest"
-        assert cfg.linear_speed == 0.5
+        assert cfg.linear_speed == 1.0
         assert cfg.angular_speed == 1.0
-        assert cfg.waypoint_arrival_threshold == 1.0
+        assert cfg.waypoint_arrival_threshold == 0.3
 
     def test_custom_values(self) -> None:
         cfg = ExplorationConfig(max_steps=500, goal_strategy="largest")

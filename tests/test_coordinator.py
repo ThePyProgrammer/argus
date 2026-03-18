@@ -388,10 +388,10 @@ class TestExplorationLoopStepOnce:
 
         frame = _make_sensor_frame([0, 0, 0])
 
-        # First call should trigger rescan (no previous state)
+        # Call at step 35 (past min_scan_step=30) to trigger rescan
         with patch.object(loop._frontier_detector, "detect", return_value=[]), \
              patch("src.exploration.exploration_loop.project_voxels_to_2d", return_value=MagicMock()):
-            linear, angular, metrics = loop.step_once(frame, 0)
+            linear, angular, metrics = loop.step_once(frame, 35)
 
         assert isinstance(linear, np.ndarray)
         assert isinstance(angular, float)

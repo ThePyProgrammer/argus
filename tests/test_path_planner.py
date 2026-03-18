@@ -210,8 +210,8 @@ class TestPathPlanner:
             # Z should be 0.0 (ground-plane navigation)
             assert wp[2] == 0.0
 
-    def test_start_on_occupied_returns_none(self):
-        """If start cell is OCCUPIED, return None."""
+    def test_start_on_occupied_finds_path(self):
+        """Robot can start from OCCUPIED cell (it's physically there)."""
         g = np.full((20, 20), CELL_FREE, dtype=np.int8)
         g[0, 0] = CELL_OCCUPIED
         grid = OccupancyGrid2D(
@@ -221,4 +221,4 @@ class TestPathPlanner:
         start = np.array([0.25, 0.25, 0.0])  # maps to cell (0,0) which is occupied
         goal = np.array([5.0, 5.0, 0.0])
         path = planner.plan(start, goal, grid)
-        assert path is None
+        assert path is not None
