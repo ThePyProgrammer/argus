@@ -159,23 +159,36 @@ class WebStreamingViz:
         voxels: np.ndarray,
         robot_voxel_sets: list[tuple[int, set[tuple[float, float, float]]]],
     ) -> list[list[int]]:
-        """Compute per-voxel colors based on robot ownership.
+        """Compute per-voxel colors based on spatial proximity to robots.
 
-        Each voxel is colored by the robot that contributed it.
-        If a voxel is claimed by multiple robots, the first one wins.
-        Unclaimed voxels get a neutral gray.
+        Uses X coordinate to roughly assign voxels to the nearest robot
+        (since robots start at different X positions). Simple but effective
+        for two-robot scenarios on flat ground.
         """
+        if not robot_voxel_sets:
+            return [list(color_for_robot(0))] * len(voxels)
+
+        # Get approximate robot X positions from their voxel set centers
+        robot_centers = []
+        for robot_idx, voxel_set in robot_voxel_sets:
+            if voxel_set:
+                xs = [v[0] for v in voxel_set]
+                robot_centers.append((robot_idx, sum(xs) / len(xs)))
+            else:
+                robot_centers.append((robot_idx, 0.0))
+
         colors = []
         for v in voxels:
-            key = tuple(round(float(c), 2) for c in v)
-            assigned = False
-            for robot_idx, voxel_set in robot_voxel_sets:
-                if key in voxel_set:
-                    colors.append(list(color_for_robot(robot_idx)))
-                    assigned = True
-                    break
-            if not assigned:
-                colors.append([180, 180, 180])  # Gray for unclaimed
+            vx = float(v[0])
+            # Assign to nearest robot by X distance
+            best_idx = robot_centers[0][0]
+            best_dist = abs(vx - robot_centers[0][1])
+            for robot_idx, cx in robot_centers[1:]:
+                d = abs(vx - cx)
+                if d < best_dist:
+                    best_dist = d
+                    best_idx = robot_idx
+            colors.append(list(color_for_robot(best_idx)))
         return colors
 
     def _update_robots(self, robot_data: dict) -> None:
