@@ -36,12 +36,9 @@ def depth_to_pointcloud(
     cam_x = (u[valid] - intrinsics.cx) * z_depth / intrinsics.fx
     cam_y = (v[valid] - intrinsics.cy) * z_depth / intrinsics.fy
 
-    # Output in MuJoCo/OpenGL camera frame: X-right, Y-up, Z-back
-    # Image convention: u=right (X), v=down (-Y), depth=forward (-Z)
-    # So: cam_X = +cam_x, cam_Y = -cam_y (flip v), cam_Z = -depth (forward→back)
-    # The caller (SLAMPipeline) transforms to world frame using the camera's
-    # world pose (cam_xpos + cam_xmat from MuJoCo).
-    points = np.stack([cam_x, -cam_y, -z_depth], axis=-1)
+    # Config G: [-cx, -cy, -z] with cam_xmat.T transform
+    # Empirically verified to place cloud in front of robot at ground level.
+    points = np.stack([-cam_x, -cam_y, -z_depth], axis=-1)
     colors = rgb[valid].astype(np.float64) / 255.0
 
     pcd = o3d.geometry.PointCloud()
