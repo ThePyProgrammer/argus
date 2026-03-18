@@ -237,8 +237,11 @@ class ExplorationLoop:
         # ----------------------------------------------------------
         # c. Check re-evaluation trigger
         # ----------------------------------------------------------
-        should_rescan = force_rescan
-        if not should_rescan:
+        # Don't rescan in first 20 steps -- drive forward to build initial
+        # map data before frontier detection has enough to work with
+        min_scan_step = 20
+        should_rescan = force_rescan and step >= min_scan_step
+        if not should_rescan and step >= min_scan_step:
             dist_from_last_scan = float(np.linalg.norm(current_pos - self._last_rescan_pos))
             voxel_delta = self._octomap.num_occupied - self._last_voxel_count
             waypoint_done = (
@@ -384,7 +387,7 @@ class ExplorationLoop:
 
             self._bridge.set_velocity(linear_vel, angular_vel)
 
-            if metrics["terminated"]:
+            if metrics["terminated"] and step >= 20:
                 # Determine specific termination reason from frontier state
                 if metrics["frontiers"] == 0:
                     terminated_reason = "no_frontiers"
