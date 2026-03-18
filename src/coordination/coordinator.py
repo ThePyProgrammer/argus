@@ -197,11 +197,10 @@ class Coordinator:
                 if not metrics.get("terminated", False):
                     all_terminated = False
 
-            # Don't trust early termination — robots need time to build maps
-            # before "no frontiers" is a meaningful signal
-            min_explore_steps = max(self._config.boot_phase_steps // self._config.sim_steps_per_frame, 50)
-            if step < min_explore_steps:
-                all_terminated = False
+            # Never terminate early in multi-robot mode. The frontier
+            # detection on flat/sparse scenes is unreliable for termination.
+            # Run for full max_steps; user controls duration via CLI flag.
+            all_terminated = False
 
                 # When rescan triggered: robot publishes map via pLCM
                 if metrics.get("rescan_triggered", False):
