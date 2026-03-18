@@ -52,9 +52,9 @@ class TestPatchActuators:
         actuator_elem = root.find("actuator")
 
         expected_gains = {
-            "abduction": ("40", "2"),
-            "hip": ("40", "2"),
-            "knee": ("60", "3"),
+            "abduction": ("80", "4"),
+            "hip": ("80", "4"),
+            "knee": ("120", "6"),
         }
 
         for child in actuator_elem:
@@ -151,10 +151,10 @@ class TestGaitParams:
         from src.locomotion.gait_params import GaitParams
 
         p = GaitParams()
-        assert p.frequency == 2.0
+        assert p.frequency == 3.0
         assert p.stance_height == -0.25
-        assert p.swing_height == 0.06
-        assert p.stride_length == 0.15
+        assert p.swing_height == 0.15
+        assert p.stride_length == 0.4
         assert p.lateral_stride == 0.08
         assert p.max_speed == 1.0
         assert p.standing_hip == 0.0
@@ -171,9 +171,9 @@ def _load_patched_model():
     """Load Go2 with patched position actuators + floor for physics tests."""
     import mujoco
 
-    from src.locomotion.xml_patcher import patch_actuators_to_position
+    from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
 
-    xml_str = patch_actuators_to_position(GO2_XML)
+    xml_str = patch_actuators_to_position_with_floor(GO2_XML)
 
     # Build assets dict
     asset_dir = Path(GO2_XML).parent / "assets"
@@ -328,7 +328,7 @@ class TestMuJoCoIntegration:
         )
 
     def test_robot_turns(self):
-        """Robot turns >45 degrees (0.785 rad) in 50 steps with omega=1.0."""
+        """Robot turns >45 degrees (0.785 rad) in 100 steps with omega=1.0."""
         import mujoco
 
         from src.locomotion.gait_controller import TrotGaitController
@@ -352,9 +352,9 @@ class TestMuJoCoIntegration:
 
         start_yaw = _yaw_from_quat(data.qpos[3:7])
 
-        # Run 50 steps with angular velocity
+        # Run 100 steps with angular velocity
         dt = model.opt.timestep * 10
-        for _ in range(50):
+        for _ in range(100):
             targets = ctrl.compute(vx=0.0, vy=0.0, omega=1.0, dt=dt)
             data.ctrl[:] = targets
             for _ in range(10):

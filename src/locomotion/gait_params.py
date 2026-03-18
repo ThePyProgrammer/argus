@@ -15,17 +15,17 @@ class GaitParams:
     code values (0, 0.8, -1.5).
     """
 
-    frequency: float = 2.0
-    """Gait cycles per second. Kept low to avoid frame aliasing at 5-10 Hz."""
+    frequency: float = 3.0
+    """Gait cycles per second. Moderate frequency for good stride coverage."""
 
     stance_height: float = -0.25
     """Target foot height relative to hip (negative = below)."""
 
-    swing_height: float = 0.06
-    """Foot lift during swing phase (meters)."""
+    swing_height: float = 0.15
+    """Foot lift amplitude during swing phase (joint-angle scale, not meters)."""
 
-    stride_length: float = 0.15
-    """Max forward stride per step at full speed (meters)."""
+    stride_length: float = 0.4
+    """Max forward stride per step at full speed (joint-angle scale)."""
 
     lateral_stride: float = 0.08
     """Max lateral stride per step at full speed (meters)."""

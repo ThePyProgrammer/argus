@@ -15,9 +15,9 @@ import xml.etree.ElementTree as ET
 # PD gains per actuator class (from community Go2 controllers).
 # Keys match the ``class`` attribute on <motor> elements in go2.xml.
 _GAINS: dict[str, dict[str, str]] = {
-    "abduction": {"kp": "40", "kv": "2"},
-    "hip": {"kp": "40", "kv": "2"},
-    "knee": {"kp": "60", "kv": "3"},
+    "abduction": {"kp": "80", "kv": "4"},
+    "hip": {"kp": "80", "kv": "4"},
+    "knee": {"kp": "120", "kv": "6"},
 }
 
 
@@ -59,5 +59,50 @@ def patch_actuators_to_position(xml_path: str) -> str:
 
         # Remove torque ctrlrange -- position actuators use joint limits
         motor.attrib.pop("ctrlrange", None)
+
+    return ET.tostring(root, encoding="unicode")
+
+
+def patch_actuators_to_position_with_floor(xml_path: str) -> str:
+    """Like :func:`patch_actuators_to_position` but also adds a ground plane.
+
+    Inserts a ``<geom type="plane" .../>`` and a ``<light>`` into the
+    worldbody so that the patched model can be loaded standalone for
+    physics testing without a separate scene XML.
+    """
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    # Patch actuators (same logic)
+    actuator_elem = root.find("actuator")
+    if actuator_elem is not None:
+        for motor in list(actuator_elem):
+            if motor.tag != "motor":
+                continue
+            joint_class = motor.get("class", "")
+            gains = _GAINS.get(joint_class, _GAINS["hip"])
+            motor.tag = "position"
+            motor.set("kp", gains["kp"])
+            motor.set("kv", gains["kv"])
+            motor.attrib.pop("ctrlrange", None)
+
+    # Add floor and light to worldbody
+    worldbody = root.find("worldbody")
+    if worldbody is not None:
+        has_floor = any(
+            g.get("type") == "plane" for g in worldbody.findall("geom")
+        )
+        if not has_floor:
+            floor = ET.SubElement(worldbody, "geom")
+            floor.set("name", "floor")
+            floor.set("type", "plane")
+            floor.set("size", "100 100 0.05")
+            floor.set("condim", "6")
+            floor.set("friction", "0.8 0.02 0.01")
+
+            light = ET.SubElement(worldbody, "light")
+            light.set("pos", "0 0 3")
+            light.set("dir", "0 0 -1")
+            light.set("directional", "true")
 
     return ET.tostring(root, encoding="unicode")
