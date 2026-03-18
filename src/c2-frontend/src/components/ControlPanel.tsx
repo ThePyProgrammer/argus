@@ -11,6 +11,8 @@ export default function ControlPanel() {
   const setSimSpeed = useControlStore((s) => s.setSimSpeed);
   const cloudConfigs = useControlStore((s) => s.cloudConfigs);
   const activeCloudConfig = useControlStore((s) => s.activeCloudConfig);
+  const cloudOffset = useControlStore((s) => s.cloudOffset);
+  const setCloudOffset = useControlStore((s) => s.setCloudOffset);
 
   const handleStartStop = () => {
     const action = isRunning ? 'stop' : 'start';
@@ -122,6 +124,44 @@ export default function ControlPanel() {
                 <strong>{key}</strong>: {label}
               </button>
             ))}
+          </div>
+
+          <div style={{ marginTop: '10px', borderTop: '1px solid #2a2a4a', paddingTop: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', color: '#777' }}>
+              CLOUD OFFSET
+            </div>
+            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+              <div key={axis} style={{ marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
+                  <span>{axis}</span>
+                  <span>{cloudOffset[i].toFixed(1)}m</span>
+                </div>
+                <input
+                  type="range"
+                  min="-10"
+                  max="10"
+                  step="0.1"
+                  value={cloudOffset[i]}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    const newOffset: [number, number, number] = [...cloudOffset];
+                    newOffset[i] = val;
+                    setCloudOffset(newOffset);
+                  }}
+                  style={{ width: '100%', height: '14px' }}
+                />
+              </div>
+            ))}
+            <button
+              onClick={() => setCloudOffset([0, 0, 0])}
+              style={{
+                padding: '3px 8px', border: '1px solid #444', borderRadius: '3px',
+                cursor: 'pointer', fontSize: '10px', background: '#222', color: '#aaa',
+                width: '100%', marginTop: '2px',
+              }}
+            >
+              Reset offsets
+            </button>
           </div>
         </div>
       )}

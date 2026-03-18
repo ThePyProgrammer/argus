@@ -5,6 +5,7 @@ import { PointCloudManager } from './PointCloud';
 import { RobotMarkerManager } from './RobotMarker';
 import { TrajectoryTrailManager } from './TrajectoryTrail';
 import { useRobotStore } from '../stores/robotStore';
+import { useControlStore } from '../stores/controlStore';
 import { useSceneLoader } from '../hooks/useSceneLoader';
 
 /**
@@ -80,6 +81,14 @@ export default function SceneViewer() {
     const robotMarkerManager = new RobotMarkerManager(worldRoot);
     const trailManager = new TrajectoryTrailManager(worldRoot);
 
+    // --- Cloud offset subscription ---
+    const unsubControl = useControlStore.subscribe((state, prev) => {
+      if (state.cloudOffset !== prev.cloudOffset) {
+        const [ox, oy, oz] = state.cloudOffset;
+        pointCloudManager.setOffset(ox, oy, oz);
+      }
+    });
+
     // --- Zustand subscription (imperative, no React re-renders) ---
     const unsub = useRobotStore.subscribe((state, prevState) => {
       // Point cloud update
@@ -149,6 +158,7 @@ export default function SceneViewer() {
     return () => {
       cancelAnimationFrame(animationId);
       unsub();
+      unsubControl();
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();

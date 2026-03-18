@@ -8,8 +8,9 @@ export interface ControlStoreState {
   sendRaw: ((msg: Record<string, unknown>) => void) | null;
 
   // Cloud config
-  cloudConfigs: Record<string, string>; // key -> label
+  cloudConfigs: Record<string, string>;
   activeCloudConfig: string;
+  cloudOffset: [number, number, number]; // [x, y, z] offset applied to cloud in scene
 
   setRunning: (running: boolean) => void;
   setPaused: (paused: boolean) => void;
@@ -18,6 +19,7 @@ export interface ControlStoreState {
   setSendRaw: (fn: (msg: Record<string, unknown>) => void) => void;
   setCloudConfigs: (configs: Record<string, string>, active: string) => void;
   setActiveCloudConfig: (key: string) => void;
+  setCloudOffset: (offset: [number, number, number]) => void;
 }
 
 export const useControlStore = create<ControlStoreState>((set) => ({
@@ -28,6 +30,7 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   sendRaw: null,
   cloudConfigs: {},
   activeCloudConfig: 'G',
+  cloudOffset: [0, 0, 0] as [number, number, number],
 
   setRunning: (running: boolean) => set({ isRunning: running }),
   setPaused: (paused: boolean) => set({ isPaused: paused }),
@@ -36,4 +39,5 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   setSendRaw: (fn) => set({ sendRaw: fn }),
   setCloudConfigs: (configs, active) => set({ cloudConfigs: configs, activeCloudConfig: active }),
   setActiveCloudConfig: (key) => set({ activeCloudConfig: key }),
+  setCloudOffset: (offset) => set({ cloudOffset: offset }),
 }));

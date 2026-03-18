@@ -120,6 +120,11 @@ export class PointCloudManager {
     this.geometry.computeBoundingSphere();
   }
 
+  /** Shift the entire cloud by an offset (in worldRoot Z-up coords). */
+  setOffset(x: number, y: number, z: number): void {
+    this.points.position.set(x, y, z);
+  }
+
   /** Release GPU resources. */
   dispose(): void {
     this.geometry.dispose();
