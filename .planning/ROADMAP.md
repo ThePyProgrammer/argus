@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Autonomous Exploration** - One robot autonomously discovers and navigates to frontiers, building its map without human input
 - [x] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time (completed 2026-03-17)
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress (1/2 plans complete)
+- [ ] **Phase 5: Robot Locomotion Fix** - Fix actuator mismatch and replace sinusoidal gait with proper trot locomotion so robots actually walk
 
 ## Phase Details
 
@@ -82,10 +83,26 @@ Plans:
 - [x] 04-01-PLAN.md — MultiRobotVisualizer class: split-panel Rerun dashboard, merged 3D map, robot overlays, coverage heatmap, stats HUD
 - [ ] 04-02-PLAN.md — Wire visualization into Coordinator and main.py --control multi mode, integration tests, human verification
 
+### Phase 5: Make sure the robots do not get stuck at one place without being able to move off
+**Goal**: Go2 robots physically walk when given velocity commands by fixing the torque-vs-position actuator mismatch and replacing the sinusoidal gait with a proper Raibert-style trot, plus adding turn-in-place stuck recovery
+**Depends on:** Phase 4
+**Requirements**: LOCO-01, LOCO-02, LOCO-03, LOCO-04, LOCO-05, LOCO-06
+**Success Criteria** (what must be TRUE):
+  1. Robot translates >0.5m in 100 steps when given a forward velocity command (currently ~0m)
+  2. Robot turns >45 degrees in 50 steps when given an angular velocity command
+  3. Both single-robot and multi-robot bridges use the same trot gait controller
+  4. Stuck detection triggers a physical turn-in-place recovery before rescanning frontiers
+  5. All existing tests continue to pass (no regression)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Locomotion module: XML actuator patcher, TrotGaitController, GaitParams, and movement tests
+- [ ] 05-02-PLAN.md — Bridge integration, scene builder patching, stuck recovery, and human verification
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -93,13 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Autonomous Exploration | 3/3 | Complete    | 2026-03-17 |
 | 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 1/2 | In progress | - |
-
-### Phase 5: Make sure the robots do not get stuck at one place without being able to move off
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 4
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 5 to break down)
+| 5. Robot Locomotion Fix | 0/2 | Not started | - |
