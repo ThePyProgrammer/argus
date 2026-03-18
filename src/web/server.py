@@ -55,12 +55,12 @@ def create_app(
     # Serve scene assets from DimOS data directory
     scene_dir = Path(__file__).parent.parent.parent / "dimos" / "data" / "mujoco_sim" / "scene_office1"
     if scene_dir.exists():
-        app.mount("/assets/scene", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+        app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
 
     # Serve GLB and other public assets from the frontend public directory
     glb_dir = Path(__file__).parent.parent / "c2-frontend" / "public"
     if glb_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(glb_dir)), name="glb_assets")
+        app.mount("/public", StaticFiles(directory=str(glb_dir)), name="glb_assets")
 
     # Serve React frontend build as static files (must be last mount -- catch-all)
     frontend_dir = Path(__file__).parent.parent / "c2-frontend" / "dist"

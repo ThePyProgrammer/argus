@@ -22,7 +22,7 @@ export function useSceneLoader(scene: THREE.Object3D | null): {
     setLoading(true);
 
     loader.load(
-      '/assets/scene.glb',
+      '/public/scene.glb',
       (gltf) => {
         scene.add(gltf.scene);
         setLoading(false);
