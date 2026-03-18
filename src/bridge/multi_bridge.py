@@ -164,8 +164,11 @@ class MultiRobotBridge:
         # Launch interactive MuJoCo 3D viewer
         self._viewer_handle = None
         try:
+            import warnings
             import mujoco.viewer
-            self._viewer_handle = mujoco.viewer.launch_passive(self._model, self._data)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*Wayland.*")
+                self._viewer_handle = mujoco.viewer.launch_passive(self._model, self._data)
             logger.info("MuJoCo interactive viewer launched")
         except Exception as e:
             logger.warning("Could not launch MuJoCo viewer: %s", e)
