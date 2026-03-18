@@ -256,6 +256,12 @@ def run_multi_mode(args):
             print(f"  {rid}: {count} voxels")
 
     bridge.stop()
+
+    # Clean shutdown of Rerun to avoid gRPC segfault on exit
+    import time
+    import rerun as rr
+    rr.disconnect()
+    time.sleep(0.5)
     print("Done.")
 
 
