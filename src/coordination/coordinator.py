@@ -297,7 +297,12 @@ class Coordinator:
         for rid in robot_ids:
             robot = self._robots[rid]
             occupied = robot.octomap.get_occupied_voxels()
-            grid_2d = project_voxels_to_2d(occupied, robot.exploration._frontier_detector._resolution)
+            if len(occupied) == 0:
+                continue
+            try:
+                grid_2d = project_voxels_to_2d(occupied, robot.exploration._frontier_detector._resolution)
+            except (ValueError, IndexError):
+                continue
             frontiers = robot.exploration._frontier_detector.detect(
                 occupied,
                 np.array([robot.slam.slam_poses[-1][:3, 3]])
