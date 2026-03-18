@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointCloudManager } from './PointCloud';
@@ -20,9 +20,10 @@ import { useSceneLoader } from '../hooks/useSceneLoader';
 export default function SceneViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
 
   // GLB scene loader (fires once scene is created)
-  useSceneLoader(sceneRef.current);
+  useSceneLoader(sceneReady ? sceneRef.current : null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -38,6 +39,7 @@ export default function SceneViewer() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0d0d1a);
     sceneRef.current = scene;
+    setSceneReady(true);
 
     // --- Camera ---
     const aspect = container.clientWidth / container.clientHeight;

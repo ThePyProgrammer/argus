@@ -86,12 +86,23 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             "payload": {"robots": _robot_ids},
         })
         while True:
-            data = await websocket.receive_json()
-            if data.get("type") == "command" and command_callback is not None:
-                command_callback(data.get("payload", {}))
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            if "text" in message:
+                import json
+                try:
+                    data = json.loads(message["text"])
+                    if data.get("type") == "command" and command_callback is not None:
+                        command_callback(data.get("payload", {}))
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            elif "bytes" in message:
+                pass  # Binary messages from client not expected
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-    except Exception:
+    except Exception as e:
+        logger.warning("WebSocket error: %s", e)
         manager.disconnect(websocket)
 
 
