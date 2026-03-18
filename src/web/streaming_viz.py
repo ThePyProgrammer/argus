@@ -123,10 +123,12 @@ class WebStreamingViz:
         now = time.monotonic()
         if now - self._last_full_sync > self._full_sync_interval:
             self._last_full_sync = now
+            full_colors = self._compute_colors(merged_voxels)
             self._message_queue.append({
                 "type": CLOUD_FULL,
                 "payload": {
                     "positions": merged_voxels.tolist(),
+                    "colors": full_colors,
                 },
             })
 
