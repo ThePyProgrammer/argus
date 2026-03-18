@@ -123,12 +123,10 @@ class WaypointRunner:
         # Proportional control
         angular_vel = np.clip(angle_error * 2.0, -self._angular_speed, self._angular_speed)
 
-        # Drive forward when roughly facing the target
-        if abs(angle_error) < math.pi / 4:
-            linear_vel = np.array([self._linear_speed, 0.0])
-        else:
-            # Turn in place when far off heading
-            linear_vel = np.zeros(2)
+        # Always drive forward while turning -- quadrupeds can walk and
+        # turn simultaneously. Scale down speed when far off heading.
+        heading_factor = max(0.3, 1.0 - abs(angle_error) / math.pi)
+        linear_vel = np.array([self._linear_speed * heading_factor, 0.0])
 
         return linear_vel, float(angular_vel)
 
