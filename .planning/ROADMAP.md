@@ -115,7 +115,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — FastAPI backend: message types, ConnectionManager, WebStreamingViz, WebSocket server, tests
+- [x] 06-01-PLAN.md — FastAPI backend: message types, ConnectionManager, WebStreamingViz, WebSocket server, tests
 - [ ] 06-02-PLAN.md — React/Vite frontend scaffold: Zustand stores, WebSocket hook, layout, sidebar, camera components
 - [ ] 06-03-PLAN.md — Three.js 3D viewer: scene setup, point cloud manager, robot markers, trajectory trails, GLB loader
 - [ ] 06-04-PLAN.md — End-to-end integration: Coordinator wiring, main.py --control web, scene GLB conversion, human verification
@@ -132,4 +132,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 1/2 | In progress | - |
 | 5. Robot Locomotion Fix | 2/2 | Complete    | 2026-03-18 |
-| 6. React C2 Web Interface | 0/4 | Not started | - |
+| 6. React C2 Web Interface | 2/4 | In progress | - |

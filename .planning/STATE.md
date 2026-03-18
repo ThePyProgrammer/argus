@@ -48,7 +48,7 @@ Progress: [###############-----] 78%
 | 3 | 3 | 20 min | 7 min |
 | 4 | 1 | 6 min | 6 min |
 | 5 | 2 | 77 min | 39 min |
-| 6 | 2 | 5 min | 3 min |
+| 6 | 2 | 12 min | 6 min |
 
 **Recent Trend:**
 - Last 5 plans: 9, 5, 6, 17, 60 min
@@ -115,6 +115,9 @@ Recent decisions affecting current work:
 - [05-02]: Waypoint runner always drives forward (no turn-in-place stalling)
 - [05-02]: Stuck detection thresholds relaxed for continuous gait locomotion
 - [05-02]: Multi-robot early termination disabled to run full max_steps
+- [06-01]: Sync queue + async drain pattern: WebStreamingViz.update() queues synchronously, server push_loop drains asynchronously
+- [06-01]: Binary camera protocol: [0x01][id_len][robot_id_ascii][jpeg_bytes] for efficient frame streaming
+- [06-01]: Set-based delta tracking with np.round(2) for stable float comparison
 - [06-02]: Zustand Map<string, RobotInfo> for O(1) robot lookup with selective subscriptions
 - [06-02]: Blob URL revokeObjectURL in setCameraUrl to prevent memory leaks
 - [06-02]: Custom events (focus-robot) for cross-component communication with Plan 03
@@ -144,5 +147,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T08:34:19Z
-Stopped at: Completed 06-02-PLAN (React frontend shell)
+Last session: 2026-03-18T08:36:18Z
+Stopped at: Completed 06-01-PLAN (FastAPI WebSocket backend)
