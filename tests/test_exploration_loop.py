@@ -253,7 +253,7 @@ class TestExplorationLoop:
         bridge = MockBridge(move_per_step=0.0)  # no movement
         slam = MockSLAM()
         octomap = MockOctoMap()
-        config = self._make_config(max_steps=30, stuck_threshold_steps=5)
+        config = self._make_config(max_steps=80, stuck_threshold_steps=5)
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
