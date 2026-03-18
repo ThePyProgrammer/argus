@@ -155,11 +155,20 @@ class MultiRobotBridge:
         for _ in range(self._config.boot_phase_steps):
             mujoco.mj_step(self._model, self._data)
 
-        # Create one renderer per robot + one for overview
+        # Create one renderer per robot
         w, h = self._config.resolution
         for robot_id in self._config.robot_ids:
             self._renderers[robot_id] = mujoco.Renderer(self._model, height=h, width=w)
         self._overview_renderer = mujoco.Renderer(self._model, height=h, width=w)
+
+        # Launch interactive MuJoCo 3D viewer
+        self._viewer_handle = None
+        try:
+            import mujoco.viewer
+            self._viewer_handle = mujoco.viewer.launch_passive(self._model, self._data)
+            logger.info("MuJoCo interactive viewer launched")
+        except Exception as e:
+            logger.warning("Could not launch MuJoCo viewer: %s", e)
 
         self._step_count = 0
 
@@ -192,6 +201,13 @@ class MultiRobotBridge:
             mujoco.mj_step(self._model, self._data)
 
         self._step_count += 1
+
+        # Sync interactive viewer if open
+        if self._viewer_handle is not None:
+            try:
+                self._viewer_handle.sync()
+            except Exception:
+                self._viewer_handle = None
 
         # Capture frames
         frames = {}
@@ -229,6 +245,12 @@ class MultiRobotBridge:
         if self._overview_renderer is not None:
             self._overview_renderer.close()
             self._overview_renderer = None
+        if self._viewer_handle is not None:
+            try:
+                self._viewer_handle.close()
+            except Exception:
+                pass
+            self._viewer_handle = None
         self._model = None
         self._data = None
         self._step_count = 0

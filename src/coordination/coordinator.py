@@ -191,6 +191,12 @@ class Coordinator:
                 if not metrics.get("terminated", False):
                     all_terminated = False
 
+            # Don't trust early termination — robots need time to build maps
+            # before "no frontiers" is a meaningful signal
+            min_explore_steps = max(self._config.boot_phase_steps // self._config.sim_steps_per_frame, 20)
+            if step < min_explore_steps:
+                all_terminated = False
+
                 # When rescan triggered: robot publishes map via pLCM
                 if metrics.get("rescan_triggered", False):
                     any_rescan_triggered = True
@@ -230,7 +236,6 @@ class Coordinator:
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
                 frontier_cells = self._gather_frontier_cells(robot_ids)
                 total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
-                overview_img = self._bridge.render_overview() if hasattr(self._bridge, 'render_overview') else None
                 self._viz.update(
                     merged_voxels=self._merger.last_merged_voxels,
                     robot_data=robot_data,
@@ -239,7 +244,6 @@ class Coordinator:
                     voronoi_direction=voronoi_dir,
                     total_coverage=total_cov,
                     merge_count=self._merge_count,
-                    overview_image=overview_img,
                 )
 
             if all_terminated:
