@@ -121,7 +121,6 @@ class MultiRobotVisualizer:
         for rid, data in robot_data.items():
             self._log_robot_panel(rid, data)
             self._log_robot_overlay(rid, data)
-        self._log_coverage_heatmap(merged_voxels, frontier_cells)
         if voronoi_midpoint is not None:
             self._log_voronoi_plane(voronoi_midpoint, voronoi_direction)
         self._log_stats_hud(total_coverage, robot_data, merge_count)
