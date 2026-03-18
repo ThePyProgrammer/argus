@@ -20,10 +20,11 @@ import { useSceneLoader } from '../hooks/useSceneLoader';
 export default function SceneViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const worldRootRef = useRef<THREE.Group | null>(null);
+  const sceneObjRef = useRef<THREE.Scene | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
 
-  // GLB scene loader (adds to worldRoot so Z-up rotation applies)
-  useSceneLoader(sceneReady ? worldRootRef.current : null);
+  // GLB scene loaded into raw scene (OBJ meshes are Y-up, no rotation needed)
+  useSceneLoader(sceneReady ? sceneObjRef.current : null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -46,6 +47,7 @@ export default function SceneViewer() {
     worldRoot.rotation.x = -Math.PI / 2;
     scene.add(worldRoot);
     worldRootRef.current = worldRoot;
+    sceneObjRef.current = scene;
     setSceneReady(true);
 
     // --- Camera ---

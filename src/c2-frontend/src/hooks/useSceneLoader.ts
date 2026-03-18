@@ -6,7 +6,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  * Attempts to load a GLB scene file into the provided Three.js scene.
  * Gracefully handles 404 (scene.glb may not exist yet).
  */
-export function useSceneLoader(scene: THREE.Object3D | null): {
+/**
+ * @param parent The parent to add the GLB to. Pass the raw THREE.Scene
+ *   (not worldRoot) if the OBJ meshes use Y-up (standard OBJ convention).
+ */
+export function useSceneLoader(parent: THREE.Object3D | null): {
   loading: boolean;
   error: string | null;
 } {
@@ -15,7 +19,7 @@ export function useSceneLoader(scene: THREE.Object3D | null): {
   const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (!scene || loadedRef.current) return;
+    if (!parent || loadedRef.current) return;
     loadedRef.current = true;
 
     const loader = new GLTFLoader();
@@ -24,7 +28,7 @@ export function useSceneLoader(scene: THREE.Object3D | null): {
     loader.load(
       '/public/scene.glb',
       (gltf) => {
-        scene.add(gltf.scene);
+        parent.add(gltf.scene);
         setLoading(false);
       },
       undefined,
@@ -37,7 +41,7 @@ export function useSceneLoader(scene: THREE.Object3D | null): {
         setLoading(false);
       },
     );
-  }, [scene]);
+  }, [parent]);
 
   return { loading, error };
 }
