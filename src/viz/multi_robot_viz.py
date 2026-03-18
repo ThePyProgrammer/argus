@@ -49,6 +49,8 @@ class MultiRobotVisualizer:
             app_name: Application name shown in the Rerun viewer title bar.
         """
         rr.init(app_name, spawn=True)
+        # MuJoCo uses Z-up coordinate system
+        rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
         blueprint = self._create_blueprint()
         rr.send_blueprint(blueprint)
         self._start_time = time.monotonic()
