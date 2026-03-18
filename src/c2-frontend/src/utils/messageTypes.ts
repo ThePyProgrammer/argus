@@ -8,7 +8,9 @@ export interface WSMessage {
     | 'camera_frame'
     | 'stats'
     | 'command'
-    | 'trajectory';
+    | 'trajectory'
+    | 'cloud_configs'
+    | 'cloud_config_ack';
   robot_id?: string;
   payload: unknown;
 }
