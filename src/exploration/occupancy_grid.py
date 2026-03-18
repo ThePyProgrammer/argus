@@ -148,6 +148,14 @@ def project_voxels_to_2d(
 
     # Compute XY bounding box with padding
     xy = filtered[:, :2]
+    if len(xy) == 0:
+        return OccupancyGrid2D(
+            grid=np.full((1, 1), CELL_UNKNOWN, dtype=np.int8),
+            resolution=resolution,
+            origin=np.array([0.0, 0.0]),
+            width=1,
+            height=1,
+        )
     xy_min = xy.min(axis=0) - padding * resolution
     xy_max = xy.max(axis=0) + padding * resolution
 
