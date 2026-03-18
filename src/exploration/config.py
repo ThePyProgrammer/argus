@@ -38,5 +38,5 @@ class ExplorationConfig:
 
     # Coverage and logging
     log_interval_steps: int = 50          # log every N steps
-    z_min: float = 0.0                    # height range for 2D projection
+    z_min: float = 0.15                   # above ground plane (~robot ankle height)
     z_max: float = 2.0
