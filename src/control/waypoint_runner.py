@@ -88,8 +88,9 @@ class WaypointRunner:
         delta = target[:2] - position[:2]
         distance = np.linalg.norm(delta)
 
-        # Check arrival
-        if distance < self._arrival_threshold:
+        # Check arrival -- only advance to next waypoint if close enough,
+        # but don't skip the LAST waypoint (always drive toward it)
+        if distance < self._arrival_threshold and self._current_index < len(self._waypoints) - 1:
             logger.info(
                 "Reached waypoint %d/%d (dist=%.3f m)",
                 self._current_index + 1,
@@ -97,13 +98,16 @@ class WaypointRunner:
                 distance,
             )
             self._current_index += 1
-            if self.is_complete:
-                logger.info("All waypoints reached")
-                return np.zeros(2), 0.0
             # Recompute for the new waypoint
             target = self._waypoints[self._current_index]
             delta = target[:2] - position[:2]
             distance = np.linalg.norm(delta)
+
+        # Only mark complete when very close to the final waypoint
+        if self._current_index == len(self._waypoints) - 1 and distance < 0.1:
+            logger.info("Reached final waypoint (dist=%.3f m)", distance)
+            self._current_index = len(self._waypoints)
+            return np.zeros(2), 0.0
 
         # Compute desired heading angle toward waypoint
         desired_yaw = math.atan2(delta[1], delta[0])
