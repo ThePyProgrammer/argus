@@ -139,7 +139,7 @@ class TestExplorationLoop:
 
         call_count = 0
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
@@ -171,7 +171,7 @@ class TestExplorationLoop:
 
         detect_calls = [0]
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             detect_calls[0] += 1
             if detect_calls[0] <= 2:
                 return frontiers
@@ -213,7 +213,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             return [
                 _make_cluster([2.0, 0.0, 0.0]),
                 _make_cluster([5.0, 0.0, 0.0]),
@@ -235,7 +235,7 @@ class TestExplorationLoop:
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
         # Always return frontiers and valid paths so loop never terminates naturally
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             return [_make_cluster([10.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
@@ -259,7 +259,7 @@ class TestExplorationLoop:
 
         detect_call_count = [0]
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             detect_call_count[0] += 1
             # After a few detections, return empty to terminate
             if detect_call_count[0] > 3:
@@ -285,7 +285,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             return [_make_cluster([10.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
@@ -307,7 +307,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             return []
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect):
@@ -339,7 +339,7 @@ class TestStuckRecovery:
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
         # Mock frontier detection to return frontiers (keep loop alive)
-        def fake_detect(occupied, robot_positions):
+        def fake_detect(occupied, robot_positions, grid_2d=None):
             return [_make_cluster([5.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
@@ -347,22 +347,22 @@ class TestStuckRecovery:
                  np.array([2.0, 0.0, 0.0]),
                  np.array([5.0, 0.0, 0.0]),
              ]):
-            # Run enough steps to trigger stuck detection
+            # Run enough steps to trigger stuck detection + reverse + turn
             frame = bridge.start()
-            for step in range(10):
+            for step in range(30):
                 linear_vel, angular_vel, metrics = loop.step_once(frame, step)
                 bridge.set_velocity(linear_vel, angular_vel)
                 frame = bridge.step()
 
-            # After stuck_threshold_steps (5), recovery should have been triggered
-            # The angular velocity should be non-zero during recovery
-            # Check that at some point we got a recovery angular velocity
+            # After stuck_threshold_steps (5), recovery should have been triggered.
+            # Recovery is reverse-then-turn: check for reverse (negative linear)
+            # OR angular turn commands as evidence of activation.
             recovery_commands = [
                 cmd for cmd in bridge._velocity_commands
-                if abs(cmd[1]) > 0.5  # angular > 0.5 indicates recovery turn
+                if abs(cmd[1]) > 0.5 or cmd[0][0] < -0.1  # angular turn OR reverse
             ]
             assert len(recovery_commands) > 0, (
-                "Expected recovery turn commands with significant angular velocity"
+                "Expected recovery commands (reverse or turn)"
             )
 
     def test_stuck_recovery_completes(self) -> None:
@@ -396,12 +396,18 @@ class TestStuckRecovery:
         for seed in range(20):
             np.random.seed(seed)
             recovery.trigger()
-            result = recovery.step(0.01)
-            if result is not None:
-                directions.append(np.sign(result[2]))  # sign of omega
+            # Step through the reverse phase to reach the turn phase
+            for _ in range(20):
+                result = recovery.step(0.1)
+                if result is not None and abs(result[2]) > 0.01:
+                    # Found the turn phase -- record direction
+                    directions.append(np.sign(result[2]))
+                    break
             # Reset for next trial
             recovery._active = False
-            recovery._remaining = 0.0
+            recovery._remaining_turn = 0.0
+            recovery._remaining_reverse = 0
+            recovery._phase = "idle"
 
         unique_directions = set(directions)
         assert len(unique_directions) >= 2, (
