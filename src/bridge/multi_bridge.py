@@ -8,7 +8,6 @@ buffer. Joint/actuator indices are discovered dynamically via mj_name2id().
 from __future__ import annotations
 
 import logging
-import math
 from typing import Any
 
 import numpy as np
@@ -16,15 +15,16 @@ import numpy as np
 from src.bridge.sensor_types import SensorFrame
 from src.coordination.multi_robot_config import MultiRobotConfig
 from src.coordination.scene_builder import build_two_robot_office_scene, build_two_robot_scene
+from src.locomotion import TrotGaitController, GaitParams
 
 logger = logging.getLogger(__name__)
 
-# Standing joint positions for one Go2 (12 actuators: 4 legs x 3 joints)
+# Standing joint positions from go2.xml keyframe (position-controlled).
 _STANDING_QPOS = np.array([
-    0.0, 0.8, -1.5,   # FR: hip, thigh, calf
-    0.0, 0.8, -1.5,   # FL
-    0.0, 0.8, -1.5,   # RR
-    0.0, 0.8, -1.5,   # RL
+    0.0, 0.9, -1.8,   # FR: hip, thigh, calf
+    0.0, 0.9, -1.8,   # FL
+    0.0, 0.9, -1.8,   # RR
+    0.0, 0.9, -1.8,   # RL
 ])
 
 # Actuator name suffixes in the order they appear in go2.xml
@@ -64,6 +64,11 @@ class MultiRobotBridge:
         # Velocity buffers
         self._velocities: dict[str, tuple[np.ndarray, float]] = {
             rid: (np.zeros(2), 0.0) for rid in self._config.robot_ids
+        }
+
+        # Trot gait controllers (one per robot)
+        self._gaits: dict[str, TrotGaitController] = {
+            rid: TrotGaitController() for rid in self._config.robot_ids
         }
 
         # Last captured frames
@@ -157,9 +162,10 @@ class MultiRobotBridge:
             qstart = self._qpos_starts[robot_id]
             # qpos layout: [x, y, z, qw, qx, qy, qz, joint1..joint12]
             self._data.qpos[qstart + 7 : qstart + 19] = _STANDING_QPOS
-            # Set ctrl to standing
+            # Set ctrl to standing via gait controller (zero velocity = standing)
+            standing = self._gaits[robot_id].compute(0.0, 0.0, 0.0, 0.0)
             for i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = _STANDING_QPOS[i]
+                self._data.ctrl[act_id] = standing[i]
 
         # Settle physics
         for _ in range(self._config.boot_phase_steps):
@@ -413,7 +419,8 @@ class MultiRobotBridge:
     def _velocity_to_ctrl(self, robot_id: str) -> np.ndarray:
         """Convert buffered velocity to 12-element joint position targets.
 
-        Uses same sinusoidal gait pattern as MuJoCoBridge._velocity_to_ctrl().
+        Uses TrotGaitController for proper trot gait with position-controlled
+        actuators, matching MuJoCoBridge._velocity_to_ctrl() behaviour.
 
         Args:
             robot_id: Which robot's velocity buffer to read.
@@ -422,33 +429,10 @@ class MultiRobotBridge:
             (12,) float64 joint position targets.
         """
         linear, angular = self._velocities[robot_id]
-        t = self._step_count * self._dt
-        speed = float(np.linalg.norm(linear))
-        turn = angular
-
-        ctrl = _STANDING_QPOS.copy()
-
-        if speed > 0.01 or abs(turn) > 0.01:
-            freq = 4.0
-            amplitude = 0.3 * min(speed + abs(turn), 1.0)
-            phase = 2 * math.pi * freq * t
-
-            # FR and RL move together (phase 0), FL and RR (phase pi)
-            for leg_idx in [0, 3]:  # FR, RL
-                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase)
-                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase) * 0.5
-            for leg_idx in [1, 2]:  # FL, RR
-                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase + math.pi)
-                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase + math.pi) * 0.5
-
-            if abs(turn) > 0.01:
-                hip_offset = 0.2 * turn
-                ctrl[0] += hip_offset
-                ctrl[3] -= hip_offset
-                ctrl[6] += hip_offset
-                ctrl[9] -= hip_offset
-
-        return ctrl
+        dt = self._dt * self._config.sim_steps_per_frame
+        vx = float(linear[0]) if len(linear) > 0 else 0.0
+        vy = float(linear[1]) if len(linear) > 1 else 0.0
+        return self._gaits[robot_id].compute(vx, vy, angular, dt)
 
     @staticmethod
     def _quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:

@@ -20,6 +20,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from src.locomotion import patch_actuators_to_position
+
 
 # Attributes that contain names which must be prefixed
 _NAME_ATTRS = frozenset({
@@ -73,10 +75,11 @@ def build_two_robot_scene(
         Combined MuJoCo XML as a string.
     """
     model_path = Path(model_dir)
-    go2_tree = ET.parse(str(model_path / "go2.xml"))
-    go2_root = go2_tree.getroot()
+    # Patch actuators to position-controlled servos before building scene
+    patched_xml = patch_actuators_to_position(str(model_path / "go2.xml"))
+    go2_root = ET.fromstring(patched_xml)
 
-    # Extract sections from go2.xml
+    # Extract sections from patched go2.xml
     compiler_elem = go2_root.find("compiler")
     option_elem = go2_root.find("option")
     default_elem = go2_root.find("default")
@@ -223,9 +226,9 @@ def build_two_robot_office_scene(
     scene_tree = ET.parse(str(scene_xml_path))
     scene_root = scene_tree.getroot()
 
-    # Parse the Go2 robot XML
-    go2_tree = ET.parse(str(model_path / "go2.xml"))
-    go2_root = go2_tree.getroot()
+    # Parse the Go2 robot XML with patched position-controlled actuators
+    patched_xml = patch_actuators_to_position(str(model_path / "go2.xml"))
+    go2_root = ET.fromstring(patched_xml)
 
     # Extract Go2 sections
     go2_default = go2_root.find("default")

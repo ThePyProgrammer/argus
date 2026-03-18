@@ -10,7 +10,6 @@ The Go2 model comes from mujoco_menagerie (models/unitree_go2/).
 from __future__ import annotations
 
 import logging
-import math
 from pathlib import Path
 from typing import Any
 
@@ -18,17 +17,17 @@ import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import SensorFrame
+from src.locomotion import TrotGaitController, GaitParams, patch_actuators_to_position
+from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
 
 logger = logging.getLogger(__name__)
 
-# Action mapping: we command joint velocities to move the robot.
-# The Go2 has 12 actuators (4 legs x 3 joints: hip, thigh, calf).
-# For locomotion, we use a simple gait pattern.
+# Standing joint positions from go2.xml keyframe (position-controlled).
 _STANDING_QPOS = np.array([
-    0.0, 0.8, -1.5,   # FR: hip, thigh, calf
-    0.0, 0.8, -1.5,   # FL
-    0.0, 0.8, -1.5,   # RR
-    0.0, 0.8, -1.5,   # RL
+    0.0, 0.9, -1.8,   # FR: hip, thigh, calf
+    0.0, 0.9, -1.8,   # FL
+    0.0, 0.9, -1.8,   # RR
+    0.0, 0.9, -1.8,   # RL
 ])
 
 
@@ -59,6 +58,8 @@ class MuJoCoBridge:
         self._angular_vel: float = 0.0
         # Camera ID (added programmatically)
         self._cam_id: int = -1
+        # Trot gait controller for locomotion
+        self._gait = TrotGaitController()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -76,7 +77,23 @@ class MuJoCoBridge:
         if not model_path.exists():
             raise FileNotFoundError(f"MuJoCo model not found: {model_path}")
 
-        self._model = mujoco.MjModel.from_xml_path(str(model_path))
+        # Locate go2.xml in the model directory for patching
+        model_dir = model_path.parent
+        go2_xml_path = model_dir / "go2.xml"
+
+        # Patch actuators to position-controlled servos and add floor/light
+        # so the model can be loaded standalone (no scene.xml <include> needed)
+        patched_xml = patch_actuators_to_position_with_floor(str(go2_xml_path))
+
+        # Load mesh assets for from_xml_string
+        asset_dir = model_dir / "assets"
+        assets: dict[str, bytes] = {}
+        if asset_dir.exists():
+            for f in asset_dir.iterdir():
+                if f.is_file():
+                    assets[f.name] = f.read_bytes()
+
+        self._model = mujoco.MjModel.from_xml_string(patched_xml, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
 
@@ -85,8 +102,9 @@ class MuJoCoBridge:
             self._data.qpos[7:19] = _STANDING_QPOS
 
         # Settle the robot (let it land on ground)
+        standing = self._gait.compute(0.0, 0.0, 0.0, 0.0)
         for _ in range(200):
-            self._data.ctrl[:] = _STANDING_QPOS
+            self._data.ctrl[:] = standing
             mujoco.mj_step(self._model, self._data)
 
         # Create offscreen renderer
@@ -151,40 +169,14 @@ class MuJoCoBridge:
     def _velocity_to_ctrl(self) -> np.ndarray:
         """Convert buffered velocity to joint position targets.
 
-        Uses a simple sinusoidal gait pattern modulated by the velocity
-        command. This is a crude but functional locomotion controller
-        sufficient for SLAM testing.
+        Uses TrotGaitController for proper trot gait with position-controlled
+        actuators, producing actual locomotion via diagonal pair alternation
+        and differential stride turning.
         """
-        t = self._step_count * self._dt
-        speed = float(np.linalg.norm(self._linear_vel))
-        turn = self._angular_vel
-
-        # Base standing pose
-        ctrl = _STANDING_QPOS.copy()
-
-        if speed > 0.01 or abs(turn) > 0.01:
-            # Simple trot gait: diagonal legs move together
-            freq = 4.0  # gait frequency Hz
-            amplitude = 0.3 * min(speed + abs(turn), 1.0)
-            phase = 2 * math.pi * freq * t
-
-            # FR and RL move together (phase 0), FL and RR (phase pi)
-            for leg_idx in [0, 3]:  # FR, RL
-                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase)      # thigh
-                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase) * 0.5  # calf
-            for leg_idx in [1, 2]:  # FL, RR
-                ctrl[leg_idx * 3 + 1] += amplitude * math.sin(phase + math.pi)
-                ctrl[leg_idx * 3 + 2] += amplitude * math.sin(phase + math.pi) * 0.5
-
-            # Turning: offset hip joints
-            if abs(turn) > 0.01:
-                hip_offset = 0.2 * turn
-                ctrl[0] += hip_offset   # FR hip
-                ctrl[3] -= hip_offset   # FL hip
-                ctrl[6] += hip_offset   # RR hip
-                ctrl[9] -= hip_offset   # RL hip
-
-        return ctrl
+        dt = self._dt * self._config.sim_steps_per_frame  # effective frame dt
+        vx = float(self._linear_vel[0]) if len(self._linear_vel) > 0 else 0.0
+        vy = float(self._linear_vel[1]) if len(self._linear_vel) > 1 else 0.0
+        return self._gait.compute(vx, vy, self._angular_vel, dt)
 
     # ------------------------------------------------------------------
     # Observation capture

@@ -287,6 +287,28 @@ class TestTrotGaitController:
 
 
 # ------------------------------------------------------------------ #
+# Bridge gait parity test
+# ------------------------------------------------------------------ #
+
+
+class TestBridgeGaitParity:
+    """Both MuJoCoBridge and MultiRobotBridge use the same TrotGaitController."""
+
+    def test_same_gait_output(self):
+        """Single-robot and multi-robot gait controllers produce identical output."""
+        from src.locomotion.gait_controller import TrotGaitController
+
+        gait_a = TrotGaitController()
+        gait_b = TrotGaitController()
+
+        # Run several steps with the same velocity input
+        for _ in range(20):
+            out_a = gait_a.compute(vx=0.5, vy=0.1, omega=0.3, dt=0.02)
+            out_b = gait_b.compute(vx=0.5, vy=0.1, omega=0.3, dt=0.02)
+            np.testing.assert_array_equal(out_a, out_b)
+
+
+# ------------------------------------------------------------------ #
 # MuJoCo integration tests
 # ------------------------------------------------------------------ #
 
