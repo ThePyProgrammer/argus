@@ -196,15 +196,21 @@ class MuJoCoBridge:
         depth_raw = self._renderer.render().copy()  # (H, W) float32
         self._renderer.disable_depth_rendering()
 
-        # MuJoCo depth is distance from near plane; convert to metric
-        # The renderer returns linear depth in [0, 1] mapped to [znear, zfar]
-        extent = self._model.stat.extent
-        znear = self._model.vis.map.znear * extent
-        zfar = self._model.vis.map.zfar * extent
-        # Convert from [0,1] buffer to metric meters
-        depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
-        # Clip max distance
-        depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
+        # MuJoCo depth buffer handling:
+        # - Some versions/configs return normalized [0, 1] needing conversion
+        # - Others return metric depth directly (values > 1.0)
+        # Detect which format we got and handle accordingly
+        if depth_raw.max() <= 1.0:
+            # Normalized [0, 1] -- convert to metric
+            extent = self._model.stat.extent
+            znear = self._model.vis.map.znear * extent
+            zfar = self._model.vis.map.zfar * extent
+            depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
+            depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
+        else:
+            # Already metric -- clip sky/far pixels
+            max_range = 20.0  # meters
+            depth = np.where(depth_raw > max_range, 0.0, depth_raw).astype(np.float32)
 
         # Ground-truth pose from freejoint qpos
         pose = self._extract_pose()
