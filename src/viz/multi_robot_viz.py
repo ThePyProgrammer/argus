@@ -157,11 +157,26 @@ class MultiRobotVisualizer:
             data: Robot data dict with pose and trajectory.
         """
         pose = data["pose"]
+        pos = pose[:3, 3]
+        rot = pose[:3, :3]
         rr.log(
             f"/merged/{rid}/pose",
             rr.Transform3D(
-                translation=pose[:3, 3],
-                mat3x3=pose[:3, :3],
+                translation=pos,
+                mat3x3=rot,
+            ),
+        )
+        # Axis triad: RGB arrows for X/Y/Z axes at robot position
+        axis_len = 0.4
+        origins = np.tile(pos, (3, 1))
+        vectors = rot * axis_len  # columns are X, Y, Z axes
+        rr.log(
+            f"/merged/{rid}/axes",
+            rr.Arrows3D(
+                origins=origins,
+                vectors=vectors.T,
+                colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],
+                radii=0.02,
             ),
         )
         color_rgb = ROBOT_COLORS.get(rid, (128, 128, 128))
