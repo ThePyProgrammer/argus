@@ -385,12 +385,12 @@ class MultiRobotBridge:
             depth = np.where(depth_raw > max_range, 0.0, depth_raw).astype(np.float32)
 
         # Ground-truth camera pose (not body pose — camera is offset from body)
-        # cam_xmat rows are camera frame axes in world coords; we need columns
-        # for the rotation matrix (world_point = R @ cam_point + t)
+        # cam_xmat rows are camera frame axes in world coords.
+        # world_point = cam_xmat @ cam_point + cam_xpos (no transpose needed)
         cam_id = self._cam_ids[robot_id]
         pose = np.eye(4, dtype=np.float64)
         pose[:3, 3] = self._data.cam_xpos[cam_id]
-        pose[:3, :3] = self._data.cam_xmat[cam_id].reshape(3, 3).T
+        pose[:3, :3] = self._data.cam_xmat[cam_id].reshape(3, 3)
         sim_time = self._step_count * self._dt
 
         return SensorFrame(
