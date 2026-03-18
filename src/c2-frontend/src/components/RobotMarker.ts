@@ -114,16 +114,18 @@ export class RobotMarkerManager {
   private applyRotation(obj: THREE.Object3D, rotation: number[]): void {
     if (rotation.length !== 9) return;
 
-    // Extract yaw from the Z-up rotation matrix.
-    // In Z-up frame, yaw = atan2(R[1][0], R[0][0]) = atan2(rotation[3], rotation[0])
-    const yaw = Math.atan2(rotation[3], rotation[0]);
-
-    // Mesh orientation offset: the Go2 GLB model's forward direction may not
-    // align with MuJoCo's body +X axis. Adjust by ~30° (empirically tuned).
-    const meshOffset = -Math.PI / 6; // -30 degrees
+    // Extract yaw from the Z-up rotation matrix, filtering out roll/pitch
+    // from the trot gait's body rocking.
+    //
+    // The rotation matrix columns are the body's local axes in world frame.
+    // Column 0 (rotation[0], rotation[3], rotation[6]) is the body's X axis
+    // (forward direction). Project it onto the XY ground plane and take atan2.
+    const fwdX = rotation[0]; // R[0][0] = body X projected onto world X
+    const fwdY = rotation[3]; // R[1][0] = body X projected onto world Y
+    const yaw = Math.atan2(fwdY, fwdX);
 
     // In the worldRoot's local frame (Z-up), yaw is rotation around Z axis.
-    obj.rotation.set(0, 0, yaw + meshOffset);
+    obj.rotation.set(0, 0, yaw);
   }
 
   /**
