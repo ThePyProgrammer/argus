@@ -197,17 +197,17 @@ class Coordinator:
                 if not metrics.get("terminated", False):
                     all_terminated = False
 
-            # Never terminate early in multi-robot mode. The frontier
-            # detection on flat/sparse scenes is unreliable for termination.
-            # Run for full max_steps; user controls duration via CLI flag.
-            all_terminated = False
-
                 # When rescan triggered: robot publishes map via pLCM
                 if metrics.get("rescan_triggered", False):
                     any_rescan_triggered = True
                     robot.publish_map_state(
                         coverage_pct=metrics.get("coverage", 0.0),
                     )
+
+            # Never terminate early in multi-robot mode. The frontier
+            # detection on flat/sparse scenes is unreliable for termination.
+            # Run for full max_steps; user controls duration via CLI flag.
+            all_terminated = False
 
             # Slow down for visualization
             if self._config.step_delay > 0:
