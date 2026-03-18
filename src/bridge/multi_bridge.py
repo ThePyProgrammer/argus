@@ -373,12 +373,16 @@ class MultiRobotBridge:
         depth_raw = renderer.render().copy()
         renderer.disable_depth_rendering()
 
-        # Convert depth buffer to metric meters
-        extent = self._model.stat.extent
-        znear = self._model.vis.map.znear * extent
-        zfar = self._model.vis.map.zfar * extent
-        depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
-        depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
+        # MuJoCo depth buffer: auto-detect normalized [0,1] vs metric
+        if depth_raw.max() <= 1.0:
+            extent = self._model.stat.extent
+            znear = self._model.vis.map.znear * extent
+            zfar = self._model.vis.map.zfar * extent
+            depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
+            depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
+        else:
+            max_range = 20.0
+            depth = np.where(depth_raw > max_range, 0.0, depth_raw).astype(np.float32)
 
         # Ground-truth camera pose (not body pose — camera is offset from body)
         # cam_xmat rows are camera frame axes in world coords; we need columns
