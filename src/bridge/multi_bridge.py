@@ -429,7 +429,7 @@ class MultiRobotBridge:
             (12,) float64 joint position targets.
         """
         linear, angular = self._velocities[robot_id]
-        dt = self._dt * self._config.sim_steps_per_frame
+        dt = self._dt  # self._dt already includes sim_steps_per_frame
         vx = float(linear[0]) if len(linear) > 0 else 0.0
         vy = float(linear[1]) if len(linear) > 1 else 0.0
         return self._gaits[robot_id].compute(vx, vy, angular, dt)

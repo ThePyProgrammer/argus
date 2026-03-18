@@ -92,6 +92,12 @@ def parse_args():
         default=200,
         help="Boot phase steps for multi-robot mode (default: 200)",
     )
+    parser.add_argument(
+        "--scene",
+        choices=["flat", "office"],
+        default="office",
+        help="Scene type for multi-robot mode (default: office)",
+    )
     return parser.parse_args()
 
 
@@ -205,7 +211,11 @@ def run_multi_mode(args):
     from src.exploration.config import ExplorationConfig
     from src.viz.multi_robot_viz import MultiRobotVisualizer
 
-    config = MultiRobotConfig(boot_phase_steps=args.multi_boot_steps)
+    scene = getattr(args, 'scene', 'office')
+    config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
+    if scene == "flat":
+        config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
+    config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
 
     # Camera intrinsics (same as single-robot mode)

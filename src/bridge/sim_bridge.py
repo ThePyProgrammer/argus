@@ -173,7 +173,7 @@ class MuJoCoBridge:
         actuators, producing actual locomotion via diagonal pair alternation
         and differential stride turning.
         """
-        dt = self._dt * self._config.sim_steps_per_frame  # effective frame dt
+        dt = self._dt  # self._dt already includes sim_steps_per_frame
         vx = float(self._linear_vel[0]) if len(self._linear_vel) > 0 else 0.0
         vy = float(self._linear_vel[1]) if len(self._linear_vel) > 1 else 0.0
         return self._gait.compute(vx, vy, self._angular_vel, dt)
