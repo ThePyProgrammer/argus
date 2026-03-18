@@ -26,8 +26,8 @@ class MultiRobotConfig:
     robot_ids: tuple[str, str] = ("robot_a", "robot_b")
     spawn_positions: dict[str, tuple[float, float, float]] = field(
         default_factory=lambda: {
-            "robot_a": (-1.0, 1.0, 0.3),
-            "robot_b": (2.0, -1.0, 0.3),
+            "robot_a": (-2.5, 3.5, 0.3),
+            "robot_b": (6.5, -8.5, 0.3),
         }
     )
     resolution: tuple[int, int] = (320, 240)

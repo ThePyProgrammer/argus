@@ -149,7 +149,7 @@ class MultiRobotVisualizer:
             return
         points = np.concatenate(all_points, axis=0)
         colors = np.concatenate(all_colors, axis=0)
-        rr.log("/merged/point_cloud", rr.Points3D(points, colors=colors))
+        rr.log("/merged/point_cloud", rr.Points3D(points, colors=colors, radii=0.05))
 
     def _log_robot_overlay(self, rid: str, data: dict) -> None:
         """Log robot pose and fading trajectory trail on the merged view.
@@ -296,7 +296,7 @@ class MultiRobotVisualizer:
                 # Red for unexplored
                 cell_colors.append([200, 0, 0, 100])
 
-            positions.append([center_x, center_y, 0.0])
+            positions.append([center_x, center_y, -0.05])
 
         if positions:
             positions = np.array(positions)
