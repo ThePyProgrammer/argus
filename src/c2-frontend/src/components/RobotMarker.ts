@@ -102,50 +102,40 @@ export class RobotMarkerManager {
     this.markers.set(robotId, mesh);
   }
 
+  /** Previous position per robot for heading computation. */
+  private prevPositions: Map<string, [number, number, number]> = new Map();
+
   /**
-   * Apply a flat 9-element 3x3 rotation matrix (row-major, Z-up MuJoCo frame)
-   * to a Three.js object inside the Z-up worldRoot.
+   * Create or update a robot marker. Heading is derived from the direction
+   * of movement (current position vs previous position) so the robot mesh
+   * always faces the way the trajectory trail is going.
    *
-   * The worldRoot already handles Z-up → Y-up for positions. For rotations,
-   * we extract just the yaw (rotation around Z in MuJoCo = rotation around
-   * Y in the worldRoot's local frame) since the robot moves on a ground plane
-   * and pitch/roll are mostly noise from the trot gait.
-   */
-  private applyRotation(obj: THREE.Object3D, rotation: number[]): void {
-    if (rotation.length !== 9) return;
-
-    // Extract yaw from the Z-up rotation matrix, filtering out roll/pitch
-    // from the trot gait's body rocking.
-    //
-    // The rotation matrix columns are the body's local axes in world frame.
-    // Column 0 (rotation[0], rotation[3], rotation[6]) is the body's X axis
-    // (forward direction). Project it onto the XY ground plane and take atan2.
-    const fwdX = rotation[0]; // R[0][0] = body X projected onto world X
-    const fwdY = rotation[3]; // R[1][0] = body X projected onto world Y
-    const yaw = Math.atan2(fwdY, fwdX);
-
-    // In the worldRoot's local frame (Z-up), yaw is rotation around Z axis.
-    obj.rotation.set(0, 0, yaw);
-  }
-
-  /**
-   * Create or update a robot marker at the given position and rotation.
    * @param robotId Unique robot identifier
    * @param position [x, y, z] world position
    * @param colorIndex Index into the Okabe-Ito palette
-   * @param rotation Optional 9-element flat 3x3 rotation matrix (row-major)
    */
   updateRobot(
     robotId: string,
     position: [number, number, number],
     colorIndex: number,
-    rotation?: number[],
   ): void {
     const existing = this.markers.get(robotId);
 
     if (existing) {
       existing.position.set(position[0], position[1], position[2]);
-      if (rotation) this.applyRotation(existing, rotation);
+
+      // Compute heading from movement direction
+      const prev = this.prevPositions.get(robotId);
+      if (prev) {
+        const dx = position[0] - prev[0];
+        const dy = position[1] - prev[1];
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0.01) { // only update heading if moved enough
+          const yaw = Math.atan2(dy, dx);
+          existing.rotation.set(0, 0, yaw);
+        }
+      }
+      this.prevPositions.set(robotId, [...position]);
       return;
     }
 
