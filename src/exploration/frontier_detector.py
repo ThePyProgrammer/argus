@@ -1,12 +1,14 @@
-"""3D voxel frontier detection with 26-connected neighbor scanning and BFS clustering.
+"""Frontier detection on 2D occupancy grid.
 
-A frontier voxel is an occupied voxel that has at least one 26-connected
-neighbor position that is NOT occupied (i.e., on the boundary of the known
-region). Frontier voxels are clustered via BFS and filtered by minimum
-cluster size to remove noise.
+A frontier cell is a FREE cell adjacent to at least one UNKNOWN cell --
+the boundary between explored navigable space and unexplored territory.
+This correctly handles enclosed environments (offices, rooms) where walls
+are OCCUPIED and should NOT be frontiers.
 
-This module reads occupied voxel centers from OctoMapBuilder.get_occupied_voxels()
-and produces ranked FrontierCluster objects for goal selection.
+Previous approach (3D voxel boundary) treated wall edges as frontiers,
+causing the robot to immediately declare "all explored" in office scenes.
+
+Frontier cells are clustered via BFS and filtered by minimum cluster size.
 """
 
 from collections import deque
@@ -14,138 +16,129 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.exploration.occupancy_grid import OccupancyGrid2D, CELL_FREE, CELL_UNKNOWN, CELL_OCCUPIED
+
 
 @dataclass
 class FrontierCluster:
-    """A cluster of frontier voxels on the boundary of explored space.
+    """A cluster of frontier cells on the boundary of explored space.
 
     Attributes:
-        centroid: (3,) float64 world coordinates of cluster center.
-        voxel_count: Number of voxels in this cluster.
-        voxels: (K, 3) int grid indices of cluster voxels.
+        centroid: (3,) float64 world coordinates of cluster center (z=0).
+        voxel_count: Number of cells in this cluster.
+        voxels: (K, 2) int grid indices (row, col) of cluster cells.
     """
 
     centroid: np.ndarray  # (3,) float64 world coordinates
-    voxel_count: int  # number of voxels in this cluster
-    voxels: np.ndarray  # (K, 3) int grid indices of cluster voxels
+    voxel_count: int
+    voxels: np.ndarray  # (K, 2) int grid indices
 
 
-# Pre-computed 26-connected neighbor offsets (excludes (0,0,0))
-_OFFSETS_26: list[tuple[int, int, int]] = []
-for _dx in (-1, 0, 1):
-    for _dy in (-1, 0, 1):
-        for _dz in (-1, 0, 1):
-            if _dx == 0 and _dy == 0 and _dz == 0:
-                continue
-            _OFFSETS_26.append((_dx, _dy, _dz))
+# 8-connected neighbor offsets for 2D grid
+_OFFSETS_8: list[tuple[int, int]] = [
+    (-1, -1), (-1, 0), (-1, 1),
+    (0, -1),           (0, 1),
+    (1, -1),  (1, 0),  (1, 1),
+]
 
 
 class FrontierDetector:
-    """Detect frontier voxels in 3D voxel space using 26-connectivity.
+    """Detect frontier cells on a 2D occupancy grid.
 
-    A frontier voxel is an occupied voxel with at least one empty
-    26-connected neighbor. Frontiers are clustered via BFS and
-    filtered by minimum cluster size.
+    A frontier is a FREE cell with at least one UNKNOWN 8-connected
+    neighbor. Frontiers are clustered via BFS and filtered by minimum
+    cluster size.
     """
 
-    def __init__(self, resolution: float = 0.1, min_cluster_size: int = 5):
+    def __init__(self, resolution: float = 0.1, min_cluster_size: int = 3):
         self._resolution = resolution
         self._min_cluster_size = min_cluster_size
 
-    @staticmethod
-    def _get_26_offsets() -> list[tuple[int, int, int]]:
-        """Return pre-computed 26-connected neighbor offsets."""
-        return _OFFSETS_26
-
     def detect(
-        self, occupied_voxels: np.ndarray, robot_positions: np.ndarray
+        self, occupied_voxels: np.ndarray, robot_positions: np.ndarray,
+        grid_2d: OccupancyGrid2D | None = None,
     ) -> list[FrontierCluster]:
-        """Detect frontier clusters from occupied voxel centers.
+        """Detect frontier clusters.
 
         Args:
-            occupied_voxels: (N, 3) float64 voxel centers from
-                OctoMapBuilder.get_occupied_voxels().
-            robot_positions: (M, 3) float64 positions the robot has visited
-                (defines the observed region -- reserved for future use).
+            occupied_voxels: (N, 3) float64 voxel centers (used to build
+                grid if grid_2d not provided).
+            robot_positions: (M, 3) float64 visited positions (unused,
+                kept for API compatibility).
+            grid_2d: Pre-built 2D occupancy grid. If None, one is built
+                from occupied_voxels using default parameters.
 
         Returns:
-            List of FrontierCluster objects sorted by voxel_count descending.
-            Empty list if no frontiers found or input too small.
+            List of FrontierCluster sorted by voxel_count descending.
         """
-        if occupied_voxels.size == 0 or len(occupied_voxels) < self._min_cluster_size:
+        if grid_2d is None:
+            from src.exploration.occupancy_grid import project_voxels_to_2d
+            grid_2d = project_voxels_to_2d(
+                occupied_voxels, self._resolution,
+            )
+
+        grid = grid_2d.grid
+        rows, cols = grid.shape
+
+        # Find frontier cells: FREE cells with at least one UNKNOWN neighbor
+        frontier_cells: set[tuple[int, int]] = set()
+
+        # Vectorized: find all FREE cells
+        free_mask = grid == CELL_FREE
+        free_rows, free_cols = np.where(free_mask)
+
+        for r, c in zip(free_rows, free_cols):
+            for dr, dc in _OFFSETS_8:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < rows and 0 <= nc < cols:
+                    if grid[nr, nc] == CELL_UNKNOWN:
+                        frontier_cells.add((int(r), int(c)))
+                        break
+
+        if not frontier_cells:
             return []
 
-        # Convert world coords to grid indices
-        grid_min = occupied_voxels.min(axis=0) - self._resolution * 5
-        indices = np.round((occupied_voxels - grid_min) / self._resolution).astype(int)
+        # Cluster via BFS
+        clusters = self._cluster_bfs(frontier_cells)
 
-        # Build O(1) lookup set
-        occupied_set: set[tuple[int, int, int]] = set(map(tuple, indices))
-
-        # Find frontier voxels: occupied voxels with at least one empty neighbor
-        offsets = self._get_26_offsets()
-        frontier_set: set[tuple[int, int, int]] = set()
-
-        for idx in occupied_set:
-            ix, iy, iz = idx
-            for dx, dy, dz in offsets:
-                neighbor = (ix + dx, iy + dy, iz + dz)
-                if neighbor not in occupied_set:
-                    frontier_set.add(idx)
-                    break
-
-        if not frontier_set:
-            return []
-
-        # Cluster frontier voxels using BFS on 26-connectivity
-        clusters = self._cluster_bfs(frontier_set, offsets)
-
-        # Filter by min cluster size and build FrontierCluster objects
+        # Build FrontierCluster objects
         result: list[FrontierCluster] = []
-        for cluster_indices in clusters:
-            if len(cluster_indices) < self._min_cluster_size:
+        for cluster_cells in clusters:
+            if len(cluster_cells) < self._min_cluster_size:
                 continue
 
-            voxels_arr = np.array(cluster_indices, dtype=int)
-            centroid_world = grid_min + np.mean(voxels_arr, axis=0) * self._resolution
-            centroid_world = centroid_world.astype(np.float64)
+            cells_arr = np.array(cluster_cells, dtype=int)
+            # Compute centroid in world coordinates
+            mean_row = np.mean(cells_arr[:, 0])
+            mean_col = np.mean(cells_arr[:, 1])
+            cx = grid_2d.origin[0] + (mean_col + 0.5) * grid_2d.resolution
+            cy = grid_2d.origin[1] + (mean_row + 0.5) * grid_2d.resolution
 
             result.append(
                 FrontierCluster(
-                    centroid=centroid_world,
-                    voxel_count=len(cluster_indices),
-                    voxels=voxels_arr,
+                    centroid=np.array([cx, cy, 0.0], dtype=np.float64),
+                    voxel_count=len(cluster_cells),
+                    voxels=cells_arr,
                 )
             )
 
-        # Sort by voxel_count descending
         result.sort(key=lambda c: c.voxel_count, reverse=True)
         return result
 
     @staticmethod
     def _cluster_bfs(
-        frontier_set: set[tuple[int, int, int]],
-        offsets: list[tuple[int, int, int]],
-    ) -> list[list[tuple[int, int, int]]]:
-        """Cluster frontier voxels using BFS on 26-connectivity.
+        frontier_cells: set[tuple[int, int]],
+    ) -> list[list[tuple[int, int]]]:
+        """Cluster frontier cells using BFS on 8-connectivity."""
+        visited: set[tuple[int, int]] = set()
+        clusters: list[list[tuple[int, int]]] = []
 
-        Args:
-            frontier_set: Set of frontier voxel grid indices.
-            offsets: 26-connected neighbor offsets.
-
-        Returns:
-            List of clusters, each a list of (ix, iy, iz) tuples.
-        """
-        visited: set[tuple[int, int, int]] = set()
-        clusters: list[list[tuple[int, int, int]]] = []
-
-        for idx in frontier_set:
-            if idx in visited:
+        for cell in frontier_cells:
+            if cell in visited:
                 continue
 
-            # BFS from this seed
-            cluster: list[tuple[int, int, int]] = []
-            queue = deque([idx])
+            cluster: list[tuple[int, int]] = []
+            queue = deque([cell])
 
             while queue:
                 current = queue.popleft()
@@ -154,10 +147,10 @@ class FrontierDetector:
                 visited.add(current)
                 cluster.append(current)
 
-                cx, cy, cz = current
-                for dx, dy, dz in offsets:
-                    neighbor = (cx + dx, cy + dy, cz + dz)
-                    if neighbor in frontier_set and neighbor not in visited:
+                r, c = current
+                for dr, dc in _OFFSETS_8:
+                    neighbor = (r + dr, c + dc)
+                    if neighbor in frontier_cells and neighbor not in visited:
                         queue.append(neighbor)
 
             if cluster:

@@ -243,15 +243,17 @@ class ExplorationLoop:
 
         if should_rescan:
             occupied = self._octomap.get_occupied_voxels()
-            frontiers = self._frontier_detector.detect(
-                occupied, np.array(self._robot_positions),
-            )
 
             grid_2d = project_voxels_to_2d(
                 occupied,
                 config.voxel_resolution,
                 config.z_min,
                 config.z_max,
+            )
+
+            frontiers = self._frontier_detector.detect(
+                occupied, np.array(self._robot_positions),
+                grid_2d=grid_2d,
             )
 
             frontier_count = len(frontiers)
