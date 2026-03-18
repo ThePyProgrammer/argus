@@ -35,4 +35,4 @@ class MultiRobotConfig:
     model_dir: str = "models/unitree_go2"
     boot_phase_steps: int = 200
     scene: str = "flat"
-    step_delay: float = 0.05  # seconds to sleep between steps (slows sim for visualization)
+    step_delay: float = 0.0  # seconds to sleep between steps (0 = full speed)
