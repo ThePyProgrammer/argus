@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-18T04:11:09.331Z"
-last_activity: 2026-03-17 - Completed 04-01-PLAN (MultiRobotVisualizer with Rerun dashboard)
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-18T04:56:47Z"
+last_activity: 2026-03-18 - Completed 05-01-PLAN (Locomotion module with trot gait controller)
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** Two simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 4 - Visualization and Integration
+**Current focus:** Phase 5 - Robot Locomotion Fix
 
 ## Current Position
 
-Phase: 4 of 4 (Visualization and Integration)
-Plan: 1 of 2 in current phase (1 complete)
-Status: In Progress
-Last activity: 2026-03-17 - Completed 04-01-PLAN (MultiRobotVisualizer with Rerun dashboard)
+Phase: 5 of 5 (Robot Locomotion Fix)
+Plan: 1 of 1 in current phase (1 complete)
+Status: Complete
+Last activity: 2026-03-18 - Completed 05-01-PLAN (Locomotion module with trot gait controller)
 
-Progress: [################### ] 92%
+Progress: [####################] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 7 min
-- Total execution time: 1.2 hours
+- Total plans completed: 12
+- Average duration: 8 min
+- Total execution time: 1.5 hours
 
 **By Phase:**
 
@@ -47,10 +47,11 @@ Progress: [################### ] 92%
 | 2 | 3 | 19 min | 6 min |
 | 3 | 3 | 20 min | 7 min |
 | 4 | 1 | 6 min | 6 min |
+| 5 | 1 | 17 min | 17 min |
 
 **Recent Trend:**
-- Last 5 plans: 7, 6, 9, 5, 6 min
-- Trend: stable
+- Last 5 plans: 6, 9, 5, 6, 17 min
+- Trend: phase 5 longer due to physics tuning
 
 *Updated after each plan completion*
 
@@ -101,6 +102,11 @@ Recent decisions affecting current work:
 - [04-01]: Module-level sys.modules mock with mock_rr.blueprint = mock_rrb for correct rerun import resolution in tests
 - [04-01]: Points3D with radii for heatmap (not Boxes3D) -- simpler, consistent with existing patterns
 - [04-01]: Set-based grid lookup for heatmap cell classification -- O(1) per cell
+- [05-01]: PD gains kp=80/120 kv=4/6 (doubled from research recommendation) for reliable servo tracking
+- [05-01]: Gait frequency=3.0 Hz for sufficient stride cycles per exploration step
+- [05-01]: Differential stride turning instead of hip-abduction-only (produces actual yaw torque)
+- [05-01]: Calf tucking (more negative) during swing for ground clearance -- corrected from plan
+- [05-01]: stride_length=0.4 and swing_height=0.15 (joint-angle scale, not meters)
 
 ### Roadmap Evolution
 
@@ -126,6 +132,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T04:11:09.328Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-make-sure-the-robots-do-not-get-stuck-at-one-place-without-being-able-to-move-off/05-CONTEXT.md
+Last session: 2026-03-18T04:56:47Z
+Stopped at: Completed 05-01-PLAN.md
