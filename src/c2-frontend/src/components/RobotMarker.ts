@@ -103,20 +103,41 @@ export class RobotMarkerManager {
   }
 
   /**
-   * Create or update a robot marker at the given position.
+   * Apply a flat 9-element 3x3 rotation matrix (row-major, Z-up MuJoCo frame)
+   * to a Three.js object. The parent scene already handles Z-up → Y-up
+   * conversion via the worldRoot -90° X rotation.
+   */
+  private applyRotation(obj: THREE.Object3D, rotation: number[]): void {
+    if (rotation.length !== 9) return;
+    // Row-major 3x3: [r00, r01, r02, r10, r11, r12, r20, r21, r22]
+    const m = new THREE.Matrix4();
+    m.set(
+      rotation[0], rotation[1], rotation[2], 0,
+      rotation[3], rotation[4], rotation[5], 0,
+      rotation[6], rotation[7], rotation[8], 0,
+      0, 0, 0, 1,
+    );
+    obj.quaternion.setFromRotationMatrix(m);
+  }
+
+  /**
+   * Create or update a robot marker at the given position and rotation.
    * @param robotId Unique robot identifier
    * @param position [x, y, z] world position
    * @param colorIndex Index into the Okabe-Ito palette
+   * @param rotation Optional 9-element flat 3x3 rotation matrix (row-major)
    */
   updateRobot(
     robotId: string,
     position: [number, number, number],
     colorIndex: number,
+    rotation?: number[],
   ): void {
     const existing = this.markers.get(robotId);
 
     if (existing) {
       existing.position.set(position[0], position[1], position[2]);
+      if (rotation) this.applyRotation(existing, rotation);
       return;
     }
 
