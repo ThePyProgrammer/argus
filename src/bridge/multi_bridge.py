@@ -69,6 +69,16 @@ class MultiRobotBridge:
         # Last captured frames
         self._last_frames: dict[str, SensorFrame] = {}
 
+        # Trajectory traces for MuJoCo viewer persistence
+        self._trace_positions: dict[str, list[np.ndarray]] = {
+            rid: [] for rid in self._config.robot_ids
+        }
+        # Colors: blue for robot_a, orange for robot_b (RGBA 0-1)
+        self._trace_colors: dict[str, np.ndarray] = {
+            "robot_a": np.array([0.26, 0.52, 0.96, 1.0]),
+            "robot_b": np.array([1.0, 0.60, 0.0, 1.0]),
+        }
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -205,9 +215,45 @@ class MultiRobotBridge:
 
         self._step_count += 1
 
-        # Sync interactive viewer if open
+        # Record trajectory positions and sync viewer with traces
+        for robot_id in self._config.robot_ids:
+            start = self._qpos_starts[robot_id]
+            pos = self._data.qpos[start : start + 3].copy()
+            trace = self._trace_positions[robot_id]
+            # Only record if moved enough (avoids clutter when stationary)
+            if not trace or np.linalg.norm(pos - trace[-1]) > 0.05:
+                trace.append(pos)
+
         if self._viewer_handle is not None:
             try:
+                # Add trajectory trace geoms to the viewer scene
+                with self._viewer_handle.lock():
+                    self._viewer_handle.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = False
+                    scn = self._viewer_handle.user_scn
+                    scn.ngeom = 0  # clear previous custom geoms
+                    for robot_id in self._config.robot_ids:
+                        trace = self._trace_positions[robot_id]
+                        color = self._trace_colors.get(robot_id, np.array([0.5, 0.5, 0.5, 1.0]))
+                        # Draw line segments between consecutive positions
+                        for i in range(len(trace) - 1):
+                            if scn.ngeom >= scn.maxgeom:
+                                break
+                            mujoco.mjv_initGeom(
+                                scn.geoms[scn.ngeom],
+                                mujoco.mjtGeom.mjGEOM_CAPSULE,
+                                np.zeros(3),  # size filled by connector
+                                np.zeros(3),  # pos filled by connector
+                                np.zeros(9),  # mat filled by connector
+                                color.astype(np.float32),
+                            )
+                            mujoco.mjv_connector(
+                                scn.geoms[scn.ngeom],
+                                mujoco.mjtGeom.mjGEOM_CAPSULE,
+                                0.01,  # width of the trace line
+                                trace[i],
+                                trace[i + 1],
+                            )
+                            scn.ngeom += 1
                 self._viewer_handle.sync()
             except Exception:
                 self._viewer_handle = None

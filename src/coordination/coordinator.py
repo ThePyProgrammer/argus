@@ -204,6 +204,11 @@ class Coordinator:
                         coverage_pct=metrics.get("coverage", 0.0),
                     )
 
+            # Slow down for visualization
+            if self._config.step_delay > 0:
+                import time
+                time.sleep(self._config.step_delay)
+
             # Step simulation (advances both robots)
             frames = self._bridge.step()
 
