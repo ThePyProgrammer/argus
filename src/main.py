@@ -215,6 +215,8 @@ def run_multi_mode(args):
     config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
     if scene == "flat":
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
+    else:
+        config_kwargs["spawn_positions"] = {"robot_a": (-2.0, 3.0, 0.3), "robot_b": (5.0, -7.0, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
 
@@ -310,6 +312,8 @@ def run_web_mode(args):
     config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
     if scene == "flat":
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
+    else:
+        config_kwargs["spawn_positions"] = {"robot_a": (-2.0, 3.0, 0.3), "robot_b": (5.0, -7.0, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
 
