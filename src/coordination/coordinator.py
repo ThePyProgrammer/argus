@@ -230,6 +230,7 @@ class Coordinator:
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
                 frontier_cells = self._gather_frontier_cells(robot_ids)
                 total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
+                overview_img = self._bridge.render_overview() if hasattr(self._bridge, 'render_overview') else None
                 self._viz.update(
                     merged_voxels=self._merger.last_merged_voxels,
                     robot_data=robot_data,
@@ -238,6 +239,7 @@ class Coordinator:
                     voronoi_direction=voronoi_dir,
                     total_coverage=total_cov,
                     merge_count=self._merge_count,
+                    overview_image=overview_img,
                 )
 
             if all_terminated:

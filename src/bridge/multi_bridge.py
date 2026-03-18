@@ -52,6 +52,7 @@ class MultiRobotBridge:
         self._model: Any = None
         self._data: Any = None
         self._renderers: dict[str, Any] = {}
+        self._overview_renderer: Any = None
         self._step_count: int = 0
         self._dt: float = 0.0
 
@@ -148,10 +149,11 @@ class MultiRobotBridge:
         for _ in range(self._config.boot_phase_steps):
             mujoco.mj_step(self._model, self._data)
 
-        # Create one renderer per robot
+        # Create one renderer per robot + one for overview
         w, h = self._config.resolution
         for robot_id in self._config.robot_ids:
             self._renderers[robot_id] = mujoco.Renderer(self._model, height=h, width=w)
+        self._overview_renderer = mujoco.Renderer(self._model, height=h, width=w)
 
         self._step_count = 0
 
@@ -218,9 +220,49 @@ class MultiRobotBridge:
         for renderer in self._renderers.values():
             renderer.close()
         self._renderers.clear()
+        if self._overview_renderer is not None:
+            self._overview_renderer.close()
+            self._overview_renderer = None
         self._model = None
         self._data = None
         self._step_count = 0
+
+    def render_overview(self, distance: float = 8.0, elevation: float = -35.0) -> np.ndarray:
+        """Render a bird's-eye overview of the scene using MuJoCo's free camera.
+
+        The camera tracks the midpoint between both robots and looks down
+        at the scene from a configurable distance and elevation angle.
+
+        Args:
+            distance: Camera distance from the lookat point in meters.
+            elevation: Camera elevation angle in degrees (negative = above).
+
+        Returns:
+            (H, W, 3) uint8 RGB image of the full scene with both robots.
+        """
+        import mujoco
+
+        if self._model is None or self._data is None:
+            w, h = self._config.resolution
+            return np.zeros((h, w, 3), dtype=np.uint8)
+
+        # Compute midpoint between the two robots as lookat target
+        positions = []
+        for robot_id in self._config.robot_ids:
+            start = self._qpos_starts[robot_id]
+            positions.append(self._data.qpos[start : start + 3].copy())
+        midpoint = np.mean(positions, axis=0)
+
+        # Configure free camera
+        cam = mujoco.MjvCamera()
+        cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+        cam.lookat[:] = midpoint
+        cam.distance = distance
+        cam.elevation = elevation
+        cam.azimuth = 90.0
+
+        self._overview_renderer.update_scene(self._data, camera=cam)
+        return self._overview_renderer.render().copy()
 
     # ------------------------------------------------------------------
     # Internal helpers

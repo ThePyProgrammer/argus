@@ -80,11 +80,15 @@ class MultiRobotVisualizer:
                         name="Robot A",
                         origin="/robot_a",
                     ),
+                    rrb.Spatial2DView(
+                        name="Ground Truth",
+                        origin="/overview",
+                    ),
                     rrb.Spatial3DView(
                         name="Robot B",
                         origin="/robot_b",
                     ),
-                    column_shares=[1, 1],
+                    column_shares=[1, 1, 1],
                 ),
                 row_shares=[3, 1],
             ),
@@ -100,6 +104,7 @@ class MultiRobotVisualizer:
         voronoi_direction: np.ndarray | None = None,
         total_coverage: float = 0.0,
         merge_count: int = 0,
+        overview_image: np.ndarray | None = None,
     ) -> None:
         """Update all dashboard panels in one call.
 
@@ -116,6 +121,7 @@ class MultiRobotVisualizer:
             voronoi_direction: Optional (2,) direction vector A->B.
             total_coverage: Combined coverage percentage.
             merge_count: Number of map merges performed.
+            overview_image: Optional (H, W, 3) uint8 RGB bird's-eye MuJoCo render.
         """
         self._log_merged_map(merged_voxels, robot_data)
         for rid, data in robot_data.items():
@@ -125,6 +131,8 @@ class MultiRobotVisualizer:
         if voronoi_midpoint is not None:
             self._log_voronoi_plane(voronoi_midpoint, voronoi_direction)
         self._log_stats_hud(total_coverage, robot_data, merge_count)
+        if overview_image is not None:
+            rr.log("/overview/image", rr.Image(overview_image))
 
     def _log_merged_map(
         self, merged_voxels: np.ndarray, robot_data: dict
