@@ -152,7 +152,7 @@ def test_coordinator_without_viz(no_viz_setup):
 
 
 def test_viz_update_interval(viz_setup):
-    """viz.update is called exactly 3 times for a 25-step run (steps 0, 10, 20).
+    """viz.update is called every 2 steps for a 25-step run (steps 0, 2, 4, ..., 24 = 13 calls).
 
     Patches step_once to never terminate, ensuring the full 25 steps execute
     so the update interval can be verified.
@@ -165,6 +165,7 @@ def test_viz_update_interval(viz_setup):
         robots[rid].exploration.step_once = MagicMock(return_value=non_terminating)
 
     coordinator.run(max_steps=25)
-    assert mock_viz.update.call_count == 3, (
-        f"Expected 3 calls (steps 0, 10, 20), got {mock_viz.update.call_count}"
+    # Coordinator updates viz every 2 steps: steps 0,2,4,...,24 = 13 calls
+    assert mock_viz.update.call_count == 13, (
+        f"Expected 13 calls (every 2 steps for 25 steps), got {mock_viz.update.call_count}"
     )
