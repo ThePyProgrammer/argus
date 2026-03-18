@@ -105,15 +105,8 @@ class WebStreamingViz:
         if len(merged_voxels) == 0:
             return
 
-        # Shift cloud Z down to ground level. The forward-facing camera
-        # reconstructs the ground plane at Z≈0.15 instead of Z=0 due to
-        # the camera height and viewing angle. Subtract the offset so the
-        # cloud sits on the ground in the web UI.
-        corrected = merged_voxels.copy()
-        corrected[:, 2] -= 0.15
-
         # Delta tracking
-        delta, updated_set = compute_cloud_delta(corrected, self._last_voxel_set)
+        delta, updated_set = compute_cloud_delta(merged_voxels, self._last_voxel_set)
         self._last_voxel_set = updated_set
 
         if len(delta) > 0:
@@ -130,11 +123,11 @@ class WebStreamingViz:
         now = time.monotonic()
         if now - self._last_full_sync > self._full_sync_interval:
             self._last_full_sync = now
-            full_colors = self._compute_colors(corrected)
+            full_colors = self._compute_colors(merged_voxels)
             self._message_queue.append({
                 "type": CLOUD_FULL,
                 "payload": {
-                    "positions": corrected.tolist(),
+                    "positions": merged_voxels.tolist(),
                     "colors": full_colors,
                 },
             })
