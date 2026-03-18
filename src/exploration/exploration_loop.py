@@ -314,6 +314,13 @@ class ExplorationLoop:
         if (self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
             linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
+        elif self._current_waypoint_runner is None:
+            # No waypoints yet (e.g., empty map during boot phase, or all
+            # frontiers unreachable) -- drive forward to build initial map
+            # instead of standing still. The coordinator decides when to
+            # truly terminate; this just ensures the robot keeps moving.
+            linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)
+            angular_vel = 0.0
 
         # ----------------------------------------------------------
         # f. Periodic logging
