@@ -84,7 +84,7 @@ def project_voxels_to_2d(
     resolution: float,
     z_min: float = 0.0,
     z_max: float = 2.0,
-    padding: int = 10,
+    padding: int = 30,
     robot_positions: np.ndarray | None = None,
 ) -> OccupancyGrid2D:
     """Project 3D occupied voxels to a 2D occupancy grid for navigation.
@@ -191,7 +191,7 @@ def project_voxels_to_2d(
 
     # Dilate FREE space around obstacles
     # For each occupied cell, mark nearby UNKNOWN cells as FREE
-    dilation_rounds = max(3, int(1.0 / resolution))
+    dilation_rounds = max(3, int(0.5 / resolution))  # ~0.5m free space around obstacles
     occupied_mask = grid == CELL_OCCUPIED
 
     for _ in range(dilation_rounds):
