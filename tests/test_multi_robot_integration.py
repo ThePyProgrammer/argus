@@ -71,7 +71,7 @@ def test_coordinator_runs_without_crash(multi_robot_setup):
 def test_incremental_merge_during_exploration(multi_robot_setup):
     """MERGE-04: Verify merge happens DURING exploration, not just at the end."""
     coordinator, merger, bridge, robots = multi_robot_setup
-    result = coordinator.run(max_steps=100)
+    result = coordinator.run(max_steps=30)
     # At least one merge should have happened during the run
     assert result["merge_count"] >= 1, "Map merge must happen during exploration, not just at end"
 
