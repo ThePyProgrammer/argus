@@ -2,16 +2,19 @@
 
 Provides /ws endpoint for real-time robot data streaming and
 command reception. Uses ConnectionManager for client tracking
-and WebStreamingViz for data serialization.
+and WebStreamingViz for data serialization. Serves React frontend
+build as static files at /.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 
 from src.web.connection_manager import ConnectionManager
 from src.web.streaming_viz import WebStreamingViz
@@ -33,6 +36,9 @@ def create_app(
 ) -> tuple[FastAPI, WebStreamingViz]:
     """Create and configure the FastAPI application.
 
+    Sets up WebSocket endpoint, static file serving for the React
+    frontend build, and scene asset directories.
+
     Args:
         robot_ids: List of robot identifiers to manage.
         command_cb: Optional callback for command messages received on WebSocket.
@@ -45,6 +51,22 @@ def create_app(
     streaming_viz = WebStreamingViz(manager, robot_ids)
     command_callback = command_cb
     _robot_ids = robot_ids
+
+    # Serve scene assets from DimOS data directory
+    scene_dir = Path(__file__).parent.parent.parent / "dimos" / "data" / "mujoco_sim" / "scene_office1"
+    if scene_dir.exists():
+        app.mount("/assets/scene", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+
+    # Serve GLB and other public assets from the frontend public directory
+    glb_dir = Path(__file__).parent.parent / "c2-frontend" / "public"
+    if glb_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(glb_dir)), name="glb_assets")
+
+    # Serve React frontend build as static files (must be last mount -- catch-all)
+    frontend_dir = Path(__file__).parent.parent / "c2-frontend" / "dist"
+    if frontend_dir.exists():
+        app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+
     return app, streaming_viz
 
 
@@ -73,6 +95,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         manager.disconnect(websocket)
 
 
+@app.on_event("startup")
+async def start_push_loop() -> None:
+    """Register the push_loop as a background task on server startup."""
+    asyncio.create_task(push_loop())
+
+
 async def push_loop(interval: float = 0.1) -> None:
     """Background task that drains streaming_viz messages and broadcasts.
 
@@ -83,11 +111,11 @@ async def push_loop(interval: float = 0.1) -> None:
         interval: Seconds between push cycles (default 100ms).
     """
     while True:
+        await asyncio.sleep(interval)
         if streaming_viz is not None:
             messages = streaming_viz.get_pending_messages()
             for msg in messages:
-                if isinstance(msg, dict):
-                    await manager.broadcast_json(msg)
-                elif isinstance(msg, bytes):
+                if isinstance(msg, bytes):
                     await manager.broadcast_bytes(msg)
-        await asyncio.sleep(interval)
+                else:
+                    await manager.broadcast_json(msg)

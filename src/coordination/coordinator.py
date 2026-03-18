@@ -68,7 +68,7 @@ class Coordinator:
         config: MultiRobotConfig,
         partitioner: VoronoiPartitioner | None = None,
         merger: MapMerger | None = None,
-        viz: MultiRobotVisualizer | None = None,
+        viz: Any = None,
     ):
         self._bridge = bridge
         self._robots = robots
@@ -85,9 +85,41 @@ class Coordinator:
         self._step_count = 0
         self._merge_count = 0
 
+        # Web control flags (set via _command_handler from C2 interface)
+        self._should_stop: bool = False
+        self._paused: bool = False
+
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}
         self._subscribers: list[pLCMTransport] = []
+
+    def _command_handler(self, command: dict) -> None:
+        """Handle control commands from the C2 web interface.
+
+        Supports:
+            {"action": "stop"} -- terminate exploration
+            {"action": "pause"} -- pause the coordination loop
+            {"action": "resume"} -- resume after pause
+            {"action": "set_speed", "value": N} -- set simulation speed
+
+        Args:
+            command: Dict with at least an "action" key.
+        """
+        action = command.get("action")
+        if action == "stop":
+            self._should_stop = True
+            logger.info("Command received: stop")
+        elif action == "pause":
+            self._paused = True
+            logger.info("Command received: pause")
+        elif action == "resume":
+            self._paused = False
+            logger.info("Command received: resume")
+        elif action == "set_speed":
+            value = command.get("value", 1.0)
+            if value > 0:
+                self._config.step_delay = 1.0 / value
+                logger.info("Command received: set_speed %.1f (delay=%.3fs)", value, self._config.step_delay)
 
     def _get_voronoi_geometry(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         """Extract Voronoi midpoint and direction for visualization."""
@@ -168,6 +200,16 @@ class Coordinator:
 
         for step in range(max_steps):
             self._step_count = step
+
+            # Check web control flags
+            if self._should_stop:
+                terminated_reason = "user_stopped"
+                break
+            while self._paused:
+                import time
+                time.sleep(0.1)
+                if self._should_stop:
+                    break
 
             # Per-robot: run one exploration step
             all_terminated = True

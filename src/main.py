@@ -41,7 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
     parser.add_argument(
         "--control",
-        choices=["teleop", "waypoint", "random", "explore", "multi"],
+        choices=["teleop", "waypoint", "random", "explore", "multi", "web"],
         default="teleop",
         help="Control mode (default: teleop)",
     )
@@ -286,9 +286,119 @@ def run_multi_mode(args):
     print("Done.")
 
 
+def run_web_mode(args):
+    """Run the C2 web interface: FastAPI + MuJoCo simulation together.
+
+    Starts the multi-robot simulation in a background thread and serves
+    the React C2 frontend via FastAPI at http://localhost:8000.
+    """
+    import math
+    import subprocess
+    import threading
+
+    import uvicorn
+
+    from src.coordination.multi_robot_config import MultiRobotConfig
+    from src.bridge.multi_bridge import MultiRobotBridge
+    from src.coordination.robot_instance import RobotInstance
+    from src.coordination.coordinator import Coordinator
+    from src.bridge.sensor_types import CameraIntrinsics
+    from src.exploration.config import ExplorationConfig
+    from src.web.server import create_app
+
+    scene = getattr(args, "scene", "office")
+    config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
+    if scene == "flat":
+        config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
+    config = MultiRobotConfig(**config_kwargs)
+    bridge = MultiRobotBridge(config)
+
+    # Camera intrinsics
+    w, h = config.resolution
+    fov_rad = math.radians(45.0)
+    fx = (w / 2.0) / math.tan(fov_rad / 2.0)
+    intrinsics = CameraIntrinsics(fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h)
+
+    explore_config = ExplorationConfig(
+        max_steps=args.multi_max_steps,
+        rescan_distance_m=args.explore_rescan_distance,
+        voxel_resolution=args.octomap_resolution,
+    )
+
+    robots = {}
+    for rid in config.robot_ids:
+        robots[rid] = RobotInstance.create(
+            robot_id=rid,
+            bridge=bridge,
+            intrinsics=intrinsics,
+            config=explore_config,
+            spawn_position=config.spawn_positions[rid],
+        )
+
+    # Create FastAPI app and streaming viz BEFORE coordinator
+    # so we can pass command_handler as callback
+    coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
+    app, streaming_viz = create_app(
+        list(config.robot_ids),
+        command_cb=coordinator._command_handler,
+    )
+    # Plug streaming viz into coordinator
+    coordinator._viz = streaming_viz
+
+    # Build React frontend
+    from pathlib import Path
+    frontend_dir = Path(__file__).parent / "c2-frontend"
+    if (frontend_dir / "package.json").exists():
+        print("Building React frontend...")
+        try:
+            subprocess.run(
+                ["npm", "run", "build"],
+                cwd=str(frontend_dir),
+                check=True,
+                capture_output=True,
+            )
+            print("Frontend build complete.")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"Warning: frontend build failed ({e}). Serving pre-built files if available.")
+
+    max_steps = args.multi_max_steps
+
+    # Start simulation in background thread
+    def _run_simulation():
+        try:
+            result = coordinator.run(max_steps=max_steps)
+            print(f"\nSimulation complete: {result['terminated_reason']}, "
+                  f"{result['total_steps']} steps, {result['merge_count']} merges")
+        except Exception as e:
+            print(f"\nSimulation error: {e}")
+
+    sim_thread = threading.Thread(target=_run_simulation, daemon=True)
+    sim_thread.start()
+
+    print(f"\nC2 Interface running at http://localhost:8000")
+    print(f"Robots: {config.robot_ids}")
+    print(f"Scene: {scene}")
+    print(f"Max steps: {max_steps}")
+    print("Press Ctrl+C to stop\n")
+
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    except KeyboardInterrupt:
+        print("\nShutting down C2 interface...")
+    finally:
+        coordinator._should_stop = True
+        sim_thread.join(timeout=5.0)
+        bridge.stop()
+        print("Done.")
+
+
 def main():
     """Run the single-robot SLAM loop."""
     args = parse_args()
+
+    if args.control == "web":
+        run_web_mode(args)
+        return
 
     if args.control == "multi":
         run_multi_mode(args)
