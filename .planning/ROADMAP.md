@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Multi-Robot Coordination and Map Merging** - Two robots split the environment between them and fuse their maps into a unified 3D reconstruction in real-time (completed 2026-03-17)
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress (1/2 plans complete)
 - [x] **Phase 5: Robot Locomotion Fix** - Fix actuator mismatch and replace sinusoidal gait with proper trot locomotion so robots actually walk (completed 2026-03-18)
+- [ ] **Phase 6: React C2 Web Interface** - Browser-based Command & Control interface replacing desktop Rerun viewer with Three.js 3D visualization and WebSocket streaming
 
 ## Phase Details
 
@@ -99,10 +100,30 @@ Plans:
 - [x] 05-01-PLAN.md — Locomotion module: XML actuator patcher, TrotGaitController, GaitParams, and movement tests
 - [x] 05-02-PLAN.md — Bridge integration, scene builder patching, stuck recovery, and human verification
 
+### Phase 6: React C2 Web Interface for Multi-Robot Visualization and Control
+**Goal**: A browser-based Command & Control interface replaces the desktop Rerun viewer with a React/Three.js dashboard showing the merged 3D reconstruction, robot positions, camera feeds, and exploration controls -- all streamed via WebSocket from a FastAPI backend
+**Depends on:** Phase 5
+**Requirements**: C2-01, C2-02, C2-03, C2-04, C2-05, C2-06, C2-07, C2-08, C2-09, C2-10
+**Success Criteria** (what must be TRUE):
+  1. `python src/main.py --control web` launches FastAPI + MuJoCo simulation, serving React app at localhost:8000
+  2. Browser displays mission control layout: large 3D viewer (~70%), right sidebar with robot cards, collapsible camera strip
+  3. Merged point cloud updates in real-time via WebSocket delta + periodic full sync
+  4. Per-robot camera feeds stream as JPEG binary WebSocket messages
+  5. Robot status cards show coverage %, action, voxel count; clicking centers 3D view on robot
+  6. Control panel sends start/stop/pause/speed commands that reach the Coordinator
+  7. UI adapts dynamically to N robots without frontend code changes
+**Plans**: 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — FastAPI backend: message types, ConnectionManager, WebStreamingViz, WebSocket server, tests
+- [ ] 06-02-PLAN.md — React/Vite frontend scaffold: Zustand stores, WebSocket hook, layout, sidebar, camera components
+- [ ] 06-03-PLAN.md — Three.js 3D viewer: scene setup, point cloud manager, robot markers, trajectory trails, GLB loader
+- [ ] 06-04-PLAN.md — End-to-end integration: Coordinator wiring, main.py --control web, scene GLB conversion, human verification
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -111,13 +132,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. Multi-Robot Coordination and Map Merging | 3/3 | Complete    | 2026-03-17 |
 | 4. Visualization and Integration | 1/2 | In progress | - |
 | 5. Robot Locomotion Fix | 2/2 | Complete    | 2026-03-18 |
-
-### Phase 6: React C2 Web Interface for Multi-Robot Visualization and Control
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 5
-**Plans:** 2/2 plans complete
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+| 6. React C2 Web Interface | 0/4 | Not started | - |
