@@ -32,26 +32,36 @@ logger = logging.getLogger(__name__)
 
 
 class StuckRecovery:
-    """Turn-in-place recovery when robot is physically stuck.
+    """Reverse-then-turn recovery when robot is physically stuck.
 
-    When triggered, commands a 90-degree turn with randomized direction
-    (left or right). The recovery runs for the required angular displacement,
-    then completes and signals the caller to rescan frontiers.
+    When triggered: first reverses for a set number of steps to back away
+    from the obstacle, then turns 90 degrees with randomized direction.
+    This gets the robot clear of furniture/walls before choosing a new heading.
     """
 
     def __init__(
-        self, turn_angle: float = np.pi / 2, angular_speed: float = 1.0,
+        self,
+        turn_angle: float = np.pi / 2,
+        angular_speed: float = 1.0,
+        reverse_speed: float = 0.5,
+        reverse_steps: int = 15,
     ) -> None:
         self._turn_angle = turn_angle
         self._angular_speed = angular_speed
-        self._remaining: float = 0.0
+        self._reverse_speed = reverse_speed
+        self._reverse_steps = reverse_steps
+        self._remaining_turn: float = 0.0
+        self._remaining_reverse: int = 0
         self._active: bool = False
+        self._phase: str = "idle"  # "reverse" or "turn"
 
     def trigger(self) -> None:
-        """Start a turn recovery. Randomizes direction (left/right)."""
+        """Start a reverse-then-turn recovery."""
+        self._remaining_reverse = self._reverse_steps
         direction = 1.0 if np.random.random() > 0.5 else -1.0
-        self._remaining = self._turn_angle * direction
+        self._remaining_turn = self._turn_angle * direction
         self._active = True
+        self._phase = "reverse"
 
     def step(self, dt: float) -> tuple[float, float, float] | None:
         """Get recovery velocity command (vx, vy, omega), or None if complete.
@@ -62,18 +72,26 @@ class StuckRecovery:
         if not self._active:
             return None
 
-        turn = np.sign(self._remaining) * self._angular_speed
-        self._remaining -= turn * dt
+        if self._phase == "reverse":
+            self._remaining_reverse -= 1
+            if self._remaining_reverse <= 0:
+                self._phase = "turn"
+            return (-self._reverse_speed, 0.0, 0.0)  # reverse
 
-        if abs(self._remaining) < 0.1:
+        # Turn phase
+        turn = np.sign(self._remaining_turn) * self._angular_speed
+        self._remaining_turn -= turn * dt
+
+        if abs(self._remaining_turn) < 0.1:
             self._active = False
+            self._phase = "idle"
             return None
 
-        return (0.0, 0.0, turn)  # zero linear, only angular
+        return (0.0, 0.0, turn)
 
     @property
     def is_active(self) -> bool:
-        """True while a recovery turn is in progress."""
+        """True while a recovery is in progress."""
         return self._active
 
 
