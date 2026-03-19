@@ -221,11 +221,14 @@ def run_multi_mode(args):
     if scene == "flat":
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
     else:
-        import random
-        ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
-        bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
-        while abs(ax - bx) < 2 and abs(ay - by) < 2:  # ensure they're not too close
+        import random, math
+        min_dist = 4.0  # minimum distance between robots
+        for _ in range(100):  # max attempts
+            ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
             bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
+            dist = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+            if dist >= min_dist:
+                break
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
@@ -325,11 +328,14 @@ def run_web_mode(args):
     if scene == "flat":
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
     else:
-        import random
-        ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
-        bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
-        while abs(ax - bx) < 2 and abs(ay - by) < 2:  # ensure they're not too close
+        import random, math
+        min_dist = 4.0  # minimum distance between robots
+        for _ in range(100):  # max attempts
+            ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
             bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
+            dist = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+            if dist >= min_dist:
+                break
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
