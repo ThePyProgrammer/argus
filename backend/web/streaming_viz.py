@@ -106,7 +106,13 @@ class WebStreamingViz:
         if len(merged_voxels) == 0:
             return
 
-        # Get robot world positions for coloring
+        # Build color lookup based on mode
+        if self._color_mode == "true_rgb":
+            self._rgb_lookup = self._build_rgb_lookup(robot_data)
+        else:
+            self._rgb_lookup = None
+
+        # Get robot world positions for robot-tint coloring
         robot_positions = []
         for i, (rid, data) in enumerate(robot_data.items()):
             pose = data.get("pose")
@@ -161,27 +167,53 @@ class WebStreamingViz:
                 result.append((i, voxel_set))
         return result
 
+    def _build_rgb_lookup(self, robot_data: dict) -> dict[tuple[float, float, float], list[int]]:
+        """Build voxel→RGB color lookup from SLAM point cloud colors."""
+        lookup: dict[tuple[float, float, float], list[int]] = {}
+        for rid, data in robot_data.items():
+            local_voxels = data.get("local_voxels")
+            local_colors = data.get("local_colors")
+            if local_voxels is None or local_colors is None:
+                continue
+            if len(local_voxels) == 0 or len(local_colors) == 0:
+                continue
+            # Colors from SLAM are float [0,1] → convert to uint8 [0,255]
+            n = min(len(local_voxels), len(local_colors))
+            for i in range(n):
+                key = tuple(round(float(c), 2) for c in local_voxels[i])
+                rgb = local_colors[i]
+                lookup[key] = [int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255)]
+        return lookup
+
     def _compute_colors(
         self,
         voxels: np.ndarray,
         robot_positions: list[tuple[int, np.ndarray]],
     ) -> list[list[int]]:
-        """Compute per-voxel colors by nearest robot (3D distance).
+        """Compute per-voxel colors based on current color mode.
 
-        Each voxel is colored by the robot whose current world position
-        is closest to it.
+        true_rgb: uses SLAM point cloud RGB colors via _rgb_lookup.
+        robot_tint: colors by nearest robot using palette.
         """
+        # True RGB mode
+        if self._color_mode == "true_rgb" and self._rgb_lookup:
+            colors = []
+            for v in voxels:
+                key = tuple(round(float(c), 2) for c in v)
+                rgb = self._rgb_lookup.get(key)
+                colors.append(rgb if rgb else [180, 180, 180])
+            return colors
+
+        # Robot tint mode (default)
         if not robot_positions:
             return [list(color_for_robot(0))] * len(voxels)
 
-        # Vectorized: compute distance from each voxel to each robot
-        robot_pos_array = np.array([pos for _, pos in robot_positions])  # (R, 3)
-        # Broadcast: (N, 1, 3) - (1, R, 3) → (N, R, 3) → (N, R) distances
+        robot_pos_array = np.array([pos for _, pos in robot_positions])
         dists = np.linalg.norm(
             voxels[:, np.newaxis, :] - robot_pos_array[np.newaxis, :, :],
             axis=2,
         )
-        nearest = np.argmin(dists, axis=1)  # (N,) indices into robot_positions
+        nearest = np.argmin(dists, axis=1)
 
         colors = []
         for i in range(len(voxels)):

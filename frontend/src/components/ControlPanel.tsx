@@ -1,4 +1,5 @@
 import { useControlStore } from '../stores/controlStore';
+import { useRobotStore } from '../stores/robotStore';
 
 export default function ControlPanel() {
   const isRunning = useControlStore((s) => s.isRunning);
@@ -15,6 +16,7 @@ export default function ControlPanel() {
   const setCloudOffset = useControlStore((s) => s.setCloudOffset);
   const showScene = useControlStore((s) => s.showScene);
   const toggleScene = useControlStore((s) => s.toggleScene);
+  const colorMode = useRobotStore((s) => s.colorMode);
 
   const handleStartStop = () => {
     const action = isRunning ? 'stop' : 'start';
@@ -99,7 +101,7 @@ export default function ControlPanel() {
         />
       </div>
 
-      <div style={{ marginTop: '10px' }}>
+      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
           onClick={toggleScene}
           style={{
@@ -111,6 +113,22 @@ export default function ControlPanel() {
           }}
         >
           {showScene ? 'Hide Scene Mesh' : 'Show Scene Mesh'}
+        </button>
+        <button
+          onClick={() => {
+            const newMode = colorMode === 'robot_tint' ? 'true_rgb' : 'robot_tint';
+            useRobotStore.getState().setColorMode(newMode);
+            sendRaw?.({ type: 'set_color_mode', mode: newMode });
+          }}
+          style={{
+            ...buttonStyle,
+            width: '100%',
+            background: colorMode === 'true_rgb' ? '#1b5e20' : '#37474f',
+            color: '#e0e0e0',
+            border: '1px solid #444',
+          }}
+        >
+          {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
         </button>
       </div>
 

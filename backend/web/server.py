@@ -125,6 +125,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                             "type": "cloud_config_ack",
                             "payload": {"config": key, "label": label},
                         })
+                    elif data.get("type") == "set_color_mode":
+                        mode = data.get("mode", "robot_tint")
+                        if streaming_viz is not None:
+                            streaming_viz.set_color_mode(mode)
+                            streaming_viz._last_voxel_set = set()  # force full resend
+                            logger.info("Color mode switched to %s", mode)
+                        await websocket.send_json({
+                            "type": "color_mode_ack",
+                            "payload": {"mode": mode},
+                        })
                 except (json.JSONDecodeError, TypeError):
                     pass
             elif "bytes" in message:
