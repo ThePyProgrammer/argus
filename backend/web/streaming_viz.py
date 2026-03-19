@@ -105,9 +105,8 @@ class WebStreamingViz:
         self._message_queue = []
         return msgs
 
-    # Standard cloud offset to align SLAM output with scene geometry.
-    # Empirically tuned: config 1 (Y-Z- cam) with xyaxes="0 0 -1 0 1 0".
-    CLOUD_OFFSET = np.array([1.4, -1.6, -0.2], dtype=np.float64)
+    # Z offset to bring cloud to ground level (camera height compensation)
+    CLOUD_OFFSET = np.array([0.0, 0.0, -0.2], dtype=np.float64)
 
     def _update_cloud(self, merged_voxels: np.ndarray, robot_data: dict) -> None:
         """Compute and queue cloud delta/full messages with per-robot colors."""
