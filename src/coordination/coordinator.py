@@ -278,8 +278,11 @@ class Coordinator:
             if any_rescan_triggered:
                 self._do_merge(robot_ids)
 
-            # Visualization update (every 10 frames, per established pattern)
+            # Visualization update (every 2 frames)
             if step % 2 == 0 and self._viz is not None:
+                # Always merge for viz (ensures cloud updates after config switch)
+                self._do_merge(robot_ids)
+
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
