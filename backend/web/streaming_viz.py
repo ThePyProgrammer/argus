@@ -7,10 +7,13 @@ pose, trajectory, camera frames, and stats.
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from backend.web.connection_manager import ConnectionManager
 from backend.web.message_types import (
