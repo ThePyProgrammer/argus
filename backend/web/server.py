@@ -30,43 +30,59 @@ _robot_ids: list[str] = []
 app = FastAPI(title="C2 Interface")
 
 
-def create_app(
+def configure_app(
     robot_ids: list[str],
     command_cb: Callable[[dict[str, Any]], None] | None = None,
-) -> tuple[FastAPI, WebStreamingViz]:
-    """Create and configure the FastAPI application.
+) -> WebStreamingViz:
+    """Configure module-level shared state before uvicorn.run().
 
-    Sets up WebSocket endpoint, static file serving for the React
-    frontend build, and scene asset directories.
+    Called once by main.py. Sets up the streaming viz and callbacks
+    that the app reads from. Persists across uvicorn reloads.
 
     Args:
-        robot_ids: List of robot identifiers to manage.
-        command_cb: Optional callback for command messages received on WebSocket.
+        robot_ids: List of robot identifiers.
+        command_cb: Callback for command messages from WebSocket clients.
 
     Returns:
-        Tuple of (FastAPI app, WebStreamingViz instance).
+        WebStreamingViz instance for the coordinator to write to.
     """
     global manager, streaming_viz, command_callback, _robot_ids
     manager = ConnectionManager()
     streaming_viz = WebStreamingViz(manager, robot_ids)
     command_callback = command_cb
     _robot_ids = robot_ids
+    return streaming_viz
 
-    # Project root is two levels up from backend/web/
+
+def create_app(
+    robot_ids: list[str],
+    command_cb: Callable[[dict[str, Any]], None] | None = None,
+) -> tuple[FastAPI, WebStreamingViz]:
+    """Legacy API: configure + return (app, viz). For non-reload usage."""
+    viz = configure_app(robot_ids, command_cb)
+    return app, viz
+
+
+def _mount_static_dirs() -> None:
+    """Mount static file directories for frontend assets."""
     project_root = Path(__file__).parent.parent.parent
 
-    # Serve scene assets from DimOS data directory
     scene_dir = project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1"
     if scene_dir.exists():
-        app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+        try:
+            app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+        except Exception:
+            pass
 
-    # Serve React frontend build as static files (must be last mount -- catch-all)
-    # Vite copies public/ into dist/ at build time, so GLB files are included
     frontend_dir = project_root / "frontend" / "dist"
     if frontend_dir.exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        try:
+            app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        except Exception:
+            pass
 
-    return app, streaming_viz
+
+_mount_static_dirs()
 
 
 @app.websocket("/ws")
