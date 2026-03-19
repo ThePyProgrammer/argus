@@ -7,8 +7,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/ws': { target: 'ws://localhost:8000', ws: true },
-      '/public': { target: 'http://localhost:8000' },
-      '/scene-data': { target: 'http://localhost:8000' },
     },
   },
 });

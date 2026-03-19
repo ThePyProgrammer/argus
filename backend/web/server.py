@@ -60,12 +60,8 @@ def create_app(
     if scene_dir.exists():
         app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
 
-    # Serve GLB and other public assets from the frontend public directory
-    glb_dir = project_root / "frontend" / "public"
-    if glb_dir.exists():
-        app.mount("/public", StaticFiles(directory=str(glb_dir)), name="glb_assets")
-
     # Serve React frontend build as static files (must be last mount -- catch-all)
+    # Vite copies public/ into dist/ at build time, so GLB files are included
     frontend_dir = project_root / "frontend" / "dist"
     if frontend_dir.exists():
         app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

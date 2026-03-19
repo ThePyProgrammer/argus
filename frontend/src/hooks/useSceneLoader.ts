@@ -26,7 +26,7 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
     setLoading(true);
 
     loader.load(
-      '/public/scene.glb',
+      '/scene.glb',
       (gltf) => {
         parent.add(gltf.scene);
         setLoading(false);

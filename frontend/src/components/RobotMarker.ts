@@ -27,7 +27,7 @@ export class RobotMarkerManager {
   private loadModel(): void {
     const loader = new GLTFLoader();
     loader.load(
-      '/public/go2.glb',
+      '/go2.glb',
       (gltf) => {
         this.templateModel = gltf.scene;
         // Scale down — Go2 OBJ meshes are in meters but may be oversized
