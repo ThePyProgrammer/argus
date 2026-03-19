@@ -109,6 +109,18 @@ class WebStreamingViz:
         # Build color lookup based on mode
         if self._color_mode == "true_rgb":
             self._rgb_lookup = self._build_rgb_lookup(robot_data)
+            if self._rgb_lookup:
+                logger.info("RGB lookup: %d entries, %d merged voxels", len(self._rgb_lookup), len(merged_voxels))
+            else:
+                # Debug: check what data we actually got
+                for rid, data in robot_data.items():
+                    pts = data.get("slam_cloud_pts")
+                    cols = data.get("slam_cloud_rgb")
+                    logger.warning("RGB debug %s: pts=%s cols=%s",
+                        rid,
+                        f"{len(pts)} pts" if pts is not None and hasattr(pts, '__len__') else "None",
+                        f"{len(cols)} cols" if cols is not None and hasattr(cols, '__len__') else "None",
+                    )
         else:
             self._rgb_lookup = None
 
