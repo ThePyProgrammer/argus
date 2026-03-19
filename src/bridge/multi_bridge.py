@@ -172,9 +172,11 @@ class MultiRobotBridge:
             mujoco.mj_step(self._model, self._data)
 
         # Create one renderer per robot
+        # Robot cameras use xyaxes which swaps the image plane axes,
+        # so swap w/h to produce landscape output
         w, h = self._config.resolution
         for robot_id in self._config.robot_ids:
-            self._renderers[robot_id] = mujoco.Renderer(self._model, height=h, width=w)
+            self._renderers[robot_id] = mujoco.Renderer(self._model, height=w, width=h)
         self._overview_renderer = mujoco.Renderer(self._model, height=h, width=w)
 
         # Launch interactive MuJoCo 3D viewer
