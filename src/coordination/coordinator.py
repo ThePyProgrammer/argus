@@ -89,6 +89,7 @@ class Coordinator:
         # Web control flags (set via _command_handler from C2 interface)
         self._should_stop: bool = False
         self._paused: bool = False
+        self._static: bool = False  # set True to keep robots stationary
 
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}
@@ -235,7 +236,10 @@ class Coordinator:
                 linear, angular, metrics = robot.exploration.step_once(
                     frame, step, score_fn=score_fn,
                 )
-                self._bridge.set_velocity(rid, linear, angular)
+                if self._static:
+                    self._bridge.set_velocity(rid, np.zeros(2), 0.0)
+                else:
+                    self._bridge.set_velocity(rid, linear, angular)
 
                 if not metrics.get("terminated", False):
                     all_terminated = False

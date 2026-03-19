@@ -98,6 +98,11 @@ def parse_args():
         default="flat",
         help="Scene type for multi-robot mode (default: flat)",
     )
+    parser.add_argument(
+        "--static",
+        action="store_true",
+        help="Keep robots stationary (SLAM still runs, robots don't walk)",
+    )
     return parser.parse_args()
 
 
@@ -244,6 +249,8 @@ def run_multi_mode(args):
 
     viz = MultiRobotVisualizer(app_name="multi_robot_viz")
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config, viz=viz)
+    if getattr(args, 'static', False):
+        coordinator._static = True
 
     print(f"Starting multi-robot exploration...")
     print(f"Robots: {config.robot_ids}")
@@ -363,6 +370,8 @@ def run_web_mode(args):
         slam_reset_cb=_reset_slam,
     )
     coordinator._viz = streaming_viz
+    if getattr(args, 'static', False):
+        coordinator._static = True
 
     # Build React frontend
     from pathlib import Path
