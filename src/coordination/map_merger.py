@@ -70,8 +70,10 @@ class MapMerger:
                 unified_voxels: (N, 3) float64 deduplicated voxel centers
                 merged_cloud: Open3D PointCloud, voxel-downsampled
         """
-        voxels_a = self._apply_transform(octomap_a.get_occupied_voxels(), robot_a_id)
-        voxels_b = self._apply_transform(octomap_b.get_occupied_voxels(), robot_b_id)
+        # No transform needed: SLAM pipeline already outputs world-frame voxels
+        # (camera pose includes robot position, so OctoMap data is in world frame)
+        voxels_a = octomap_a.get_occupied_voxels()
+        voxels_b = octomap_b.get_occupied_voxels()
         return self.merge_from_voxels(voxels_a, voxels_b)
 
     def merge_from_voxels(
