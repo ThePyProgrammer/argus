@@ -373,16 +373,13 @@ class MultiRobotBridge:
         depth_raw = renderer.render().copy()
         renderer.disable_depth_rendering()
 
-        # MuJoCo depth buffer: auto-detect normalized [0,1] vs metric
-        if depth_raw.max() <= 1.0:
-            extent = self._model.stat.extent
-            znear = self._model.vis.map.znear * extent
-            zfar = self._model.vis.map.zfar * extent
-            depth = znear / (1.0 - depth_raw * (1.0 - znear / zfar) + 1e-10)
-            depth = np.where(depth_raw >= 0.999, 0.0, depth).astype(np.float32)
-        else:
-            max_range = 20.0
-            depth = np.where(depth_raw > max_range, 0.0, depth_raw).astype(np.float32)
+        # MuJoCo depth buffer → metric conversion (always needed)
+        extent = self._model.stat.extent
+        znear = self._model.vis.map.znear * extent
+        zfar = self._model.vis.map.zfar * extent
+        depth = znear * zfar / (zfar - depth_raw * (zfar - znear))
+        depth[depth_raw >= 0.999] = 0.0
+        depth = depth.astype(np.float32)
 
         # Pose transform depends on active cloud config
         from src.slam.depth_to_cloud import get_pose_mode
