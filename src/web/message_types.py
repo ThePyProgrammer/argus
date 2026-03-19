@@ -88,6 +88,48 @@ def encode_camera_frame(
     return header + jpeg_bytes
 
 
+def encode_depth_frame(
+    robot_id: str, depth: np.ndarray, max_range: float = 10.0, quality: int = 70
+) -> bytes:
+    """Encode depth image as a colorized JPEG with binary protocol header.
+
+    Normalizes depth to [0, max_range], applies a turbo/inferno-style
+    colormap for visualization, and encodes as JPEG.
+
+    Binary layout: [0x02][id_len: 1 byte][robot_id ASCII][JPEG bytes]
+
+    Args:
+        robot_id: Robot identifier string.
+        depth: (H, W) float32 depth in meters. 0 = invalid.
+        max_range: Max depth for normalization in meters.
+        quality: JPEG compression quality (0-100).
+
+    Returns:
+        bytes with header + JPEG payload.
+    """
+    import cv2
+
+    # Normalize to 0-255 range
+    valid = (depth > 0) & (depth < max_range)
+    normalized = np.zeros_like(depth, dtype=np.uint8)
+    if np.any(valid):
+        normalized[valid] = (255 * (1.0 - depth[valid] / max_range)).clip(0, 255).astype(np.uint8)
+
+    # Apply colormap (TURBO gives a nice rainbow depth visualization)
+    colored = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
+    # Black out invalid pixels
+    colored[~valid] = 0
+
+    success, buf = cv2.imencode(".jpg", colored, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not success:
+        raise RuntimeError("Depth JPEG encoding failed")
+
+    jpeg_bytes = buf.tobytes()
+    rid_bytes = robot_id.encode("ascii")
+    header = bytes([0x02, len(rid_bytes)]) + rid_bytes
+    return header + jpeg_bytes
+
+
 def decode_camera_frame_header(data: bytes) -> tuple[str, bytes]:
     """Decode binary camera frame header to extract robot_id and JPEG data.
 

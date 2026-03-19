@@ -123,8 +123,9 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
       const view = new DataView(data);
       const msgType = view.getUint8(0);
 
-      if (msgType === 0x01) {
-        // Camera frame: [0x01][id_len:1][robot_id ASCII][JPEG bytes]
+      if (msgType === 0x01 || msgType === 0x02) {
+        // Camera frame: [type][id_len:1][robot_id ASCII][JPEG bytes]
+        // 0x01 = RGB, 0x02 = depth (colorized)
         const idLen = view.getUint8(1);
         const robotId = new TextDecoder().decode(
           new Uint8Array(data, 2, idLen),
@@ -132,7 +133,11 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
         const jpegData = new Uint8Array(data, 2 + idLen);
         const blob = new Blob([jpegData], { type: 'image/jpeg' });
         const blobUrl = URL.createObjectURL(blob);
-        useRobotStore.getState().setCameraUrl(robotId, blobUrl);
+        if (msgType === 0x01) {
+          useRobotStore.getState().setCameraUrl(robotId, blobUrl);
+        } else {
+          useRobotStore.getState().setDepthUrl(robotId, blobUrl);
+        }
       }
     }
 

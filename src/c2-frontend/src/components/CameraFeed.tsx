@@ -6,17 +6,32 @@ interface CameraFeedProps {
 }
 
 export default function CameraFeed({ robotId }: CameraFeedProps) {
-  // Selective subscription: only re-renders when THIS robot's cameraUrl changes
   const cameraUrl = useRobotStore((s) => s.robots.get(robotId)?.cameraUrl);
+  const depthUrl = useRobotStore((s) => s.robots.get(robotId)?.depthUrl);
   const colorIndex = useRobotStore(
     (s) => s.robots.get(robotId)?.colorIndex ?? 0,
   );
   const color = robotColor(colorIndex);
 
+  const imgStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  };
+
+  const noFeedStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: '#555',
+    fontSize: '12px',
+  };
+
   return (
     <div
       style={{
-        width: '320px',
+        width: '400px',
         height: '240px',
         flexShrink: 0,
         background: '#0a0a1a',
@@ -26,13 +41,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
       }}
     >
       {/* Color accent bar */}
-      <div
-        style={{
-          height: '3px',
-          background: color,
-          width: '100%',
-        }}
-      />
+      <div style={{ height: '3px', background: color, width: '100%' }} />
       {/* Label */}
       <div
         style={{
@@ -45,30 +54,39 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
           padding: '2px 6px',
           borderRadius: '3px',
           color: '#e0e0e0',
+          zIndex: 1,
         }}
       >
         {robotId}
       </div>
-      {cameraUrl ? (
-        <img
-          src={cameraUrl}
-          alt={`${robotId} camera`}
-          style={{ width: '320px', height: '237px', objectFit: 'cover' }}
-        />
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '237px',
-            color: '#555',
-            fontSize: '13px',
-          }}
-        >
-          No feed
+      {/* Side-by-side: RGB + Depth */}
+      <div style={{ display: 'flex', height: '237px' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{
+            position: 'absolute', bottom: '4px', left: '4px',
+            fontSize: '10px', color: '#aaa', background: 'rgba(0,0,0,0.5)',
+            padding: '1px 4px', borderRadius: '2px', zIndex: 1,
+          }}>RGB</div>
+          {cameraUrl ? (
+            <img src={cameraUrl} alt={`${robotId} rgb`} style={imgStyle} />
+          ) : (
+            <div style={noFeedStyle}>No RGB</div>
+          )}
         </div>
-      )}
+        <div style={{ width: '1px', background: '#2a2a4a' }} />
+        <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{
+            position: 'absolute', bottom: '4px', left: '4px',
+            fontSize: '10px', color: '#aaa', background: 'rgba(0,0,0,0.5)',
+            padding: '1px 4px', borderRadius: '2px', zIndex: 1,
+          }}>Depth</div>
+          {depthUrl ? (
+            <img src={depthUrl} alt={`${robotId} depth`} style={imgStyle} />
+          ) : (
+            <div style={noFeedStyle}>No depth</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

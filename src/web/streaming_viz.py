@@ -22,6 +22,7 @@ from src.web.message_types import (
     color_for_robot,
     compute_cloud_delta,
     encode_camera_frame,
+    encode_depth_frame,
 )
 
 if TYPE_CHECKING:
@@ -222,14 +223,20 @@ class WebStreamingViz:
                     },
                 })
 
-            # Camera frame (binary)
+            # Camera frames (binary) — RGB + depth
             frame = data.get("frame")
             if frame is not None:
                 try:
                     binary = encode_camera_frame(rid, frame.rgb)
                     self._message_queue.append(binary)
                 except Exception:
-                    pass  # Skip if encoding fails
+                    pass
+                if frame.depth is not None:
+                    try:
+                        depth_binary = encode_depth_frame(rid, frame.depth)
+                        self._message_queue.append(depth_binary)
+                    except Exception:
+                        pass
 
     def _update_stats(
         self,

@@ -9,6 +9,7 @@ export interface RobotInfo {
   voxelCount: number;
   action: string; // "exploring" | "idle" | "stuck"
   cameraUrl: string | null;
+  depthUrl: string | null;
   trajectory: number[][]; // list of [x,y,z]
   trajectoryAlphas: number[];
 }
@@ -40,6 +41,7 @@ export interface RobotStoreState {
   appendCloudDelta: (positions: number[][], colors?: number[][]) => void;
   setCloudFull: (positions: number[][], colors?: number[][]) => void;
   setCameraUrl: (robotId: string, url: string) => void;
+  setDepthUrl: (robotId: string, url: string) => void;
   updateTrajectory: (
     robotId: string,
     positions: number[][],
@@ -70,6 +72,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         voxelCount: existing?.voxelCount ?? 0,
         action: existing?.action ?? 'idle',
         cameraUrl: existing?.cameraUrl ?? null,
+        depthUrl: existing?.depthUrl ?? null,
         trajectory: existing?.trajectory ?? [],
         trajectoryAlphas: existing?.trajectoryAlphas ?? [],
       });
@@ -138,6 +141,18 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         URL.revokeObjectURL(robot.cameraUrl);
       }
       robots.set(robotId, { ...robot, cameraUrl: url });
+      set({ robots });
+    }
+  },
+
+  setDepthUrl: (robotId: string, url: string) => {
+    const robots = new Map(get().robots);
+    const robot = robots.get(robotId);
+    if (robot) {
+      if (robot.depthUrl) {
+        URL.revokeObjectURL(robot.depthUrl);
+      }
+      robots.set(robotId, { ...robot, depthUrl: url });
       set({ robots });
     }
   },
