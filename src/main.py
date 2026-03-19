@@ -223,14 +223,12 @@ def run_multi_mode(args):
     else:
         import random, math
         # Place robot_a randomly, then robot_b at a forced distance away
-        ax, ay = random.uniform(-2, 2), random.uniform(-2, 2)
+        spawn_range = 8.0  # ±8m from origin
+        ax, ay = random.uniform(-spawn_range, spawn_range), random.uniform(-spawn_range, spawn_range)
         angle = random.uniform(0, 2 * math.pi)
-        dist = random.uniform(4.0, 6.0)
+        dist = random.uniform(5.0, 10.0)
         bx = ax + dist * math.cos(angle)
         by = ay + dist * math.sin(angle)
-        # Clamp to scene bounds
-        bx = max(-4, min(4, bx))
-        by = max(-4, min(4, by))
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
@@ -332,14 +330,12 @@ def run_web_mode(args):
     else:
         import random, math
         # Place robot_a randomly, then robot_b at a forced distance away
-        ax, ay = random.uniform(-2, 2), random.uniform(-2, 2)
+        spawn_range = 8.0  # ±8m from origin
+        ax, ay = random.uniform(-spawn_range, spawn_range), random.uniform(-spawn_range, spawn_range)
         angle = random.uniform(0, 2 * math.pi)
-        dist = random.uniform(4.0, 6.0)
+        dist = random.uniform(5.0, 10.0)
         bx = ax + dist * math.cos(angle)
         by = ay + dist * math.sin(angle)
-        # Clamp to scene bounds
-        bx = max(-4, min(4, bx))
-        by = max(-4, min(4, by))
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
