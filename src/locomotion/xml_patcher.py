@@ -116,7 +116,7 @@ def patch_actuators_to_position_with_floor(xml_path: str) -> str:
                 cam = ET.SubElement(base_body, "camera")
                 cam.set("name", "front_cam")
                 cam.set("pos", "0.4 0 0.05")  # past the nose, at snout level
-                cam.set("xyaxes", "0 0 -1 0 1 0")  # look along body +X (forward)
+                cam.set("xyaxes", "0 0 1 0 1 0")  # look along body -X (outward from nose)
                 cam.set("fovy", "45")
 
     # Add visual settings for depth rendering (znear/zfar)
