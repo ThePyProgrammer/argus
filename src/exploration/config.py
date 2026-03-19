@@ -22,7 +22,7 @@ class ExplorationConfig:
 
     # Navigation
     waypoint_arrival_threshold: float = 0.3   # tighter threshold for continuous gait
-    linear_speed: float = 5.0
+    linear_speed: float = 2.0
     angular_speed: float = 1.0
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
 
