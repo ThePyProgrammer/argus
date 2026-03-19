@@ -79,7 +79,7 @@ def encode_camera_frame(
 
     # MuJoCo camera xyaxes="0 -1 0 0 0 1" produces a rotated image;
     # rotate 90° clockwise to get the natural orientation
-    rgb_rotated = cv2.rotate(rgb, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    rgb_rotated = cv2.rotate(rgb, cv2.ROTATE_180)
     bgr = cv2.cvtColor(rgb_rotated, cv2.COLOR_RGB2BGR)
     success, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
@@ -122,7 +122,7 @@ def encode_depth_frame(
     # Black out invalid pixels
     colored[~valid] = 0
     # Rotate 90° clockwise to match camera xyaxes orientation
-    colored = cv2.rotate(colored, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    colored = cv2.rotate(colored, cv2.ROTATE_180)
 
     success, buf = cv2.imencode(".jpg", colored, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
