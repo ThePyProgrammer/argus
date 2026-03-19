@@ -108,8 +108,13 @@ def encode_depth_frame(
     """
     import cv2
 
-    # Normalize to 0-255 range
-    valid = (depth > 0) & (depth < max_range)
+    # Auto-scale: use actual max of valid depths if it exceeds max_range
+    valid_mask = (depth > 0.01) & np.isfinite(depth)
+    if np.any(valid_mask):
+        actual_max = float(np.percentile(depth[valid_mask], 95))  # 95th percentile to ignore outliers
+        max_range = max(max_range, min(actual_max, 50.0))
+
+    valid = valid_mask & (depth < max_range)
     normalized = np.zeros_like(depth, dtype=np.uint8)
     if np.any(valid):
         normalized[valid] = (255 * (1.0 - depth[valid] / max_range)).clip(0, 255).astype(np.uint8)

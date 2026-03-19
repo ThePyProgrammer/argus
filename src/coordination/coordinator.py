@@ -281,7 +281,10 @@ class Coordinator:
             # Visualization update (every 2 frames)
             if step % 2 == 0 and self._viz is not None:
                 # Always merge for viz (ensures cloud updates after config switch)
-                self._do_merge(robot_ids)
+                try:
+                    self._do_merge(robot_ids)
+                except Exception:
+                    pass  # skip merge if OctoMaps are empty
 
                 robot_data = {}
                 for rid in robot_ids:
