@@ -342,8 +342,8 @@ def run_web_mode(args):
     # Configure shared state BEFORE coordinator so we can pass command_handler
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
 
-    from backend.web.server import configure_app
-    streaming_viz = configure_app(
+    from backend.web.server import create_app
+    app, streaming_viz = create_app(
         list(config.robot_ids),
         command_cb=coordinator._command_handler,
     )
@@ -386,14 +386,7 @@ def run_web_mode(args):
     print("Press Ctrl+C to stop\n")
 
     try:
-        uvicorn.run(
-            "backend.web.server:app",
-            host="0.0.0.0",
-            port=8000,
-            log_level="info",
-            reload=True,
-            reload_dirs=["src/web", "src/slam", "backend/web"],
-        )
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
     except (KeyboardInterrupt, SystemExit):
         print("\nShutting down C2 interface...")
     finally:
