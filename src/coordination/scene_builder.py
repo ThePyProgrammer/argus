@@ -142,7 +142,7 @@ def build_two_robot_scene(
     # Add per-robot camera as child of base body
     # Camera: looks forward (+X in body frame), Y-right = -Y body, Y-up = +Z body
     ET.SubElement(body_a, "camera", name="robot_a_cam",
-                  pos="0.35 0 0.15", xyaxes="0 0 -1 0 1 0", fovy="45")
+                  pos="0.4 0 0.05", xyaxes="0 0 -1 0 1 0", fovy="45")
     wb.append(body_a)
 
     # Create robot_b body
@@ -151,7 +151,7 @@ def build_two_robot_scene(
     sx, sy, sz = spawn_positions.get("robot_b", (10.0, 0.0, 0.3))
     body_b.attrib["pos"] = f"{sx} {sy} {sz}"
     ET.SubElement(body_b, "camera", name="robot_b_cam",
-                  pos="0.35 0 0.15", xyaxes="0 0 -1 0 1 0", fovy="45")
+                  pos="0.4 0 0.05", xyaxes="0 0 -1 0 1 0", fovy="45")
     wb.append(body_b)
 
     # Actuators: duplicate with prefixes (do NOT prefix class on actuators)
@@ -266,7 +266,7 @@ def build_two_robot_office_scene(
         sx, sy, sz = spawn_positions.get(robot_id, (0.0, 0.0, 0.3))
         body.attrib["pos"] = f"{sx} {sy} {sz}"
         ET.SubElement(body, "camera", name=f"{robot_id}_cam",
-                      pos="0.35 0 0.15", xyaxes="0 0 -1 0 1 0", fovy="45")
+                      pos="0.4 0 0.05", xyaxes="0 0 -1 0 1 0", fovy="45")
         worldbody.append(body)
 
     # Add actuators for both robots

@@ -115,7 +115,7 @@ def patch_actuators_to_position_with_floor(xml_path: str) -> str:
             if not has_cam:
                 cam = ET.SubElement(base_body, "camera")
                 cam.set("name", "front_cam")
-                cam.set("pos", "0.35 0 0.15")  # front of robot, above body to clear self-view
+                cam.set("pos", "0.4 0 0.05")  # past the nose, at snout level
                 cam.set("xyaxes", "0 0 -1 0 1 0")  # look along body +X (forward)
                 cam.set("fovy", "45")
 
