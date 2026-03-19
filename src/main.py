@@ -306,7 +306,7 @@ def run_web_mode(args):
     from src.coordination.coordinator import Coordinator
     from src.bridge.sensor_types import CameraIntrinsics
     from src.exploration.config import ExplorationConfig
-    from backend.web.server import create_app
+    pass  # web server module imported below via configure_app
 
     scene = getattr(args, "scene", "office")
     config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
@@ -339,14 +339,14 @@ def run_web_mode(args):
             spawn_position=config.spawn_positions[rid],
         )
 
-    # Create FastAPI app and streaming viz BEFORE coordinator
-    # so we can pass command_handler as callback
+    # Configure shared state BEFORE coordinator so we can pass command_handler
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
-    app, streaming_viz = create_app(
+
+    from backend.web.server import configure_app
+    streaming_viz = configure_app(
         list(config.robot_ids),
         command_cb=coordinator._command_handler,
     )
-    # Plug streaming viz into coordinator
     coordinator._viz = streaming_viz
 
     # Build React frontend
@@ -386,7 +386,14 @@ def run_web_mode(args):
     print("Press Ctrl+C to stop\n")
 
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.run(
+            "backend.web.server:app",
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+            reload=True,
+            reload_dirs=["src/web", "src/slam", "backend/web"],
+        )
     except (KeyboardInterrupt, SystemExit):
         print("\nShutting down C2 interface...")
     finally:

@@ -4,6 +4,13 @@ Provides /ws endpoint for real-time robot data streaming and
 command reception. Uses ConnectionManager for client tracking
 and WebStreamingViz for data serialization. Serves React frontend
 build as static files at /.
+
+Architecture for uvicorn reload:
+  Module-level globals (streaming_viz, command_callback, etc.) are set
+  by main.py BEFORE uvicorn.run(). On reload, uvicorn reimports this
+  module but the globals persist in the parent process memory (they're
+  set via configure_app(), not at import time). The app object and
+  routes are recreated, but they read from the persistent globals.
 """
 
 from __future__ import annotations
@@ -21,53 +28,83 @@ from src.web.streaming_viz import WebStreamingViz
 
 logger = logging.getLogger(__name__)
 
-# Module-level state (set by create_app)
+# Module-level shared state. Set by configure_app() from main.py before
+# uvicorn.run(). Persists across uvicorn reloads because the parent
+# process keeps the module in sys.modules.
 manager = ConnectionManager()
 streaming_viz: WebStreamingViz | None = None
 command_callback: Callable[[dict[str, Any]], None] | None = None
 _robot_ids: list[str] = []
+_configured: bool = False
 
 app = FastAPI(title="C2 Interface")
+
+
+def configure_app(
+    robot_ids: list[str],
+    command_cb: Callable[[dict[str, Any]], None] | None = None,
+) -> WebStreamingViz:
+    """Configure the module-level state for the FastAPI app.
+
+    Called once by main.py before uvicorn.run(). Sets up the shared
+    state that the app reads from. Returns the streaming viz instance
+    so main.py can plug it into the coordinator.
+
+    Args:
+        robot_ids: List of robot identifiers.
+        command_cb: Callback for command messages from WebSocket clients.
+
+    Returns:
+        WebStreamingViz instance for the coordinator to write to.
+    """
+    global manager, streaming_viz, command_callback, _robot_ids, _configured
+    manager = ConnectionManager()
+    streaming_viz = WebStreamingViz(manager, robot_ids)
+    command_callback = command_cb
+    _robot_ids = robot_ids
+    _configured = True
+    return streaming_viz
 
 
 def create_app(
     robot_ids: list[str],
     command_cb: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[FastAPI, WebStreamingViz]:
-    """Create and configure the FastAPI application.
+    """Legacy API: configure + return (app, viz). For non-reload usage."""
+    viz = configure_app(robot_ids, command_cb)
+    _mount_static_dirs()
+    return app, viz
 
-    Sets up WebSocket endpoint, static file serving for the React
-    frontend build, and scene asset directories.
 
-    Args:
-        robot_ids: List of robot identifiers to manage.
-        command_cb: Optional callback for command messages received on WebSocket.
-
-    Returns:
-        Tuple of (FastAPI app, WebStreamingViz instance).
-    """
-    global manager, streaming_viz, command_callback, _robot_ids
-    manager = ConnectionManager()
-    streaming_viz = WebStreamingViz(manager, robot_ids)
-    command_callback = command_cb
-    _robot_ids = robot_ids
-
+def _mount_static_dirs() -> None:
+    """Mount static file directories for frontend assets."""
     # Serve scene assets from DimOS data directory
     scene_dir = Path(__file__).parent.parent.parent / "dimos" / "data" / "mujoco_sim" / "scene_office1"
     if scene_dir.exists():
-        app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+        try:
+            app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
+        except Exception:
+            pass  # already mounted
 
     # Serve GLB and other public assets from the frontend public directory
     glb_dir = Path(__file__).parent.parent / "c2-frontend" / "public"
     if glb_dir.exists():
-        app.mount("/public", StaticFiles(directory=str(glb_dir)), name="glb_assets")
+        try:
+            app.mount("/public", StaticFiles(directory=str(glb_dir)), name="glb_assets")
+        except Exception:
+            pass
 
     # Serve React frontend build as static files (must be last mount -- catch-all)
     frontend_dir = Path(__file__).parent.parent / "c2-frontend" / "dist"
     if frontend_dir.exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        try:
+            app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+        except Exception:
+            pass
 
-    return app, streaming_viz
+
+# Mount static dirs at import time (works for both reload and non-reload)
+_mount_static_dirs()
 
 
 @app.websocket("/ws")
