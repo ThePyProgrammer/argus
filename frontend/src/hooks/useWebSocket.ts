@@ -75,11 +75,20 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
           const payload = msg.payload as PoseUpdatePayload;
           if (msg.robot_id) {
             store.updatePose(msg.robot_id, payload.position, payload.rotation);
+            if (msg.robot_id === 'robot_a') {
+              const p = payload.position;
+              console.log(`[pose] robot_a: [${p[0].toFixed(2)}, ${p[1].toFixed(2)}, ${p[2].toFixed(2)}]`);
+            }
           }
           break;
         }
         case 'cloud_delta': {
           const payload = msg.payload as CloudDeltaPayload;
+          if (payload.positions.length > 0) {
+            const first = payload.positions[0];
+            const last = payload.positions[payload.positions.length - 1];
+            console.log(`[cloud] ${payload.positions.length} pts, first=[${first[0].toFixed(2)},${first[1].toFixed(2)},${first[2].toFixed(2)}] last=[${last[0].toFixed(2)},${last[1].toFixed(2)},${last[2].toFixed(2)}]`);
+          }
           store.appendCloudDelta(payload.positions, payload.colors);
           break;
         }
