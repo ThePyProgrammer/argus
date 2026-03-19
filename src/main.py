@@ -83,8 +83,8 @@ def parse_args():
     parser.add_argument(
         "--multi-max-steps",
         type=int,
-        default=10000,
-        help="Max steps for multi-robot mode (default: 10000)",
+        default=0,
+        help="Max steps for multi-robot mode (0 = unlimited, stop with Ctrl+C)",
     )
     parser.add_argument(
         "--multi-boot-steps",

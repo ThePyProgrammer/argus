@@ -183,8 +183,11 @@ class Coordinator:
             transport.stop()
         self._subscribers.clear()
 
-    def run(self, max_steps: int = 10000) -> dict:
+    def run(self, max_steps: int = 0) -> dict:
         """Run the multi-robot coordination loop.
+
+        Args:
+            max_steps: Maximum steps. 0 = run forever (until Ctrl+C or stop command).
 
         Returns:
             dict with "total_steps", "merge_count", "terminated_reason",
@@ -198,10 +201,12 @@ class Coordinator:
 
         frames = self._bridge.start()
         robot_ids = tuple(self._robots.keys())
-        terminated_reason = "max_steps"
+        terminated_reason = "stopped"
 
-        for step in range(max_steps):
+        step = 0
+        while max_steps == 0 or step < max_steps:
             self._step_count = step
+            step += 1
 
             # Check web control flags
             if self._should_stop:
