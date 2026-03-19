@@ -386,7 +386,8 @@ def run_web_mode(args):
     print("Press Ctrl+C to stop\n")
 
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info",
+                    reload=True, reload_dirs=["src/web", "src/slam"])
     except KeyboardInterrupt:
         print("\nShutting down C2 interface...")
     finally:
