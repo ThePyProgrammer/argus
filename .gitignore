@@ -1,5 +1,6 @@
 __pycache__/
 .venv/
-SimWorld-Robotics/dimos/
+SimWorld-Robotics/
+dimos/
 node_modules/
 dist/
