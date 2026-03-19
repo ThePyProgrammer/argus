@@ -342,10 +342,25 @@ def run_web_mode(args):
     # Configure shared state BEFORE coordinator so we can pass command_handler
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config)
 
+    def _reset_slam():
+        """Reset SLAM and OctoMap for all robots when cloud config changes."""
+        import open3d as o3d
+        for rid, robot in robots.items():
+            robot.slam._global_cloud = o3d.geometry.PointCloud()
+            robot.slam._slam_poses.clear()
+            robot.slam._prev_cloud = None
+            robot.slam._current_pose = np.eye(4)
+            robot.octomap._accumulated_cloud = o3d.geometry.PointCloud()
+        # Also clear the merger's last merged voxels
+        if hasattr(coordinator, '_merger'):
+            coordinator._merger.last_merged_voxels = np.empty((0, 3))
+        print("[cloud config] SLAM and OctoMap reset for all robots")
+
     from backend.web.server import create_app
     app, streaming_viz = create_app(
         list(config.robot_ids),
         command_cb=coordinator._command_handler,
+        slam_reset_cb=_reset_slam,
     )
     coordinator._viz = streaming_viz
 

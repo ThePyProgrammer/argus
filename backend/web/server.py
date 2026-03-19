@@ -25,42 +25,34 @@ logger = logging.getLogger(__name__)
 manager = ConnectionManager()
 streaming_viz: WebStreamingViz | None = None
 command_callback: Callable[[dict[str, Any]], None] | None = None
+_slam_reset_callback: Callable[[], None] | None = None
 _robot_ids: list[str] = []
 
 app = FastAPI(title="C2 Interface")
 
 
-def configure_app(
+def create_app(
     robot_ids: list[str],
     command_cb: Callable[[dict[str, Any]], None] | None = None,
-) -> WebStreamingViz:
-    """Configure module-level shared state before uvicorn.run().
-
-    Called once by main.py. Sets up the streaming viz and callbacks
-    that the app reads from. Persists across uvicorn reloads.
+    slam_reset_cb: Callable[[], None] | None = None,
+) -> tuple[FastAPI, WebStreamingViz]:
+    """Configure and return the FastAPI app.
 
     Args:
         robot_ids: List of robot identifiers.
         command_cb: Callback for command messages from WebSocket clients.
+        slam_reset_cb: Callback to reset SLAM/OctoMap when cloud config changes.
 
     Returns:
-        WebStreamingViz instance for the coordinator to write to.
+        Tuple of (FastAPI app, WebStreamingViz instance).
     """
-    global manager, streaming_viz, command_callback, _robot_ids
+    global manager, streaming_viz, command_callback, _slam_reset_callback, _robot_ids
     manager = ConnectionManager()
     streaming_viz = WebStreamingViz(manager, robot_ids)
     command_callback = command_cb
+    _slam_reset_callback = slam_reset_cb
     _robot_ids = robot_ids
-    return streaming_viz
-
-
-def create_app(
-    robot_ids: list[str],
-    command_cb: Callable[[dict[str, Any]], None] | None = None,
-) -> tuple[FastAPI, WebStreamingViz]:
-    """Legacy API: configure + return (app, viz). For non-reload usage."""
-    viz = configure_app(robot_ids, command_cb)
-    return app, viz
+    return app, streaming_viz
 
 
 def _mount_static_dirs() -> None:
@@ -118,13 +110,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         command_callback(data.get("payload", {}))
                     elif data.get("type") == "set_cloud_config":
                         from src.slam.depth_to_cloud import set_active_config, get_active_config, CLOUD_CONFIGS
-                        key = data.get("config", "G")
+                        key = data.get("config", "1")
                         set_active_config(key)
                         label = CLOUD_CONFIGS.get(key, {}).get("label", key)
                         logger.info("Cloud config switched to %s: %s", key, label)
-                        # Clear accumulated SLAM data so new config takes effect
+                        # Clear ALL accumulated data so new config builds fresh
                         if streaming_viz is not None:
                             streaming_viz._last_voxel_set = set()
+                        # Reset SLAM and OctoMap in each robot
+                        if _slam_reset_callback is not None:
+                            _slam_reset_callback()
                         # Send acknowledgment
                         await websocket.send_json({
                             "type": "cloud_config_ack",
