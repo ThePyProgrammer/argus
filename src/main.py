@@ -222,13 +222,15 @@ def run_multi_mode(args):
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
     else:
         import random, math
-        min_dist = 4.0  # minimum distance between robots
-        for _ in range(100):  # max attempts
-            ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
-            bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
-            dist = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
-            if dist >= min_dist:
-                break
+        # Place robot_a randomly, then robot_b at a forced distance away
+        ax, ay = random.uniform(-2, 2), random.uniform(-2, 2)
+        angle = random.uniform(0, 2 * math.pi)
+        dist = random.uniform(4.0, 6.0)
+        bx = ax + dist * math.cos(angle)
+        by = ay + dist * math.sin(angle)
+        # Clamp to scene bounds
+        bx = max(-4, min(4, bx))
+        by = max(-4, min(4, by))
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
@@ -329,13 +331,15 @@ def run_web_mode(args):
         config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
     else:
         import random, math
-        min_dist = 4.0  # minimum distance between robots
-        for _ in range(100):  # max attempts
-            ax, ay = random.uniform(-3, 3), random.uniform(-3, 3)
-            bx, by = random.uniform(-3, 3), random.uniform(-3, 3)
-            dist = math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
-            if dist >= min_dist:
-                break
+        # Place robot_a randomly, then robot_b at a forced distance away
+        ax, ay = random.uniform(-2, 2), random.uniform(-2, 2)
+        angle = random.uniform(0, 2 * math.pi)
+        dist = random.uniform(4.0, 6.0)
+        bx = ax + dist * math.cos(angle)
+        by = ay + dist * math.sin(angle)
+        # Clamp to scene bounds
+        bx = max(-4, min(4, bx))
+        by = max(-4, min(4, by))
         config_kwargs["spawn_positions"] = {"robot_a": (ax, ay, 0.3), "robot_b": (bx, by, 0.3)}
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
