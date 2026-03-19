@@ -295,20 +295,52 @@ class Coordinator:
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
+                    spawn_offset = robot.spawn_transform[:3, 3]
+
+                    # Adjust pose: subtract spawn position
+                    pose = robot.slam.slam_poses[-1].copy() if robot.slam.slam_poses else np.eye(4)
+                    pose[:3, 3] -= spawn_offset
+
+                    # Adjust trajectory: subtract spawn position from each pose
+                    trajectory = []
+                    for p in robot.slam.slam_poses:
+                        adj = p.copy()
+                        adj[:3, 3] -= spawn_offset
+                        trajectory.append(adj)
+
+                    # Adjust cloud points
+                    cloud_pts = robot.slam.get_cloud_points()
+                    if len(cloud_pts) > 0:
+                        cloud_pts = cloud_pts - spawn_offset
+
+                    # Adjust local voxels
+                    local_voxels = robot.octomap.get_occupied_voxels()
+                    if len(local_voxels) > 0:
+                        local_voxels = local_voxels - spawn_offset
+
                     robot_data[rid] = {
                         "frame": frames[rid],
-                        "local_voxels": robot.octomap.get_occupied_voxels(),
-                        "slam_cloud_pts": robot.slam.get_cloud_points(),
+                        "local_voxels": local_voxels,
+                        "slam_cloud_pts": cloud_pts,
                         "slam_cloud_rgb": robot.slam.get_cloud_colors(),
-                        "pose": robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
-                        "trajectory": list(robot.slam.slam_poses),
+                        "pose": pose,
+                        "trajectory": trajectory,
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
                     }
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
                 frontier_cells = self._gather_frontier_cells(robot_ids)
                 total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
+                # Adjust merged voxels: subtract average spawn position
+                merged = self._merger.last_merged_voxels
+                if len(merged) > 0:
+                    avg_spawn = np.mean(
+                        [self._robots[rid].spawn_transform[:3, 3] for rid in robot_ids],
+                        axis=0,
+                    )
+                    merged = merged - avg_spawn
+
                 self._viz.update(
-                    merged_voxels=self._merger.last_merged_voxels,
+                    merged_voxels=merged,
                     robot_data=robot_data,
                     frontier_cells=frontier_cells,
                     voronoi_midpoint=voronoi_mid,
