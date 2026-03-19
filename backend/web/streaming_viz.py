@@ -106,15 +106,21 @@ class WebStreamingViz:
         if len(merged_voxels) == 0:
             return
 
-        # Build per-robot voxel ownership for coloring
-        robot_voxel_sets = self._build_robot_voxel_sets(robot_data)
+        # Get robot world positions for coloring
+        robot_positions = []
+        for i, (rid, data) in enumerate(robot_data.items()):
+            pose = data.get("pose")
+            if pose is not None:
+                robot_positions.append((i, pose[:3, 3].copy()))
+            else:
+                robot_positions.append((i, np.zeros(3)))
 
         # Delta tracking
         delta, updated_set = compute_cloud_delta(merged_voxels, self._last_voxel_set)
         self._last_voxel_set = updated_set
 
         if len(delta) > 0:
-            colors = self._compute_colors(delta, robot_voxel_sets)
+            colors = self._compute_colors(delta, robot_positions)
             self._message_queue.append({
                 "type": CLOUD_DELTA,
                 "payload": {
@@ -127,7 +133,7 @@ class WebStreamingViz:
         now = time.monotonic()
         if now - self._last_full_sync > self._full_sync_interval:
             self._last_full_sync = now
-            full_colors = self._compute_colors(merged_voxels, robot_voxel_sets)
+            full_colors = self._compute_colors(merged_voxels, robot_positions)
             self._message_queue.append({
                 "type": CLOUD_FULL,
                 "payload": {
@@ -158,38 +164,29 @@ class WebStreamingViz:
     def _compute_colors(
         self,
         voxels: np.ndarray,
-        robot_voxel_sets: list[tuple[int, set[tuple[float, float, float]]]],
+        robot_positions: list[tuple[int, np.ndarray]],
     ) -> list[list[int]]:
-        """Compute per-voxel colors based on spatial proximity to robots.
+        """Compute per-voxel colors by nearest robot (3D distance).
 
-        Uses X coordinate to roughly assign voxels to the nearest robot
-        (since robots start at different X positions). Simple but effective
-        for two-robot scenarios on flat ground.
+        Each voxel is colored by the robot whose current world position
+        is closest to it.
         """
-        if not robot_voxel_sets:
+        if not robot_positions:
             return [list(color_for_robot(0))] * len(voxels)
 
-        # Get approximate robot X positions from their voxel set centers
-        robot_centers = []
-        for robot_idx, voxel_set in robot_voxel_sets:
-            if voxel_set:
-                xs = [v[0] for v in voxel_set]
-                robot_centers.append((robot_idx, sum(xs) / len(xs)))
-            else:
-                robot_centers.append((robot_idx, 0.0))
+        # Vectorized: compute distance from each voxel to each robot
+        robot_pos_array = np.array([pos for _, pos in robot_positions])  # (R, 3)
+        # Broadcast: (N, 1, 3) - (1, R, 3) → (N, R, 3) → (N, R) distances
+        dists = np.linalg.norm(
+            voxels[:, np.newaxis, :] - robot_pos_array[np.newaxis, :, :],
+            axis=2,
+        )
+        nearest = np.argmin(dists, axis=1)  # (N,) indices into robot_positions
 
         colors = []
-        for v in voxels:
-            vx = float(v[0])
-            # Assign to nearest robot by X distance
-            best_idx = robot_centers[0][0]
-            best_dist = abs(vx - robot_centers[0][1])
-            for robot_idx, cx in robot_centers[1:]:
-                d = abs(vx - cx)
-                if d < best_dist:
-                    best_dist = d
-                    best_idx = robot_idx
-            colors.append(list(color_for_robot(best_idx)))
+        for i in range(len(voxels)):
+            robot_idx = robot_positions[nearest[i]][0]
+            colors.append(list(color_for_robot(robot_idx)))
         return colors
 
     def _update_robots(self, robot_data: dict) -> None:
