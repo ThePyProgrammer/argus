@@ -82,9 +82,6 @@ def _mount_static_dirs() -> None:
             pass
 
 
-_mount_static_dirs()
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """Handle WebSocket connections for real-time data streaming.
@@ -145,8 +142,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 
 @app.on_event("startup")
-async def start_push_loop() -> None:
-    """Register the push_loop as a background task on server startup."""
+async def startup() -> None:
+    """Mount static dirs (after routes) and start push loop."""
+    _mount_static_dirs()
     asyncio.create_task(push_loop())
 
 
