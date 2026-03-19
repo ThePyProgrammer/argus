@@ -13,6 +13,8 @@ export default function ControlPanel() {
   const activeCloudConfig = useControlStore((s) => s.activeCloudConfig);
   const cloudOffset = useControlStore((s) => s.cloudOffset);
   const setCloudOffset = useControlStore((s) => s.setCloudOffset);
+  const showScene = useControlStore((s) => s.showScene);
+  const toggleScene = useControlStore((s) => s.toggleScene);
 
   const handleStartStop = () => {
     const action = isRunning ? 'stop' : 'start';
@@ -95,6 +97,21 @@ export default function ControlPanel() {
           onChange={handleSpeedChange}
           style={{ width: '100%' }}
         />
+      </div>
+
+      <div style={{ marginTop: '10px' }}>
+        <button
+          onClick={toggleScene}
+          style={{
+            ...buttonStyle,
+            width: '100%',
+            background: showScene ? '#37474f' : '#263238',
+            color: showScene ? '#e0e0e0' : '#666',
+            border: '1px solid #444',
+          }}
+        >
+          {showScene ? 'Hide Scene Mesh' : 'Show Scene Mesh'}
+        </button>
       </div>
 
       {Object.keys(cloudConfigs).length > 0 && (

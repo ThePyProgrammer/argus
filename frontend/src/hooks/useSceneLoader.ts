@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { useControlStore } from '../stores/controlStore';
 
 /**
- * Attempts to load a GLB scene file into the provided Three.js scene.
- * Gracefully handles 404 (scene.glb may not exist yet).
- */
-/**
- * @param parent The parent to add the GLB to. Pass the raw THREE.Scene
- *   (not worldRoot) if the OBJ meshes use Y-up (standard OBJ convention).
+ * Loads GLB scene file and toggles visibility via controlStore.showScene.
  */
 export function useSceneLoader(parent: THREE.Object3D | null): {
   loading: boolean;
@@ -17,6 +13,7 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadedRef = useRef(false);
+  const sceneObjRef = useRef<THREE.Object3D | null>(null);
 
   useEffect(() => {
     if (!parent || loadedRef.current) return;
@@ -28,12 +25,13 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
     loader.load(
       '/scene.glb',
       (gltf) => {
+        sceneObjRef.current = gltf.scene;
+        gltf.scene.visible = useControlStore.getState().showScene;
         parent.add(gltf.scene);
         setLoading(false);
       },
       undefined,
       (err) => {
-        // Graceful fallback -- GLB may not exist yet
         const message =
           err instanceof Error ? err.message : 'Failed to load scene.glb';
         console.warn('[useSceneLoader] GLB not available, using empty scene:', message);
@@ -42,6 +40,16 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
       },
     );
   }, [parent]);
+
+  // Subscribe to showScene toggle
+  useEffect(() => {
+    const unsub = useControlStore.subscribe((state, prev) => {
+      if (state.showScene !== prev.showScene && sceneObjRef.current) {
+        sceneObjRef.current.visible = state.showScene;
+      }
+    });
+    return unsub;
+  }, []);
 
   return { loading, error };
 }
