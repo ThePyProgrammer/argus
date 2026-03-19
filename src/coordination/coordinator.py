@@ -221,21 +221,27 @@ class Coordinator:
                 robot = self._robots[rid]
                 frame = frames[rid]
 
-                # Build score function if partitioned
-                score_fn = None
-                if self._partitioned:
-                    score_fn = lambda centroid, _rid=rid: (
-                        self._partitioner.score_frontier_with_bias(
-                            centroid,
-                            _rid,
-                            robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
-                            robot_ids,
+                try:
+                    # Build score function if partitioned
+                    score_fn = None
+                    if self._partitioned:
+                        score_fn = lambda centroid, _rid=rid: (
+                            self._partitioner.score_frontier_with_bias(
+                                centroid,
+                                _rid,
+                                robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
+                                robot_ids,
+                            )
                         )
-                    )
 
-                linear, angular, metrics = robot.exploration.step_once(
-                    frame, step, score_fn=score_fn,
-                )
+                    linear, angular, metrics = robot.exploration.step_once(
+                        frame, step, score_fn=score_fn,
+                    )
+                except (IndexError, ValueError) as e:
+                    logger.warning("[Step %d] %s: step_once error: %s", step, rid, e)
+                    linear, angular = np.zeros(2), 0.0
+                    metrics = {"terminated": False, "rescan_triggered": False, "coverage": 0.0}
+
                 if self._static:
                     self._bridge.set_velocity(rid, np.zeros(2), 0.0)
                 else:
