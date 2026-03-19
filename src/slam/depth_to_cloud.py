@@ -16,7 +16,8 @@ from src.bridge.sensor_types import CameraIntrinsics
 # Cloud configs: each defines how points are arranged in camera frame
 # and which pose transform to use (body, cam_mat, cam_mat.T)
 CLOUD_CONFIGS = {
-    "DIMOS": {"label": "DimOS (o3d + flip Y/Z) | cam_mat", "pose": "cam_direct"},
+    "DIMOS": {"label": "DimOS (o3d + flip Y/Z) | cam_mat",    "pose": "cam_direct"},
+    "DIMOS_T": {"label": "DimOS (o3d + flip Y/Z) | cam_mat.T", "pose": "cam_T"},
     "A":     {"label": "[cx, -cy, -z] | cam (no .T)",       "pose": "cam_noT", "sx": 1,  "sy": -1, "sz": -1},
     "B":     {"label": "[cx, cy, -z] | cam (no .T)",        "pose": "cam_noT", "sx": 1,  "sy": 1,  "sz": -1},
     "C":     {"label": "[z, -cx, -cy] | body",              "pose": "body"},
@@ -66,7 +67,7 @@ def depth_to_pointcloud(
     """
     cfg = _active_config
 
-    if cfg == "DIMOS":
+    if cfg in ("DIMOS", "DIMOS_T"):
         return _dimos_depth_to_cloud(depth, rgb, intrinsics, max_depth)
     else:
         return _manual_depth_to_cloud(depth, rgb, intrinsics, max_depth, cfg)
