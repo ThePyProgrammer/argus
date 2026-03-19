@@ -292,32 +292,38 @@ class Coordinator:
                 except Exception:
                     pass  # skip merge if OctoMaps are empty
 
+                # Use a single reference offset (midpoint of all spawns, XY only)
+                # so all robots stay correctly positioned relative to each other
+                ref_offset = np.mean(
+                    [self._robots[rid].spawn_transform[:3, 3] for rid in robot_ids],
+                    axis=0,
+                )
+                ref_offset[2] = 0.0  # keep Z as-is
+
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
-                    spawn_offset = robot.spawn_transform[:3, 3].copy()
-                    spawn_offset[2] = 0.0  # only subtract X/Y, keep Z as-is
 
-                    # Adjust pose: subtract spawn position
+                    # Adjust pose
                     pose = robot.slam.slam_poses[-1].copy() if robot.slam.slam_poses else np.eye(4)
-                    pose[:3, 3] -= spawn_offset
+                    pose[:3, 3] -= ref_offset
 
-                    # Adjust trajectory: subtract spawn position from each pose
+                    # Adjust trajectory
                     trajectory = []
                     for p in robot.slam.slam_poses:
                         adj = p.copy()
-                        adj[:3, 3] -= spawn_offset
+                        adj[:3, 3] -= ref_offset
                         trajectory.append(adj)
 
                     # Adjust cloud points
                     cloud_pts = robot.slam.get_cloud_points()
                     if len(cloud_pts) > 0:
-                        cloud_pts = cloud_pts - spawn_offset
+                        cloud_pts = cloud_pts - ref_offset
 
                     # Adjust local voxels
                     local_voxels = robot.octomap.get_occupied_voxels()
                     if len(local_voxels) > 0:
-                        local_voxels = local_voxels - spawn_offset
+                        local_voxels = local_voxels - ref_offset
 
                     robot_data[rid] = {
                         "frame": frames[rid],
@@ -334,12 +340,7 @@ class Coordinator:
                 # Adjust merged voxels: subtract average spawn position
                 merged = self._merger.last_merged_voxels
                 if len(merged) > 0:
-                    avg_spawn = np.mean(
-                        [self._robots[rid].spawn_transform[:3, 3] for rid in robot_ids],
-                        axis=0,
-                    )
-                    avg_spawn[2] = 0.0  # only subtract X/Y, keep Z as-is
-                    merged = merged - avg_spawn
+                    merged = merged - ref_offset
 
                 self._viz.update(
                     merged_voxels=merged,
