@@ -295,7 +295,8 @@ class Coordinator:
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
-                    spawn_offset = robot.spawn_transform[:3, 3]
+                    spawn_offset = robot.spawn_transform[:3, 3].copy()
+                    spawn_offset[2] = 0.0  # only subtract X/Y, keep Z as-is
 
                     # Adjust pose: subtract spawn position
                     pose = robot.slam.slam_poses[-1].copy() if robot.slam.slam_poses else np.eye(4)
@@ -337,6 +338,7 @@ class Coordinator:
                         [self._robots[rid].spawn_transform[:3, 3] for rid in robot_ids],
                         axis=0,
                     )
+                    avg_spawn[2] = 0.0  # only subtract X/Y, keep Z as-is
                     merged = merged - avg_spawn
 
                 self._viz.update(

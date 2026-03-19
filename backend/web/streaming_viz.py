@@ -105,8 +105,8 @@ class WebStreamingViz:
         self._message_queue = []
         return msgs
 
-    # Z offset to bring cloud to ground level (camera height compensation)
-    CLOUD_OFFSET = np.array([0.0, 0.0, -0.2], dtype=np.float64)
+    # No hardcoded offset -- spawn subtraction handles positioning
+    CLOUD_OFFSET = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 
     def _update_cloud(self, merged_voxels: np.ndarray, robot_data: dict) -> None:
         """Compute and queue cloud delta/full messages with per-robot colors."""
