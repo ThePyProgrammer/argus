@@ -386,14 +386,16 @@ def run_web_mode(args):
     print("Press Ctrl+C to stop\n")
 
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info",
-                    reload=True, reload_dirs=["src/web", "src/slam"])
-    except KeyboardInterrupt:
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    except (KeyboardInterrupt, SystemExit):
         print("\nShutting down C2 interface...")
     finally:
         coordinator._should_stop = True
         sim_thread.join(timeout=5.0)
-        bridge.stop()
+        try:
+            bridge.stop()
+        except RuntimeError:
+            pass  # ignore dict-changed-size during cleanup
         print("Done.")
 
 
