@@ -1,9 +1,11 @@
 """Depth image to Open3D point cloud conversion.
 
-Unprojects a depth image into 3D points using pinhole camera intrinsics,
-optionally coloring each point from the corresponding RGB pixel.
+Supports multiple unprojection methods switchable at runtime via the
+cloud config system. The active config determines both the point
+arrangement and the pose transform mode used in multi_bridge.
 
-The point arrangement config is switchable at runtime via CLOUD_CONFIG.
+Config "DIMOS" uses DimOS's proven approach (Open3D create_from_depth_image
++ Y/Z flip + cam_mat @ points). All other configs use manual pinhole math.
 """
 
 import numpy as np
@@ -11,22 +13,21 @@ import open3d as o3d
 
 from src.bridge.sensor_types import CameraIntrinsics
 
-# Runtime-switchable cloud configuration.
-# Format: (cx_sign, cy_sign, cz_component) where cz_component is 'z' or '-z'
-# Combined with pose_mode in multi_bridge: "body", "cam_noT", "cam_T"
+# Cloud configs: each defines how points are arranged in camera frame
+# and which pose transform to use (body, cam_mat, cam_mat.T)
 CLOUD_CONFIGS = {
-    "A": {"label": "[cx, -cy, -z] | cam (no .T)",  "sx": 1,  "sy": -1, "sz": -1},
-    "B": {"label": "[cx, cy, -z] | cam (no .T)",   "sx": 1,  "sy": 1,  "sz": -1},
-    "C": {"label": "[z, -cx, -cy] | body",         "sx": None, "sy": None, "sz": None},  # special
-    "D": {"label": "[z, cx, -cy] | body",          "sx": None, "sy": None, "sz": None},  # special
-    "E": {"label": "[-z, cx, cy] | body",          "sx": None, "sy": None, "sz": None},  # special
-    "F": {"label": "[cx, -cy, z] | cam (no .T)",   "sx": 1,  "sy": -1, "sz": 1},
-    "G": {"label": "[-cx, -cy, -z] | cam (.T)",    "sx": -1, "sy": -1, "sz": -1},
-    "H": {"label": "[z, -cx, cy] | body",          "sx": None, "sy": None, "sz": None},  # special
+    "DIMOS": {"label": "DimOS (o3d + flip Y/Z) | cam_mat", "pose": "cam_direct"},
+    "A":     {"label": "[cx, -cy, -z] | cam (no .T)",       "pose": "cam_noT", "sx": 1,  "sy": -1, "sz": -1},
+    "B":     {"label": "[cx, cy, -z] | cam (no .T)",        "pose": "cam_noT", "sx": 1,  "sy": 1,  "sz": -1},
+    "C":     {"label": "[z, -cx, -cy] | body",              "pose": "body"},
+    "D":     {"label": "[z, cx, -cy] | body",               "pose": "body"},
+    "E":     {"label": "[-z, cx, cy] | body",               "pose": "body"},
+    "F":     {"label": "[cx, -cy, z] | cam (no .T)",        "pose": "cam_noT", "sx": 1,  "sy": -1, "sz": 1},
+    "G":     {"label": "[-cx, -cy, -z] | cam (.T)",         "pose": "cam_T",   "sx": -1, "sy": -1, "sz": -1},
+    "H":     {"label": "[z, -cx, cy] | body",               "pose": "body"},
 }
 
-# Active config key -- switched via WebSocket command
-_active_config: str = "G"
+_active_config: str = "DIMOS"
 
 
 def get_active_config() -> str:
@@ -41,13 +42,7 @@ def set_active_config(key: str) -> None:
 
 def get_pose_mode() -> str:
     """Return the pose transform mode for the active config."""
-    cfg = _active_config
-    if cfg in ("A", "B", "F"):
-        return "cam_noT"
-    elif cfg in ("G",):
-        return "cam_T"
-    else:
-        return "body"
+    return CLOUD_CONFIGS.get(_active_config, CLOUD_CONFIGS["DIMOS"])["pose"]
 
 
 def depth_to_pointcloud(
@@ -58,15 +53,86 @@ def depth_to_pointcloud(
 ) -> o3d.geometry.PointCloud:
     """Convert a depth image + RGB image to an Open3D PointCloud.
 
+    The point arrangement depends on the active cloud config.
+
     Args:
         depth: (H, W) float32 depth in meters.
         rgb: (H, W, 3) uint8 color image.
         intrinsics: Camera intrinsic parameters.
-        max_depth: Maximum depth to include (meters). Points beyond this are excluded.
+        max_depth: Maximum depth to include (meters).
 
     Returns:
         Open3D PointCloud with points and colors.
     """
+    cfg = _active_config
+
+    if cfg == "DIMOS":
+        return _dimos_depth_to_cloud(depth, rgb, intrinsics, max_depth)
+    else:
+        return _manual_depth_to_cloud(depth, rgb, intrinsics, max_depth, cfg)
+
+
+def _dimos_depth_to_cloud(
+    depth: np.ndarray,
+    rgb: np.ndarray,
+    intrinsics: CameraIntrinsics,
+    max_depth: float,
+) -> o3d.geometry.PointCloud:
+    """DimOS approach: Open3D create_from_depth_image + Y/Z flip.
+
+    This is the proven method from dimos/simulation/mujoco/depth_camera.py.
+    Open3D handles the intrinsics math, then we flip Y and Z to convert
+    from OpenCV convention (Y-down, Z-forward) to OpenGL/MuJoCo convention
+    (Y-up, Z-back).
+
+    The caller must use cam_mat @ points.T + cam_pos (no transpose)
+    for world transform -- see get_pose_mode() returning "cam_direct".
+    """
+    h, w = depth.shape
+
+    o3d_intrinsics = o3d.camera.PinholeCameraIntrinsic(
+        w, h, intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy,
+    )
+
+    # Clamp depth: Open3D treats 0 as invalid
+    depth_clean = depth.copy()
+    depth_clean[depth_clean > max_depth] = 0.0
+
+    o3d_depth = o3d.geometry.Image(depth_clean.astype(np.float32))
+    pcd = o3d.geometry.PointCloud.create_from_depth_image(o3d_depth, o3d_intrinsics)
+
+    points = np.asarray(pcd.points)
+    if len(points) == 0:
+        return pcd
+
+    # Flip Y and Z: OpenCV (Y-down, Z-forward) → OpenGL (Y-up, Z-back)
+    points[:, 1] = -points[:, 1]
+    points[:, 2] = -points[:, 2]
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    # Add colors from RGB image
+    if rgb is not None and len(points) > 0:
+        # Re-project points back to pixel coords to sample colors
+        # (create_from_depth_image preserves pixel ordering for valid depths)
+        valid_mask = (depth_clean > 0).flatten()
+        valid_indices = np.where(valid_mask)[0]
+        if len(valid_indices) == len(points):
+            rows = valid_indices // w
+            cols = valid_indices % w
+            colors = rgb[rows, cols].astype(np.float64) / 255.0
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+
+    return pcd
+
+
+def _manual_depth_to_cloud(
+    depth: np.ndarray,
+    rgb: np.ndarray,
+    intrinsics: CameraIntrinsics,
+    max_depth: float,
+    cfg: str,
+) -> o3d.geometry.PointCloud:
+    """Manual pinhole unprojection with configurable point arrangement."""
     h, w = depth.shape
     u, v = np.meshgrid(np.arange(w), np.arange(h))
 
@@ -74,8 +140,6 @@ def depth_to_pointcloud(
     z_depth = depth[valid]
     cam_x = (u[valid] - intrinsics.cx) * z_depth / intrinsics.fx
     cam_y = (v[valid] - intrinsics.cy) * z_depth / intrinsics.fy
-
-    cfg = _active_config
 
     if cfg == "C":
         points = np.stack([z_depth, -cam_x, -cam_y], axis=-1)
@@ -86,7 +150,6 @@ def depth_to_pointcloud(
     elif cfg == "H":
         points = np.stack([z_depth, -cam_x, cam_y], axis=-1)
     else:
-        # Standard configs: [sx*cx, sy*cy, sz*z]
         c = CLOUD_CONFIGS.get(cfg, CLOUD_CONFIGS["G"])
         points = np.stack([
             c["sx"] * cam_x,

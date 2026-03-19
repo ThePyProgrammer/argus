@@ -394,7 +394,11 @@ class MultiRobotBridge:
             pose = np.eye(4, dtype=np.float64)
             pose[:3, 3] = self._data.cam_xpos[cam_id]
             cam_mat = self._data.cam_xmat[cam_id].reshape(3, 3)
-            pose[:3, :3] = cam_mat.T if pose_mode == "cam_T" else cam_mat
+            if pose_mode == "cam_T":
+                pose[:3, :3] = cam_mat.T
+            else:
+                # "cam_noT" and "cam_direct" (DimOS) both use cam_mat directly
+                pose[:3, :3] = cam_mat
         sim_time = self._step_count * self._dt
 
         return SensorFrame(
