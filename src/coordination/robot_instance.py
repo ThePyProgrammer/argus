@@ -66,15 +66,10 @@ class RobotInstance:
         """Publish current occupancy grid and coverage via pLCM.
 
         Called by Coordinator when step_once returns rescan_triggered=True.
-        Transforms local voxels to world frame using spawn_transform before publishing.
+        Voxels are already in world frame (SLAM pipeline transforms them
+        using the camera's world pose), so no additional transform needed.
         """
-        local_voxels = self.octomap.get_occupied_voxels()
-        if local_voxels.size > 0:
-            rotation = self.spawn_transform[:3, :3]
-            translation = self.spawn_transform[:3, 3]
-            world_voxels = (local_voxels @ rotation.T) + translation
-        else:
-            world_voxels = local_voxels
+        world_voxels = self.octomap.get_occupied_voxels()
 
         msg = RobotMapMessage(
             robot_id=self.robot_id,
