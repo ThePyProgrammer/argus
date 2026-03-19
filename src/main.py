@@ -416,6 +416,8 @@ def run_web_mode(args):
     print(f"\nC2 Interface running at http://localhost:8000")
     print(f"Robots: {config.robot_ids}")
     print(f"Scene: {scene}")
+    for rid, pos in config.spawn_positions.items():
+        print(f"  {rid}: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})")
     print(f"Max steps: {max_steps}")
     print("Press Ctrl+C to stop\n")
 
