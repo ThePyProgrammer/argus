@@ -196,13 +196,19 @@ class MuJoCoBridge:
         depth_raw = self._renderer.render().copy()  # (H, W) float32
         self._renderer.disable_depth_rendering()
 
-        # MuJoCo depth buffer → metric conversion (always needed)
+        # MuJoCo depth: convert based on value range
         extent = self._model.stat.extent
         znear = self._model.vis.map.znear * extent
         zfar = self._model.vis.map.zfar * extent
-        depth = znear * zfar / (zfar - depth_raw * (zfar - znear))
-        depth[depth_raw >= 0.999] = 0.0
-        depth = depth.astype(np.float32)
+
+        if depth_raw.max() <= 1.0 + 1e-6:
+            depth = znear * zfar / (zfar - depth_raw * (zfar - znear))
+            depth[depth_raw >= 0.999] = 0.0
+        else:
+            depth = depth_raw.copy()
+            depth[depth_raw >= zfar * 0.99] = 0.0
+
+        depth = np.clip(depth, 0, 20.0).astype(np.float32)
 
         # Ground-truth pose from freejoint qpos
         pose = self._extract_pose()
