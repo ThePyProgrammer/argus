@@ -292,38 +292,12 @@ class Coordinator:
                 except Exception:
                     pass  # skip merge if OctoMaps are empty
 
-                # Use a single reference offset (midpoint of all spawns, XY only)
-                # so all robots stay correctly positioned relative to each other
-                ref_offset = np.mean(
-                    [self._robots[rid].spawn_transform[:3, 3] for rid in robot_ids],
-                    axis=0,
-                )
-                ref_offset[2] = 0.0  # keep Z as-is
-
                 robot_data = {}
                 for rid in robot_ids:
                     robot = self._robots[rid]
-
-                    # Adjust pose
-                    pose = robot.slam.slam_poses[-1].copy() if robot.slam.slam_poses else np.eye(4)
-                    pose[:3, 3] -= ref_offset
-
-                    # Adjust trajectory
-                    trajectory = []
-                    for p in robot.slam.slam_poses:
-                        adj = p.copy()
-                        adj[:3, 3] -= ref_offset
-                        trajectory.append(adj)
-
-                    # Adjust cloud points
+                    pose = robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4)
                     cloud_pts = robot.slam.get_cloud_points()
-                    if len(cloud_pts) > 0:
-                        cloud_pts = cloud_pts - ref_offset
-
-                    # Adjust local voxels
                     local_voxels = robot.octomap.get_occupied_voxels()
-                    if len(local_voxels) > 0:
-                        local_voxels = local_voxels - ref_offset
 
                     robot_data[rid] = {
                         "frame": frames[rid],
@@ -331,7 +305,7 @@ class Coordinator:
                         "slam_cloud_pts": cloud_pts,
                         "slam_cloud_rgb": robot.slam.get_cloud_colors(),
                         "pose": pose,
-                        "trajectory": trajectory,
+                        "trajectory": list(robot.slam.slam_poses),
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
                     }
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
@@ -339,8 +313,7 @@ class Coordinator:
                 total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
                 # Adjust merged voxels: subtract average spawn position
                 merged = self._merger.last_merged_voxels
-                if len(merged) > 0:
-                    merged = merged - ref_offset
+                # No offset adjustment -- use raw world coordinates
 
                 self._viz.update(
                     merged_voxels=merged,
