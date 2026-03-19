@@ -106,6 +106,10 @@ class WebStreamingViz:
         if len(merged_voxels) == 0:
             return
 
+        # Shift cloud down to ground level (camera height offset)
+        merged_voxels = merged_voxels.copy()
+        merged_voxels[:, 2] -= 0.3
+
         # Get robot world positions for coloring
         robot_positions = []
         for i, (rid, data) in enumerate(robot_data.items()):
