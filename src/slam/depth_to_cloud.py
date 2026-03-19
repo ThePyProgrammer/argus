@@ -24,7 +24,7 @@ CLOUD_CONFIGS = {
     "8": {"label": "Y+ Z+ | cam.T",  "fy":  1, "fz":  1, "pose": "cam_T"},
 }
 
-_active_config: str = "2"  # Y-Z- cam.T (verified: box at 3m reconstructed at 2.76m, correct geometry)
+_active_config: str = "1"  # Y-Z- cam (standardized with offset correction)
 
 
 def get_active_config() -> str:

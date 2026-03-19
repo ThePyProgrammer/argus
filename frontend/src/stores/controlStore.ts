@@ -31,7 +31,7 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   sendCommand: null,
   sendRaw: null,
   cloudConfigs: {},
-  activeCloudConfig: 'G',
+  activeCloudConfig: '1',
   cloudOffset: [0, 0, 0] as [number, number, number],
   showScene: true,
 
