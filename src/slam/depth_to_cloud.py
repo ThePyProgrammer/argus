@@ -84,13 +84,21 @@ def depth_to_pointcloud(
     points[:, 2] *= cfg["fz"]
     pcd.points = o3d.utility.Vector3dVector(points)
 
-    # Add colors from RGB
-    valid_mask = (depth_clean > 0).flatten()
-    valid_indices = np.where(valid_mask)[0]
-    if len(valid_indices) == len(points):
-        rows = valid_indices // w
-        cols = valid_indices % w
-        colors = rgb[rows, cols].astype(np.float64) / 255.0
-        pcd.colors = o3d.utility.Vector3dVector(colors)
+    # Add colors from RGB using Open3D's RGBD image pipeline
+    # This guarantees point-to-pixel correspondence (unlike manual valid_mask)
+    o3d_color = o3d.geometry.Image(rgb.astype(np.uint8))
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        o3d_color, o3d_depth, depth_scale=1.0, depth_trunc=max_depth, convert_rgb_to_intensity=False,
+    )
+    pcd_with_color = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, o3d_intrinsics)
+    if len(pcd_with_color.colors) == len(points):
+        pcd.colors = pcd_with_color.colors
+    elif len(pcd_with_color.points) > 0 and len(pcd_with_color.colors) > 0:
+        # Lengths may differ slightly — use RGBD cloud directly (it has correct correspondence)
+        pcd = pcd_with_color
+        pts = np.asarray(pcd.points)
+        pts[:, 1] *= cfg["fy"]
+        pts[:, 2] *= cfg["fz"]
+        pcd.points = o3d.utility.Vector3dVector(pts)
 
     return pcd

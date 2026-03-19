@@ -90,6 +90,7 @@ class WebStreamingViz:
             mode: Either "robot_tint" (per-robot palette) or "true_rgb".
         """
         self._color_mode = mode
+        logger.info("Color mode set to: %s", mode)
 
     def get_pending_messages(self) -> list[dict | bytes]:
         """Drain and return all queued messages.
