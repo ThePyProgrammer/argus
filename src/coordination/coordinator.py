@@ -283,6 +283,7 @@ class Coordinator:
                         "frame": frames[rid],
                         "local_voxels": robot.octomap.get_occupied_voxels(),
                         "local_colors": robot.slam.get_cloud_colors(),
+                        "_slam": robot.slam,
                         "pose": robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
                         "trajectory": list(robot.slam.slam_poses),
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
