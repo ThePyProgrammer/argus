@@ -170,56 +170,44 @@ class WebStreamingViz:
     def _build_rgb_lookup(self, robot_data: dict) -> dict[tuple[int, int, int], list[int]]:
         """Build voxel-grid→RGB color lookup from SLAM point cloud.
 
-        Voxelizes the raw SLAM cloud points to the same grid as the octomap
-        (0.1m resolution), averaging colors per voxel cell. This ensures the
-        lookup keys match the merged voxel positions exactly.
+        Uses slam_cloud_pts and slam_cloud_rgb from robot_data (the raw
+        SLAM global cloud before octomap voxelization). Quantizes points
+        to the same 0.1m grid and averages colors per cell.
         """
-        # Accumulate colors per grid cell
         color_sums: dict[tuple[int, int, int], list[float]] = {}
         color_counts: dict[tuple[int, int, int], int] = {}
-        resolution = 0.1  # must match octomap resolution
+        resolution = 0.1
 
         for rid, data in robot_data.items():
-            cloud_pts = data.get("local_voxels")  # (N,3) from octomap — grid aligned
-            cloud_colors = data.get("local_colors")  # (M,3) from SLAM — float [0,1]
-            if cloud_colors is None or len(cloud_colors) == 0:
+            pts = data.get("slam_cloud_pts")
+            cols = data.get("slam_cloud_rgb")
+            if pts is None or cols is None:
                 continue
-            # Use the raw SLAM cloud for color, not the octomap voxels
-            # Get points and colors directly from the SLAM pipeline
-            slam = data.get("_slam")
-            if slam is not None:
-                pts = np.asarray(slam.global_cloud.points)
-                cols = np.asarray(slam.global_cloud.colors)
-            else:
-                # Fallback: use local_colors with local_voxels positions
-                pts = cloud_pts
-                cols = cloud_colors
-                if pts is None or cols is None or len(pts) == 0 or len(cols) == 0:
-                    continue
+            if len(pts) == 0 or len(cols) == 0:
+                continue
 
             n = min(len(pts), len(cols))
             for i in range(n):
                 key = (
-                    int(round(pts[i][0] / resolution)),
-                    int(round(pts[i][1] / resolution)),
-                    int(round(pts[i][2] / resolution)),
+                    int(round(float(pts[i][0]) / resolution)),
+                    int(round(float(pts[i][1]) / resolution)),
+                    int(round(float(pts[i][2]) / resolution)),
                 )
                 if key not in color_sums:
                     color_sums[key] = [0.0, 0.0, 0.0]
                     color_counts[key] = 0
-                color_sums[key][0] += cols[i][0]
-                color_sums[key][1] += cols[i][1]
-                color_sums[key][2] += cols[i][2]
+                color_sums[key][0] += float(cols[i][0])
+                color_sums[key][1] += float(cols[i][1])
+                color_sums[key][2] += float(cols[i][2])
                 color_counts[key] += 1
 
-        # Average and convert to uint8
         lookup: dict[tuple[int, int, int], list[int]] = {}
         for key, sums in color_sums.items():
             count = color_counts[key]
             lookup[key] = [
-                int(sums[0] / count * 255),
-                int(sums[1] / count * 255),
-                int(sums[2] / count * 255),
+                min(255, int(sums[0] / count * 255)),
+                min(255, int(sums[1] / count * 255)),
+                min(255, int(sums[2] / count * 255)),
             ]
         return lookup
 
