@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
-from src.web.message_types import (
+from backend.web.message_types import (
     CLOUD_DELTA,
     CLOUD_FULL,
     OKABE_ITO_PALETTE,
@@ -27,7 +27,7 @@ from src.web.message_types import (
     decode_camera_frame_header,
     encode_camera_frame,
 )
-from src.web.connection_manager import ConnectionManager
+from backend.web.connection_manager import ConnectionManager
 
 
 # ---------- WSMessage tests ----------
@@ -208,7 +208,7 @@ def _make_robot_data(
 
 class TestWebStreamingViz:
     def _make_viz(self):
-        from src.web.streaming_viz import WebStreamingViz
+        from backend.web.streaming_viz import WebStreamingViz
 
         cm = MagicMock()
         robot_ids = ["robot_a", "robot_b"]
@@ -219,7 +219,7 @@ class TestWebStreamingViz:
         viz, cm = self._make_viz()
         merged = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
@@ -231,7 +231,7 @@ class TestWebStreamingViz:
         viz, cm = self._make_viz()
         merged = np.array([[1.0, 2.0, 3.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
             _ = viz.get_pending_messages()  # drain
             viz.update(merged, robot_data)  # same voxels
@@ -245,7 +245,7 @@ class TestWebStreamingViz:
         viz, cm = self._make_viz()
         merged = np.array([[1.0, 2.0, 3.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
@@ -258,7 +258,7 @@ class TestWebStreamingViz:
         viz, cm = self._make_viz()
         merged = np.array([[1.0, 2.0, 3.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data, total_coverage=50.0, merge_count=3)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
@@ -279,7 +279,7 @@ class TestWebStreamingViz:
                 p[:3, 3] = [float(j), 0.0, 0.0]
                 poses.append(p)
             robot_data[rid]["trajectory"] = poses
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
@@ -293,7 +293,7 @@ class TestWebStreamingViz:
         viz.set_color_mode("true_rgb")
         merged = np.array([[1.0, 2.0, 3.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
@@ -311,7 +311,7 @@ class TestWebStreamingViz:
         viz._last_full_sync = 0.0
         merged = np.array([[1.0, 2.0, 3.0]])
         robot_data = _make_robot_data(["robot_a", "robot_b"])
-        with patch("src.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
         msgs = viz.get_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]

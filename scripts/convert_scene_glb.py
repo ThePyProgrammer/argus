@@ -5,7 +5,7 @@ Loads all OBJ files from the DimOS office scene directory and exports
 them as a single GLB file suitable for the C2 frontend 3D viewer.
 
 Input:  dimos/data/mujoco_sim/scene_office1/office_split/*.obj
-Output: src/c2-frontend/public/scene.glb
+Output: frontend/public/scene.glb
 
 Methods (tried in order):
 1. trimesh library (pip install trimesh) -- pure Python, most portable
@@ -40,7 +40,7 @@ def find_default_input_dir() -> Path:
 def find_default_output() -> Path:
     """Return the default output path for the GLB file."""
     project_root = Path(__file__).parent.parent
-    return project_root / "src" / "c2-frontend" / "public" / "scene.glb"
+    return project_root / "frontend" / "public" / "scene.glb"
 
 
 def convert_with_trimesh(input_dir: Path, output: Path) -> bool:
@@ -184,7 +184,7 @@ def main():
         "--output",
         type=Path,
         default=None,
-        help="Output .glb file path (default: src/c2-frontend/public/scene.glb)",
+        help="Output .glb file path (default: frontend/public/scene.glb)",
     )
     args = parser.parse_args()
 

@@ -306,7 +306,7 @@ def run_web_mode(args):
     from src.coordination.coordinator import Coordinator
     from src.bridge.sensor_types import CameraIntrinsics
     from src.exploration.config import ExplorationConfig
-    from src.web.server import create_app
+    from backend.web.server import create_app
 
     scene = getattr(args, "scene", "office")
     config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
@@ -351,7 +351,7 @@ def run_web_mode(args):
 
     # Build React frontend
     from pathlib import Path
-    frontend_dir = Path(__file__).parent / "c2-frontend"
+    frontend_dir = Path(__file__).parent.parent / "frontend"
     if (frontend_dir / "package.json").exists():
         print("Building React frontend...")
         try:

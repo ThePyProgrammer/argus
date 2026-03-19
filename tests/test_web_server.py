@@ -12,7 +12,7 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from src.web.server import create_app
+from backend.web.server import create_app
 
 
 class TestWebSocketServer:
