@@ -79,12 +79,12 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   );
   const color = robotColor(colorIndex);
 
-  // Rotated image: 90° counter-clockwise
-  const rotatedImgStyle: React.CSSProperties = {
+  // Images are rotated server-side (cv2.rotate in encode_camera_frame)
+  // so no CSS rotation needed.
+  const imgStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    transform: 'rotate(-90deg)',
   };
 
   const noFeedStyle: React.CSSProperties = {
@@ -137,21 +137,14 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
           }}>RGB</div>
           {cameraUrl ? (
             <>
-              <img src={cameraUrl} alt={`${robotId} rgb`} style={rotatedImgStyle} />
-              {/* YOLO detection overlay (also rotated) */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                transform: 'rotate(-90deg)',
-                transformOrigin: 'center center',
-                zIndex: 2,
-              }}>
-                <DetectionOverlay
-                  detections={detections}
-                  color={color}
-                  width={640}
-                  height={480}
-                />
-              </div>
+              <img src={cameraUrl} alt={`${robotId} rgb`} style={imgStyle} />
+              {/* YOLO detection overlay */}
+              <DetectionOverlay
+                detections={detections}
+                color={color}
+                width={640}
+                height={480}
+              />
             </>
           ) : (
             <div style={noFeedStyle}>No RGB</div>
@@ -165,7 +158,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
             padding: '1px 4px', borderRadius: '2px', zIndex: 3,
           }}>Depth</div>
           {depthUrl ? (
-            <img src={depthUrl} alt={`${robotId} depth`} style={rotatedImgStyle} />
+            <img src={depthUrl} alt={`${robotId} depth`} style={imgStyle} />
           ) : (
             <div style={noFeedStyle}>No depth</div>
           )}

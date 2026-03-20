@@ -78,6 +78,8 @@ def encode_camera_frame(
     import cv2
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    # Rotate 90° counter-clockwise to correct for camera xyaxes orientation
+    bgr = cv2.rotate(bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
     success, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise RuntimeError("JPEG encoding failed")
@@ -123,6 +125,8 @@ def encode_depth_frame(
     colored = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
     # Black out invalid pixels
     colored[~valid] = 0
+    # Rotate 90° counter-clockwise to match RGB rotation
+    colored = cv2.rotate(colored, cv2.ROTATE_90_COUNTERCLOCKWISE)
     success, buf = cv2.imencode(".jpg", colored, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise RuntimeError("Depth JPEG encoding failed")
