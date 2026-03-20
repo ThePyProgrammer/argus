@@ -4,3 +4,6 @@ SimWorld-Robotics/
 dimos/
 node_modules/
 dist/
+
+*.pt
+*.egg-info/
