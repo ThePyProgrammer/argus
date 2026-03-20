@@ -68,14 +68,14 @@ export class CameraFrustumManager {
     // the SLAM cloud forms.
     const camZx = rotation[6];
     const camZy = rotation[7];
-    const yaw = Math.atan2(camZy, camZx);
+    // Flip yaw 180° -- cam_xmat Z-row points backward, robot faces opposite
+    const yaw = Math.atan2(camZy, camZx) + Math.PI;
 
-    // Build level camera axes from yaw only
-    // Frustum points in actual camera look direction (-Z of cam_xmat)
+    // Build level camera axes from yaw
     const camX = new THREE.Vector3(-Math.sin(yaw), Math.cos(yaw), 0);
     const camY = new THREE.Vector3(0, 0, 1);
     const camZ = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
-    const lookDir = camZ.clone().negate(); // actual camera look = -Z
+    const lookDir = camZ.clone().negate();
 
     // Frustum corners in camera frame, then transform to world
     // Camera frame: X=right, Y=up, -Z=forward
