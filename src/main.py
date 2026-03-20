@@ -439,14 +439,27 @@ def run_web_mode(args):
             except Exception:
                 pass
 
-            # Update config with new positions if provided
+            # Update config with new or random positions
             if new_positions:
                 config.spawn_positions = {
                     rid: (float(p[0]), float(p[1]), float(p[2]))
                     for rid, p in new_positions.items()
                     if rid in config.robot_ids
                 }
-                print(f"New spawn positions: {config.spawn_positions}")
+            elif config.scene != "flat":
+                # Generate random positions for office scene
+                import random, math as _math
+                spawn_range = 8.0
+                ax, ay = random.uniform(-spawn_range, spawn_range), random.uniform(-spawn_range, spawn_range)
+                angle = random.uniform(0, 2 * _math.pi)
+                dist = random.uniform(5.0, 10.0)
+                bx = ax + dist * _math.cos(angle)
+                by = ay + dist * _math.sin(angle)
+                config.spawn_positions = {
+                    "robot_a": (ax, ay, 0.3),
+                    "robot_b": (bx, by, 0.3),
+                }
+            print(f"Spawn positions: {config.spawn_positions}")
 
             # Recreate bridge + robots
             bridge = MultiRobotBridge(config)
