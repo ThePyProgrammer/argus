@@ -42,8 +42,8 @@ def parse_args():
     parser.add_argument(
         "--control",
         choices=["teleop", "waypoint", "random", "explore", "multi", "web"],
-        default="teleop",
-        help="Control mode (default: teleop)",
+        default="web",
+        help="Control mode (default: web)",
     )
     parser.add_argument(
         "--max-steps",
