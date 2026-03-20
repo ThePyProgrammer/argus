@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useRobotStore, type Detection } from '../stores/robotStore';
 import { robotColor } from '../utils/palette';
 
@@ -7,69 +7,104 @@ interface CameraFeedProps {
 }
 
 /**
- * Draw YOLO bounding boxes on a canvas overlaying the RGB image.
+ * Interactive YOLO detection overlays as positioned HTML divs.
+ * Hover to highlight and see a tooltip with details.
  */
 function DetectionOverlay({
   detections,
   color,
-  width,
-  height,
+  imgWidth,
+  imgHeight,
 }: {
   detections: Detection[];
   color: string;
-  width: number;
-  height: number;
+  imgWidth: number;
+  imgHeight: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, width, height);
-
-    for (const det of detections) {
-      if (!det.bbox || det.bbox.length < 4) continue;
-      const [x1, y1, x2, y2] = det.bbox;
-
-      // Draw box
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-
-      // Draw label -- above box if space, inside box if at top edge
-      const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
-      ctx.font = 'bold 12px monospace';
-      const textWidth = ctx.measureText(label).width;
-      const labelH = 16;
-      const labelY = y1 >= labelH + 2 ? y1 - labelH : y1 + 2;
-      const textY = y1 >= labelH + 2 ? y1 - 4 : y1 + labelH - 2;
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(x1, labelY, textWidth + 6, labelH);
-
-      ctx.fillStyle = color;
-      ctx.fillText(label, x1 + 3, textY);
-    }
-  }, [detections, color, width, height]);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 2,
-      }}
-    />
+    <div style={{
+      position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+      zIndex: 2,
+    }}>
+      {detections.map((det, i) => {
+        if (!det.bbox || det.bbox.length < 4) return null;
+        const [x1, y1, x2, y2] = det.bbox;
+
+        // Convert pixel coords to percentages for responsive positioning
+        const left = `${(x1 / imgWidth) * 100}%`;
+        const top = `${(y1 / imgHeight) * 100}%`;
+        const width = `${((x2 - x1) / imgWidth) * 100}%`;
+        const height = `${((y2 - y1) / imgHeight) * 100}%`;
+        const isHovered = hovered === i;
+
+        return (
+          <div
+            key={i}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              position: 'absolute',
+              left, top, width, height,
+              border: `2px solid ${isHovered ? '#fff' : color}`,
+              borderRadius: '2px',
+              background: isHovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: isHovered ? `0 0 8px ${color}` : 'none',
+            }}
+          >
+            {/* Label badge */}
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              bottom: '100%',
+              marginBottom: '2px',
+              padding: '1px 5px',
+              background: isHovered ? color : 'rgba(0,0,0,0.75)',
+              color: isHovered ? '#000' : color,
+              fontSize: '10px',
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              borderRadius: '2px',
+              transition: 'all 0.15s ease',
+            }}>
+              {det.class} {(det.confidence * 100).toFixed(0)}%
+            </div>
+
+            {/* Tooltip on hover */}
+            {isHovered && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '100%',
+                transform: 'translateX(-50%)',
+                marginTop: '4px',
+                padding: '6px 10px',
+                background: 'rgba(0,0,0,0.9)',
+                border: `1px solid ${color}`,
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                color: '#eee',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}>
+                <div><strong style={{ color }}>{det.class}</strong></div>
+                <div>Confidence: {(det.confidence * 100).toFixed(1)}%</div>
+                <div>BBox: [{det.bbox.join(', ')}]</div>
+                {det.pos_3d && (
+                  <div>3D: [{det.pos_3d.map(v => v.toFixed(2)).join(', ')}]</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -139,12 +174,12 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
           {cameraUrl ? (
             <>
               <img src={cameraUrl} alt={`${robotId} rgb`} style={imgStyle} />
-              {/* YOLO detection overlay */}
+              {/* YOLO detection overlay (interactive) */}
               <DetectionOverlay
                 detections={detections}
                 color={color}
-                width={640}
-                height={480}
+                imgWidth={640}
+                imgHeight={480}
               />
             </>
           ) : (
