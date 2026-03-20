@@ -8,10 +8,10 @@ Requires: pip install ultralytics
 Falls back gracefully if not installed.
 """
 
+from __future__ import annotations
+
 import os
 os.environ["NNPACK_DISABLE"] = "1"  # suppress NNPACK warnings on unsupported hardware
-
-from __future__ import annotations
 
 import logging
 import threading
