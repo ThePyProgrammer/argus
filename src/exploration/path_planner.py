@@ -46,7 +46,7 @@ class PathPlanner:
     and furniture (robot body is ~30cm wide).
     """
 
-    def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.4):
+    def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.8):
         """Initialize planner.
 
         Args:
@@ -81,18 +81,18 @@ class PathPlanner:
         dist = distance_transform_edt(~occupied_mask)
 
         radius_cells = max(1, int(self._inflation_radius / grid.resolution))
-        # Hard lethal zone: within half robot width (~15cm)
-        lethal_cells = max(1, int(0.15 / grid.resolution))
+        # Hard lethal zone: within robot half-width (~20cm)
+        lethal_cells = max(1, int(0.20 / grid.resolution))
 
         cost = np.zeros_like(dist, dtype=np.float32)
         # Lethal zone: effectively impassable
         cost[dist <= lethal_cells] = 1e6
-        # Inflation zone: decaying cost
+        # Inflation zone: exponential decay (stronger near obstacles)
         inflation_mask = (dist > lethal_cells) & (dist <= radius_cells)
         if np.any(inflation_mask):
-            # Linear decay from 50x to 1x within inflation zone
+            # Exponential decay: high cost near obstacles, low far away
             normalized = (radius_cells - dist[inflation_mask]) / (radius_cells - lethal_cells)
-            cost[inflation_mask] = 50.0 * normalized
+            cost[inflation_mask] = 100.0 * np.exp(2.0 * normalized) / np.exp(2.0)
 
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
