@@ -69,22 +69,24 @@ export class CameraFrustumManager {
     const camX = new THREE.Vector3(rotation[0], rotation[1], rotation[2]);
     const camY = new THREE.Vector3(rotation[3], rotation[4], rotation[5]);
     const camZ = new THREE.Vector3(rotation[6], rotation[7], rotation[8]);
-    // Camera looks along -Z
-    const lookDir = camZ.clone().negate();
+    // Camera looks along -Z in its own frame, but the SLAM cloud forms
+    // in the opposite direction due to the Y/Z flip + cam_mat.T transform.
+    // Show the frustum pointing toward the SLAM cloud (along +Z = body +X).
+    const lookDir = camZ.clone();
 
     // Frustum corners in camera frame, then transform to world
     // Camera frame: X=right, Y=up, -Z=forward
     const corners = [
-      // Near plane (4 corners)
-      { x: -nearW, y: -nearH, z: -nearDist },
-      { x:  nearW, y: -nearH, z: -nearDist },
-      { x:  nearW, y:  nearH, z: -nearDist },
-      { x: -nearW, y:  nearH, z: -nearDist },
+      // Near plane (4 corners) -- along +Z (toward SLAM cloud)
+      { x: -nearW, y: -nearH, z: nearDist },
+      { x:  nearW, y: -nearH, z: nearDist },
+      { x:  nearW, y:  nearH, z: nearDist },
+      { x: -nearW, y:  nearH, z: nearDist },
       // Far plane (4 corners)
-      { x: -farW, y: -farH, z: -farDist },
-      { x:  farW, y: -farH, z: -farDist },
-      { x:  farW, y:  farH, z: -farDist },
-      { x: -farW, y:  farH, z: -farDist },
+      { x: -farW, y: -farH, z: farDist },
+      { x:  farW, y: -farH, z: farDist },
+      { x:  farW, y:  farH, z: farDist },
+      { x: -farW, y:  farH, z: farDist },
     ];
 
     // Transform corners from camera frame to world frame
