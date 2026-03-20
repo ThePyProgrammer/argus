@@ -63,12 +63,16 @@ export class CameraFrustumManager {
     const farH = farDist * Math.tan(fovRad / 2);
     const farW = farH * aspect;
 
-    // Extract yaw-only rotation (ignore pitch/roll from gait wobble)
-    // cam_xmat row 2 = camera Z axis in world. Its +Z direction is where
-    // the SLAM cloud forms.
-    const camZx = rotation[6];
-    const camZy = rotation[7];
-    const yaw = Math.atan2(camZy, camZx);
+    // The pose rotation is cam_xmat. The camera's Z row points along body -X
+    // (backward) due to xyaxes="0 0 1 0 1 0". The SLAM cloud forms along +Z
+    // which is body +X (forward). But for the frustum we want the ACTUAL
+    // camera look direction to match the MuJoCo sim.
+    //
+    // Camera -Z = look direction. cam_xmat row 2 = Z axis in world.
+    // Look = -row2.
+    const lookX = -rotation[6];
+    const lookY = -rotation[7];
+    const yaw = Math.atan2(lookY, lookX);
 
     // Build level camera axes from yaw only
     const camX = new THREE.Vector3(-Math.sin(yaw), Math.cos(yaw), 0);
@@ -79,7 +83,7 @@ export class CameraFrustumManager {
     // Frustum corners in camera frame, then transform to world
     // Camera frame: X=right, Y=up, -Z=forward
     const corners = [
-      // Near plane (4 corners) -- along +Z (toward SLAM cloud)
+      // Near plane (4 corners) -- along the look direction
       { x: -nearW, y: -nearH, z: nearDist },
       { x:  nearW, y: -nearH, z: nearDist },
       { x:  nearW, y:  nearH, z: nearDist },
