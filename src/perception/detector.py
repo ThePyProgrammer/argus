@@ -181,26 +181,23 @@ class ObjectDetector:
                     bbox=(x1, y1, x2, y2),
                 )
 
-                # Estimate 3D position: use the SLAM cloud's last frame points
-                # to find the closest point to the bbox center. This guarantees
-                # the detection box aligns with the point cloud exactly.
-                if self._last_cloud is not None and len(self._last_cloud) > 0 and depth is not None:
+                # Estimate 3D position from depth + pose
+                if depth is not None:
                     cx_px, cy_px = (x1 + x2) // 2, (y1 + y2) // 2
                     h_img, w_img = depth.shape
                     cx_px = min(max(cx_px, 0), w_img - 1)
                     cy_px = min(max(cy_px, 0), h_img - 1)
 
-                    # The SLAM cloud points are in world frame, ordered by
-                    # valid depth pixels (row-major). Find the index of this pixel.
-                    valid_mask = (depth > 0.05) & (depth < 20.0)
-                    valid_indices = np.argwhere(valid_mask)  # (N, 2) [row, col]
-
-                    if len(valid_indices) > 0 and len(valid_indices) <= len(self._last_cloud):
-                        # Find the valid pixel closest to bbox center
-                        dists = (valid_indices[:, 0] - cy_px) ** 2 + (valid_indices[:, 1] - cx_px) ** 2
-                        nearest_idx = int(np.argmin(dists))
-                        if nearest_idx < len(self._last_cloud):
-                            det.center_3d = self._last_cloud[nearest_idx].copy()
+                    # Median depth in bbox
+                    roi = depth[max(0,y1):min(h_img,y2), max(0,x1):min(w_img,x2)]
+                    valid_roi = roi[(roi > 0.1) & (roi < 15.0)]
+                    if len(valid_roi) > 0:
+                        d = float(np.median(valid_roi))
+                        # Simple forward projection: robot position + depth along look direction
+                        # pose[:3, 3] is camera/robot position, pose[:3, :3] is rotation
+                        # The camera's -Z axis (look dir) in world = -pose[:3, 2]
+                        look_dir = -pose[:3, 2]  # camera looks along -Z
+                        det.center_3d = pose[:3, 3] + look_dir * d
 
                 detections.append(det)
 
