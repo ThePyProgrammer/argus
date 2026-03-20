@@ -1,4 +1,5 @@
 import type { RobotInfo } from '../stores/robotStore';
+import { useControlStore } from '../stores/controlStore';
 import { robotColor } from '../utils/palette';
 
 interface RobotCardProps {
@@ -7,9 +8,10 @@ interface RobotCardProps {
 
 export default function RobotCard({ robot }: RobotCardProps) {
   const color = robotColor(robot.colorIndex);
+  const placingRobot = useControlStore((s) => s.placingRobot);
+  const setPlacingRobot = useControlStore((s) => s.setPlacingRobot);
 
   const handleClick = () => {
-    // Dispatch custom event for Plan 03 to listen to (center camera on robot)
     window.dispatchEvent(
       new CustomEvent('focus-robot', { detail: { robotId: robot.id } }),
     );
@@ -63,6 +65,26 @@ export default function RobotCard({ robot }: RobotCardProps) {
         <span>Coverage: {robot.coveragePct.toFixed(1)}%</span>
         <span>Voxels: {robot.voxelCount.toLocaleString()}</span>
       </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setPlacingRobot(placingRobot === robot.id ? null : robot.id);
+        }}
+        style={{
+          marginTop: '6px',
+          padding: '4px 10px',
+          width: '100%',
+          border: placingRobot === robot.id ? '1px solid #ff9800' : '1px solid #555',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          fontWeight: 600,
+          background: placingRobot === robot.id ? '#4a2800' : '#1a1a2e',
+          color: placingRobot === robot.id ? '#ff9800' : '#aaa',
+        }}
+      >
+        {placingRobot === robot.id ? 'Cancel — Click scene to place' : 'Send To...'}
+      </button>
     </div>
   );
 }

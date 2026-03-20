@@ -124,6 +124,25 @@ class Coordinator:
             if value > 0:
                 self._config.step_delay = 1.0 / value
                 logger.info("Command received: set_speed %.1f (delay=%.3fs)", value, self._config.step_delay)
+        elif action == "send_to":
+            robot_id = command.get("robot_id")
+            target = command.get("target")
+            if robot_id and target and robot_id in self._robots:
+                target_pos = np.array(target, dtype=np.float64)
+                robot = self._robots[robot_id]
+                # Get current pose for path planning
+                if robot.slam.slam_poses:
+                    current_pos = robot.slam.slam_poses[-1][:3, 3]
+                else:
+                    current_pos = np.array(robot.spawn_transform[:3, 3])
+                # Create a waypoint runner to the target
+                from src.control.waypoint_runner import WaypointRunner
+                waypoints = [target_pos]
+                robot.exploration._current_waypoint_runner = WaypointRunner(
+                    waypoints, linear_speed=robot.exploration._config.linear_speed,
+                    angular_speed=robot.exploration._config.angular_speed,
+                )
+                logger.info("Command received: send %s to (%.1f, %.1f)", robot_id, target[0], target[1])
         elif action == "restart":
             positions = command.get("positions")
             if positions and isinstance(positions, dict):

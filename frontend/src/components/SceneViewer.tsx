@@ -130,6 +130,46 @@ export default function SceneViewer() {
     };
     window.addEventListener('focus-robot', handleCenterOnRobot);
 
+    // --- Click-to-place: raycast to Z=0 plane in worldRoot coords ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    // Ground plane normal in Z-up worldRoot space
+
+    const handleClick = (event: MouseEvent) => {
+      const placing = useControlStore.getState().placingRobot;
+      if (!placing) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      // Intersect with the ground plane in world space
+      // worldRoot has rotation, so we need to transform the plane into scene space
+      const worldPlaneNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(worldRoot.quaternion);
+      const scenePlane = new THREE.Plane(worldPlaneNormal, 0);
+      const intersection = new THREE.Vector3();
+      const hit = raycaster.ray.intersectPlane(scenePlane, intersection);
+
+      if (hit) {
+        // Convert back to Z-up coords (worldRoot local space)
+        const local = worldRoot.worldToLocal(intersection.clone());
+        const sendRaw = useControlStore.getState().sendRaw;
+        sendRaw?.({
+          type: 'command',
+          payload: {
+            action: 'send_to',
+            robot_id: placing,
+            target: [local.x, local.y, 0],
+          },
+        });
+        console.log(`[C2] Sending ${placing} to (${local.x.toFixed(1)}, ${local.y.toFixed(1)})`);
+        useControlStore.getState().setPlacingRobot(null);
+      }
+    };
+    renderer.domElement.addEventListener('click', handleClick);
+
     // --- Render loop ---
     let animationId = 0;
     const animate = () => {
@@ -159,6 +199,7 @@ export default function SceneViewer() {
       cancelAnimationFrame(animationId);
       unsub();
       unsubControl();
+      renderer.domElement.removeEventListener('click', handleClick);
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
@@ -173,10 +214,27 @@ export default function SceneViewer() {
     };
   }, []);
 
+  const placingRobot = useControlStore((s) => s.placingRobot);
+
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100%', overflow: 'hidden' }}
-    />
+    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%', height: '100%',
+          cursor: placingRobot ? 'crosshair' : 'grab',
+        }}
+      />
+      {placingRobot && (
+        <div style={{
+          position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.8)', color: '#ff9800', padding: '8px 20px',
+          borderRadius: '6px', fontSize: '14px', fontWeight: 600,
+          border: '1px solid #ff9800', pointerEvents: 'none',
+        }}>
+          Click on the scene to send {placingRobot} to that position
+        </div>
+      )}
+    </div>
   );
 }

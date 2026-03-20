@@ -12,6 +12,7 @@ export interface ControlStoreState {
   activeCloudConfig: string;
   cloudOffset: [number, number, number]; // [x, y, z] offset applied to cloud in scene
   showScene: boolean; // toggle scene mesh visibility
+  placingRobot: string | null; // robot_id being placed, or null
 
   setRunning: (running: boolean) => void;
   setPaused: (paused: boolean) => void;
@@ -22,6 +23,7 @@ export interface ControlStoreState {
   setActiveCloudConfig: (key: string) => void;
   setCloudOffset: (offset: [number, number, number]) => void;
   toggleScene: () => void;
+  setPlacingRobot: (robotId: string | null) => void;
 }
 
 export const useControlStore = create<ControlStoreState>((set) => ({
@@ -34,6 +36,7 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   activeCloudConfig: '1',
   cloudOffset: [0, 0, 0] as [number, number, number],
   showScene: true,
+  placingRobot: null,
 
   setRunning: (running: boolean) => set({ isRunning: running }),
   setPaused: (paused: boolean) => set({ isPaused: paused }),
@@ -44,4 +47,5 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   setActiveCloudConfig: (key) => set({ activeCloudConfig: key }),
   setCloudOffset: (offset) => set({ cloudOffset: offset }),
   toggleScene: () => set((s) => ({ showScene: !s.showScene })),
+  setPlacingRobot: (robotId) => set({ placingRobot: robotId }),
 }));
