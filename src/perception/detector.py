@@ -42,6 +42,7 @@ class Detection:
     confidence: float
     bbox: tuple[int, int, int, int]  # x1, y1, x2, y2
     center_3d: np.ndarray | None = None  # (3,) world position if depth available
+    depth_m: float | None = None  # median depth in meters
 
 
 @dataclass
@@ -237,6 +238,7 @@ class ObjectDetector:
                         # pose is cam_xmat (no transpose) + cam_xpos
                         world_pt = pose[:3, :3] @ cam_pt + pose[:3, 3]
                         det.center_3d = world_pt
+                        det.depth_m = d
 
                 detections.append(det)
 

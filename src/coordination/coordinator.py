@@ -373,7 +373,8 @@ class Coordinator:
                         detections = [
                             {"class": d.class_name, "confidence": d.confidence,
                              "bbox": list(d.bbox),
-                             "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None}
+                             "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None,
+                             "depth": d.depth_m}
                             for d in self._detector.get_detections(rid)
                         ]
 

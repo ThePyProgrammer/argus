@@ -5,6 +5,7 @@ export interface Detection {
   confidence: number;
   bbox: number[];
   pos_3d: number[] | null;
+  depth: number | null;
 }
 
 export interface RobotInfo {

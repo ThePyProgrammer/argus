@@ -76,12 +76,21 @@ export class DetectionBoxManager {
 
       const [x, y, z] = det.pos_3d;
       const depth = det.depth ?? 3.0;
+      const bbox = det.bbox ?? [0, 0, 100, 100];
 
-      // Box size scales with distance (closer = smaller box for precision)
-      const boxSize = Math.max(0.2, Math.min(0.8, depth * 0.15));
+      // Compute real-world box size from 2D bbox + depth + focal length
+      // f = imgHeight / (2 * tan(fov/2)), fov=70°
+      const imgH = 480; // MuJoCo render height
+      const fovRad = (70 * Math.PI) / 180;
+      const f = imgH / (2 * Math.tan(fovRad / 2));
+      const bboxW = Math.abs(bbox[2] - bbox[0]);
+      const bboxH = Math.abs(bbox[3] - bbox[1]);
+      const worldW = Math.max(0.1, (bboxW * depth) / f);
+      const worldH = Math.max(0.1, (bboxH * depth) / f);
+      const worldD = Math.max(0.1, Math.min(worldW, worldH) * 0.5); // depth = half of smaller dimension
 
-      // Wireframe box
-      const boxGeo = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
+      // Wireframe box with real-world proportions
+      const boxGeo = new THREE.BoxGeometry(worldW, worldD, worldH);
       const boxMat = new THREE.MeshBasicMaterial({
         color: threeColor,
         wireframe: true,
@@ -108,7 +117,7 @@ export class DetectionBoxManager {
         `${det.class} ${(det.confidence * 100).toFixed(0)}%`,
         threeColor,
       );
-      label.position.set(x, y, z + boxSize * 0.8);
+      label.position.set(x, y, z + worldH * 0.6);
       label.scale.set(1.0, 0.25, 1);
       group.add(label);
     }
