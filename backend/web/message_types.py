@@ -78,8 +78,10 @@ def encode_camera_frame(
     import cv2
 
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    # Rotate 90° counter-clockwise to correct for camera xyaxes orientation
+    # Rotate 90° CCW to correct for camera xyaxes, then flip horizontally
+    # to mirror the backward-facing camera view so it matches the SLAM/frustum direction
     bgr = cv2.rotate(bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    bgr = cv2.flip(bgr, 1)  # horizontal flip
     success, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise RuntimeError("JPEG encoding failed")
@@ -127,6 +129,7 @@ def encode_depth_frame(
     colored[~valid] = 0
     # Rotate 90° counter-clockwise to match RGB rotation
     colored = cv2.rotate(colored, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    colored = cv2.flip(colored, 1)  # horizontal flip to match RGB
     success, buf = cv2.imencode(".jpg", colored, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise RuntimeError("Depth JPEG encoding failed")
