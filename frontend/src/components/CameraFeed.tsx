@@ -39,16 +39,19 @@ function DetectionOverlay({
       ctx.lineWidth = 2;
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
-      // Draw label background
+      // Draw label -- above box if space, inside box if at top edge
       const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
       ctx.font = 'bold 12px monospace';
       const textWidth = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(x1, y1 - 16, textWidth + 6, 16);
+      const labelH = 16;
+      const labelY = y1 >= labelH + 2 ? y1 - labelH : y1 + 2;
+      const textY = y1 >= labelH + 2 ? y1 - 4 : y1 + labelH - 2;
 
-      // Draw label text
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(x1, labelY, textWidth + 6, labelH);
+
       ctx.fillStyle = color;
-      ctx.fillText(label, x1 + 3, y1 - 4);
+      ctx.fillText(label, x1 + 3, textY);
     }
   }, [detections, color, width, height]);
 
