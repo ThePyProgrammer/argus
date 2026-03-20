@@ -122,13 +122,11 @@ export class RobotMarkerManager {
     if (existing) {
       existing.position.set(position[0], position[1], position[2]);
 
-      // Use rotation matrix for heading (cam_xmat Z-row = camera forward axis)
+      // Use rotation matrix for heading: camera look = -Z of cam_xmat
       if (rotation && rotation.length === 9) {
-        // Camera Z axis in world (row 2 of cam_xmat)
-        // The SLAM cloud extends along +Z, which is the robot's forward
-        const camZx = rotation[6];
-        const camZy = rotation[7];
-        const yaw = Math.atan2(camZy, camZx);
+        const lookX = -rotation[6];
+        const lookY = -rotation[7];
+        const yaw = Math.atan2(lookY, lookX);
         existing.rotation.set(0, 0, yaw);
       }
       return;

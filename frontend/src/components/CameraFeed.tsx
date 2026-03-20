@@ -186,8 +186,8 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
               <DetectionOverlay
                 detections={detections}
                 color={color}
-                imgWidth={480}
-                imgHeight={640}
+                imgWidth={640}
+                imgHeight={480}
               />
             </>
           ) : (

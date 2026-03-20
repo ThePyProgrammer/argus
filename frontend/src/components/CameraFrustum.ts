@@ -63,19 +63,17 @@ export class CameraFrustumManager {
     const farH = farDist * Math.tan(fovRad / 2);
     const farW = farH * aspect;
 
-    // Extract yaw-only rotation (ignore pitch/roll from gait wobble)
-    // cam_xmat row 2 = camera Z axis in world. Its +Z direction is where
-    // the SLAM cloud forms.
-    const camZx = rotation[6];
-    const camZy = rotation[7];
-    // Flip yaw 180° -- cam_xmat Z-row points backward, robot faces opposite
-    const yaw = Math.atan2(camZy, camZx) + Math.PI;
+    // Extract yaw from camera look direction (-Z of cam_xmat)
+    // cam_xmat row 2 = Z-back axis. Camera looks along -Z.
+    const lookX = -rotation[6];
+    const lookY = -rotation[7];
+    const yaw = Math.atan2(lookY, lookX);
 
-    // Build level camera axes from yaw
+    // Build level camera axes from yaw (ignore pitch/roll from gait)
+    const lookDir = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
     const camX = new THREE.Vector3(-Math.sin(yaw), Math.cos(yaw), 0);
     const camY = new THREE.Vector3(0, 0, 1);
-    const camZ = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
-    const lookDir = camZ.clone().negate();
+    const camZ = lookDir.clone().negate(); // Z-back = opposite of look
 
     // Frustum corners in camera frame, then transform to world
     // Camera frame: X=right, Y=up, -Z=forward
