@@ -293,10 +293,21 @@ class WebStreamingViz:
             # Trajectory
             trajectory = data.get("trajectory", [])
             if len(trajectory) >= 1:
-                recent = trajectory[-50:]
-                positions = [p[:3, 3].tolist() for p in recent]
+                # Send full trajectory but downsample if too long
+                # Keep first, last, and evenly spaced points in between
+                max_trail_points = 500
+                if len(trajectory) > max_trail_points:
+                    step = len(trajectory) / max_trail_points
+                    indices = [int(i * step) for i in range(max_trail_points - 1)]
+                    indices.append(len(trajectory) - 1)  # always include latest
+                    sampled = [trajectory[i] for i in indices]
+                else:
+                    sampled = trajectory
+
+                positions = [p[:3, 3].tolist() for p in sampled]
                 n = len(positions)
-                alphas = [int(255 * (j + 1) / n) for j in range(n)]
+                # Fade: older points dimmer, recent points fully opaque
+                alphas = [max(40, int(255 * (j + 1) / n)) for j in range(n)]
                 self._message_queue.append({
                     "type": TRAJECTORY,
                     "robot_id": rid,
