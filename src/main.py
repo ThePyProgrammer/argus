@@ -389,6 +389,11 @@ def run_web_mode(args):
     if getattr(args, 'static', False):
         coordinator._static = True
 
+    # Configure MCP server for Claude Code integration
+    from src.mcp.server import configure as configure_mcp
+    configure_mcp(coordinator, list(config.robot_ids))
+    print("MCP endpoint available at http://localhost:8000/mcp")
+
     # Build React frontend
     from pathlib import Path
     frontend_dir = Path(__file__).parent.parent / "frontend"

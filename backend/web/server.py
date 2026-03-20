@@ -52,6 +52,10 @@ def create_app(
     command_callback = command_cb
     _slam_reset_callback = slam_reset_cb
     _robot_ids = robot_ids
+    # Register MCP endpoint
+    from src.mcp.server import mcp_endpoint
+    app.post("/mcp")(mcp_endpoint)
+
     return app, streaming_viz
 
 
