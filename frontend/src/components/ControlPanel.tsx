@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
 
 export default function ControlPanel() {
+  const [showCloudConfig, setShowCloudConfig] = useState(false);
+  const [showCloudOffset, setShowCloudOffset] = useState(false);
   const isRunning = useControlStore((s) => s.isRunning);
   const isPaused = useControlStore((s) => s.isPaused);
   const simSpeed = useControlStore((s) => s.simSpeed);
@@ -134,69 +137,89 @@ export default function ControlPanel() {
 
       {Object.keys(cloudConfigs).length > 0 && (
         <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#888' }}>
-            CLOUD CONFIG
+          <div
+            onClick={() => setShowCloudConfig(!showCloudConfig)}
+            style={{
+              fontSize: '12px', fontWeight: 600, color: '#888', cursor: 'pointer',
+              userSelect: 'none', display: 'flex', justifyContent: 'space-between',
+            }}
+          >
+            <span>CLOUD CONFIG</span>
+            <span style={{ fontSize: '10px' }}>{showCloudConfig ? '▼' : '▶'}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '200px', overflowY: 'auto' }}>
-            {Object.entries(cloudConfigs).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => {
-                  sendRaw?.({ type: 'set_cloud_config', config: key });
-                }}
-                style={{
-                  padding: '4px 8px',
-                  border: key === activeCloudConfig ? '2px solid #2ecc71' : '1px solid #444',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  textAlign: 'left',
-                  background: key === activeCloudConfig ? '#1a3a2a' : '#222',
-                  color: key === activeCloudConfig ? '#2ecc71' : '#aaa',
-                }}
-              >
-                <strong>{key}</strong>: {label}
-              </button>
-            ))}
-          </div>
+          {showCloudConfig && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '200px', overflowY: 'auto', marginTop: '6px' }}>
+              {Object.entries(cloudConfigs).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    sendRaw?.({ type: 'set_cloud_config', config: key });
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    border: key === activeCloudConfig ? '2px solid #2ecc71' : '1px solid #444',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    textAlign: 'left',
+                    background: key === activeCloudConfig ? '#1a3a2a' : '#222',
+                    color: key === activeCloudConfig ? '#2ecc71' : '#aaa',
+                  }}
+                >
+                  <strong>{key}</strong>: {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={{ marginTop: '10px', borderTop: '1px solid #2a2a4a', paddingTop: '8px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', color: '#777' }}>
-              CLOUD OFFSET
-            </div>
-            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
-              <div key={axis} style={{ marginBottom: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
-                  <span>{axis}</span>
-                  <span>{cloudOffset[i].toFixed(1)}m</span>
-                </div>
-                <input
-                  type="range"
-                  min="-10"
-                  max="10"
-                  step="0.1"
-                  value={cloudOffset[i]}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    const newOffset: [number, number, number] = [...cloudOffset];
-                    newOffset[i] = val;
-                    setCloudOffset(newOffset);
-                  }}
-                  style={{ width: '100%', height: '14px' }}
-                />
-              </div>
-            ))}
-            <button
-              onClick={() => setCloudOffset([0, 0, 0])}
+            <div
+              onClick={() => setShowCloudOffset(!showCloudOffset)}
               style={{
-                padding: '3px 8px', border: '1px solid #444', borderRadius: '3px',
-                cursor: 'pointer', fontSize: '10px', background: '#222', color: '#aaa',
-                width: '100%', marginTop: '2px',
+                fontSize: '11px', fontWeight: 600, color: '#777', cursor: 'pointer',
+                userSelect: 'none', display: 'flex', justifyContent: 'space-between',
               }}
             >
-              Reset offsets
-            </button>
+              <span>CLOUD OFFSET</span>
+              <span style={{ fontSize: '10px' }}>{showCloudOffset ? '▼' : '▶'}</span>
+            </div>
+            {showCloudOffset && (
+              <div style={{ marginTop: '4px' }}>
+                {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+                  <div key={axis} style={{ marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
+                      <span>{axis}</span>
+                      <span>{cloudOffset[i].toFixed(1)}m</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-10"
+                      max="10"
+                      step="0.1"
+                      value={cloudOffset[i]}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const newOffset: [number, number, number] = [...cloudOffset];
+                        newOffset[i] = val;
+                        setCloudOffset(newOffset);
+                      }}
+                      style={{ width: '100%', height: '14px' }}
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={() => setCloudOffset([0, 0, 0])}
+                  style={{
+                    padding: '3px 8px', border: '1px solid #444', borderRadius: '3px',
+                    cursor: 'pointer', fontSize: '10px', background: '#222', color: '#aaa',
+                    width: '100%', marginTop: '2px',
+                  }}
+                >
+                  Reset offsets
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
