@@ -8,6 +8,9 @@ Requires: pip install ultralytics
 Falls back gracefully if not installed.
 """
 
+import os
+os.environ["NNPACK_DISABLE"] = "1"  # suppress NNPACK warnings on unsupported hardware
+
 from __future__ import annotations
 
 import logging
@@ -20,6 +23,10 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 try:
+    import warnings
+    warnings.filterwarnings("ignore", message=".*NNPACK.*")
+    import torch
+    torch.set_num_threads(2)  # limit CPU usage for background detection
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
 except ImportError:
