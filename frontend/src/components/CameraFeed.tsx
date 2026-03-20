@@ -99,8 +99,8 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   return (
     <div
       style={{
-        width: '400px',
-        height: '240px',
+        width: '100%',
+        aspectRatio: '4 / 3',
         flexShrink: 0,
         background: '#0a0a1a',
         borderRadius: '4px',
@@ -128,7 +128,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
         {robotId}
       </div>
       {/* Side-by-side: RGB (with detection overlay) + Depth */}
-      <div style={{ display: 'flex', height: '237px' }}>
+      <div style={{ display: 'flex', height: 'calc(100% - 3px)' }}>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <div style={{
             position: 'absolute', bottom: '4px', left: '4px',
