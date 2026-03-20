@@ -317,6 +317,15 @@ class WebStreamingViz:
                     },
                 })
 
+            # Object detections
+            detections = data.get("detections", [])
+            if detections:
+                self._message_queue.append({
+                    "type": "detections",
+                    "robot_id": rid,
+                    "payload": {"detections": detections},
+                })
+
             # Camera frames (binary) — RGB + depth
             frame = data.get("frame")
             if frame is not None:

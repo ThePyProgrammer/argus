@@ -86,6 +86,17 @@ class Coordinator:
         self._merge_count = 0
         self._body_trajectories: dict[str, list[np.ndarray]] = {}
 
+        # Object detection (optional -- graceful if ultralytics not installed)
+        self._detector = None
+        try:
+            from src.perception.detector import ObjectDetector, YOLO_AVAILABLE
+            if YOLO_AVAILABLE:
+                self._detector = ObjectDetector(device="cpu", max_fps=1.0)
+                self._detector.start()
+                logger.info("YOLO object detector started (CPU, 1 FPS)")
+        except ImportError:
+            pass
+
         # Web control flags (set via _command_handler from C2 interface)
         self._should_stop: bool = False
         self._paused: bool = False
@@ -336,6 +347,20 @@ class Coordinator:
                     cloud_pts = robot.slam.get_cloud_points()
                     local_voxels = robot.octomap.get_occupied_voxels()
 
+                    # Submit frame for YOLO detection (background thread)
+                    if self._detector is not None:
+                        self._detector.submit_frame(rid, frames[rid].rgb, frames[rid].depth, pose)
+
+                    # Get latest detections
+                    detections = []
+                    if self._detector is not None:
+                        detections = [
+                            {"class": d.class_name, "confidence": d.confidence,
+                             "bbox": list(d.bbox),
+                             "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None}
+                            for d in self._detector.get_detections(rid)
+                        ]
+
                     robot_data[rid] = {
                         "frame": frames[rid],
                         "local_voxels": local_voxels,
@@ -344,6 +369,7 @@ class Coordinator:
                         "pose": pose,
                         "trajectory": list(robot.slam.slam_poses),
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
+                        "detections": detections,
                     }
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
                 frontier_cells = self._gather_frontier_cells(robot_ids)
