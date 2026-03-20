@@ -124,9 +124,10 @@ export class RobotMarkerManager {
 
       // Use rotation matrix for heading: camera look = -Z of cam_xmat
       if (rotation && rotation.length === 9) {
+        // Camera looks along body -Y. Robot forward = +X = 90° CCW from -Y.
         const lookX = -rotation[6];
         const lookY = -rotation[7];
-        const yaw = Math.atan2(lookY, lookX);
+        const yaw = Math.atan2(lookY, lookX) + Math.PI / 2;
         existing.rotation.set(0, 0, yaw);
       }
       return;

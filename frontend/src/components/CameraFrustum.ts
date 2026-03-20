@@ -65,9 +65,10 @@ export class CameraFrustumManager {
 
     // Extract yaw from camera look direction (-Z of cam_xmat)
     // cam_xmat row 2 = Z-back axis. Camera looks along -Z.
+    // Camera looks along body -Y. Robot forward is body +X = 90° CCW from -Y.
     const lookX = -rotation[6];
     const lookY = -rotation[7];
-    const yaw = Math.atan2(lookY, lookX);
+    const yaw = Math.atan2(lookY, lookX) + Math.PI / 2;
 
     // Build level camera axes from yaw (ignore pitch/roll from gait)
     const lookDir = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
