@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointCloudManager } from './PointCloud';
 import { RobotMarkerManager } from './RobotMarker';
 import { TrajectoryTrailManager } from './TrajectoryTrail';
+import { DetectionBoxManager } from './DetectionBoxes';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSceneLoader } from '../hooks/useSceneLoader';
@@ -80,6 +81,7 @@ export default function SceneViewer() {
     const pointCloudManager = new PointCloudManager(worldRoot);
     const robotMarkerManager = new RobotMarkerManager(worldRoot);
     const trailManager = new TrajectoryTrailManager(worldRoot);
+    const detectionBoxManager = new DetectionBoxManager(worldRoot);
 
     // --- Cloud offset subscription ---
     const unsubControl = useControlStore.subscribe((state, prev) => {
@@ -113,6 +115,14 @@ export default function SceneViewer() {
             id,
             robot.trajectory,
             robot.trajectoryAlphas,
+            robot.colorIndex,
+          );
+        }
+        // 3D detection bounding boxes
+        if (!prev || prev.detections !== robot.detections) {
+          detectionBoxManager.updateDetections(
+            id,
+            robot.detections,
             robot.colorIndex,
           );
         }
@@ -207,6 +217,7 @@ export default function SceneViewer() {
       pointCloudManager.dispose();
       robotMarkerManager.dispose();
       trailManager.dispose();
+      detectionBoxManager.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
