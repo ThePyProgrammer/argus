@@ -209,6 +209,72 @@ MuJoCo Simulation (5 physics steps/frame, 320x240 depth+RGB)
             └─ get_status, get_detections, send_command, get_coverage
 ```
 
+## Technical Deep Dives
+
+### SLAM Pipeline
+
+The SLAM system produces a 3D point cloud and occupancy grid from each robot's depth camera:
+
+1. **Depth rendering** -- MuJoCo renders 320x240 depth images at 70° vertical FOV. Raw depth buffer values are converted to metric meters using `znear * zfar / (zfar - raw * (zfar - znear))` where znear/zfar come from the model's visual settings × statistic extent.
+
+2. **Depth-to-cloud unprojection** -- Open3D's `create_from_depth_image()` unprojects depth pixels to 3D points in camera frame using pinhole intrinsics (`f = height / (2 * tan(fovy/2))`). Points are then Y/Z flipped (OpenCV→OpenGL convention) to match MuJoCo's camera frame.
+
+3. **World transform** -- Each frame's cloud is transformed to world coordinates using `cam_xmat @ cam_point + cam_xpos` (camera rotation matrix × point + camera position). The DimOS standard camera (`xyaxes="0 -1 0 0 0 1"`) looks along body -Y; the Y/Z flip compensates so the cloud forms correctly in world frame.
+
+4. **Noise filtering** -- Statistical outlier removal (Open3D, `nb_neighbors=10, std_ratio=2.0`) runs every 5th frame to clean depth noise without impacting throughput.
+
+5. **Accumulation** -- Per-frame clouds are accumulated into a global Open3D PointCloud, downsampled at 0.03m voxel resolution every 30 frames. Each frame's cloud is also inserted directly into the OctoMapBuilder (Open3D VoxelGrid at 0.05m resolution).
+
+6. **Map merging** -- The Coordinator collects OctoMap voxels from all robots and performs union-OR merge (occupied if any robot saw it). No spawn transform is applied since SLAM clouds are already in world frame.
+
+### Path Planning
+
+The navigation stack uses a five-stage pipeline adapted from DimOS:
+
+1. **Occupancy grid** -- 3D voxels are projected to a 2D grid filtered by height. A ground-plane filter removes the dominant Z-layer. Robot trajectory positions are stamped as FREE to ensure navigable corridors.
+
+2. **Voronoi-gradient costmap** -- Two-layer costmap replaces simple inflation:
+   - **Binary inflation**: Obstacles dilated by robot half-width (0.15m) creating hard impassable zones
+   - **Voronoi gradient**: Labels connected obstacle clusters, finds Voronoi edges (corridor centers), computes cost as `50 × d_voronoi / (d_obstacle + d_voronoi)`. This pushes A* paths to the center of corridors and doorways, eliminating corner-clipping.
+
+3. **A* search** -- 8-connected grid search with octile heuristic on the Voronoi-gradient costmap. UNKNOWN cells are traversable with 5× cost penalty. Occupied and lethal-zone cells are impassable.
+
+4. **Path smoothing** -- Raw A* paths are:
+   - Upsampled 10× (linear interpolation between grid waypoints)
+   - Smoothed with a moving average filter (window=50) to remove grid artifacts
+   - Resampled at 0.1m uniform spacing for consistent pure pursuit behavior
+
+5. **Pure pursuit** -- The waypoint runner uses 0.5m lookahead along the smoothed path instead of driving at the next waypoint. Finds the closest path point, then walks 0.5m ahead to compute the steering target. Rotate-in-place if heading error >90°, otherwise drive with proportional angular correction. Speed: 0.8 m/s (office-safe).
+
+6. **Mid-path replanning** -- Every 10 steps, if the occupancy grid has changed (frontier rescan triggered), the current path is invalidated and A* replans from the current position. This handles newly discovered obstacles.
+
+7. **Frontier exploration** -- Frontiers are FREE cells adjacent to UNKNOWN cells on the 2D occupancy grid. Clustered via BFS, filtered by minimum size. Goal selector picks the nearest frontier centroid. Voronoi region bias (soft constraint) prioritizes frontiers in the robot's assigned zone.
+
+8. **Stuck recovery** -- If position unchanged for 30 steps (0.05m threshold), triggers reverse (25 steps at 1.0 m/s) followed by 135° random turn.
+
+### Object Detection
+
+Three detection layers run in parallel:
+
+1. **2D YOLO Detection** (`src/perception/detector.py`)
+   - YOLOv11-nano runs in a background thread on CPU at 0.5 FPS
+   - Filtered to 25 indoor-relevant COCO classes (chair, table, person, couch, etc.)
+   - Confidence threshold: 50% (higher than default to reduce false positives on synthetic MuJoCo renders)
+   - Minimum bbox size: 20×20 pixels
+   - Results displayed as interactive overlays on the RGB camera feed (hover for details)
+
+2. **3D Detection Projection** (`src/perception/detection_3d.py`)
+   - Each 2D bbox center is unprojected to a 3D ray using camera intrinsics
+   - Median depth within the bbox provides the distance
+   - Camera-frame point is Y/Z flipped and transformed to world frame via `cam_xmat`
+   - 3D wireframe bounding boxes rendered in Three.js scene, sized proportionally to the 2D bbox
+
+3. **VLM Scene Descriptions** (`src/perception/scene_describer.py`) -- *disabled by default*
+   - Moondream2 vision-language model generates one-sentence scene descriptions
+   - Runs every 15 seconds per robot in background thread
+   - Extracts keyword objects (chair, table, wall, etc.)
+   - Requires `transformers`, `torch`, and system `libvips`
+
 ### Key Design Decisions
 
 | Decision | Rationale |
