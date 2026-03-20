@@ -208,7 +208,7 @@ class ObjectDetector:
                     bbox=(x1, y1, x2, y2),
                 )
 
-                # Estimate 3D position from depth + pose
+                # Estimate 3D position using per-pixel ray from camera intrinsics
                 if depth is not None:
                     cx_px, cy_px = (x1 + x2) // 2, (y1 + y2) // 2
                     h_img, w_img = depth.shape
@@ -220,11 +220,23 @@ class ObjectDetector:
                     valid_roi = roi[(roi > 0.1) & (roi < 15.0)]
                     if len(valid_roi) > 0:
                         d = float(np.median(valid_roi))
-                        # Simple forward projection: robot position + depth along look direction
-                        # pose[:3, 3] is camera/robot position, pose[:3, :3] is rotation
-                        # The camera's -Z axis (look dir) in world = -pose[:3, 2]
-                        look_dir = -pose[:3, 2]  # camera looks along -Z
-                        det.center_3d = pose[:3, 3] + look_dir * d
+
+                        # Unproject bbox center to camera-frame ray using intrinsics
+                        # Same math as Open3D create_from_depth_image:
+                        # OpenCV convention: X=right, Y=down, Z=forward
+                        import math as _math
+                        fov_rad = _math.radians(70.0)
+                        f = h_img / (2.0 * _math.tan(fov_rad / 2.0))
+                        cam_x = (cx_px - w_img / 2.0) * d / f
+                        cam_y = (cy_px - h_img / 2.0) * d / f
+
+                        # Apply same Y/Z flip as SLAM cloud (config 1: Y- Z-)
+                        cam_pt = np.array([cam_x, -cam_y, -d])
+
+                        # Transform to world: cam_mat @ cam_pt + cam_pos
+                        # pose is cam_xmat (no transpose) + cam_xpos
+                        world_pt = pose[:3, :3] @ cam_pt + pose[:3, 3]
+                        det.center_3d = world_pt
 
                 detections.append(det)
 
