@@ -65,6 +65,18 @@ class SLAMPipeline:
         )
         cloud = cloud.voxel_down_sample(self._voxel_size)
 
+        # Depth filtering: remove noise from depth sensor
+        if len(cloud.points) > 50:
+            # Statistical outlier removal: remove points far from their neighbors
+            cloud, _ = cloud.remove_statistical_outlier(
+                nb_neighbors=20, std_ratio=2.0,
+            )
+            # Radius outlier removal: remove isolated points
+            if len(cloud.points) > 50:
+                cloud, _ = cloud.remove_radius_outlier(
+                    nb_points=6, radius=self._voxel_size * 5,
+                )
+
         # ICP for drift metrics (optional — does not affect pose output)
         if self._prev_cloud is not None and len(cloud.points) > 100:
             result = o3d.pipelines.registration.registration_icp(
