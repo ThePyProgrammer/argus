@@ -63,15 +63,17 @@ export class CameraFrustumManager {
     const farH = farDist * Math.tan(fovRad / 2);
     const farW = farH * aspect;
 
-    // Build rotation matrix from flat 9-element array
-    // rotation is row-major: [r00, r01, r02, r10, r11, r12, r20, r21, r22]
-    // Camera axes in world frame (rows of cam_xmat)
-    const camX = new THREE.Vector3(rotation[0], rotation[1], rotation[2]);
-    const camY = new THREE.Vector3(rotation[3], rotation[4], rotation[5]);
-    const camZ = new THREE.Vector3(rotation[6], rotation[7], rotation[8]);
-    // Camera looks along -Z in its own frame, but the SLAM cloud forms
-    // in the opposite direction due to the Y/Z flip + cam_mat.T transform.
-    // Show the frustum pointing toward the SLAM cloud (along +Z = body +X).
+    // Extract yaw-only rotation (ignore pitch/roll from gait wobble)
+    // cam_xmat row 2 = camera Z axis in world. Its +Z direction is where
+    // the SLAM cloud forms.
+    const camZx = rotation[6];
+    const camZy = rotation[7];
+    const yaw = Math.atan2(camZy, camZx);
+
+    // Build level camera axes from yaw only
+    const camX = new THREE.Vector3(-Math.sin(yaw), Math.cos(yaw), 0);
+    const camY = new THREE.Vector3(0, 0, 1);
+    const camZ = new THREE.Vector3(Math.cos(yaw), Math.sin(yaw), 0);
     const lookDir = camZ.clone();
 
     // Frustum corners in camera frame, then transform to world
