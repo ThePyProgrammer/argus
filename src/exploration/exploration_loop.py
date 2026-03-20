@@ -385,8 +385,6 @@ class ExplorationLoop:
             # detect walls to the side. Rely on stuck recovery instead.
             linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)
             angular_vel = 0.0
-                if avoidance is not None:
-                    linear_vel, angular_vel = avoidance
 
         # ----------------------------------------------------------
         # f. Periodic logging
