@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 
+export interface Detection {
+  class: string;
+  confidence: number;
+  bbox: number[];
+  pos_3d: number[] | null;
+}
+
 export interface RobotInfo {
   id: string;
   colorIndex: number;
@@ -12,6 +19,9 @@ export interface RobotInfo {
   depthUrl: string | null;
   trajectory: number[][]; // list of [x,y,z]
   trajectoryAlphas: number[];
+  detections: Detection[];
+  sceneDescription: string | null;
+  sceneObjects: string[];
 }
 
 export interface RobotStoreState {
@@ -48,6 +58,8 @@ export interface RobotStoreState {
     alphas: number[],
   ) => void;
   setColorMode: (mode: 'robot_tint' | 'true_rgb') => void;
+  updateDetections: (robotId: string, detections: Detection[]) => void;
+  updateSceneDescription: (robotId: string, text: string, objects: string[]) => void;
 }
 
 export const useRobotStore = create<RobotStoreState>((set, get) => ({
@@ -75,6 +87,9 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         depthUrl: existing?.depthUrl ?? null,
         trajectory: existing?.trajectory ?? [],
         trajectoryAlphas: existing?.trajectoryAlphas ?? [],
+        detections: existing?.detections ?? [],
+        sceneDescription: existing?.sceneDescription ?? null,
+        sceneObjects: existing?.sceneObjects ?? [],
       });
     });
     set({ robots });
@@ -176,5 +191,27 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
 
   setColorMode: (mode: 'robot_tint' | 'true_rgb') => {
     set({ colorMode: mode });
+  },
+
+  updateDetections: (robotId, detections) => {
+    set((state) => {
+      const robots = new Map(state.robots);
+      const robot = robots.get(robotId);
+      if (robot) {
+        robots.set(robotId, { ...robot, detections });
+      }
+      return { robots };
+    });
+  },
+
+  updateSceneDescription: (robotId, text, objects) => {
+    set((state) => {
+      const robots = new Map(state.robots);
+      const robot = robots.get(robotId);
+      if (robot) {
+        robots.set(robotId, { ...robot, sceneDescription: text, sceneObjects: objects });
+      }
+      return { robots };
+    });
   },
 }));

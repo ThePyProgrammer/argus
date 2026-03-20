@@ -10,7 +10,10 @@ export interface WSMessage {
     | 'command'
     | 'trajectory'
     | 'cloud_configs'
-    | 'cloud_config_ack';
+    | 'cloud_config_ack'
+    | 'detections'
+    | 'scene_description'
+    | 'color_mode_ack';
   robot_id?: string;
   payload: unknown;
 }

@@ -113,6 +113,20 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
           }
           break;
         }
+        case 'detections': {
+          const payload = msg.payload as { detections: Array<{class: string; confidence: number; bbox: number[]; pos_3d: number[] | null}> };
+          if (msg.robot_id) {
+            store.updateDetections(msg.robot_id, payload.detections);
+          }
+          break;
+        }
+        case 'scene_description': {
+          const payload = msg.payload as { text: string; objects: string[] };
+          if (msg.robot_id) {
+            store.updateSceneDescription(msg.robot_id, payload.text, payload.objects);
+          }
+          break;
+        }
         case 'cloud_configs': {
           const payload = msg.payload as { configs: Record<string, string>; active: string };
           useControlStore.getState().setCloudConfigs(payload.configs, payload.active);

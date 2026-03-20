@@ -65,6 +65,39 @@ export default function RobotCard({ robot }: RobotCardProps) {
         <span>Coverage: {robot.coveragePct.toFixed(1)}%</span>
         <span>Voxels: {robot.voxelCount.toLocaleString()}</span>
       </div>
+      {/* Scene description from VLM */}
+      {robot.sceneDescription && (
+        <div style={{
+          marginTop: '6px', padding: '4px 6px', background: '#1a1a3a',
+          borderRadius: '4px', fontSize: '11px', color: '#9ca3af',
+          fontStyle: 'italic', lineHeight: '1.3',
+        }}>
+          🔍 {robot.sceneDescription}
+        </div>
+      )}
+
+      {/* YOLO detections */}
+      {robot.detections.length > 0 && (
+        <div style={{
+          marginTop: '4px', fontSize: '11px', color: '#aaa',
+          display: 'flex', flexWrap: 'wrap', gap: '3px',
+        }}>
+          {robot.detections.slice(0, 8).map((det, i) => (
+            <span key={i} style={{
+              padding: '1px 5px', background: '#2a2a4a', borderRadius: '3px',
+              fontSize: '10px',
+            }}>
+              {det.class} {(det.confidence * 100).toFixed(0)}%
+            </span>
+          ))}
+          {robot.detections.length > 8 && (
+            <span style={{ fontSize: '10px', color: '#666' }}>
+              +{robot.detections.length - 8} more
+            </span>
+          )}
+        </div>
+      )}
+
       <button
         onClick={(e) => {
           e.stopPropagation();
