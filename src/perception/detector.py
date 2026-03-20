@@ -177,16 +177,39 @@ class ObjectDetector:
                     bbox=(x1, y1, x2, y2),
                 )
 
-                # Estimate 3D position from depth at bbox center
+                # Estimate 3D position using same transform as SLAM cloud
                 if depth is not None:
-                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                    cy = min(cy, depth.shape[0] - 1)
-                    cx = min(cx, depth.shape[1] - 1)
-                    d = float(depth[cy, cx])
-                    if 0.1 < d < 10.0:
-                        # Rough 3D position: use pose translation + depth along forward
-                        fwd = pose[:3, 0]  # body forward
-                        det.center_3d = pose[:3, 3] + fwd * d
+                    cx_px, cy_px = (x1 + x2) // 2, (y1 + y2) // 2
+                    cy_px = min(cy_px, depth.shape[0] - 1)
+                    cx_px = min(cx_px, depth.shape[1] - 1)
+
+                    # Median depth in bbox for robustness
+                    roi = depth[max(0,y1):min(depth.shape[0],y2), max(0,x1):min(depth.shape[1],x2)]
+                    valid = roi[(roi > 0.1) & (roi < 10.0)]
+                    if len(valid) > 0:
+                        d = float(np.median(valid))
+
+                        # Unproject using same method as depth_to_cloud:
+                        # OpenCV pinhole: cam_x, cam_y from pixel + depth
+                        h_img, w_img = depth.shape
+                        from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config
+                        import math
+                        fov_rad = math.radians(70.0)
+                        f = h_img / (2.0 * math.tan(fov_rad / 2.0))
+                        cam_x = (cx_px - w_img / 2.0) * d / f
+                        cam_y = (cy_px - h_img / 2.0) * d / f
+
+                        # Apply same Y/Z flip as active cloud config
+                        cfg = CLOUD_CONFIGS[get_active_config()]
+                        cam_pt = np.array([
+                            cfg["fy"] * cam_x,
+                            cfg["fy"] * cam_y,
+                            cfg["fz"] * d,
+                        ])
+
+                        # Transform to world using pose (same as SLAM)
+                        world_pt = pose[:3, :3] @ cam_pt + pose[:3, 3]
+                        det.center_3d = world_pt
 
                 detections.append(det)
 
