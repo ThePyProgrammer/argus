@@ -133,30 +133,20 @@ def build_two_robot_scene(
     ET.SubElement(wb, "geom", name="floor", size="100 100 0.05", type="plane",
                   material="groundplane")
 
-    # Create robot_a body
-    body_a = copy.deepcopy(robot_body)
-    _prefix_element(body_a, "robot_a_")
-    # Set spawn position
-    sx, sy, sz = spawn_positions.get("robot_a", (0.0, 0.0, 0.3))
-    body_a.attrib["pos"] = f"{sx} {sy} {sz}"
-    # Add per-robot camera as child of base body
-    # Camera: looks forward (+X in body frame), Y-right = -Y body, Y-up = +Z body
-    ET.SubElement(body_a, "camera", name="robot_a_cam",
-                  pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
-    wb.append(body_a)
+    # Create N robot bodies from spawn_positions
+    for robot_id, (sx, sy, sz) in spawn_positions.items():
+        prefix = f"{robot_id}_"
+        body = copy.deepcopy(robot_body)
+        _prefix_element(body, prefix)
+        body.attrib["pos"] = f"{sx} {sy} {sz}"
+        ET.SubElement(body, "camera", name=f"{robot_id}_cam",
+                      pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
+        wb.append(body)
 
-    # Create robot_b body
-    body_b = copy.deepcopy(robot_body)
-    _prefix_element(body_b, "robot_b_")
-    sx, sy, sz = spawn_positions.get("robot_b", (10.0, 0.0, 0.3))
-    body_b.attrib["pos"] = f"{sx} {sy} {sz}"
-    ET.SubElement(body_b, "camera", name="robot_b_cam",
-                  pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
-    wb.append(body_b)
-
-    # Actuators: duplicate with prefixes (do NOT prefix class on actuators)
+    # Actuators: duplicate with prefixes for each robot
     act_section = ET.SubElement(scene, "actuator")
-    for prefix in ("robot_a_", "robot_b_"):
+    for robot_id in spawn_positions:
+        prefix = f"{robot_id}_"
         for motor in actuator_elem:
             new_motor = copy.deepcopy(motor)
             for attr in ("name", "joint", "tendon", "site"):
@@ -273,7 +263,8 @@ def build_two_robot_office_scene(
     act_section = scene_root.find("actuator")
     if act_section is None:
         act_section = ET.SubElement(scene_root, "actuator")
-    for prefix in ("robot_a_", "robot_b_"):
+    for robot_id in spawn_positions:
+        prefix = f"{robot_id}_"
         for motor in go2_actuator:
             new_motor = copy.deepcopy(motor)
             for attr in ("name", "joint", "tendon", "site"):

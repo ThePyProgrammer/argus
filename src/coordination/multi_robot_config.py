@@ -23,7 +23,7 @@ class MultiRobotConfig:
         scene: Scene type: "flat" for checkerboard floor, "office" for DimOS office.
     """
 
-    robot_ids: tuple[str, str] = ("robot_a", "robot_b")
+    robot_ids: tuple[str, ...] = ("robot_a", "robot_b")
     spawn_positions: dict[str, tuple[float, float, float]] = field(
         default_factory=lambda: {
             "robot_a": (0.0, 0.0, 0.3),

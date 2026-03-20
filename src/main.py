@@ -108,6 +108,12 @@ def parse_args():
         action="store_true",
         help="Keep robots stationary (SLAM still runs, robots don't walk)",
     )
+    parser.add_argument(
+        "--num-robots",
+        type=int,
+        default=2,
+        help="Number of robots (default: 2)",
+    )
     return parser.parse_args()
 
 
@@ -221,45 +227,19 @@ def run_multi_mode(args):
     from src.exploration.config import ExplorationConfig
     from src.viz.multi_robot_viz import MultiRobotVisualizer
 
+    from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
+
     scene = getattr(args, 'scene', 'office')
-    config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
-    if scene == "flat":
-        config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
-    else:
-        import random
-        # Known valid spawn positions inside the office rooms.
-        # Discovered by testing in MuJoCo -- these are open floor areas
-        # away from walls and furniture.
-        OFFICE_SPAWNS = [
-            (-1.0, 1.0),    # DimOS default -- main room center
-            (-2.5, 0.0),    # main room left
-            (0.5, 1.5),     # main room right
-            (-1.0, -1.0),   # main room back
-            (1.0, 0.0),     # near doorway
-            (-3.0, 1.5),    # far left corner
-            (-0.5, 2.5),    # near window
-            (1.5, 2.0),     # right side
-            (-2.0, 2.0),    # left open area
-            (0.0, 0.0),     # center
-            (-1.5, -0.5),   # back left
-            (0.5, -0.5),    # back right
-        ]
-        # Pick two positions that are far apart
-        random.shuffle(OFFICE_SPAWNS)
-        pos_a = OFFICE_SPAWNS[0]
-        # Find the farthest position from pos_a
-        best_b = OFFICE_SPAWNS[1]
-        best_dist = 0.0
-        for pos in OFFICE_SPAWNS[1:]:
-            d = (pos[0] - pos_a[0])**2 + (pos[1] - pos_a[1])**2
-            if d > best_dist:
-                best_dist = d
-                best_b = pos
-        config_kwargs["spawn_positions"] = {
-            "robot_a": (pos_a[0], pos_a[1], 0.3),
-            "robot_b": (best_b[0], best_b[1], 0.3),
-        }
-    config = MultiRobotConfig(**config_kwargs)
+    n_robots = getattr(args, 'num_robots', 2)
+    robot_ids = generate_robot_ids(n_robots)
+    spawn_positions = generate_spawn_positions(robot_ids, scene)
+
+    config = MultiRobotConfig(
+        robot_ids=robot_ids,
+        spawn_positions=spawn_positions,
+        boot_phase_steps=args.multi_boot_steps,
+        scene=scene,
+    )
     bridge = MultiRobotBridge(config)
 
     # Camera intrinsics (same as single-robot mode)
@@ -352,43 +332,18 @@ def run_web_mode(args):
     from src.exploration.config import ExplorationConfig
     pass  # web server module imported below via configure_app
 
+    from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
+
     scene = getattr(args, "scene", "office")
-    config_kwargs = {"boot_phase_steps": args.multi_boot_steps, "scene": scene}
-    if scene == "flat":
-        config_kwargs["spawn_positions"] = {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)}
-    else:
-        import random
-        # Known valid spawn positions inside the office rooms.
-        # Discovered by testing in MuJoCo -- these are open floor areas
-        # away from walls and furniture.
-        OFFICE_SPAWNS = [
-            (-1.0, 1.0),    # DimOS default -- main room center
-            (-2.5, 0.0),    # main room left
-            (0.5, 1.5),     # main room right
-            (-1.0, -1.0),   # main room back
-            (1.0, 0.0),     # near doorway
-            (-3.0, 1.5),    # far left corner
-            (-0.5, 2.5),    # near window
-            (1.5, 2.0),     # right side
-            (-2.0, 2.0),    # left open area
-            (0.0, 0.0),     # center
-            (-1.5, -0.5),   # back left
-            (0.5, -0.5),    # back right
-        ]
-        # Pick two positions that are far apart
-        random.shuffle(OFFICE_SPAWNS)
-        pos_a = OFFICE_SPAWNS[0]
-        # Find the farthest position from pos_a
-        best_b = OFFICE_SPAWNS[1]
-        best_dist = 0.0
-        for pos in OFFICE_SPAWNS[1:]:
-            d = (pos[0] - pos_a[0])**2 + (pos[1] - pos_a[1])**2
-            if d > best_dist:
-                best_dist = d
-                best_b = pos
-        config_kwargs["spawn_positions"] = {
-            "robot_a": (pos_a[0], pos_a[1], 0.3),
-            "robot_b": (best_b[0], best_b[1], 0.3),
+    n_robots = getattr(args, 'num_robots', 2)
+    robot_ids = generate_robot_ids(n_robots)
+    spawn_positions = generate_spawn_positions(robot_ids, scene)
+
+    config_kwargs = {
+        "robot_ids": robot_ids,
+        "spawn_positions": spawn_positions,
+        "boot_phase_steps": args.multi_boot_steps,
+        "scene": scene,
         }
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
@@ -500,20 +455,7 @@ def run_web_mode(args):
                     if rid in config.robot_ids
                 }
             elif config.scene != "flat":
-                # Pick from known valid office positions
-                import random
-                OFFICE_SPAWNS = [
-                    (-1.0, 1.0), (-2.5, 0.0), (0.5, 1.5), (-1.0, -1.0),
-                    (1.0, 0.0), (-3.0, 1.5), (-0.5, 2.5), (1.5, 2.0),
-                    (-2.0, 2.0), (0.0, 0.0), (-1.5, -0.5), (0.5, -0.5),
-                ]
-                random.shuffle(OFFICE_SPAWNS)
-                pos_a = OFFICE_SPAWNS[0]
-                best_b = max(OFFICE_SPAWNS[1:], key=lambda p: (p[0]-pos_a[0])**2 + (p[1]-pos_a[1])**2)
-                config.spawn_positions = {
-                    "robot_a": (pos_a[0], pos_a[1], 0.3),
-                    "robot_b": (best_b[0], best_b[1], 0.3),
-                }
+                config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
             print(f"Spawn positions: {config.spawn_positions}")
 
             # Recreate bridge + robots

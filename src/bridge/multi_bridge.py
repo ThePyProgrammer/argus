@@ -478,6 +478,6 @@ class MultiRobotBridge:
         return self._step_count
 
     @property
-    def robot_ids(self) -> tuple[str, str]:
+    def robot_ids(self) -> tuple[str, ...]:
         """The two robot IDs."""
         return self._config.robot_ids

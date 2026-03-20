@@ -482,14 +482,24 @@ class Coordinator:
         pre-transformed voxels from subscriptions. Falls back to direct
         OctoMapBuilder access if no pLCM data received yet (e.g., first merge).
         """
-        if len(self._latest_map_data) == len(robot_ids):
-            # Use pLCM-received data (voxels already in world frame)
-            voxels_a = self._latest_map_data[robot_ids[0]].occupied_voxels
-            voxels_b = self._latest_map_data[robot_ids[1]].occupied_voxels
-            self._merger.merge_from_voxels(voxels_a, voxels_b)
-        else:
-            # Fallback: direct access (e.g., final merge or before first publish)
-            octo_a = self._robots[robot_ids[0]].octomap
-            octo_b = self._robots[robot_ids[1]].octomap
-            self._merger.merge(octo_a, octo_b, robot_ids[0], robot_ids[1])
+        # Collect all robot voxels and merge N-way
+        all_voxels = []
+        for rid in robot_ids:
+            if rid in self._latest_map_data:
+                v = self._latest_map_data[rid].occupied_voxels
+                if len(v) > 0:
+                    all_voxels.append(v)
+            else:
+                robot = self._robots.get(rid)
+                if robot:
+                    v = robot.octomap.get_occupied_voxels()
+                    if len(v) > 0:
+                        all_voxels.append(v)
+
+        if len(all_voxels) >= 2:
+            import numpy as np
+            combined = np.vstack(all_voxels)
+            self._merger.merge_from_voxels(all_voxels[0], combined[len(all_voxels[0]):])
+        elif len(all_voxels) == 1:
+            self._merger._last_merged_voxels = all_voxels[0]
         self._merge_count += 1
