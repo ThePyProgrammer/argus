@@ -90,6 +90,8 @@ class Coordinator:
         self._should_stop: bool = False
         self._paused: bool = False
         self._static: bool = False  # set True to keep robots stationary
+        self._restart_requested: bool = False
+        self._restart_positions: dict[str, tuple[float, float, float]] | None = None
 
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}
@@ -122,6 +124,17 @@ class Coordinator:
             if value > 0:
                 self._config.step_delay = 1.0 / value
                 logger.info("Command received: set_speed %.1f (delay=%.3fs)", value, self._config.step_delay)
+        elif action == "restart":
+            positions = command.get("positions")
+            if positions and isinstance(positions, dict):
+                self._restart_positions = {
+                    rid: tuple(pos) for rid, pos in positions.items()
+                }
+            else:
+                self._restart_positions = None  # use current/default positions
+            self._restart_requested = True
+            self._should_stop = True
+            logger.info("Command received: restart with positions=%s", self._restart_positions)
 
     def _get_voronoi_geometry(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         """Extract Voronoi midpoint and direction for visualization."""

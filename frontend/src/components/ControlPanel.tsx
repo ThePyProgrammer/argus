@@ -5,6 +5,9 @@ import { useRobotStore } from '../stores/robotStore';
 export default function ControlPanel() {
   const [showCloudConfig, setShowCloudConfig] = useState(false);
   const [showCloudOffset, setShowCloudOffset] = useState(false);
+  const [showRestart, setShowRestart] = useState(false);
+  const [spawnA, setSpawnA] = useState({ x: -2.0, y: 3.0 });
+  const [spawnB, setSpawnB] = useState({ x: 5.0, y: -7.0 });
   const isRunning = useControlStore((s) => s.isRunning);
   const isPaused = useControlStore((s) => s.isPaused);
   const simSpeed = useControlStore((s) => s.simSpeed);
@@ -133,6 +136,76 @@ export default function ControlPanel() {
         >
           {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
         </button>
+      </div>
+
+      <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
+        <div
+          onClick={() => setShowRestart(!showRestart)}
+          style={{
+            fontSize: '12px', fontWeight: 600, color: '#888', cursor: 'pointer',
+            userSelect: 'none', display: 'flex', justifyContent: 'space-between',
+          }}
+        >
+          <span>RESTART SIM</span>
+          <span style={{ fontSize: '10px' }}>{showRestart ? '▼' : '▶'}</span>
+        </div>
+        {showRestart && (
+          <div style={{ marginTop: '6px' }}>
+            {[
+              { label: 'Robot A', pos: spawnA, setPos: setSpawnA, color: '#4285f4' },
+              { label: 'Robot B', pos: spawnB, setPos: setSpawnB, color: '#ff9800' },
+            ].map(({ label, pos, setPos, color }) => (
+              <div key={label} style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color, marginBottom: '2px' }}>
+                  {label}
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {(['x', 'y'] as const).map((axis) => (
+                    <div key={axis} style={{ flex: 1 }}>
+                      <div style={{ fontSize: '10px', color: '#777' }}>{axis.toUpperCase()}</div>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={pos[axis]}
+                        onChange={(e) => setPos({ ...pos, [axis]: parseFloat(e.target.value) || 0 })}
+                        style={{
+                          width: '100%', padding: '3px 5px', fontSize: '11px',
+                          background: '#1a1a2e', color: '#e0e0e0', border: '1px solid #444',
+                          borderRadius: '3px',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                sendRaw?.({
+                  type: 'command',
+                  payload: {
+                    action: 'restart',
+                    positions: {
+                      robot_a: [spawnA.x, spawnA.y, 0.3],
+                      robot_b: [spawnB.x, spawnB.y, 0.3],
+                    },
+                  },
+                });
+                // Clear local state
+                useRobotStore.getState().setCloudFull([], []);
+              }}
+              style={{
+                ...buttonStyle,
+                width: '100%',
+                background: '#b71c1c',
+                color: '#fff',
+                border: 'none',
+              }}
+            >
+              Restart Simulation
+            </button>
+          </div>
+        )}
       </div>
 
       {Object.keys(cloudConfigs).length > 0 && (

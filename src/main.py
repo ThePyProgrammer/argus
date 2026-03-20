@@ -407,16 +407,72 @@ def run_web_mode(args):
 
     max_steps = args.multi_max_steps
 
-    # Start simulation in background thread
-    def _run_simulation():
-        try:
-            result = coordinator.run(max_steps=max_steps)
-            print(f"\nSimulation complete: {result['terminated_reason']}, "
-                  f"{result['total_steps']} steps, {result['merge_count']} merges")
-        except Exception as e:
-            print(f"\nSimulation error: {e}")
+    # Start simulation in background thread with restart support
+    def _run_simulation_loop():
+        nonlocal bridge, robots, coordinator, streaming_viz
+        import open3d as o3d
 
-    sim_thread = threading.Thread(target=_run_simulation, daemon=True)
+        while True:
+            try:
+                result = coordinator.run(max_steps=max_steps)
+                print(f"\nSimulation complete: {result['terminated_reason']}, "
+                      f"{result['total_steps']} steps, {result['merge_count']} merges")
+            except Exception as e:
+                print(f"\nSimulation error: {e}")
+
+            # Check if restart was requested
+            if not coordinator._restart_requested:
+                break
+
+            print("\n=== RESTARTING SIMULATION ===")
+            coordinator._restart_requested = False
+            new_positions = coordinator._restart_positions
+
+            # Stop old bridge
+            try:
+                bridge.stop()
+            except Exception:
+                pass
+
+            # Update config with new positions if provided
+            if new_positions:
+                config.spawn_positions = {
+                    rid: (float(p[0]), float(p[1]), float(p[2]))
+                    for rid, p in new_positions.items()
+                    if rid in config.robot_ids
+                }
+                print(f"New spawn positions: {config.spawn_positions}")
+
+            # Recreate bridge + robots
+            bridge = MultiRobotBridge(config)
+            robots = {}
+            for rid in config.robot_ids:
+                robots[rid] = RobotInstance.create(
+                    robot_id=rid,
+                    bridge=bridge,
+                    intrinsics=intrinsics,
+                    config=explore_config,
+                    spawn_position=config.spawn_positions[rid],
+                )
+
+            # Reset coordinator state
+            coordinator._bridge = bridge
+            coordinator._robots = robots
+            coordinator._should_stop = False
+            coordinator._paused = False
+            coordinator._partitioned = False
+            coordinator._step_count = 0
+            coordinator._merge_count = 0
+            coordinator._body_trajectories = {}
+            coordinator._restart_positions = None
+
+            # Reset streaming viz cloud tracking
+            if streaming_viz is not None:
+                streaming_viz._last_voxel_set = set()
+
+            print("Simulation restarted.\n")
+
+    sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)
     sim_thread.start()
 
     print(f"\nC2 Interface running at http://localhost:8000")
