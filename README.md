@@ -8,13 +8,16 @@ Two simulated Unitree Go2 quadrupeds autonomously explore a MuJoCo office enviro
 
 ### Prerequisites
 
-- [Nix](https://nixos.org/download.html) (provides Python 3.12, system deps)
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Node.js 18+ (for the frontend)
 - Git LFS (for DimOS scene data)
 
 ```bash
-# Enter the Nix dev shell
-nix develop
+# Install Python 3.12 and create venv
+uv python install 3.12
+uv venv --python 3.12
+uv pip install -e .
+uv pip install -e ./dimos
 
 # Pull MuJoCo scene data from LFS
 cd dimos && git lfs pull --include "data/.lfs/mujoco_sim.tar.gz" && cd ..
@@ -26,7 +29,6 @@ cd dimos/data && tar xzf .lfs/mujoco_sim.tar.gz && cd ../..
 cd frontend && npm install && cd ..
 
 # Convert scene to GLB for the web viewer (one-time)
-pip install trimesh
 python scripts/convert_scene_glb.py
 ```
 
@@ -47,17 +49,21 @@ sudo pacman -S libvips  # Arch/CachyOS
 
 ```bash
 # Start everything -- backend + simulation + frontend at http://localhost:8000
-python src/main.py --scene office
+uv run c2 --scene office
+
+# Or equivalently:
+uv run src/main.py --scene office
 
 # Runs indefinitely. Ctrl+C to stop.
 # MuJoCo viewer opens automatically for ground-truth comparison.
+# Open http://localhost:8000 for the C2 dashboard.
 ```
 
 For frontend development with hot reload:
 
 ```bash
 # Terminal 1: Backend
-python src/main.py --scene office
+uv run c2 --scene office
 
 # Terminal 2: Frontend dev server (proxies /ws to :8000)
 cd frontend && npm run dev
@@ -67,13 +73,13 @@ cd frontend && npm run dev
 #### Desktop Visualization (Rerun + MuJoCo viewer)
 
 ```bash
-python src/main.py --control multi --scene office
+uv run src/main.py --control multi --scene office
 ```
 
 #### Single Robot Exploration
 
 ```bash
-python src/main.py --control explore --max-steps 500
+uv run src/main.py --control explore --max-steps 500
 ```
 
 ### CLI Flags
@@ -253,7 +259,7 @@ npx tsc --noEmit   # Type check
 ### Tests
 
 ```bash
-python -m pytest tests/ -x --timeout=30
+uv run python -m pytest tests/ -x --timeout=30
 ```
 
 ### Regenerating Scene GLB
