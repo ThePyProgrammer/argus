@@ -129,7 +129,8 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   // so no CSS rotation needed.
   const imgStyle: React.CSSProperties = {
     width: '100%',
-    height: 'auto',
+    height: '100%',
+    objectFit: 'contain',
     display: 'block',
   };
 
@@ -145,6 +146,8 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   return (
     <div
       style={{
+        width: '640px',
+        height: '480px',
         flexShrink: 0,
         background: '#0a0a1a',
         borderRadius: '4px',
