@@ -144,7 +144,11 @@ class Coordinator:
         elif action == "set_speed":
             value = command.get("value", 1.0)
             if value > 0:
-                self._config.step_delay = 1.0 / value
+                # Speed 1.0 = no delay, higher = faster (no delay), lower = add delay
+                if value >= 1.0:
+                    self._config.step_delay = 0.0
+                else:
+                    self._config.step_delay = (1.0 / value) * 0.01  # small delay for slow-mo
                 logger.info("Command received: set_speed %.1f (delay=%.3fs)", value, self._config.step_delay)
         elif action == "send_to":
             robot_id = command.get("robot_id")
