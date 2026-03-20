@@ -36,6 +36,8 @@ class SLAMPipeline:
         self._slam_poses: list[np.ndarray] = []
         self._prev_cloud: o3d.geometry.PointCloud | None = None
         self._current_pose: np.ndarray = np.eye(4)  # cumulative pose
+        self._last_frame_cloud: np.ndarray = np.empty((0, 3))
+        self._last_frame_colors: np.ndarray = np.empty((0, 3))
 
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         """Process one RGB-D frame. Returns estimated (4,4) pose.
@@ -77,10 +79,15 @@ class SLAMPipeline:
 
         # Transform cloud to world frame using ground-truth pose
         cloud.transform(gt_pose)
+
+        # Store per-frame cloud for direct OctoMap insertion
+        self._last_frame_cloud = np.asarray(cloud.points).copy()
+        self._last_frame_colors = np.asarray(cloud.colors).copy() if cloud.has_colors() else np.empty((0, 3))
+
         self._global_cloud += cloud
 
-        # Downsample accumulated cloud periodically (every 10 frames)
-        if len(self._slam_poses) % 10 == 0:
+        # Downsample accumulated cloud less aggressively (every 30 frames)
+        if len(self._slam_poses) % 30 == 0:
             self._global_cloud = self._global_cloud.voxel_down_sample(
                 self._voxel_size
             )

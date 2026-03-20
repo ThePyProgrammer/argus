@@ -218,10 +218,10 @@ class ExplorationLoop:
         pose = self._slam.process_frame(frame)
         current_pos = pose[:3, 3].copy()
 
-        # Insert current frame's cloud into OctoMap
-        cloud_points = self._slam.get_cloud_points()
-        if len(cloud_points) > 0:
-            self._octomap.insert_scan(cloud_points[-5000:], current_pos)
+        # Insert this frame's cloud directly into OctoMap (not the global accumulator)
+        frame_cloud = self._slam._last_frame_cloud
+        if len(frame_cloud) > 0:
+            self._octomap.insert_scan(frame_cloud, current_pos)
 
         self._robot_positions.append(current_pos)
 
