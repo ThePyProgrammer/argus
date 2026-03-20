@@ -5,6 +5,7 @@ import { PointCloudManager } from './PointCloud';
 import { RobotMarkerManager } from './RobotMarker';
 import { TrajectoryTrailManager } from './TrajectoryTrail';
 import { DetectionBoxManager } from './DetectionBoxes';
+import { CameraFrustumManager } from './CameraFrustum';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSceneLoader } from '../hooks/useSceneLoader';
@@ -82,6 +83,7 @@ export default function SceneViewer() {
     const robotMarkerManager = new RobotMarkerManager(worldRoot);
     const trailManager = new TrajectoryTrailManager(worldRoot);
     const detectionBoxManager = new DetectionBoxManager(worldRoot);
+    const cameraFrustumManager = new CameraFrustumManager(worldRoot);
 
     // --- Cloud offset subscription ---
     const unsubControl = useControlStore.subscribe((state, prev) => {
@@ -117,6 +119,14 @@ export default function SceneViewer() {
             robot.trajectoryAlphas,
             robot.colorIndex,
           );
+        }
+        // Camera frustum visualization
+        if (!prev || prev.position !== robot.position || prev.rotation !== robot.rotation) {
+          if (robot.rotation.length === 9) {
+            cameraFrustumManager.updateFrustum(
+              id, robot.position, robot.rotation, robot.colorIndex,
+            );
+          }
         }
         // 3D detection bounding boxes
         if (!prev || prev.detections !== robot.detections) {
@@ -218,6 +228,7 @@ export default function SceneViewer() {
       robotMarkerManager.dispose();
       trailManager.dispose();
       detectionBoxManager.dispose();
+      cameraFrustumManager.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
