@@ -78,10 +78,10 @@ class StuckRecovery:
 
     def __init__(
         self,
-        turn_angle: float = np.pi / 2,
-        angular_speed: float = 1.0,
-        reverse_speed: float = 0.5,
-        reverse_steps: int = 15,
+        turn_angle: float = np.pi * 0.75,  # 135 degrees -- bigger turn to escape corners
+        angular_speed: float = 1.5,
+        reverse_speed: float = 1.0,  # faster reverse
+        reverse_steps: int = 25,     # longer reverse to clear obstacles
     ) -> None:
         self._turn_angle = turn_angle
         self._angular_speed = angular_speed
