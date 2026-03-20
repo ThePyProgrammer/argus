@@ -32,7 +32,7 @@ class ExplorationConfig:
     stuck_distance_m: float = 0.05        # minimum movement over threshold steps
 
     # Frontier detection
-    voxel_resolution: float = 0.1         # must match OctoMapBuilder
+    voxel_resolution: float = 0.05        # must match OctoMapBuilder
     min_cluster_size: int = 5
     goal_strategy: str = "nearest"        # "nearest" or "largest"
 

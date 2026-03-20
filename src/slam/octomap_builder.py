@@ -21,7 +21,7 @@ class OctoMapBuilder:
     Resolution controls the voxel edge length in meters.
     """
 
-    def __init__(self, resolution: float = 0.1):
+    def __init__(self, resolution: float = 0.05):
         self._resolution = resolution
         self._accumulated_cloud = o3d.geometry.PointCloud()
 
@@ -53,15 +53,10 @@ class OctoMapBuilder:
         if not voxels:
             return np.empty((0, 3))
 
-        # Convert voxel indices to world coordinates (voxel center)
-        centers = []
-        origin = voxel_grid.origin
-        for voxel in voxels:
-            idx = np.array(voxel.grid_index, dtype=np.float64)
-            center = origin + (idx + 0.5) * self._resolution
-            centers.append(center)
-
-        return np.array(centers)
+        # Vectorized: convert voxel indices to world coordinates
+        origin = np.asarray(voxel_grid.origin)
+        indices = np.array([v.grid_index for v in voxels], dtype=np.float64)
+        return origin + (indices + 0.5) * self._resolution
 
     @property
     def resolution(self) -> float:

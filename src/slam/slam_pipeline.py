@@ -29,7 +29,7 @@ class SLAMPipeline:
         voxel_size: Voxel size for downsampling (meters). Smaller = denser.
     """
 
-    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.05):
+    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.03):
         self._intrinsics = intrinsics
         self._voxel_size = voxel_size
         self._global_cloud = o3d.geometry.PointCloud()
