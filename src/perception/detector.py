@@ -56,12 +56,23 @@ class ObjectDetector:
         detector.stop()
     """
 
+    # COCO classes relevant to indoor/office scenes
+    INDOOR_CLASSES = {
+        56: "chair", 57: "couch", 58: "potted plant", 59: "bed",
+        60: "dining table", 61: "toilet", 62: "tv", 63: "laptop",
+        64: "mouse", 65: "remote", 66: "keyboard", 67: "cell phone",
+        72: "refrigerator", 73: "book", 74: "clock", 75: "vase",
+        0: "person", 24: "backpack", 25: "umbrella", 26: "handbag",
+        39: "bottle", 41: "cup", 42: "fork", 43: "knife",
+        44: "spoon", 45: "bowl",
+    }
+
     def __init__(
         self,
         model_name: str = "yolo11n.pt",
-        confidence: float = 0.3,
+        confidence: float = 0.5,  # higher threshold for synthetic images
         device: str = "cpu",
-        max_fps: float = 2.0,  # limit detection rate on CPU
+        max_fps: float = 2.0,
     ):
         self._model_name = model_name
         self._confidence = confidence
@@ -170,9 +181,18 @@ class ObjectDetector:
                 continue
             for box in result.boxes:
                 cls_id = int(box.cls[0])
-                cls_name = result.names.get(cls_id, f"class_{cls_id}")
                 conf = float(box.conf[0])
+
+                # Filter: only keep indoor-relevant classes
+                if cls_id not in self.INDOOR_CLASSES:
+                    continue
+
+                cls_name = self.INDOOR_CLASSES[cls_id]
                 x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+
+                # Filter: skip tiny detections (likely noise)
+                if (x2 - x1) < 20 or (y2 - y1) < 20:
+                    continue
 
                 det = Detection(
                     class_id=cls_id,
