@@ -250,10 +250,10 @@ def build_two_robot_office_scene(
     # Inject robots into worldbody
     worldbody = scene_root.find("worldbody")
 
-    for robot_id, prefix in [("robot_a", "robot_a_"), ("robot_b", "robot_b_")]:
+    for robot_id, (sx, sy, sz) in spawn_positions.items():
+        prefix = f"{robot_id}_"
         body = copy.deepcopy(robot_body)
         _prefix_element(body, prefix)
-        sx, sy, sz = spawn_positions.get(robot_id, (0.0, 0.0, 0.3))
         body.attrib["pos"] = f"{sx} {sy} {sz}"
         ET.SubElement(body, "camera", name=f"{robot_id}_cam",
                       pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
