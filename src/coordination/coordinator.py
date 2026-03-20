@@ -360,7 +360,10 @@ class Coordinator:
 
                     # Submit frame for YOLO detection and VLM description (background threads)
                     if self._detector is not None:
-                        self._detector.submit_frame(rid, frames[rid].rgb, frames[rid].depth, pose)
+                        self._detector.submit_frame(
+                            rid, frames[rid].rgb, frames[rid].depth, pose,
+                            slam_cloud=robot.slam._last_frame_cloud if hasattr(robot.slam, '_last_frame_cloud') else None,
+                        )
                     if self._describer is not None:
                         self._describer.submit_frame(rid, frames[rid].rgb)
 
