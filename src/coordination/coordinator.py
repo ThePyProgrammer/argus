@@ -91,22 +91,15 @@ class Coordinator:
         try:
             from src.perception.detector import ObjectDetector, YOLO_AVAILABLE
             if YOLO_AVAILABLE:
-                self._detector = ObjectDetector(device="cpu", max_fps=1.0)
+                self._detector = ObjectDetector(device="cpu", max_fps=0.5)
                 self._detector.start()
-                logger.info("YOLO object detector started (CPU, 1 FPS)")
+                logger.info("YOLO object detector started (CPU, 0.5 FPS)")
         except ImportError:
             pass
 
-        # Scene description (optional -- graceful if transformers not installed)
+        # Scene description disabled by default (heavy on CPU, requires libvips)
+        # Enable with: coordinator._describer = SceneDescriber(...)
         self._describer = None
-        try:
-            from src.perception.scene_describer import SceneDescriber, VLM_AVAILABLE
-            if VLM_AVAILABLE:
-                self._describer = SceneDescriber(device="cpu", interval_s=15.0)
-                self._describer.start()
-                logger.info("VLM scene describer started (CPU, every 15s)")
-        except ImportError:
-            pass
 
         # Web control flags (set via _command_handler from C2 interface)
         self._should_stop: bool = False
@@ -349,13 +342,14 @@ class Coordinator:
             if any_rescan_triggered:
                 self._do_merge(robot_ids)
 
-            # Visualization update (every 5 frames)
-            if step % 5 == 0 and self._viz is not None:
-                # Always merge for viz (ensures cloud updates after config switch)
-                try:
-                    self._do_merge(robot_ids)
-                except Exception:
-                    pass  # skip merge if OctoMaps are empty
+            # Visualization update (every 10 frames)
+            if step % 10 == 0 and self._viz is not None:
+                # Merge only if data changed (not every viz frame)
+                if any_rescan_triggered or self._merge_count == 0:
+                    try:
+                        self._do_merge(robot_ids)
+                    except Exception:
+                        pass
 
                 robot_data = {}
                 for rid in robot_ids:

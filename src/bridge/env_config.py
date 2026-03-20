@@ -21,7 +21,7 @@ class MuJoCoEnvConfig:
     """
 
     model_path: str = "models/unitree_go2/scene.xml"
-    resolution: tuple[int, int] = (640, 480)
+    resolution: tuple[int, int] = (320, 240)
     camera_name: int | str = "front_cam"  # named camera attached to robot base
     sim_steps_per_frame: int = 10  # 10 steps * 0.002s dt = 50Hz physics, 5Hz frames
     target_step_hz: float = 10.0

@@ -30,7 +30,7 @@ class MultiRobotConfig:
             "robot_b": (5.0, 0.0, 0.3),
         }
     )
-    resolution: tuple[int, int] = (640, 480)
+    resolution: tuple[int, int] = (320, 240)
     sim_steps_per_frame: int = 5  # fewer physics steps = faster frame rate
     model_dir: str = "models/unitree_go2"
     boot_phase_steps: int = 200
