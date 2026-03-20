@@ -61,38 +61,26 @@ class PathPlanner:
         self._inflation_grid_id: int | None = None
 
     def _get_inflation_cost(self, grid: OccupancyGrid2D) -> np.ndarray:
-        """Compute per-cell inflation cost based on proximity to obstacles.
+        """Voronoi-gradient costmap: paths stay centered in corridors.
 
-        Cells near OCCUPIED cells get extra traversal cost that decays with
-        distance. Cells within robot half-width are treated as impassable
-        (cost = inf). This ensures paths keep clearance from walls/furniture.
+        Two layers:
+        1. Binary inflation (robot half-width) -- hard impassable
+        2. Voronoi gradient -- soft repulsion toward corridor centers
 
         Returns:
-            (H, W) float array of extra cost per cell. 0.0 = no penalty.
+            (H, W) float array. 0 = free, >0 = cost, 1e6 = impassable.
         """
-        from scipy.ndimage import distance_transform_edt
-
         grid_id = id(grid.grid)
         if self._inflation_grid_id == grid_id and self._inflation_cache is not None:
             return self._inflation_cache
 
-        occupied_mask = grid.grid == CELL_OCCUPIED
-        # Distance from each cell to nearest occupied cell (in grid units)
-        dist = distance_transform_edt(~occupied_mask)
-
-        radius_cells = max(1, int(self._inflation_radius / grid.resolution))
-        # Hard lethal zone: within robot half-width (~20cm)
-        lethal_cells = max(1, int(0.20 / grid.resolution))
-
-        cost = np.zeros_like(dist, dtype=np.float32)
-        # Lethal zone: effectively impassable
-        cost[dist <= lethal_cells] = 1e6
-        # Inflation zone: exponential decay (stronger near obstacles)
-        inflation_mask = (dist > lethal_cells) & (dist <= radius_cells)
-        if np.any(inflation_mask):
-            # Exponential decay: high cost near obstacles, low far away
-            normalized = (radius_cells - dist[inflation_mask]) / (radius_cells - lethal_cells)
-            cost[inflation_mask] = 100.0 * np.exp(2.0 * normalized) / np.exp(2.0)
+        from src.exploration.costmap import build_costmap
+        cost = build_costmap(
+            grid.grid,
+            resolution=grid.resolution,
+            robot_half_width=0.15,
+            gradient_distance=self._inflation_radius,
+        )
 
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
@@ -224,15 +212,13 @@ class PathPlanner:
             xy = grid.grid_to_world(row, col)
             path_world.append(np.array([xy[0], xy[1], 0.0], dtype=np.float64))
 
-        # Simplify: keep every Nth waypoint (~1m apart)
-        step = max(1, int(1.0 / grid.resolution))
-        simplified: list[np.ndarray] = []
-        for i in range(0, len(path_world), step):
-            simplified.append(path_world[i])
+        # Smooth and resample (replaces old Nth-waypoint simplification)
+        from src.exploration.path_smoother import smooth_path
+        smoothed = smooth_path(path_world, resample_spacing=0.1, smoothing_window=50)
 
         # Always include the goal
-        if len(path_world) > 0 and (len(simplified) == 0 or
-                not np.array_equal(simplified[-1], path_world[-1])):
-            simplified.append(path_world[-1])
+        if len(path_world) > 0 and len(smoothed) > 0:
+            if not np.allclose(smoothed[-1], path_world[-1], atol=0.2):
+                smoothed.append(path_world[-1])
 
-        return simplified
+        return smoothed

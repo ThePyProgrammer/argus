@@ -73,16 +73,14 @@ class WaypointRunner:
         current_pose: np.ndarray,
         depth: np.ndarray | None = None,
     ) -> tuple[np.ndarray, float]:
-        """Compute velocity command to drive toward the current waypoint.
+        """Pure pursuit with lookahead on smoothed path.
 
-        When depth is provided, performs reactive obstacle avoidance:
-        if the center strip of the depth image shows an obstacle within
-        0.4m, the robot stops forward motion and steers away from the
-        closer side.
+        Instead of driving at the next waypoint, finds the point 0.5m
+        ahead on the path and steers toward that. Produces smooth curves.
 
         Args:
             current_pose: (4, 4) homogeneous transform of the robot.
-            depth: Optional (H, W) float32 depth image in meters. 0 = invalid.
+            depth: Optional depth image (currently unused -- camera faces sideways).
 
         Returns:
             Tuple of (linear_vel as np.ndarray([vx, vy]), angular_vel as float).
@@ -90,42 +88,43 @@ class WaypointRunner:
         if self.is_complete:
             return np.zeros(2), 0.0
 
-        # Reactive depth avoidance — check center strip for close obstacles
-        if depth is not None:
-            avoidance = self._check_depth_avoidance(depth)
-            if avoidance is not None:
-                return avoidance
-
-        # Extract current position and heading from pose
         position = current_pose[:3, 3]
+        lookahead_dist = 0.5  # meters ahead on path
+
+        # Find closest waypoint on path
+        min_dist = float('inf')
+        closest_idx = self._current_index
+        for i in range(self._current_index, len(self._waypoints)):
+            d = np.linalg.norm(self._waypoints[i][:2] - position[:2])
+            if d < min_dist:
+                min_dist = d
+                closest_idx = i
+
+        # Advance current index to closest (don't go backward)
+        self._current_index = max(self._current_index, closest_idx)
+
+        # Find lookahead point: walk along path from closest until 0.5m ahead
         target = self._waypoints[self._current_index]
+        cumulative = 0.0
+        for i in range(self._current_index, len(self._waypoints) - 1):
+            seg = np.linalg.norm(self._waypoints[i + 1][:2] - self._waypoints[i][:2])
+            if cumulative + seg >= lookahead_dist:
+                # Interpolate within this segment
+                remaining = lookahead_dist - cumulative
+                t = remaining / max(seg, 1e-6)
+                target = self._waypoints[i] + t * (self._waypoints[i + 1] - self._waypoints[i])
+                break
+            cumulative += seg
+            target = self._waypoints[i + 1]
 
-        # Direction to target in world frame (XY plane)
-        delta = target[:2] - position[:2]
-        distance = np.linalg.norm(delta)
-
-        # Check arrival -- only advance to next waypoint if close enough,
-        # but don't skip the LAST waypoint (always drive toward it)
-        if distance < self._arrival_threshold and self._current_index < len(self._waypoints) - 1:
-            logger.info(
-                "Reached waypoint %d/%d (dist=%.3f m)",
-                self._current_index + 1,
-                len(self._waypoints),
-                distance,
-            )
-            self._current_index += 1
-            # Recompute for the new waypoint
-            target = self._waypoints[self._current_index]
-            delta = target[:2] - position[:2]
-            distance = np.linalg.norm(delta)
-
-        # Only mark complete when very close to the final waypoint
-        if self._current_index == len(self._waypoints) - 1 and distance < 0.1:
-            logger.info("Reached final waypoint (dist=%.3f m)", distance)
+        # Check if we've reached the final waypoint
+        final_dist = np.linalg.norm(self._waypoints[-1][:2] - position[:2])
+        if final_dist < self._arrival_threshold:
             self._current_index = len(self._waypoints)
             return np.zeros(2), 0.0
 
-        # Compute desired heading angle toward waypoint
+        # Compute heading to lookahead target
+        delta = target[:2] - position[:2]
         desired_yaw = math.atan2(delta[1], delta[0])
 
         # Extract current heading from rotation matrix (yaw from forward vector)

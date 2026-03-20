@@ -374,10 +374,15 @@ class ExplorationLoop:
         # ----------------------------------------------------------
         if (self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
-            # Don't pass depth for obstacle avoidance -- camera looks sideways
-            # (body -Y) while robot moves forward (body +X). Depth avoidance
-            # would falsely trigger on side walls.
-            linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
+            # Mid-path replanning: check if upcoming path is still clear
+            # every 10 steps using the occupancy grid (not depth camera)
+            if step % 10 == 0 and should_rescan:
+                # Path may be blocked by newly discovered obstacles
+                # Force a rescan which will replan if needed
+                self._current_waypoint_runner = None
+
+            if self._current_waypoint_runner is not None:
+                linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
         elif self._current_waypoint_runner is None:
             # No waypoints yet -- just drive forward. Don't check depth for
             # obstacles because the camera looks sideways (body -Y) while the
