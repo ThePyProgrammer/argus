@@ -296,8 +296,10 @@ class Coordinator:
                     linear, angular, metrics = robot.exploration.step_once(
                         frame, step, score_fn=score_fn,
                     )
-                except (IndexError, ValueError):
-                    # Transient race: cloud array resized during access. Skip this step silently.
+                except (IndexError, ValueError) as e:
+                    # Log first few errors to help diagnose stuck robots
+                    if step < 10:
+                        logger.warning("[Step %d] %s: %s", step, rid, e)
                     linear, angular = np.zeros(2), 0.0
                     metrics = {"terminated": False, "rescan_triggered": False, "coverage": 0.0}
 

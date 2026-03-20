@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-# Suppress NNPACK/PyTorch C++ warnings before any imports
+# Suppress NNPACK C++ warnings before any imports
 import os as _os
 _os.environ["NNPACK_DISABLE"] = "1"
 _os.environ["TORCH_CPP_LOG_LEVEL"] = "ERROR"
-import warnings as _w
-_w.filterwarnings("ignore", message=".*NNPACK.*")
-_w.filterwarnings("ignore", message=".*Could not initialize.*")
 
 """Main entry point: MuJoCo bridge -> SLAM -> OctoMap -> Rerun visualization.
 
