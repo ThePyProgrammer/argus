@@ -39,6 +39,12 @@ function DetectionOverlay({
         const height = `${((y2 - y1) / imgHeight) * 100}%`;
         const isHovered = hovered === i;
 
+        // Determine if label/tooltip would clip at top/bottom
+        const pctTop = (y1 / imgHeight) * 100;
+        const pctBottom = ((imgHeight - y2) / imgHeight) * 100;
+        const labelOnTop = pctTop > 5;   // enough room above?
+        const tooltipOnBottom = pctBottom > 15; // enough room below?
+
         return (
           <div
             key={i}
@@ -55,12 +61,13 @@ function DetectionOverlay({
               boxShadow: isHovered ? `0 0 8px ${color}` : 'none',
             }}
           >
-            {/* Label badge */}
+            {/* Label badge -- above box if room, below if not */}
             <div style={{
               position: 'absolute',
               left: 0,
-              bottom: '100%',
-              marginBottom: '2px',
+              ...(labelOnTop
+                ? { bottom: '100%', marginBottom: '2px' }
+                : { top: '100%', marginTop: '2px' }),
               padding: '1px 5px',
               background: isHovered ? color : 'rgba(0,0,0,0.75)',
               color: isHovered ? '#000' : color,
@@ -74,14 +81,15 @@ function DetectionOverlay({
               {det.class} {(det.confidence * 100).toFixed(0)}%
             </div>
 
-            {/* Tooltip on hover */}
+            {/* Tooltip on hover -- below box if room, above if not */}
             {isHovered && (
               <div style={{
                 position: 'absolute',
                 left: '50%',
-                top: '100%',
                 transform: 'translateX(-50%)',
-                marginTop: '4px',
+                ...(tooltipOnBottom
+                  ? { top: '100%', marginTop: '4px' }
+                  : { bottom: '100%', marginBottom: '4px' }),
                 padding: '6px 10px',
                 background: 'rgba(0,0,0,0.9)',
                 border: `1px solid ${color}`,
