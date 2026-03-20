@@ -93,7 +93,7 @@ class SceneDescriber:
             ).to(self._device)
             logger.info("VLM model loaded on %s (transformers %s)", self._device, transformers.__version__)
         except Exception as e:
-            logger.warning("VLM model load failed: %s. Scene descriptions disabled.", e)
+            logger.info("VLM disabled: %s", str(e)[:80])
             self._model = None
             return
 
