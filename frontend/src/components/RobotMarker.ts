@@ -102,40 +102,35 @@ export class RobotMarkerManager {
     this.markers.set(robotId, mesh);
   }
 
-  /** Previous position per robot for heading computation. */
-  private prevPositions: Map<string, [number, number, number]> = new Map();
-
   /**
-   * Create or update a robot marker. Heading is derived from the direction
-   * of movement (current position vs previous position) so the robot mesh
-   * always faces the way the trajectory trail is going.
+   * Create or update a robot marker. Heading uses the actual camera
+   * rotation matrix (same as frustum) for accurate orientation.
    *
    * @param robotId Unique robot identifier
    * @param position [x, y, z] world position
    * @param colorIndex Index into the Okabe-Ito palette
+   * @param rotation Optional 9-element flat 3x3 cam_xmat (row-major)
    */
   updateRobot(
     robotId: string,
     position: [number, number, number],
     colorIndex: number,
+    rotation?: number[],
   ): void {
     const existing = this.markers.get(robotId);
 
     if (existing) {
       existing.position.set(position[0], position[1], position[2]);
 
-      // Compute heading from movement direction
-      const prev = this.prevPositions.get(robotId);
-      if (prev) {
-        const dx = position[0] - prev[0];
-        const dy = position[1] - prev[1];
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 0.01) { // only update heading if moved enough
-          const yaw = Math.atan2(dy, dx);
-          existing.rotation.set(0, 0, yaw);
-        }
+      // Use rotation matrix for heading (cam_xmat Z-row = camera forward axis)
+      if (rotation && rotation.length === 9) {
+        // Camera Z axis in world (row 2 of cam_xmat)
+        // The SLAM cloud extends along +Z, which is the robot's forward
+        const camZx = rotation[6];
+        const camZy = rotation[7];
+        const yaw = Math.atan2(camZy, camZx);
+        existing.rotation.set(0, 0, yaw);
       }
-      this.prevPositions.set(robotId, [...position]);
       return;
     }
 
