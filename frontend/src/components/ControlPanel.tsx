@@ -138,24 +138,48 @@ export default function ControlPanel() {
         </button>
       </div>
 
+      {/* Restart section */}
       <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
-        <div
-          onClick={() => setShowRestart(!showRestart)}
-          style={{
-            fontSize: '12px', fontWeight: 600, color: '#888', cursor: 'pointer',
-            userSelect: 'none', display: 'flex', justifyContent: 'space-between',
-          }}
-        >
-          <span>RESTART SIM</span>
-          <span style={{ fontSize: '10px' }}>{showRestart ? '▼' : '▶'}</span>
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+          <button
+            onClick={() => {
+              sendRaw?.({ type: 'command', payload: { action: 'restart' } });
+              useRobotStore.getState().setCloudFull([], []);
+            }}
+            style={{
+              ...buttonStyle,
+              flex: 2,
+              background: '#b71c1c',
+              color: '#fff',
+              border: 'none',
+            }}
+          >
+            🔄 Restart (Random)
+          </button>
+          <button
+            onClick={() => setShowRestart(!showRestart)}
+            style={{
+              ...buttonStyle,
+              flex: 1,
+              background: '#37474f',
+              color: '#aaa',
+              border: '1px solid #555',
+              fontSize: '11px',
+            }}
+          >
+            {showRestart ? 'Hide' : 'Custom'}
+          </button>
         </div>
         {showRestart && (
-          <div style={{ marginTop: '6px' }}>
+          <div style={{ background: '#12122a', padding: '8px', borderRadius: '4px' }}>
+            <div style={{ fontSize: '10px', color: '#666', marginBottom: '6px' }}>
+              Set custom spawn positions (X, Y in meters)
+            </div>
             {[
               { label: 'Robot A', pos: spawnA, setPos: setSpawnA, color: '#4285f4' },
               { label: 'Robot B', pos: spawnB, setPos: setSpawnB, color: '#ff9800' },
             ].map(({ label, pos, setPos, color }) => (
-              <div key={label} style={{ marginBottom: '8px' }}>
+              <div key={label} style={{ marginBottom: '6px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color, marginBottom: '2px' }}>
                   {label}
                 </div>
@@ -191,18 +215,18 @@ export default function ControlPanel() {
                     },
                   },
                 });
-                // Clear local state
                 useRobotStore.getState().setCloudFull([], []);
               }}
               style={{
                 ...buttonStyle,
                 width: '100%',
-                background: '#b71c1c',
+                background: '#e65100',
                 color: '#fff',
                 border: 'none',
+                fontSize: '12px',
               }}
             >
-              Restart Simulation
+              Restart at Custom Positions
             </button>
           </div>
         )}
