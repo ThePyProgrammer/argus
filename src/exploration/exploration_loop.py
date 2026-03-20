@@ -19,6 +19,43 @@ from typing import Callable
 
 import numpy as np
 
+
+def _check_obstacle(
+    depth: np.ndarray, linear_speed: float, danger_dist: float = 1.5,
+) -> tuple[np.ndarray, float] | None:
+    """Standalone obstacle check using depth image.
+
+    Returns (linear_vel, angular_vel) if obstacle detected, else None.
+    """
+    h, w = depth.shape
+    y_lo, y_hi = int(h * 0.1), int(h * 0.9)
+    scan = depth[y_lo:y_hi, :]
+
+    valid = scan[(scan > 0.05) & (scan < danger_dist)]
+    if len(valid) == 0:
+        return None
+
+    min_dist = float(np.min(valid))
+
+    # Steer away from closer side
+    third = scan.shape[1] // 3
+    left = scan[:, :third]
+    right = scan[:, 2 * third:]
+
+    def avg_close(region):
+        c = region[(region > 0.05) & (region < danger_dist)]
+        return float(np.mean(c)) if len(c) > 0 else danger_dist
+
+    turn = -1.5 if avg_close(left) < avg_close(right) else 1.5
+
+    if min_dist < 0.3:
+        return np.array([-linear_speed * 0.3, 0.0]), turn
+    elif min_dist < 0.6:
+        return np.array([0.0, 0.0]), turn
+    else:
+        factor = (min_dist - 0.6) / (danger_dist - 0.6)
+        return np.array([linear_speed * factor * 0.5, 0.0]), turn
+
 from src.bridge.sensor_types import SensorFrame
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
@@ -343,12 +380,15 @@ class ExplorationLoop:
                 pose, depth=frame.depth,
             )
         elif self._current_waypoint_runner is None:
-            # No waypoints yet (e.g., empty map during boot phase, or all
-            # frontiers unreachable) -- drive forward to build initial map
-            # instead of standing still. The coordinator decides when to
-            # truly terminate; this just ensures the robot keeps moving.
+            # No waypoints yet -- drive forward but check for obstacles
             linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)
             angular_vel = 0.0
+
+            # Reactive depth avoidance even without a waypoint runner
+            if frame.depth is not None:
+                avoidance = _check_obstacle(frame.depth, config.linear_speed)
+                if avoidance is not None:
+                    linear_vel, angular_vel = avoidance
 
         # ----------------------------------------------------------
         # f. Periodic logging

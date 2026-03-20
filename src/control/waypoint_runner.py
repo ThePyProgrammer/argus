@@ -147,52 +147,64 @@ class WaypointRunner:
         return linear_vel, float(angular_vel)
 
     def _check_depth_avoidance(
-        self, depth: np.ndarray, danger_dist: float = 0.4
+        self, depth: np.ndarray, danger_dist: float = 1.5
     ) -> tuple[np.ndarray, float] | None:
         """Check depth image for close obstacles and return avoidance command.
 
-        Splits the center band of the depth image into left and right halves.
-        If either half has obstacles within danger_dist, returns a velocity
-        command that stops forward motion and steers away from the obstacle.
+        Uses three zones: wide scan for early detection, center for imminent
+        collision. Steers away from the closer side and slows/stops based on
+        proximity.
 
         Args:
             depth: (H, W) float32 depth in meters. 0 = invalid.
-            danger_dist: Distance threshold in meters.
+            danger_dist: Distance threshold for obstacle detection in meters.
 
         Returns:
             (linear_vel, angular_vel) if avoidance needed, else None.
         """
         h, w = depth.shape
-        # Check center vertical band (middle 60% of image, middle 80% of height)
-        y_lo, y_hi = int(h * 0.1), int(h * 0.9)
-        x_lo, x_hi = int(w * 0.2), int(w * 0.8)
-        center = depth[y_lo:y_hi, x_lo:x_hi]
 
-        valid = center[(center > 0.05) & (center < danger_dist)]
+        # Wide scan: full width, middle 80% of height
+        y_lo, y_hi = int(h * 0.1), int(h * 0.9)
+        scan = depth[y_lo:y_hi, :]
+
+        valid = scan[(scan > 0.05) & (scan < danger_dist)]
         if len(valid) == 0:
             return None  # No close obstacles
 
-        # Obstacle detected — steer away from the closer side
-        mid_x = center.shape[1] // 2
-        left_strip = center[:, :mid_x]
-        right_strip = center[:, mid_x:]
-
-        left_close = left_strip[(left_strip > 0.05) & (left_strip < danger_dist)]
-        right_close = right_strip[(right_strip > 0.05) & (right_strip < danger_dist)]
-
-        left_danger = np.mean(left_close) if len(left_close) > 0 else danger_dist
-        right_danger = np.mean(right_close) if len(right_close) > 0 else danger_dist
-
-        # Steer away from the closer side (positive = turn left)
-        if left_danger < right_danger:
-            turn = -self._angular_speed  # Turn right (away from left obstacle)
-        else:
-            turn = self._angular_speed   # Turn left (away from right obstacle)
-
-        # Slow down or stop — the closer the obstacle, the slower we go
         min_dist = float(np.min(valid))
-        speed_factor = max(0.0, (min_dist - 0.15) / (danger_dist - 0.15))
-        linear = np.array([self._linear_speed * speed_factor * 0.3, 0.0])
+
+        # Split into left/right thirds for steering direction
+        third = scan.shape[1] // 3
+        left = scan[:, :third]
+        center = scan[:, third:2*third]
+        right = scan[:, 2*third:]
+
+        def avg_close(region):
+            close = region[(region > 0.05) & (region < danger_dist)]
+            return float(np.mean(close)) if len(close) > 0 else danger_dist
+
+        left_d = avg_close(left)
+        center_d = avg_close(center)
+        right_d = avg_close(right)
+
+        # Steer away from the closer side
+        if left_d < right_d:
+            turn = -self._angular_speed * 1.5  # Turn right hard
+        else:
+            turn = self._angular_speed * 1.5   # Turn left hard
+
+        # Speed: full stop if very close, slow if medium, normal if far
+        if min_dist < 0.3:
+            # Emergency: reverse
+            linear = np.array([-self._linear_speed * 0.3, 0.0])
+        elif min_dist < 0.6:
+            # Stop forward, only turn
+            linear = np.array([0.0, 0.0])
+        else:
+            # Slow down proportionally
+            speed_factor = (min_dist - 0.6) / (danger_dist - 0.6)
+            linear = np.array([self._linear_speed * speed_factor * 0.5, 0.0])
 
         return linear, float(turn)
 
