@@ -83,14 +83,18 @@ class SceneDescriber:
 
         try:
             logger.info("Loading VLM model %s (this may take a moment)...", self._model_name)
+            import transformers
+            # Moondream2 requires specific transformers version
             self._tokenizer = AutoTokenizer.from_pretrained(self._model_name, trust_remote_code=True)
             self._model = AutoModelForCausalLM.from_pretrained(
                 self._model_name, trust_remote_code=True,
                 torch_dtype=torch.float32,
+                revision="2025-01-09",  # pin to known working revision
             ).to(self._device)
-            logger.info("VLM model loaded on %s", self._device)
+            logger.info("VLM model loaded on %s (transformers %s)", self._device, transformers.__version__)
         except Exception as e:
-            logger.warning("Failed to load VLM model: %s", e)
+            logger.warning("VLM model load failed: %s. Scene descriptions disabled.", e)
+            self._model = None
             return
 
         self._running = True
