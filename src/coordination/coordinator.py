@@ -97,6 +97,17 @@ class Coordinator:
         except ImportError:
             pass
 
+        # Scene description (optional -- graceful if transformers not installed)
+        self._describer = None
+        try:
+            from src.perception.scene_describer import SceneDescriber, VLM_AVAILABLE
+            if VLM_AVAILABLE:
+                self._describer = SceneDescriber(device="cpu", interval_s=15.0)
+                self._describer.start()
+                logger.info("VLM scene describer started (CPU, every 15s)")
+        except ImportError:
+            pass
+
         # Web control flags (set via _command_handler from C2 interface)
         self._should_stop: bool = False
         self._paused: bool = False
@@ -347,9 +358,11 @@ class Coordinator:
                     cloud_pts = robot.slam.get_cloud_points()
                     local_voxels = robot.octomap.get_occupied_voxels()
 
-                    # Submit frame for YOLO detection (background thread)
+                    # Submit frame for YOLO detection and VLM description (background threads)
                     if self._detector is not None:
                         self._detector.submit_frame(rid, frames[rid].rgb, frames[rid].depth, pose)
+                    if self._describer is not None:
+                        self._describer.submit_frame(rid, frames[rid].rgb)
 
                     # Get latest detections
                     detections = []
@@ -370,7 +383,17 @@ class Coordinator:
                         "trajectory": list(robot.slam.slam_poses),
                         "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
                         "detections": detections,
+                        "scene_description": None,
                     }
+
+                    # Add scene description if available
+                    if self._describer is not None:
+                        desc = self._describer.get_description(rid)
+                        if desc is not None:
+                            robot_data[rid]["scene_description"] = {
+                                "text": desc.description,
+                                "objects": desc.objects,
+                            }
                 voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
                 frontier_cells = self._gather_frontier_cells(robot_ids)
                 total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)

@@ -317,6 +317,15 @@ class WebStreamingViz:
                     },
                 })
 
+            # Scene description
+            scene_desc = data.get("scene_description")
+            if scene_desc:
+                self._message_queue.append({
+                    "type": "scene_description",
+                    "robot_id": rid,
+                    "payload": scene_desc,
+                })
+
             # Object detections
             detections = data.get("detections", [])
             if detections:
