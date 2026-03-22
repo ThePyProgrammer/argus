@@ -109,6 +109,64 @@ class Coordinator:
         self._should_stop: bool = False
         self._paused: bool = False
         self._static: bool = False  # set True to keep robots stationary
+
+    @property
+    def step_count(self) -> int:
+        return self._step_count
+
+    @property
+    def merge_count(self) -> int:
+        return self._merge_count
+
+    @property
+    def robots(self) -> dict[str, RobotInstance]:
+        return self._robots
+
+    @property
+    def detector(self):
+        return self._detector
+
+    @property
+    def describer(self):
+        return self._describer
+
+    def handle_command(self, command: dict) -> None:
+        """Public entry point for control commands."""
+        self._command_handler(command)
+
+    @property
+    def restart_requested(self) -> bool:
+        return self._restart_requested
+
+    @property
+    def restart_positions(self) -> dict | None:
+        return self._restart_positions
+
+    def set_viz(self, viz) -> None:
+        self._viz = viz
+
+    def set_static(self, static: bool) -> None:
+        self._static = static
+
+    def request_stop(self) -> None:
+        self._should_stop = True
+
+    def reset_merger(self) -> None:
+        """Clear the map merger's accumulated data."""
+        self._merger.last_merged_voxels = np.empty((0, 3))
+
+    def reset_for_restart(self, bridge, robots: dict[str, RobotInstance]) -> None:
+        """Reset coordinator state for a simulation restart."""
+        self._bridge = bridge
+        self._robots = robots
+        self._should_stop = False
+        self._paused = False
+        self._partitioned = False
+        self._step_count = 0
+        self._merge_count = 0
+        self._body_trajectories = {}
+        self._restart_requested = False
+        self._restart_positions = None
         self._restart_requested: bool = False
         self._restart_positions: dict[str, tuple[float, float, float]] | None = None
 
@@ -266,7 +324,6 @@ class Coordinator:
                     break
 
             # Per-robot: run one exploration step
-            all_terminated = True
             any_rescan_triggered = False
 
             for rid in robot_ids:
@@ -290,13 +347,11 @@ class Coordinator:
                         frame, step, score_fn=score_fn,
                     )
                 except (IndexError, ValueError) as e:
-                    # Log first few errors to help diagnose stuck robots
-                    if step < 10:
-                        logger.warning("[Step %d] %s: %s", step, rid, e)
+                    logger.warning("[Step %d] %s exploration error: %s", step, rid, e)
                     linear, angular = np.zeros(2), 0.0
                     from src.exploration.exploration_loop import StepMetrics
                     metrics = StepMetrics(
-                        frontiers=0, coverage=0.0, terminated=False,
+                        frontiers=0, coverage=0.0, terminated=True,
                         voxels=0, rescan_triggered=False,
                     )
 
@@ -305,20 +360,12 @@ class Coordinator:
                 else:
                     self._bridge.set_velocity(rid, linear, angular)
 
-                if not metrics.terminated:
-                    all_terminated = False
-
                 # When rescan triggered: robot publishes map via pLCM
                 if metrics.rescan_triggered:
                     any_rescan_triggered = True
                     robot.publish_map_state(
                         coverage_pct=metrics.coverage,
                     )
-
-            # Never terminate early in multi-robot mode. The frontier
-            # detection on flat/sparse scenes is unreliable for termination.
-            # Run for full max_steps; user controls duration via CLI flag.
-            all_terminated = False
 
             # Slow down for visualization
             if self._config.step_delay > 0:
@@ -344,80 +391,12 @@ class Coordinator:
 
             # Visualization update (every 10 frames)
             if step % 10 == 0 and self._viz is not None:
-                # Merge if first frame and no merge happened yet
                 if self._merge_count == 0:
                     try:
                         self._merge_occupancy_maps(robot_ids)
                     except Exception:
                         pass
-
-                robot_data = {}
-                for rid in robot_ids:
-                    robot = self._robots[rid]
-                    pose = robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4)
-                    cloud_pts = robot.slam.get_cloud_points()
-                    local_voxels = robot.octomap.get_occupied_voxels()
-
-                    # Submit frame for YOLO detection and VLM description (background threads)
-                    if self._detector is not None:
-                        self._detector.submit_frame(
-                            rid, frames[rid].rgb, frames[rid].depth, pose,
-                            slam_cloud=robot.slam.last_frame_cloud if hasattr(robot.slam, 'last_frame_cloud') else None,
-                        )
-                    if self._describer is not None:
-                        self._describer.submit_frame(rid, frames[rid].rgb)
-
-                    # Get latest detections
-                    detections = []
-                    if self._detector is not None:
-                        detections = [
-                            {"class": d.class_name, "confidence": d.confidence,
-                             "bbox": list(d.bbox),
-                             "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None,
-                             "depth": d.depth_m}
-                            for d in self._detector.get_detections(rid)
-                        ]
-
-                    robot_data[rid] = {
-                        "frame": frames[rid],
-                        "local_voxels": local_voxels,
-                        "slam_cloud_pts": cloud_pts,
-                        "slam_cloud_rgb": robot.slam.get_cloud_colors(),
-                        "pose": pose,
-                        "trajectory": list(robot.slam.slam_poses),
-                        "coverage_pct": robot.exploration.last_coverage,
-                        "detections": detections,
-                        "scene_description": None,
-                    }
-
-                    # Add scene description if available
-                    if self._describer is not None:
-                        desc = self._describer.get_description(rid)
-                        if desc is not None:
-                            robot_data[rid]["scene_description"] = {
-                                "text": desc.description,
-                                "objects": desc.objects,
-                            }
-                voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
-                frontier_cells = self._gather_frontier_cells(robot_ids)
-                total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
-                # Adjust merged voxels: subtract average spawn position
-                merged = self._merger.last_merged_voxels
-                # No offset adjustment -- use raw world coordinates
-
-                self._viz.update(
-                    merged_voxels=merged,
-                    robot_data=robot_data,
-                    frontier_cells=frontier_cells,
-                    voronoi_midpoint=voronoi_mid,
-                    voronoi_direction=voronoi_dir,
-                    total_coverage=total_cov,
-                    merge_count=self._merge_count,
-                )
-
-            if all_terminated:
-                terminated_reason = "all_explored"
-                break
+                self._send_viz_update(robot_ids, frames)
 
         # Final merge
         self._merge_occupancy_maps(robot_ids)
@@ -503,3 +482,68 @@ class Coordinator:
         elif len(all_voxels) == 1:
             self._merger.last_merged_voxels = all_voxels[0]
         self._merge_count += 1
+
+    def _send_viz_update(
+        self,
+        robot_ids: tuple[str, ...],
+        frames: dict,
+    ) -> None:
+        """Assemble per-robot viz data and send to the visualizer."""
+        robot_data = {}
+        for rid in robot_ids:
+            robot = self._robots[rid]
+            pose = robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4)
+
+            # Submit frames for perception (background threads)
+            if self._detector is not None:
+                self._detector.submit_frame(
+                    rid, frames[rid].rgb, frames[rid].depth, pose,
+                    slam_cloud=robot.slam.last_frame_cloud if hasattr(robot.slam, 'last_frame_cloud') else None,
+                )
+            if self._describer is not None:
+                self._describer.submit_frame(rid, frames[rid].rgb)
+
+            # Collect detections
+            detections = []
+            if self._detector is not None:
+                detections = [
+                    {"class": d.class_name, "confidence": d.confidence,
+                     "bbox": list(d.bbox),
+                     "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None,
+                     "depth": d.depth_m}
+                    for d in self._detector.get_detections(rid)
+                ]
+
+            robot_data[rid] = {
+                "frame": frames[rid],
+                "local_voxels": robot.octomap.get_occupied_voxels(),
+                "slam_cloud_pts": robot.slam.get_cloud_points(),
+                "slam_cloud_rgb": robot.slam.get_cloud_colors(),
+                "pose": pose,
+                "trajectory": list(robot.slam.slam_poses),
+                "coverage_pct": robot.exploration.last_coverage,
+                "detections": detections,
+                "scene_description": None,
+            }
+
+            if self._describer is not None:
+                desc = self._describer.get_description(rid)
+                if desc is not None:
+                    robot_data[rid]["scene_description"] = {
+                        "text": desc.description,
+                        "objects": desc.objects,
+                    }
+
+        voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
+        frontier_cells = self._gather_frontier_cells(robot_ids)
+        total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
+
+        self._viz.update(
+            merged_voxels=self._merger.last_merged_voxels,
+            robot_data=robot_data,
+            frontier_cells=frontier_cells,
+            voronoi_midpoint=voronoi_mid,
+            voronoi_direction=voronoi_dir,
+            total_coverage=total_cov,
+            merge_count=self._merge_count,
+        )

@@ -95,12 +95,12 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
 
     if name == "get_status":
         status = {
-            "step": _coordinator._step_count,
-            "merge_count": _coordinator._merge_count,
+            "step": _coordinator.step_count,
+            "merge_count": _coordinator.merge_count,
             "robots": {},
         }
         for rid in _robot_ids:
-            robot = _coordinator._robots.get(rid)
+            robot = _coordinator.robots.get(rid)
             if robot and robot.slam.slam_poses:
                 pos = robot.slam.slam_poses[-1][:3, 3].tolist()
             else:
@@ -113,8 +113,8 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
 
     elif name == "get_detections":
         rid = arguments.get("robot_id", "robot_a")
-        if _coordinator._detector is not None:
-            dets = _coordinator._detector.get_detections(rid)
+        if _coordinator.detector is not None:
+            dets = _coordinator.detector.get_detections(rid)
             return json.dumps([
                 {"class": d.class_name, "confidence": round(d.confidence, 2),
                  "bbox": list(d.bbox),
@@ -125,8 +125,8 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
 
     elif name == "get_scene_description":
         rid = arguments.get("robot_id", "robot_a")
-        if _coordinator._describer is not None:
-            desc = _coordinator._describer.get_description(rid)
+        if _coordinator.describer is not None:
+            desc = _coordinator.describer.get_description(rid)
             if desc:
                 return json.dumps({"description": desc.description, "objects": desc.objects})
         return json.dumps({"description": "No description available", "objects": []})
@@ -137,17 +137,17 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
         cmd = {"action": action}
         if value is not None:
             cmd["value"] = value
-        _coordinator._command_handler(cmd)
+        _coordinator.handle_command(cmd)
         return json.dumps({"status": "ok", "action": action})
 
     elif name == "get_coverage":
         result = {
-            "step": _coordinator._step_count,
-            "merge_count": _coordinator._merge_count,
+            "step": _coordinator.step_count,
+            "merge_count": _coordinator.merge_count,
             "per_robot": {},
         }
         for rid in _robot_ids:
-            robot = _coordinator._robots.get(rid)
+            robot = _coordinator.robots.get(rid)
             result["per_robot"][rid] = {
                 "voxels": robot.octomap.num_occupied if robot else 0,
                 "slam_frames": robot.slam.num_frames_processed if robot else 0,
@@ -158,10 +158,7 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
 
 
 async def mcp_endpoint(request: Request) -> JSONResponse:
-    """Handle MCP JSON-RPC 2.0 requests.
-
-    Supports: initialize, tools/list, tools/call
-    """
+    """Handle MCP JSON-RPC 2.0 requests."""
     try:
         body = await request.json()
     except Exception:

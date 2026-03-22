@@ -105,17 +105,12 @@ class WebStreamingViz:
         self._message_queue = []
         return msgs
 
-    # No hardcoded offset -- spawn subtraction handles positioning
-    CLOUD_OFFSET = np.array([0.0, 0.0, 0.0], dtype=np.float64)
-
     def _update_cloud(self, merged_voxels: np.ndarray, robot_data: dict) -> None:
         """Compute and queue cloud delta/full messages with per-robot colors."""
         if len(merged_voxels) == 0:
             return
 
-        # Apply standard cloud offset
         merged_voxels = merged_voxels.copy()
-        merged_voxels += self.CLOUD_OFFSET
 
         # Build color lookup based on mode
         if self._color_mode == "true_rgb":

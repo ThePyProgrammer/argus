@@ -146,7 +146,7 @@ def create_controller(mode: str):
 
 def run_explore_mode(args):
     """Run autonomous frontier-based exploration."""
-    import math
+
 
     from src.exploration.config import ExplorationConfig
     from src.exploration.exploration_loop import ExplorationLoop
@@ -190,16 +190,6 @@ def run_explore_mode(args):
         print(f"Coverage (bounding box): {result.final_bbox_coverage_pct:.1f}%")
         print(f"Remaining frontiers: {result.final_frontier_count}")
 
-    # Drift metrics
-    if len(slam.slam_poses) >= 2:
-        print("\n=== Drift Metrics ===")
-        try:
-            # Full GT collection happens inside ExplorationLoop
-            # For now just report SLAM stats
-            pass
-        except Exception as e:
-            print(f"Could not compute drift metrics: {e}")
-
     print(
         f"\nFinal stats: {slam.num_frames_processed} frames, "
         f"{len(slam.get_cloud_points())} cloud points, "
@@ -212,7 +202,7 @@ def run_explore_mode(args):
 
 def run_multi_mode(args):
     """Run two-robot coordinated exploration with map merging."""
-    import math
+
 
     from src.bridge.multi_robot_config import MultiRobotConfig
     from src.bridge.multi_bridge import MultiRobotBridge
@@ -260,7 +250,7 @@ def run_multi_mode(args):
     viz = MultiRobotVisualizer(app_name="multi_robot_viz")
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config, viz=viz)
     if getattr(args, 'static', False):
-        coordinator._static = True
+        coordinator.set_static(True)
 
     print(f"Starting multi-robot exploration...")
     print(f"Robots: {config.robot_ids}")
@@ -311,7 +301,7 @@ def run_web_mode(args):
     Starts the multi-robot simulation in a background thread and serves
     the React C2 frontend via FastAPI at http://localhost:8000.
     """
-    import math
+
     import subprocess
     import threading
 
@@ -369,8 +359,7 @@ def run_web_mode(args):
         for rid, robot in robots.items():
             robot.slam.reset()
             robot.octomap.reset()
-        if hasattr(coordinator, '_merger'):
-            coordinator._merger.last_merged_voxels = np.empty((0, 3))
+        coordinator.reset_merger()
         print("[cloud config] SLAM and OctoMap reset for all robots")
 
     from backend.web.server import create_app
@@ -381,7 +370,7 @@ def run_web_mode(args):
 
     app, streaming_viz = create_app(
         list(config.robot_ids),
-        command_cb=coordinator._command_handler,
+        command_cb=coordinator.handle_command,
         slam_reset_cb=_reset_slam,
         mcp_endpoint=mcp_endpoint,
         cloud_config_fns={
@@ -390,9 +379,9 @@ def run_web_mode(args):
             "configs": lambda: CLOUD_CONFIGS,
         },
     )
-    coordinator._viz = streaming_viz
+    coordinator.set_viz(streaming_viz)
     if getattr(args, 'static', False):
-        coordinator._static = True
+        coordinator.set_static(True)
     print("MCP endpoint available at http://localhost:8000/mcp")
 
     # Build React frontend
@@ -428,12 +417,11 @@ def run_web_mode(args):
                 print(f"\nSimulation error: {e}")
 
             # Check if restart was requested
-            if not coordinator._restart_requested:
+            if not coordinator.restart_requested:
                 break
 
             print("\n=== RESTARTING SIMULATION ===")
-            coordinator._restart_requested = False
-            new_positions = coordinator._restart_positions
+            new_positions = coordinator.restart_positions
 
             # Stop old bridge
             try:
@@ -464,16 +452,7 @@ def run_web_mode(args):
                     spawn_position=config.spawn_positions[rid],
                 )
 
-            # Reset coordinator state
-            coordinator._bridge = bridge
-            coordinator._robots = robots
-            coordinator._should_stop = False
-            coordinator._paused = False
-            coordinator._partitioned = False
-            coordinator._step_count = 0
-            coordinator._merge_count = 0
-            coordinator._body_trajectories = {}
-            coordinator._restart_positions = None
+            coordinator.reset_for_restart(bridge, robots)
 
             # Reset streaming viz cloud tracking
             if streaming_viz is not None:
@@ -497,7 +476,7 @@ def run_web_mode(args):
     except (KeyboardInterrupt, SystemExit):
         print("\nShutting down C2 interface...")
     finally:
-        coordinator._should_stop = True
+        coordinator.request_stop()
         sim_thread.join(timeout=5.0)
         try:
             bridge.stop()
