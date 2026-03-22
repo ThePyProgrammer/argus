@@ -35,14 +35,7 @@ class OccupancyGrid2D:
     height: int
 
     def world_to_grid(self, xy: np.ndarray) -> tuple[int, int]:
-        """Convert (2,) world XY to grid (row, col).
-
-        Args:
-            xy: (2,) world coordinates.
-
-        Returns:
-            (row, col) clamped to grid bounds.
-        """
+        """Convert (2,) world XY to grid (row, col), clamped to bounds."""
         col = int((xy[0] - self.origin[0]) / self.resolution)
         row = int((xy[1] - self.origin[1]) / self.resolution)
         # Clamp to grid bounds
@@ -51,29 +44,13 @@ class OccupancyGrid2D:
         return row, col
 
     def grid_to_world(self, row: int, col: int) -> np.ndarray:
-        """Convert grid (row, col) to (2,) world XY center.
-
-        Args:
-            row: Grid row index.
-            col: Grid column index.
-
-        Returns:
-            (2,) float64 world coordinates of cell center.
-        """
+        """Convert grid (row, col) to (2,) world XY cell center."""
         x = self.origin[0] + (col + 0.5) * self.resolution
         y = self.origin[1] + (row + 0.5) * self.resolution
         return np.array([x, y], dtype=np.float64)
 
     def is_free(self, row: int, col: int) -> bool:
-        """Return True if cell is CELL_FREE and within bounds.
-
-        Args:
-            row: Grid row index.
-            col: Grid column index.
-
-        Returns:
-            True if cell is free and in-bounds.
-        """
+        """True if cell is CELL_FREE and within bounds."""
         if row < 0 or row >= self.height or col < 0 or col >= self.width:
             return False
         return int(self.grid[row, col]) == CELL_FREE
@@ -107,8 +84,7 @@ def project_voxels_to_2d(
     Returns:
         OccupancyGrid2D with FREE/OCCUPIED/UNKNOWN cells.
     """
-    # Handle empty input
-    if occupied_voxels.size == 0:
+    def _empty_grid() -> OccupancyGrid2D:
         return OccupancyGrid2D(
             grid=np.full((1, 1), CELL_UNKNOWN, dtype=np.int8),
             resolution=resolution,
@@ -116,6 +92,10 @@ def project_voxels_to_2d(
             width=1,
             height=1,
         )
+
+    # Handle empty input
+    if occupied_voxels.size == 0:
+        return _empty_grid()
 
     # Filter by height range
     mask = (occupied_voxels[:, 2] >= z_min) & (occupied_voxels[:, 2] <= z_max)
@@ -138,24 +118,10 @@ def project_voxels_to_2d(
                 filtered = non_ground
 
     if len(filtered) == 0:
-        return OccupancyGrid2D(
-            grid=np.full((1, 1), CELL_UNKNOWN, dtype=np.int8),
-            resolution=resolution,
-            origin=np.array([0.0, 0.0]),
-            width=1,
-            height=1,
-        )
+        return _empty_grid()
 
     # Compute XY bounding box with padding
     xy = filtered[:, :2]
-    if len(xy) == 0:
-        return OccupancyGrid2D(
-            grid=np.full((1, 1), CELL_UNKNOWN, dtype=np.int8),
-            resolution=resolution,
-            origin=np.array([0.0, 0.0]),
-            width=1,
-            height=1,
-        )
     xy_min = xy.min(axis=0) - padding * resolution
     xy_max = xy.max(axis=0) + padding * resolution
 

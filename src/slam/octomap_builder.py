@@ -65,5 +65,4 @@ class OctoMapBuilder:
 
     @property
     def num_occupied(self) -> int:
-        """Number of occupied voxels."""
         return len(self.get_occupied_voxels())

@@ -32,15 +32,7 @@ from src.coordination.map_merger import MapMerger
 
 if TYPE_CHECKING:
     from src.viz.multi_robot_viz import MultiRobotVisualizer
-try:
-    from dimos.core.transport import pLCMTransport
-except (ImportError, OSError):
-    try:
-        # Fallback for local development with dimos as submodule
-        from dimos.dimos.core.transport import pLCMTransport  # type: ignore[no-redef]
-    except (ImportError, OSError):
-        # Stub for testing environments where dimos is not available
-        pLCMTransport = None  # type: ignore[assignment, misc]
+from src.coordination.transport import pLCMTransport
 
 logger = logging.getLogger(__name__)
 
