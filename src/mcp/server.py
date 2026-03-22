@@ -5,7 +5,7 @@ Provides tools that Claude Code can call to control robots:
 - get_detections: Latest YOLO detections per robot
 - get_scene_description: VLM scene description per robot
 - send_command: Pause/resume/stop/set_speed
-- get_coverage_map: Current exploration coverage stats
+- get_coverage: Current exploration coverage stats
 
 Runs as a FastAPI HTTP endpoint at /mcp alongside the C2 WebSocket.
 

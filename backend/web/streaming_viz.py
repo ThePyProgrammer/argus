@@ -57,6 +57,10 @@ class WebStreamingViz:
         self._start_time: float = time.monotonic()
         self._message_queue: list[dict | bytes] = []
 
+    def reset_cloud_tracking(self) -> None:
+        """Clear cached voxel state to force a full cloud resend."""
+        self._last_voxel_set = set()
+
     def update(
         self,
         merged_voxels: np.ndarray,

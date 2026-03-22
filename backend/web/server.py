@@ -98,7 +98,7 @@ async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
         label = configs.get(key, {}).get("label", key)
         logger.info("Cloud config switched to %s: %s", key, label)
         if streaming_viz is not None:
-            streaming_viz._last_voxel_set = set()
+            streaming_viz.reset_cloud_tracking()
         if _slam_reset_callback is not None:
             _slam_reset_callback()
         await websocket.send_json({
@@ -109,7 +109,7 @@ async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
         mode = data.get("mode", "robot_tint")
         if streaming_viz is not None:
             streaming_viz.set_color_mode(mode)
-            streaming_viz._last_voxel_set = set()
+            streaming_viz.reset_cloud_tracking()
             logger.info("Color mode switched to %s", mode)
         await websocket.send_json({
             "type": "color_mode_ack",

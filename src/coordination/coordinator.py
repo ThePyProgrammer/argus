@@ -110,6 +110,14 @@ class Coordinator:
         self._paused: bool = False
         self._static: bool = False  # set True to keep robots stationary
 
+        # Restart state
+        self._restart_requested: bool = False
+        self._restart_positions: dict | None = None
+
+        # pLCM subscription state
+        self._latest_map_data: dict[str, RobotMapMessage] = {}
+        self._subscribers: list = []
+
     @property
     def step_count(self) -> int:
         return self._step_count
@@ -123,11 +131,11 @@ class Coordinator:
         return self._robots
 
     @property
-    def detector(self):
+    def detector(self) -> Any:
         return self._detector
 
     @property
-    def describer(self):
+    def describer(self) -> Any:
         return self._describer
 
     def handle_command(self, command: dict) -> None:
@@ -167,8 +175,6 @@ class Coordinator:
         self._body_trajectories = {}
         self._restart_requested = False
         self._restart_positions = None
-        self._restart_requested: bool = False
-        self._restart_positions: dict[str, tuple[float, float, float]] | None = None
 
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}

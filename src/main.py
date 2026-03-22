@@ -456,7 +456,7 @@ def run_web_mode(args):
 
             # Reset streaming viz cloud tracking
             if streaming_viz is not None:
-                streaming_viz._last_voxel_set = set()
+                streaming_viz.reset_cloud_tracking()
 
             print("Simulation restarted.\n")
 
