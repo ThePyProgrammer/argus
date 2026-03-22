@@ -27,6 +27,7 @@ streaming_viz: WebStreamingViz | None = None
 command_callback: Callable[[dict[str, Any]], None] | None = None
 _slam_reset_callback: Callable[[], None] | None = None
 _robot_ids: list[str] = []
+_cloud_config_fns: dict[str, Callable] | None = None
 
 app = FastAPI(title="C2 Interface")
 
@@ -35,6 +36,8 @@ def create_app(
     robot_ids: list[str],
     command_cb: Callable[[dict[str, Any]], None] | None = None,
     slam_reset_cb: Callable[[], None] | None = None,
+    mcp_endpoint: Callable | None = None,
+    cloud_config_fns: dict[str, Callable] | None = None,
 ) -> tuple[FastAPI, WebStreamingViz]:
     """Configure and return the FastAPI app.
 
@@ -42,19 +45,24 @@ def create_app(
         robot_ids: List of robot identifiers.
         command_cb: Callback for command messages from WebSocket clients.
         slam_reset_cb: Callback to reset SLAM/OctoMap when cloud config changes.
+        mcp_endpoint: Optional MCP endpoint handler to register at /mcp.
+        cloud_config_fns: Optional dict with 'get', 'set', 'configs' callables
+            for cloud configuration. Injected to avoid importing from src/.
 
     Returns:
         Tuple of (FastAPI app, WebStreamingViz instance).
     """
     global manager, streaming_viz, command_callback, _slam_reset_callback, _robot_ids
+    global _cloud_config_fns
     manager = ConnectionManager()
     streaming_viz = WebStreamingViz(manager, robot_ids)
     command_callback = command_cb
     _slam_reset_callback = slam_reset_cb
     _robot_ids = robot_ids
-    # Register MCP endpoint
-    from src.mcp.server import mcp_endpoint
-    app.post("/mcp")(mcp_endpoint)
+    _cloud_config_fns = cloud_config_fns
+
+    if mcp_endpoint is not None:
+        app.post("/mcp")(mcp_endpoint)
 
     return app, streaming_viz
 
@@ -93,15 +101,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             "type": "robot_list",
             "payload": {"robots": _robot_ids},
         })
-        # Send available cloud configs
-        from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config
-        await websocket.send_json({
-            "type": "cloud_configs",
-            "payload": {
-                "configs": {k: v["label"] for k, v in CLOUD_CONFIGS.items()},
-                "active": get_active_config(),
-            },
-        })
+        # Send available cloud configs if configured
+        if _cloud_config_fns is not None:
+            configs = _cloud_config_fns["configs"]()
+            active = _cloud_config_fns["get"]()
+            await websocket.send_json({
+                "type": "cloud_configs",
+                "payload": {
+                    "configs": {k: v["label"] for k, v in configs.items()},
+                    "active": active,
+                },
+            })
         while True:
             message = await websocket.receive()
             if message.get("type") == "websocket.disconnect":
@@ -112,11 +122,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     data = json.loads(message["text"])
                     if data.get("type") == "command" and command_callback is not None:
                         command_callback(data.get("payload", {}))
-                    elif data.get("type") == "set_cloud_config":
-                        from src.slam.depth_to_cloud import set_active_config, get_active_config, CLOUD_CONFIGS
+                    elif data.get("type") == "set_cloud_config" and _cloud_config_fns is not None:
                         key = data.get("config", "1")
-                        set_active_config(key)
-                        label = CLOUD_CONFIGS.get(key, {}).get("label", key)
+                        _cloud_config_fns["set"](key)
+                        configs = _cloud_config_fns["configs"]()
+                        label = configs.get(key, {}).get("label", key)
                         logger.info("Cloud config switched to %s: %s", key, label)
                         # Clear ALL accumulated data so new config builds fresh
                         if streaming_viz is not None:

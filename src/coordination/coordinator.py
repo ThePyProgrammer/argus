@@ -156,13 +156,7 @@ class Coordinator:
                     current_pos = robot.slam.slam_poses[-1][:3, 3]
                 else:
                     current_pos = np.array(robot.spawn_transform[:3, 3])
-                # Create a waypoint runner to the target
-                from src.control.waypoint_runner import WaypointRunner
-                waypoints = [target_pos]
-                robot.exploration._current_waypoint_runner = WaypointRunner(
-                    waypoints, linear_speed=robot.exploration._config.linear_speed,
-                    angular_speed=robot.exploration._config.angular_speed,
-                )
+                robot.exploration.set_waypoint_target([target_pos])
                 logger.info("Command received: send %s to (%.1f, %.1f)", robot_id, target[0], target[1])
         elif action == "restart":
             positions = command.get("positions")
@@ -198,8 +192,8 @@ class Coordinator:
             if len(occupied) == 0:
                 continue
             sensor_pos = robot.slam.slam_poses[-1][:3, 3] if robot.slam.slam_poses else np.zeros(3)
-            grid_2d = project_voxels_to_2d(occupied, robot.exploration._frontier_detector._resolution)
-            frontiers = robot.exploration._frontier_detector.detect(
+            grid_2d = project_voxels_to_2d(occupied, robot.exploration.frontier_resolution)
+            frontiers = robot.exploration.frontier_detector.detect(
                 occupied, np.array([sensor_pos]), grid_2d=grid_2d,
             )
             for f in frontiers:
@@ -368,7 +362,7 @@ class Coordinator:
                     if self._detector is not None:
                         self._detector.submit_frame(
                             rid, frames[rid].rgb, frames[rid].depth, pose,
-                            slam_cloud=robot.slam._last_frame_cloud if hasattr(robot.slam, '_last_frame_cloud') else None,
+                            slam_cloud=robot.slam.last_frame_cloud if hasattr(robot.slam, 'last_frame_cloud') else None,
                         )
                     if self._describer is not None:
                         self._describer.submit_frame(rid, frames[rid].rgb)
@@ -391,7 +385,7 @@ class Coordinator:
                         "slam_cloud_rgb": robot.slam.get_cloud_colors(),
                         "pose": pose,
                         "trajectory": list(robot.slam.slam_poses),
-                        "coverage_pct": robot.exploration._coverage_tracker._last_coverage,
+                        "coverage_pct": robot.exploration.last_coverage,
                         "detections": detections,
                         "scene_description": None,
                     }
@@ -465,10 +459,10 @@ class Coordinator:
             if len(occupied) == 0:
                 continue
             try:
-                grid_2d = project_voxels_to_2d(occupied, robot.exploration._frontier_detector._resolution)
+                grid_2d = project_voxels_to_2d(occupied, robot.exploration.frontier_resolution)
             except (ValueError, IndexError):
                 continue
-            frontiers = robot.exploration._frontier_detector.detect(
+            frontiers = robot.exploration.frontier_detector.detect(
                 occupied,
                 np.array([robot.slam.slam_poses[-1][:3, 3]])
                 if robot.slam.slam_poses

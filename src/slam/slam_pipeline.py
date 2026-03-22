@@ -110,6 +110,11 @@ class SLAMPipeline:
         return self._global_cloud
 
     @property
+    def last_frame_cloud(self) -> np.ndarray:
+        """Point cloud from the most recent frame (Nx3 float64)."""
+        return self._last_frame_cloud
+
+    @property
     def slam_poses(self) -> list[np.ndarray]:
         """List of estimated (4, 4) poses, one per processed frame."""
         return list(self._slam_poses)

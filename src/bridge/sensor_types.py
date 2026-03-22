@@ -59,10 +59,10 @@ class CameraIntrinsics:
         height: Image height in pixels.
     """
 
-    fx: float  # focal length x (pixels)
-    fy: float  # focal length y (pixels)
-    cx: float  # principal point x
-    cy: float  # principal point y
+    fx: float
+    fy: float
+    cx: float
+    cy: float
     width: int
     height: int
 

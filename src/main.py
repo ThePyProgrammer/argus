@@ -379,18 +379,25 @@ def run_web_mode(args):
         print("[cloud config] SLAM and OctoMap reset for all robots")
 
     from backend.web.server import create_app
+    from src.mcp.server import configure as configure_mcp, mcp_endpoint
+    from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config, set_active_config
+
+    configure_mcp(coordinator, list(config.robot_ids))
+
     app, streaming_viz = create_app(
         list(config.robot_ids),
         command_cb=coordinator._command_handler,
         slam_reset_cb=_reset_slam,
+        mcp_endpoint=mcp_endpoint,
+        cloud_config_fns={
+            "get": get_active_config,
+            "set": set_active_config,
+            "configs": lambda: CLOUD_CONFIGS,
+        },
     )
     coordinator._viz = streaming_viz
     if getattr(args, 'static', False):
         coordinator._static = True
-
-    # Configure MCP server for Claude Code integration
-    from src.mcp.server import configure as configure_mcp
-    configure_mcp(coordinator, list(config.robot_ids))
     print("MCP endpoint available at http://localhost:8000/mcp")
 
     # Build React frontend

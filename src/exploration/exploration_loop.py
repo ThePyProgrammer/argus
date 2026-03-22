@@ -152,6 +152,30 @@ class ExplorationLoop:
         self._last_bbox_coverage = 0.0
         self._last_frontier_count = 0
 
+    @property
+    def frontier_detector(self) -> FrontierDetector:
+        return self._frontier_detector
+
+    @property
+    def frontier_resolution(self) -> float:
+        return self._frontier_detector._resolution
+
+    @property
+    def last_coverage(self) -> float:
+        return self._coverage_tracker._last_coverage
+
+    @property
+    def config(self) -> ExplorationConfig:
+        return self._config
+
+    def set_waypoint_target(self, waypoints: list[np.ndarray]) -> None:
+        """Set a new waypoint sequence for the robot to follow."""
+        self._current_waypoint_runner = WaypointRunner(
+            waypoints,
+            linear_speed=self._config.linear_speed,
+            angular_speed=self._config.angular_speed,
+        )
+
     def step_once(
         self,
         frame: SensorFrame,
@@ -188,7 +212,7 @@ class ExplorationLoop:
         current_pos = pose[:3, 3].copy()
 
         # Insert this frame's cloud directly into OctoMap (not the global accumulator)
-        frame_cloud = self._slam._last_frame_cloud
+        frame_cloud = self._slam.last_frame_cloud
         if len(frame_cloud) > 0:
             self._octomap.insert_scan(frame_cloud, current_pos)
 
