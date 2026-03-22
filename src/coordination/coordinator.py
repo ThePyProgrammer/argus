@@ -26,7 +26,7 @@ import numpy as np
 
 from src.bridge.multi_bridge import MultiRobotBridge
 from src.coordination.robot_instance import RobotInstance, RobotMapMessage
-from src.coordination.multi_robot_config import MultiRobotConfig
+from src.bridge.multi_robot_config import MultiRobotConfig
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.coordination.map_merger import MapMerger
 

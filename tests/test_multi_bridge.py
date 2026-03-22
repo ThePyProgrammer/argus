@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.coordination.multi_robot_config import MultiRobotConfig
-from src.coordination.scene_builder import build_two_robot_scene
+from src.bridge.multi_robot_config import MultiRobotConfig
+from src.bridge.scene_builder import build_two_robot_scene
 from src.bridge.sensor_types import SensorFrame
 
 

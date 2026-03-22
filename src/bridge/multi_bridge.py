@@ -13,8 +13,8 @@ from typing import Any
 import numpy as np
 
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
-from src.coordination.multi_robot_config import MultiRobotConfig
-from src.coordination.scene_builder import build_two_robot_office_scene, build_two_robot_scene
+from src.bridge.multi_robot_config import MultiRobotConfig
+from src.bridge.scene_builder import build_two_robot_office_scene, build_two_robot_scene
 from src.locomotion import TrotGaitController, GaitParams
 
 logger = logging.getLogger(__name__)

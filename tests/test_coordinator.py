@@ -157,7 +157,7 @@ class TestCoordinatorBootPhase:
         """Partitioner.update_positions not called before boot_phase_steps."""
         from src.coordination.coordinator import Coordinator
         from src.coordination.robot_instance import RobotInstance
-        from src.coordination.multi_robot_config import MultiRobotConfig
+        from src.bridge.multi_robot_config import MultiRobotConfig
 
         config = MultiRobotConfig(boot_phase_steps=5)
         mock_bridge = MagicMock()
@@ -211,7 +211,7 @@ class TestCoordinatorMerge:
         """Merge triggered when step_once returns rescan_triggered=True."""
         from src.coordination.coordinator import Coordinator
         from src.coordination.robot_instance import RobotInstance
-        from src.coordination.multi_robot_config import MultiRobotConfig
+        from src.bridge.multi_robot_config import MultiRobotConfig
 
         config = MultiRobotConfig(boot_phase_steps=0)
         mock_bridge = MagicMock()
@@ -270,7 +270,7 @@ class TestCoordinatorMerge:
         """No merge (except final) when step_once never returns rescan_triggered."""
         from src.coordination.coordinator import Coordinator
         from src.coordination.robot_instance import RobotInstance
-        from src.coordination.multi_robot_config import MultiRobotConfig
+        from src.bridge.multi_robot_config import MultiRobotConfig
 
         config = MultiRobotConfig(boot_phase_steps=999)  # no partition
         mock_bridge = MagicMock()
@@ -322,7 +322,7 @@ class TestCoordinatorRepartition:
         """Re-partition triggers when should_repartition returns True."""
         from src.coordination.coordinator import Coordinator
         from src.coordination.robot_instance import RobotInstance
-        from src.coordination.multi_robot_config import MultiRobotConfig
+        from src.bridge.multi_robot_config import MultiRobotConfig
 
         config = MultiRobotConfig(boot_phase_steps=0)
         mock_bridge = MagicMock()
@@ -450,7 +450,7 @@ class TestPLCMSubscriptionSetup:
         """_setup_subscriptions creates one subscriber per robot on correct topics."""
         from src.coordination.coordinator import Coordinator
         from src.coordination.robot_instance import RobotInstance
-        from src.coordination.multi_robot_config import MultiRobotConfig
+        from src.bridge.multi_robot_config import MultiRobotConfig
 
         config = MultiRobotConfig()
         mock_bridge = MagicMock()

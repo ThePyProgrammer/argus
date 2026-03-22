@@ -219,7 +219,7 @@ def run_multi_mode(args):
     """Run two-robot coordinated exploration with map merging."""
     import math
 
-    from src.coordination.multi_robot_config import MultiRobotConfig
+    from src.bridge.multi_robot_config import MultiRobotConfig
     from src.bridge.multi_bridge import MultiRobotBridge
     from src.coordination.robot_instance import RobotInstance
     from src.coordination.coordinator import Coordinator
@@ -324,7 +324,7 @@ def run_web_mode(args):
 
     import uvicorn
 
-    from src.coordination.multi_robot_config import MultiRobotConfig
+    from src.bridge.multi_robot_config import MultiRobotConfig
     from src.bridge.multi_bridge import MultiRobotBridge
     from src.coordination.robot_instance import RobotInstance
     from src.coordination.coordinator import Coordinator

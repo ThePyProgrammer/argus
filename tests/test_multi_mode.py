@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from tests.conftest import MockMultiRobotBridge
-from src.coordination.multi_robot_config import MultiRobotConfig
+from src.bridge.multi_robot_config import MultiRobotConfig
 from src.coordination.robot_instance import RobotInstance
 from src.coordination.coordinator import Coordinator
 from src.coordination.map_merger import MapMerger
