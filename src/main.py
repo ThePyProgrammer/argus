@@ -23,7 +23,6 @@ Control modes:
 """
 
 import argparse
-import math
 import sys
 import time
 
@@ -157,11 +156,7 @@ def run_explore_mode(args):
 
     # Camera intrinsics (same as main())
     w, h = config.resolution
-    fov_rad = math.radians(70.0)
-    fx = h / (2.0 * math.tan(fov_rad / 2.0))  # fovy is vertical FOV → use height
-    intrinsics = CameraIntrinsics(
-        fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h
-    )
+    intrinsics = CameraIntrinsics.from_fov(w, h)
 
     slam = SLAMPipeline(intrinsics)
     octomap = OctoMapBuilder(resolution=args.octomap_resolution)
@@ -244,9 +239,7 @@ def run_multi_mode(args):
 
     # Camera intrinsics (same as single-robot mode)
     w, h = config.resolution
-    fov_rad = math.radians(70.0)
-    fx = h / (2.0 * math.tan(fov_rad / 2.0))  # fovy is vertical FOV → use height
-    intrinsics = CameraIntrinsics(fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h)
+    intrinsics = CameraIntrinsics.from_fov(w, h)
 
     explore_config = ExplorationConfig(
         max_steps=args.multi_max_steps,
@@ -350,9 +343,7 @@ def run_web_mode(args):
 
     # Camera intrinsics
     w, h = config.resolution
-    fov_rad = math.radians(70.0)
-    fx = h / (2.0 * math.tan(fov_rad / 2.0))  # fovy is vertical FOV → use height
-    intrinsics = CameraIntrinsics(fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h)
+    intrinsics = CameraIntrinsics.from_fov(w, h)
 
     explore_config = ExplorationConfig(
         max_steps=args.multi_max_steps,
@@ -539,11 +530,7 @@ def main():
     # MuJoCo fovy is VERTICAL FOV: f = height / (2 * tan(fovy/2))
     # f = 240 / (2 * tan(22.5°)) = 289.71
     w, h = config.resolution
-    fov_rad = math.radians(70.0)
-    fx = h / (2.0 * math.tan(fov_rad / 2.0))  # fovy is vertical FOV → use height
-    intrinsics = CameraIntrinsics(
-        fx=fx, fy=fx, cx=w / 2.0, cy=h / 2.0, width=w, height=h
-    )
+    intrinsics = CameraIntrinsics.from_fov(w, h)
 
     slam = SLAMPipeline(intrinsics)
     octomap = OctoMapBuilder(resolution=args.octomap_resolution)

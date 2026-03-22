@@ -65,3 +65,11 @@ class CameraIntrinsics:
     cy: float  # principal point y
     width: int
     height: int
+
+    @classmethod
+    def from_fov(cls, width: int, height: int, fov_degrees: float = 70.0) -> "CameraIntrinsics":
+        """Create intrinsics from vertical field-of-view angle."""
+        import math
+        fov_rad = math.radians(fov_degrees)
+        fx = height / (2.0 * math.tan(fov_rad / 2.0))
+        return cls(fx=fx, fy=fx, cx=width / 2.0, cy=height / 2.0, width=width, height=height)
