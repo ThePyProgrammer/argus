@@ -397,10 +397,9 @@ class TestExplorationLoopStepOnce:
 
         assert isinstance(linear, np.ndarray)
         assert isinstance(angular, float)
-        assert "rescan_triggered" in metrics
-        assert isinstance(metrics["rescan_triggered"], bool)
+        assert isinstance(metrics.rescan_triggered, bool)
         # First step always triggers rescan (waypoint_runner is None)
-        assert metrics["rescan_triggered"] is True
+        assert metrics.rescan_triggered is True
 
 
 class TestGoalSelectorWithBias:

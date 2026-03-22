@@ -11,10 +11,10 @@ from dataclasses import dataclass, field
 
 @dataclass
 class MultiRobotConfig:
-    """Configuration for a two-robot MuJoCo scene.
+    """Configuration for a multi-robot MuJoCo scene.
 
     Attributes:
-        robot_ids: Tuple of two robot identifier strings.
+        robot_ids: Tuple of robot identifier strings.
         spawn_positions: Mapping from robot_id to (x, y, z) world spawn position.
         resolution: Render resolution as (width, height).
         sim_steps_per_frame: Number of MuJoCo physics steps per sensor frame.

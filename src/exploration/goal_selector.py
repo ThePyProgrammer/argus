@@ -31,7 +31,6 @@ class GoalSelector:
 
     @property
     def strategy(self) -> str:
-        """Current selection strategy."""
         return self._strategy
 
     def select(

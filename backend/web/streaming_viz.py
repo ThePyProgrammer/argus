@@ -120,18 +120,8 @@ class WebStreamingViz:
         # Build color lookup based on mode
         if self._color_mode == "true_rgb":
             self._rgb_lookup = self._build_rgb_lookup(robot_data)
-            if self._rgb_lookup:
-                logger.info("RGB lookup: %d entries, %d merged voxels", len(self._rgb_lookup), len(merged_voxels))
-            else:
-                # Debug: check what data we actually got
-                for rid, data in robot_data.items():
-                    pts = data.get("slam_cloud_pts")
-                    cols = data.get("slam_cloud_rgb")
-                    logger.warning("RGB debug %s: pts=%s cols=%s",
-                        rid,
-                        f"{len(pts)} pts" if pts is not None and hasattr(pts, '__len__') else "None",
-                        f"{len(cols)} cols" if cols is not None and hasattr(cols, '__len__') else "None",
-                    )
+            if not self._rgb_lookup:
+                logger.debug("No RGB lookup entries for %d merged voxels", len(merged_voxels))
         else:
             self._rgb_lookup = None
 
@@ -342,13 +332,13 @@ class WebStreamingViz:
                     binary = encode_camera_frame(rid, frame.rgb)
                     self._message_queue.append(binary)
                 except Exception:
-                    pass
+                    logger.debug("Failed to encode camera frame for %s", rid)
                 if frame.depth is not None:
                     try:
                         depth_binary = encode_depth_frame(rid, frame.depth)
                         self._message_queue.append(depth_binary)
                     except Exception:
-                        pass
+                        logger.debug("Failed to encode depth frame for %s", rid)
 
     def _update_stats(
         self,

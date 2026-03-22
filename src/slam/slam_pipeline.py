@@ -107,7 +107,6 @@ class SLAMPipeline:
 
     @property
     def global_cloud(self) -> o3d.geometry.PointCloud:
-        """Accumulated global point cloud in world frame."""
         return self._global_cloud
 
     @property

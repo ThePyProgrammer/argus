@@ -15,48 +15,24 @@ Supports two modes:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
 
 
-def _check_obstacle(
-    depth: np.ndarray, linear_speed: float, danger_dist: float = 1.5,
-) -> tuple[np.ndarray, float] | None:
-    """Standalone obstacle check using depth image.
-
-    Returns (linear_vel, angular_vel) if obstacle detected, else None.
-    """
-    h, w = depth.shape
-    y_lo, y_hi = int(h * 0.1), int(h * 0.9)
-    scan = depth[y_lo:y_hi, :]
-
-    valid = scan[(scan > 0.05) & (scan < danger_dist)]
-    if len(valid) == 0:
-        return None
-
-    min_dist = float(np.min(valid))
-
-    # Steer away from closer side
-    third = scan.shape[1] // 3
-    left = scan[:, :third]
-    right = scan[:, 2 * third:]
-
-    def avg_close(region):
-        c = region[(region > 0.05) & (region < danger_dist)]
-        return float(np.mean(c)) if len(c) > 0 else danger_dist
-
-    turn = -1.5 if avg_close(left) < avg_close(right) else 1.5
-
-    if min_dist < 0.3:
-        return np.array([-linear_speed * 0.3, 0.0]), turn
-    elif min_dist < 0.6:
-        return np.array([0.0, 0.0]), turn
-    else:
-        factor = (min_dist - 0.6) / (danger_dist - 0.6)
-        return np.array([linear_speed * factor * 0.5, 0.0]), turn
-
 from src.bridge.sensor_types import SensorFrame
+
+
+@dataclass
+class StepMetrics:
+    """Metrics returned from ExplorationLoop.step_once()."""
+
+    frontiers: int
+    coverage: float
+    terminated: bool
+    voxels: int
+    rescan_triggered: bool
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector
@@ -128,7 +104,6 @@ class StuckRecovery:
 
     @property
     def is_active(self) -> bool:
-        """True while a recovery is in progress."""
         return self._active
 
 
@@ -182,7 +157,7 @@ class ExplorationLoop:
         frame: SensorFrame,
         step: int,
         score_fn: Callable[[np.ndarray], float] | None = None,
-    ) -> tuple[np.ndarray, float, dict]:
+    ) -> tuple[np.ndarray, float, StepMetrics]:
         """Process one exploration step without owning the bridge lifecycle.
 
         This is the multi-robot entry point. The Coordinator calls this per-robot
@@ -200,15 +175,9 @@ class ExplorationLoop:
             (linear_vel, angular_vel, metrics) where:
                 linear_vel: (2,) float64 velocity command
                 angular_vel: float
-                metrics: dict with keys:
-                    "frontiers": int (number of frontier clusters detected)
-                    "coverage": float (coverage percentage)
-                    "terminated": bool (True if no frontiers remain)
-                    "voxels": int (number of occupied voxels)
-                    "rescan_triggered": bool -- True if this step triggered a
-                        frontier rescan (distance or voxel-delta threshold met).
-                        CRITICAL: Coordinator uses this to trigger map merge
-                        per user decision (merge on same event as frontier rescan).
+                metrics: StepMetrics with frontier count, coverage, termination
+                    status, voxel count, and rescan trigger flag.
+                    CRITICAL: Coordinator uses rescan_triggered to trigger map merge.
         """
         config = self._config
 
@@ -246,13 +215,13 @@ class ExplorationLoop:
                 return (
                     np.array([vx, vy], dtype=np.float64),
                     omega,
-                    {
-                        "frontiers": self._last_frontier_count,
-                        "coverage": self._last_coverage,
-                        "terminated": False,
-                        "voxels": self._octomap.num_occupied,
-                        "rescan_triggered": False,
-                    },
+                    StepMetrics(
+                        frontiers=self._last_frontier_count,
+                        coverage=self._last_coverage,
+                        terminated=False,
+                        voxels=self._octomap.num_occupied,
+                        rescan_triggered=False,
+                    ),
                 )
             else:
                 # Recovery just completed -- force rescan for new frontier
@@ -405,13 +374,13 @@ class ExplorationLoop:
         # ----------------------------------------------------------
         self._last_position = current_pos.copy()
 
-        metrics = {
-            "frontiers": frontier_count,
-            "coverage": self._last_coverage,
-            "terminated": terminated,
-            "voxels": self._octomap.num_occupied,
-            "rescan_triggered": should_rescan,
-        }
+        metrics = StepMetrics(
+            frontiers=frontier_count,
+            coverage=self._last_coverage,
+            terminated=terminated,
+            voxels=self._octomap.num_occupied,
+            rescan_triggered=should_rescan,
+        )
 
         return linear_vel, angular_vel, metrics
 
@@ -432,9 +401,9 @@ class ExplorationLoop:
 
             self._bridge.set_velocity(linear_vel, angular_vel)
 
-            if metrics["terminated"] and step >= 50:
+            if metrics.terminated and step >= 50:
                 # Determine specific termination reason from frontier state
-                if metrics["frontiers"] == 0:
+                if metrics.frontiers == 0:
                     terminated_reason = "no_frontiers"
                 else:
                     terminated_reason = "all_unreachable"

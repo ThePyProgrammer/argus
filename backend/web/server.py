@@ -68,14 +68,14 @@ def _mount_static_dirs() -> None:
         try:
             app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
         except Exception:
-            pass
+            logger.warning("Failed to mount scene data from %s", scene_dir)
 
     frontend_dir = project_root / "frontend" / "dist"
     if frontend_dir.exists():
         try:
             app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
         except Exception:
-            pass
+            logger.warning("Failed to mount frontend from %s", frontend_dir)
 
 
 @app.websocket("/ws")
@@ -140,7 +140,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                             "payload": {"mode": mode},
                         })
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    logger.debug("Ignoring malformed WebSocket text message")
             elif "bytes" in message:
                 pass  # Binary messages from client not expected
     except WebSocketDisconnect:

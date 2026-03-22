@@ -61,11 +61,11 @@ def build_two_robot_scene(
     model_dir: str,
     spawn_positions: dict[str, tuple[float, float, float]],
 ) -> str:
-    """Build a MuJoCo XML scene containing two Go2 robots.
+    """Build a MuJoCo XML scene containing N Go2 robots.
 
     Reads go2.xml from model_dir, duplicates the robot body and actuators
-    with robot_a_ and robot_b_ prefixes, and inserts them into a scene
-    with floor and lighting.
+    with per-robot prefixes, and inserts them into a scene with floor
+    and lighting.
 
     Args:
         model_dir: Path to directory containing go2.xml and assets/.
@@ -127,7 +127,7 @@ def build_two_robot_scene(
                   texrepeat="5 5", reflectance="0.2")
     scene.append(merged_asset)
 
-    # Worldbody: floor + light + two robot bodies
+    # Worldbody: floor + light + N robot bodies
     wb = ET.SubElement(scene, "worldbody")
     ET.SubElement(wb, "light", pos="0 0 3", dir="0 0 -1", directional="true")
     ET.SubElement(wb, "geom", name="floor", size="100 100 0.05", type="plane",
@@ -195,9 +195,9 @@ def build_two_robot_office_scene(
     model_dir: str,
     spawn_positions: dict[str, tuple[float, float, float]],
 ) -> tuple[str, dict[str, bytes]]:
-    """Build a MuJoCo XML with two Go2 robots in the DimOS office scene.
+    """Build a MuJoCo XML with N Go2 robots in the DimOS office scene.
 
-    Loads scene_office1.xml from the DimOS data, injects two prefixed
+    Loads scene_office1.xml from the DimOS data, injects prefixed
     Go2 robot bodies and actuators, and returns the XML along with the
     asset dictionary needed for mujoco.MjModel.from_xml_string().
 

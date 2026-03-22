@@ -7,3 +7,6 @@ dist/
 
 *.pt
 *.egg-info/
+.desloppify/
+
+.claude/

@@ -145,76 +145,12 @@ class WaypointRunner:
 
         return linear_vel, float(angular_vel)
 
-    def _check_depth_avoidance(
-        self, depth: np.ndarray, danger_dist: float = 1.5
-    ) -> tuple[np.ndarray, float] | None:
-        """Check depth image for close obstacles and return avoidance command.
-
-        Uses three zones: wide scan for early detection, center for imminent
-        collision. Steers away from the closer side and slows/stops based on
-        proximity.
-
-        Args:
-            depth: (H, W) float32 depth in meters. 0 = invalid.
-            danger_dist: Distance threshold for obstacle detection in meters.
-
-        Returns:
-            (linear_vel, angular_vel) if avoidance needed, else None.
-        """
-        h, w = depth.shape
-
-        # Wide scan: full width, middle 80% of height
-        y_lo, y_hi = int(h * 0.1), int(h * 0.9)
-        scan = depth[y_lo:y_hi, :]
-
-        valid = scan[(scan > 0.05) & (scan < danger_dist)]
-        if len(valid) == 0:
-            return None  # No close obstacles
-
-        min_dist = float(np.min(valid))
-
-        # Split into left/right thirds for steering direction
-        third = scan.shape[1] // 3
-        left = scan[:, :third]
-        center = scan[:, third:2*third]
-        right = scan[:, 2*third:]
-
-        def avg_close(region):
-            close = region[(region > 0.05) & (region < danger_dist)]
-            return float(np.mean(close)) if len(close) > 0 else danger_dist
-
-        left_d = avg_close(left)
-        center_d = avg_close(center)
-        right_d = avg_close(right)
-
-        # Steer away from the closer side
-        if left_d < right_d:
-            turn = -self._angular_speed * 1.5  # Turn right hard
-        else:
-            turn = self._angular_speed * 1.5   # Turn left hard
-
-        # Speed: full stop if very close, slow if medium, normal if far
-        if min_dist < 0.3:
-            # Emergency: reverse
-            linear = np.array([-self._linear_speed * 0.3, 0.0])
-        elif min_dist < 0.6:
-            # Stop forward, only turn
-            linear = np.array([0.0, 0.0])
-        else:
-            # Slow down proportionally
-            speed_factor = (min_dist - 0.6) / (danger_dist - 0.6)
-            linear = np.array([self._linear_speed * speed_factor * 0.5, 0.0])
-
-        return linear, float(turn)
-
     @property
     def is_complete(self) -> bool:
-        """True if all waypoints have been visited."""
         return self._current_index >= len(self._waypoints)
 
     @property
     def current_waypoint_index(self) -> int:
-        """Index of the current target waypoint."""
         return self._current_index
 
     @property

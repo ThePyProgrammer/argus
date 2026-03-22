@@ -16,19 +16,12 @@ from typing import Any
 import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
-from src.bridge.sensor_types import SensorFrame
+from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
 from src.locomotion import TrotGaitController, GaitParams, patch_actuators_to_position
 from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
 
 logger = logging.getLogger(__name__)
 
-# Standing joint positions from go2.xml keyframe (position-controlled).
-_STANDING_QPOS = np.array([
-    0.0, 0.9, -1.8,   # FR: hip, thigh, calf
-    0.0, 0.9, -1.8,   # FL
-    0.0, 0.9, -1.8,   # RR
-    0.0, 0.9, -1.8,   # RL
-])
 
 
 class MuJoCoBridge:
@@ -99,7 +92,7 @@ class MuJoCoBridge:
 
         # Set initial standing pose (skip the 7 free-joint qpos: 3 pos + 4 quat)
         if self._model.nq >= 19:  # 7 (freejoint) + 12 (actuators)
-            self._data.qpos[7:19] = _STANDING_QPOS
+            self._data.qpos[7:19] = STANDING_QPOS
 
         # Settle the robot (let it land on ground)
         standing = self._gait.compute(0.0, 0.0, 0.0, 0.0)
@@ -234,19 +227,9 @@ class MuJoCoBridge:
 
         # Orientation: quaternion in qpos[3:7] (w, x, y, z in MuJoCo convention)
         quat = self._data.qpos[3:7]
-        pose[:3, :3] = self._quat_to_rotation_matrix(quat)
+        pose[:3, :3] = quat_to_rotation_matrix(quat)
 
         return pose
-
-    @staticmethod
-    def _quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
-        """Convert MuJoCo quaternion (w, x, y, z) to 3x3 rotation matrix."""
-        w, x, y, z = q
-        return np.array([
-            [1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
-            [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-            [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
-        ], dtype=np.float64)
 
     # ------------------------------------------------------------------
     # Properties
@@ -254,10 +237,8 @@ class MuJoCoBridge:
 
     @property
     def is_running(self) -> bool:
-        """True if the simulation is active."""
         return self._model is not None
 
     @property
     def step_count(self) -> int:
-        """Number of steps taken since start."""
         return self._step_count

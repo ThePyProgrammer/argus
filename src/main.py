@@ -300,8 +300,8 @@ def run_multi_mode(args):
             while viewer_handle.is_running():
                 viewer_handle.sync()
                 time.sleep(0.03)  # ~30fps
-        except (AttributeError, Exception):
-            pass
+        except Exception:
+            pass  # viewer may already be closed
 
     bridge.stop()
 
@@ -413,6 +413,7 @@ def run_web_mode(args):
                 cwd=str(frontend_dir),
                 check=True,
                 capture_output=True,
+                timeout=120,
             )
             print("Frontend build complete.")
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
@@ -445,7 +446,7 @@ def run_web_mode(args):
             try:
                 bridge.stop()
             except Exception:
-                pass
+                pass  # best-effort cleanup during restart
 
             # Update config with new or random positions
             if new_positions:

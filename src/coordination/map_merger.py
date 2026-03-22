@@ -1,4 +1,4 @@
-"""Map merger for fusing two robots' local maps into a unified global map.
+"""Map merger for fusing multiple robots' local maps into a unified global map.
 
 Uses union (OR) logic for voxel fusion: a voxel is occupied if EITHER
 robot observed it as occupied. No probabilistic merging (v2).
@@ -23,20 +23,9 @@ from src.slam.octomap_builder import OctoMapBuilder
 
 
 class MapMerger:
-    """Fuses two robots' local maps into a unified global map.
+    """Fuses multiple robots' local maps via union-OR voxel merging.
 
-    Uses union (OR) logic for voxel fusion: a voxel is occupied if
-    EITHER robot observed it as occupied. No probabilistic merging (v2).
-
-    Frame alignment uses known spawn transforms from config -- no ICP.
-    Since MuJoCo ground-truth poses are already in world frame, the spawn
-    transform is applied as a coordinate offset to each robot's local map.
-
-    Per CONTEXT.md decision: voxel-downsampled point clouds, union (OR) voxels.
-
-    This class can accept data either directly (OctoMapBuilder instances) or
-    via raw voxel arrays (for pLCM-based data flow where Coordinator passes
-    deserialized voxels received from subscriptions).
+    Accepts either OctoMapBuilder instances or raw voxel arrays.
     """
 
     def __init__(
@@ -152,10 +141,12 @@ class MapMerger:
 
     @property
     def last_merged_voxels(self) -> np.ndarray:
-        """The voxel array from the most recent merge operation."""
         return self._last_merged_voxels
+
+    @last_merged_voxels.setter
+    def last_merged_voxels(self, voxels: np.ndarray) -> None:
+        self._last_merged_voxels = voxels
 
     @property
     def last_merged_cloud(self) -> o3d.geometry.PointCloud:
-        """The point cloud from the most recent merge operation."""
         return self._last_merged_cloud

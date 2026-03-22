@@ -120,6 +120,8 @@ class Coordinator:
             {"action": "pause"} -- pause the coordination loop
             {"action": "resume"} -- resume after pause
             {"action": "set_speed", "value": N} -- set simulation speed
+            {"action": "send_to", "robot_id": str, "target": [x, y]} -- navigate robot to target
+            {"action": "restart", "positions": {rid: [x, y, z]}} -- restart with optional positions
 
         Args:
             command: Dict with at least an "action" key.
@@ -305,14 +307,14 @@ class Coordinator:
                 else:
                     self._bridge.set_velocity(rid, linear, angular)
 
-                if not metrics.get("terminated", False):
+                if not metrics.terminated:
                     all_terminated = False
 
                 # When rescan triggered: robot publishes map via pLCM
-                if metrics.get("rescan_triggered", False):
+                if metrics.rescan_triggered:
                     any_rescan_triggered = True
                     robot.publish_map_state(
-                        coverage_pct=metrics.get("coverage", 0.0),
+                        coverage_pct=metrics.coverage,
                     )
 
             # Never terminate early in multi-robot mode. The frontier
@@ -501,5 +503,5 @@ class Coordinator:
             combined = np.vstack(all_voxels)
             self._merger.merge_from_voxels(all_voxels[0], combined[len(all_voxels[0]):])
         elif len(all_voxels) == 1:
-            self._merger._last_merged_voxels = all_voxels[0]
+            self._merger.last_merged_voxels = all_voxels[0]
         self._merge_count += 1

@@ -1,6 +1,6 @@
-"""Multi-robot MuJoCo bridge -- loads two Go2 robots in a shared scene.
+"""Multi-robot MuJoCo bridge -- loads N Go2 robots in a shared scene.
 
-Extends the single-robot MuJoCoBridge concept to support two independently
+Extends the single-robot MuJoCoBridge concept to support N independently
 controlled robots. Each robot gets its own renderer, camera, and velocity
 buffer. Joint/actuator indices are discovered dynamically via mj_name2id().
 """
@@ -12,20 +12,12 @@ from typing import Any
 
 import numpy as np
 
-from src.bridge.sensor_types import SensorFrame
+from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
 from src.coordination.multi_robot_config import MultiRobotConfig
 from src.coordination.scene_builder import build_two_robot_office_scene, build_two_robot_scene
 from src.locomotion import TrotGaitController, GaitParams
 
 logger = logging.getLogger(__name__)
-
-# Standing joint positions from go2.xml keyframe (position-controlled).
-_STANDING_QPOS = np.array([
-    0.0, 0.9, -1.8,   # FR: hip, thigh, calf
-    0.0, 0.9, -1.8,   # FL
-    0.0, 0.9, -1.8,   # RR
-    0.0, 0.9, -1.8,   # RL
-])
 
 # Actuator name suffixes in the order they appear in go2.xml
 _ACTUATOR_NAMES = [
@@ -37,7 +29,7 @@ _ACTUATOR_NAMES = [
 
 
 class MultiRobotBridge:
-    """Bridge for two Go2 robots in a shared MuJoCo simulation.
+    """Bridge for N Go2 robots in a shared MuJoCo simulation.
 
     Lifecycle:
         1. ``bridge = MultiRobotBridge(config)``
@@ -161,7 +153,7 @@ class MultiRobotBridge:
         for robot_id in self._config.robot_ids:
             qstart = self._qpos_starts[robot_id]
             # qpos layout: [x, y, z, qw, qx, qy, qz, joint1..joint12]
-            self._data.qpos[qstart + 7 : qstart + 19] = _STANDING_QPOS
+            self._data.qpos[qstart + 7 : qstart + 19] = STANDING_QPOS
             # Set ctrl to standing via gait controller (zero velocity = standing)
             standing = self._gaits[robot_id].compute(0.0, 0.0, 0.0, 0.0)
             for i, act_id in enumerate(self._ctrl_indices[robot_id]):
@@ -304,7 +296,7 @@ class MultiRobotBridge:
             try:
                 self._viewer_handle.close()
             except Exception:
-                pass
+                logger.debug("Viewer handle close failed (may already be closed)")
             self._viewer_handle = None
         self._model = None
         self._data = None
@@ -431,7 +423,7 @@ class MultiRobotBridge:
 
         # Quaternion: w, x, y, z in MuJoCo convention
         quat = self._data.qpos[start + 3 : start + 7]
-        pose[:3, :3] = self._quat_to_rotation_matrix(quat)
+        pose[:3, :3] = quat_to_rotation_matrix(quat)
 
         return pose
 
@@ -453,31 +445,19 @@ class MultiRobotBridge:
         vy = float(linear[1]) if len(linear) > 1 else 0.0
         return self._gaits[robot_id].compute(vx, vy, angular, dt)
 
-    @staticmethod
-    def _quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
-        """Convert MuJoCo quaternion (w, x, y, z) to 3x3 rotation matrix."""
-        w, x, y, z = q
-        return np.array([
-            [1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
-            [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-            [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
-        ], dtype=np.float64)
-
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
 
     @property
     def is_running(self) -> bool:
-        """True if the simulation is active."""
         return self._model is not None
 
     @property
     def step_count(self) -> int:
-        """Number of steps taken since start."""
         return self._step_count
 
     @property
     def robot_ids(self) -> tuple[str, ...]:
-        """The two robot IDs."""
+        """All robot IDs in this simulation."""
         return self._config.robot_ids
