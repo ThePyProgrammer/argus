@@ -53,6 +53,20 @@ class RobotInstance:
     spawn_transform: np.ndarray  # (4, 4) world-frame offset (identity if at origin)
     publisher: pLCMTransport  # publishes RobotMapMessage to /{robot_id}/occupancy
 
+    def get_pose(self) -> np.ndarray:
+        """Return the latest SLAM pose, or identity if no poses yet."""
+        if self.slam.slam_poses:
+            return self.slam.slam_poses[-1]
+        return np.eye(4, dtype=np.float64)
+
+    def get_occupied_voxels(self) -> np.ndarray:
+        """Return occupied voxel centers from this robot's OctoMap."""
+        return self.octomap.get_occupied_voxels()
+
+    def get_cloud_data(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return (points, colors) from this robot's SLAM global cloud."""
+        return self.slam.get_cloud_points(), self.slam.get_cloud_colors()
+
     def publish_map_state(self, coverage_pct: float = 0.0) -> None:
         """Publish current occupancy grid and coverage via pLCM.
 

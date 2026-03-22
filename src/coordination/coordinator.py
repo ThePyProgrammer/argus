@@ -359,6 +359,7 @@ class Coordinator:
                     metrics = StepMetrics(
                         frontiers=0, coverage=0.0, terminated=True,
                         voxels=0, rescan_triggered=False,
+                        error=str(e),
                     )
 
                 if self._static:
@@ -498,7 +499,8 @@ class Coordinator:
         robot_data = {}
         for rid in robot_ids:
             robot = self._robots[rid]
-            pose = robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4)
+            pose = robot.get_pose()
+            cloud_pts, cloud_rgb = robot.get_cloud_data()
 
             # Submit frames for perception (background threads)
             if self._detector is not None:
@@ -522,9 +524,9 @@ class Coordinator:
 
             robot_data[rid] = {
                 "frame": frames[rid],
-                "local_voxels": robot.octomap.get_occupied_voxels(),
-                "slam_cloud_pts": robot.slam.get_cloud_points(),
-                "slam_cloud_rgb": robot.slam.get_cloud_colors(),
+                "local_voxels": robot.get_occupied_voxels(),
+                "slam_cloud_pts": cloud_pts,
+                "slam_cloud_rgb": cloud_rgb,
                 "pose": pose,
                 "trajectory": list(robot.slam.slam_poses),
                 "coverage_pct": robot.exploration.last_coverage,

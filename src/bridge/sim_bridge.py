@@ -16,8 +16,9 @@ import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
-from src.locomotion import TrotGaitController, GaitParams, patch_actuators_to_position
-from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
+from src.locomotion.gait_controller import TrotGaitController
+from src.locomotion.gait_params import GaitParams
+from src.locomotion.xml_patcher import patch_actuators_to_position, patch_actuators_to_position_with_floor
 
 logger = logging.getLogger(__name__)
 

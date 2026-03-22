@@ -33,6 +33,7 @@ class StepMetrics:
     terminated: bool
     voxels: int
     rescan_triggered: bool
+    error: str | None = None
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector

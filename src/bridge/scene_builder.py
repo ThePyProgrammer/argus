@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from src.locomotion import patch_actuators_to_position
+from src.locomotion.xml_patcher import patch_actuators_to_position
 
 
 # Attributes that contain names which must be prefixed
