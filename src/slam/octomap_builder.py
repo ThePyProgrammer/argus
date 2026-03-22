@@ -1,13 +1,7 @@
 """OctoMap-style occupancy grid builder using Open3D VoxelGrid.
 
-Uses Open3D's VoxelGrid as backend instead of octomap-python, which has
-build compatibility issues. Provides equivalent functionality: insert point
-cloud scans, query occupied voxels, and control resolution.
-
-NOTE: octomap-python (pip install octomap-python) failed to build due to
-CMake/scikit-build issues. Open3D VoxelGrid provides the same spatial
-discretization behavior needed for Phase 1. If octomap-python becomes
-available later, this can be swapped with minimal API changes.
+Uses Open3D's VoxelGrid as backend. Provides insert point cloud scans,
+query occupied voxels, and control resolution.
 """
 
 import numpy as np
