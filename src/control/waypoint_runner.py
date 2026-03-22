@@ -1,8 +1,7 @@
-"""Scripted waypoint follower for SimWorld robot navigation.
+"""Scripted waypoint follower for robot navigation.
 
 Drives the robot through a sequence of 3D waypoints using proportional
-control, producing velocity commands compatible with
-SimWorldGymBridge.set_velocity().
+control, producing (linear_vel, angular_vel) velocity commands.
 """
 
 from __future__ import annotations
@@ -37,10 +36,6 @@ class WaypointRunner:
             frame = bridge.step()
             current_pose = frame.ground_truth_pose
 
-    Note:
-        Because SimWorld uses a Discrete(6) action space, the bridge
-        maps these continuous velocities to the nearest discrete action.
-        Navigation will be coarse (grid-like movement with 90-degree turns).
     """
 
     def __init__(

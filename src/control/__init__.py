@@ -1,8 +1,7 @@
-"""Control modules for robot navigation in SimWorld.
+"""Control modules for robot velocity generation.
 
-Provides three control modes that share the same interface:
-``get_velocity() -> (np.ndarray, float)`` returning ``(linear_vel, angular_vel)``
-compatible with ``SimWorldGymBridge.set_velocity(linear, angular)``.
+Provides three control modes that produce velocity commands:
+``get_velocity() -> (np.ndarray, float)`` returning ``(linear_vel, angular_vel)``.
 
 Modules:
     teleop: Keyboard WASD control via pynput

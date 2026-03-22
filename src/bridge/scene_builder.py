@@ -44,19 +44,6 @@ def _prefix_element(elem: ET.Element, prefix: str) -> None:
         _prefix_element(child, prefix)
 
 
-def _prefix_actuators(actuator_elem: ET.Element, prefix: str) -> ET.Element:
-    """Create a prefixed copy of actuator elements."""
-    new_act = copy.deepcopy(actuator_elem)
-    for motor in new_act:
-        for attr in ("name", "joint", "tendon", "site"):
-            if attr in motor.attrib:
-                motor.attrib[attr] = prefix + motor.attrib[attr]
-        # Also prefix class if present
-        if "class" in motor.attrib:
-            motor.attrib["class"] = prefix + motor.attrib["class"]
-    return new_act
-
-
 def build_two_robot_scene(
     model_dir: str,
     spawn_positions: dict[str, tuple[float, float, float]],

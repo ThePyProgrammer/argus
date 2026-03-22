@@ -1,8 +1,7 @@
-"""Random exploration controller for SimWorld.
+"""Random exploration controller.
 
 Produces velocity commands that change direction periodically, biased
-toward forward motion to encourage exploration. Compatible with
-SimWorldGymBridge.set_velocity().
+toward forward motion to encourage exploration.
 """
 
 from __future__ import annotations
@@ -79,7 +78,7 @@ class RandomWalkController:
         else:
             vx = self._rng.uniform(-0.5, 0.0) * self._linear_speed
 
-        # Small lateral component (mostly zero for SimWorld discrete actions)
+        # Small lateral component
         vy = self._rng.uniform(-0.3, 0.3) * self._linear_speed
 
         # Angular velocity: uniform random

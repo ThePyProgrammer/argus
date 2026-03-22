@@ -300,7 +300,11 @@ class Coordinator:
                     if step < 10:
                         logger.warning("[Step %d] %s: %s", step, rid, e)
                     linear, angular = np.zeros(2), 0.0
-                    metrics = {"terminated": False, "rescan_triggered": False, "coverage": 0.0}
+                    from src.exploration.exploration_loop import StepMetrics
+                    metrics = StepMetrics(
+                        frontiers=0, coverage=0.0, terminated=False,
+                        voxels=0, rescan_triggered=False,
+                    )
 
                 if self._static:
                     self._bridge.set_velocity(rid, np.zeros(2), 0.0)

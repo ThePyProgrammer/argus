@@ -1,6 +1,6 @@
 """Keyboard WASD teleop controller using pynput.
 
-Thread-safe velocity output compatible with SimWorldGymBridge.set_velocity().
+Thread-safe velocity output producing (linear_vel, angular_vel) commands.
 
 Controls:
     W / S  -- forward / backward (vx)
@@ -69,7 +69,6 @@ class TeleopController:
 
         Returns:
             Tuple of (linear_vel as np.ndarray([vx, vy]), angular_vel as float).
-            Compatible with ``SimWorldGymBridge.set_velocity(linear, angular)``.
         """
         from pynput import keyboard
 
