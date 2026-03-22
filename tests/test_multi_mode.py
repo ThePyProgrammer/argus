@@ -147,8 +147,8 @@ def test_coordinator_without_viz(no_viz_setup):
     """Coordinator without viz runs without error (viz is None)."""
     coordinator = no_viz_setup
     result = coordinator.run(max_steps=10)
-    assert "total_steps" in result
-    assert result["total_steps"] > 0
+    assert hasattr(result, "total_steps")
+    assert result.total_steps > 0
 
 
 def test_viz_update_interval(viz_setup):

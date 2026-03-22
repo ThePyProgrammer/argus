@@ -1,8 +1,7 @@
 """MuJoCo bridge -- loads Unitree Go2 and publishes SensorFrame data.
 
 Uses MuJoCo's native renderer for RGB and depth images, and extracts
-ground-truth poses directly from the simulation state. This replaces the
-SimWorld gym bridge after pivoting to MuJoCo (no GPU required).
+ground-truth poses directly from the simulation state. No GPU required.
 
 The Go2 model comes from mujoco_menagerie (models/unitree_go2/).
 """

@@ -63,9 +63,9 @@ def test_coordinator_runs_without_crash(multi_robot_setup):
     """Coordinator.run() completes and returns expected result keys."""
     coordinator, merger, bridge, robots = multi_robot_setup
     result = coordinator.run(max_steps=30)
-    assert "total_steps" in result
-    assert "merge_count" in result
-    assert result["total_steps"] > 0
+    assert hasattr(result, "total_steps")
+    assert hasattr(result, "merge_count")
+    assert result.total_steps > 0
 
 
 def test_incremental_merge_during_exploration(multi_robot_setup):
@@ -73,7 +73,7 @@ def test_incremental_merge_during_exploration(multi_robot_setup):
     coordinator, merger, bridge, robots = multi_robot_setup
     result = coordinator.run(max_steps=30)
     # At least one merge should have happened during the run
-    assert result["merge_count"] >= 1, "Map merge must happen during exploration, not just at end"
+    assert result.merge_count >= 1, "Map merge must happen during exploration, not just at end"
 
 
 def test_two_robots_independent_data(multi_robot_setup):

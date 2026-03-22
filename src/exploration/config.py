@@ -1,7 +1,7 @@
 """Exploration configuration with all tunable parameters.
 
 Centralizes thresholds, speeds, and limits for the autonomous exploration
-loop. All values have sensible defaults suitable for SimWorld at 0.1m
+loop. All values have sensible defaults suitable for MuJoCo at 0.1m
 voxel resolution.
 """
 

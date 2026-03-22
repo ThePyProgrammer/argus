@@ -277,11 +277,11 @@ def run_multi_mode(args):
 
     if result is not None:
         print(f"\n=== Multi-Robot Exploration Complete ===")
-        print(f"Terminated: {result['terminated_reason']}")
-        print(f"Total steps: {result['total_steps']}")
-        print(f"Merge count: {result['merge_count']}")
-        print(f"Merged voxels: {result['merged_voxel_count']}")
-        for rid, count in result['per_robot_voxels'].items():
+        print(f"Terminated: {result.terminated_reason}")
+        print(f"Total steps: {result.total_steps}")
+        print(f"Merge count: {result.merge_count}")
+        print(f"Merged voxels: {result.merged_voxel_count}")
+        for rid, count in result.per_robot_voxels.items():
             print(f"  {rid}: {count} voxels")
 
     # Keep MuJoCo viewer open until user closes it
@@ -427,8 +427,8 @@ def run_web_mode(args):
         while True:
             try:
                 result = coordinator.run(max_steps=max_steps)
-                print(f"\nSimulation complete: {result['terminated_reason']}, "
-                      f"{result['total_steps']} steps, {result['merge_count']} merges")
+                print(f"\nSimulation complete: {result.terminated_reason}, "
+                      f"{result.total_steps} steps, {result.merge_count} merges")
             except Exception as e:
                 print(f"\nSimulation error: {e}")
 

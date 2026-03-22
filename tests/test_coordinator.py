@@ -264,7 +264,7 @@ class TestCoordinatorMerge:
             result = coordinator.run(max_steps=6)
 
         # Rescan on steps 0, 2, 4 -> 3 merge calls during loop + 1 final merge = 4
-        assert result["merge_count"] >= 3  # at least 3 rescan-triggered merges
+        assert result.merge_count >= 3  # at least 3 rescan-triggered merges
 
     def test_coordinator_no_merge_without_rescan(self):
         """No merge (except final) when step_once never returns rescan_triggered."""
@@ -312,7 +312,7 @@ class TestCoordinatorMerge:
             result = coordinator.run(max_steps=100)
 
         # Only the final merge
-        assert result["merge_count"] == 1
+        assert result.merge_count == 1
 
 
 class TestCoordinatorRepartition:

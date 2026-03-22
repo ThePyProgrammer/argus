@@ -20,6 +20,7 @@ Data flow (per user decision -- DimOS pLCM transport):
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
 
 import numpy as np
@@ -27,6 +28,17 @@ import numpy as np
 from src.bridge.multi_bridge import MultiRobotBridge
 from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.bridge.multi_robot_config import MultiRobotConfig
+
+
+@dataclass
+class CoordinationResult:
+    """Result of a multi-robot coordination run."""
+
+    total_steps: int
+    merge_count: int
+    terminated_reason: str
+    merged_voxel_count: int
+    per_robot_voxels: dict[str, int] = field(default_factory=dict)
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.coordination.map_merger import MapMerger
 
@@ -222,15 +234,11 @@ class Coordinator:
             transport.stop()
         self._subscribers.clear()
 
-    def run(self, max_steps: int = 0) -> dict:
+    def run(self, max_steps: int = 0) -> CoordinationResult:
         """Run the multi-robot coordination loop.
 
         Args:
             max_steps: Maximum steps. 0 = run forever (until Ctrl+C or stop command).
-
-        Returns:
-            dict with "total_steps", "merge_count", "terminated_reason",
-            "merged_voxel_count", "per_robot_voxels"
         """
         # Start pLCM subscriptions for robot data
         self._setup_subscriptions()
@@ -420,15 +428,15 @@ class Coordinator:
             robot.publisher.stop()
         self._bridge.stop()
 
-        return {
-            "total_steps": self._step_count + 1,
-            "merge_count": self._merge_count,
-            "terminated_reason": terminated_reason,
-            "merged_voxel_count": len(self._merger.last_merged_voxels),
-            "per_robot_voxels": {
+        return CoordinationResult(
+            total_steps=self._step_count + 1,
+            merge_count=self._merge_count,
+            terminated_reason=terminated_reason,
+            merged_voxel_count=len(self._merger.last_merged_voxels),
+            per_robot_voxels={
                 rid: self._robots[rid].octomap.num_occupied for rid in robot_ids
             },
-        }
+        )
 
     def _compute_partition(self, robot_ids: tuple[str, ...]) -> None:
         """Compute Voronoi partition from current robot positions (direct call)."""
