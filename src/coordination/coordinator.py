@@ -344,8 +344,8 @@ class Coordinator:
 
             # Visualization update (every 10 frames)
             if step % 10 == 0 and self._viz is not None:
-                # Merge only if data changed (not every viz frame)
-                if any_rescan_triggered or self._merge_count == 0:
+                # Merge if first frame and no merge happened yet
+                if self._merge_count == 0:
                     try:
                         self._merge_occupancy_maps(robot_ids)
                     except Exception:

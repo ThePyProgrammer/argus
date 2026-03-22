@@ -39,6 +39,15 @@ class SLAMPipeline:
         self._last_frame_cloud: np.ndarray = np.empty((0, 3))
         self._last_frame_colors: np.ndarray = np.empty((0, 3))
 
+    def reset(self) -> None:
+        """Clear all accumulated state for a fresh start."""
+        self._global_cloud = o3d.geometry.PointCloud()
+        self._slam_poses.clear()
+        self._prev_cloud = None
+        self._current_pose = np.eye(4)
+        self._last_frame_cloud = np.empty((0, 3))
+        self._last_frame_colors = np.empty((0, 3))
+
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         """Process one RGB-D frame. Returns estimated (4,4) pose.
 

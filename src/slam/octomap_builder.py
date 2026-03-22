@@ -19,6 +19,10 @@ class OctoMapBuilder:
         self._resolution = resolution
         self._accumulated_cloud = o3d.geometry.PointCloud()
 
+    def reset(self) -> None:
+        """Clear all accumulated voxel data for a fresh start."""
+        self._accumulated_cloud = o3d.geometry.PointCloud()
+
     def insert_scan(self, points: np.ndarray, sensor_origin: np.ndarray) -> None:
         """Insert a point cloud scan into the occupancy grid.
 
