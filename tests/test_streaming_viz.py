@@ -221,7 +221,7 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
         assert len(cloud_deltas) == 1
@@ -233,9 +233,9 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-            _ = viz.get_pending_messages()  # drain
+            _ = viz.drain_pending_messages()  # drain
             viz.update(merged, robot_data)  # same voxels
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
         # No new voxels => no cloud_delta message
@@ -247,7 +247,7 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         poses = [m for m in json_msgs if m.get("type") == POSE_UPDATE]
         assert len(poses) == 2
@@ -260,7 +260,7 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data, total_coverage=50.0, merge_count=3)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         stats = [m for m in json_msgs if m.get("type") == STATS]
         assert len(stats) == 1
@@ -281,7 +281,7 @@ class TestWebStreamingViz:
             robot_data[rid]["trajectory"] = poses
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         trajs = [m for m in json_msgs if m.get("type") == TRAJECTORY]
         assert len(trajs) == 2
@@ -295,7 +295,7 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
         assert len(cloud_deltas) == 1
@@ -313,7 +313,7 @@ class TestWebStreamingViz:
         robot_data = _make_robot_data(["robot_a", "robot_b"])
         with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
             viz.update(merged, robot_data)
-        msgs = viz.get_pending_messages()
+        msgs = viz.drain_pending_messages()
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         full_syncs = [m for m in json_msgs if m.get("type") == CLOUD_FULL]
         assert len(full_syncs) == 1

@@ -48,7 +48,7 @@ class WebStreamingViz:
         connection_manager: ConnectionManager,
         robot_ids: list[str],
     ) -> None:
-        self._cm = connection_manager
+        self._connection_manager = connection_manager
         self._robot_ids = robot_ids
         self._last_voxel_set: set[tuple[float, float, float]] = set()
         self._last_full_sync: float = 0.0
@@ -95,7 +95,7 @@ class WebStreamingViz:
         self._color_mode = mode
         logger.info("Color mode set to: %s", mode)
 
-    def get_pending_messages(self) -> list[dict | bytes]:
+    def drain_pending_messages(self) -> list[dict | bytes]:
         """Drain and return all queued messages.
 
         Returns:

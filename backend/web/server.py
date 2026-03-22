@@ -86,6 +86,37 @@ def _mount_static_dirs() -> None:
             logger.warning("Failed to mount frontend from %s", frontend_dir)
 
 
+async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
+    """Route an incoming WebSocket message to the appropriate handler."""
+    msg_type = data.get("type")
+    if msg_type == "command" and command_callback is not None:
+        command_callback(data.get("payload", {}))
+    elif msg_type == "set_cloud_config" and _cloud_config_fns is not None:
+        key = data.get("config", "1")
+        _cloud_config_fns["set"](key)
+        configs = _cloud_config_fns["configs"]()
+        label = configs.get(key, {}).get("label", key)
+        logger.info("Cloud config switched to %s: %s", key, label)
+        if streaming_viz is not None:
+            streaming_viz._last_voxel_set = set()
+        if _slam_reset_callback is not None:
+            _slam_reset_callback()
+        await websocket.send_json({
+            "type": "cloud_config_ack",
+            "payload": {"config": key, "label": label},
+        })
+    elif msg_type == "set_color_mode":
+        mode = data.get("mode", "robot_tint")
+        if streaming_viz is not None:
+            streaming_viz.set_color_mode(mode)
+            streaming_viz._last_voxel_set = set()
+            logger.info("Color mode switched to %s", mode)
+        await websocket.send_json({
+            "type": "color_mode_ack",
+            "payload": {"mode": mode},
+        })
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """Handle WebSocket connections for real-time data streaming.
@@ -120,35 +151,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 import json
                 try:
                     data = json.loads(message["text"])
-                    if data.get("type") == "command" and command_callback is not None:
-                        command_callback(data.get("payload", {}))
-                    elif data.get("type") == "set_cloud_config" and _cloud_config_fns is not None:
-                        key = data.get("config", "1")
-                        _cloud_config_fns["set"](key)
-                        configs = _cloud_config_fns["configs"]()
-                        label = configs.get(key, {}).get("label", key)
-                        logger.info("Cloud config switched to %s: %s", key, label)
-                        # Clear ALL accumulated data so new config builds fresh
-                        if streaming_viz is not None:
-                            streaming_viz._last_voxel_set = set()
-                        # Reset SLAM and OctoMap in each robot
-                        if _slam_reset_callback is not None:
-                            _slam_reset_callback()
-                        # Send acknowledgment
-                        await websocket.send_json({
-                            "type": "cloud_config_ack",
-                            "payload": {"config": key, "label": label},
-                        })
-                    elif data.get("type") == "set_color_mode":
-                        mode = data.get("mode", "robot_tint")
-                        if streaming_viz is not None:
-                            streaming_viz.set_color_mode(mode)
-                            streaming_viz._last_voxel_set = set()  # force full resend
-                            logger.info("Color mode switched to %s", mode)
-                        await websocket.send_json({
-                            "type": "color_mode_ack",
-                            "payload": {"mode": mode},
-                        })
+                    await _dispatch_ws_message(data, websocket)
                 except (json.JSONDecodeError, TypeError):
                     logger.debug("Ignoring malformed WebSocket text message")
             elif "bytes" in message:
@@ -179,7 +182,7 @@ async def push_loop(interval: float = 0.1) -> None:
     while True:
         await asyncio.sleep(interval)
         if streaming_viz is not None:
-            messages = streaming_viz.get_pending_messages()
+            messages = streaming_viz.drain_pending_messages()
             for msg in messages:
                 if isinstance(msg, bytes):
                     await manager.broadcast_bytes(msg)

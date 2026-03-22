@@ -340,14 +340,14 @@ class Coordinator:
             # "Merge triggers on the same event as frontier rescan")
             # NOT step % 50 or any fixed interval
             if any_rescan_triggered:
-                self._do_merge(robot_ids)
+                self._merge_occupancy_maps(robot_ids)
 
             # Visualization update (every 10 frames)
             if step % 10 == 0 and self._viz is not None:
                 # Merge only if data changed (not every viz frame)
                 if any_rescan_triggered or self._merge_count == 0:
                     try:
-                        self._do_merge(robot_ids)
+                        self._merge_occupancy_maps(robot_ids)
                     except Exception:
                         pass
 
@@ -420,7 +420,7 @@ class Coordinator:
                 break
 
         # Final merge
-        self._do_merge(robot_ids)
+        self._merge_occupancy_maps(robot_ids)
 
         # Cleanup
         self._teardown_subscriptions()
@@ -475,7 +475,7 @@ class Coordinator:
                     self._compute_partition(robot_ids)
                     break
 
-    def _do_merge(self, robot_ids: tuple[str, ...]) -> None:
+    def _merge_occupancy_maps(self, robot_ids: tuple[str, ...]) -> None:
         """Merge maps using data received via pLCM subscriptions.
 
         If pLCM data is available (from robot publish events), use the
