@@ -34,10 +34,10 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 
 ### Frontend Controls
 
-- [ ] **CTRL-01**: Algorithm picker dropdown lists available SLAM backends with their capability badges
-- [ ] **CTRL-02**: Selecting an algorithm triggers pre-session restart with the chosen backend
-- [ ] **CTRL-03**: Parameter tuning panel renders dynamically from backend's JSON schema
-- [ ] **CTRL-04**: Parameter changes are sent to backend via WebSocket and applied (where supported)
+- [x] **CTRL-01**: Algorithm picker dropdown lists available SLAM backends with their capability badges
+- [x] **CTRL-02**: Selecting an algorithm triggers pre-session restart with the chosen backend
+- [x] **CTRL-03**: Parameter tuning panel renders dynamically from backend's JSON schema
+- [x] **CTRL-04**: Parameter changes are sent to backend via WebSocket and applied (where supported)
 - [ ] **CTRL-05**: Live metrics dashboard shows ATE, RPE, processing time (ms/frame), and tracking status per robot
 - [ ] **CTRL-06**: Metrics comparison view shows current algorithm vs baseline ICP side-by-side
 - [ ] **CTRL-07**: Output format toggle switches Three.js viewer between point cloud, voxel grid, and mesh rendering modes
@@ -93,10 +93,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | MERG-02 | Phase 10 | Complete |
 | MERG-03 | Phase 10 | Complete |
 | MERG-04 | Phase 10 | Complete |
-| CTRL-01 | Phase 9 | Pending |
-| CTRL-02 | Phase 9 | Pending |
-| CTRL-03 | Phase 9 | Pending |
-| CTRL-04 | Phase 9 | Pending |
+| CTRL-01 | Phase 9 | Complete |
+| CTRL-02 | Phase 9 | Complete |
+| CTRL-03 | Phase 9 | Complete |
+| CTRL-04 | Phase 9 | Complete |
 | CTRL-05 | Phase 13 | Pending |
 | CTRL-06 | Phase 13 | Pending |
 | CTRL-07 | Phase 13 | Pending |
