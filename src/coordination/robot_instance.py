@@ -10,7 +10,6 @@ coverage status via pLCM. The Coordinator subscribes to these channels.
 
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -18,7 +17,7 @@ from src.slam.slam_pipeline import SLAMPipeline
 from src.slam.octomap_builder import OctoMapBuilder
 from src.exploration.exploration_loop import ExplorationLoop
 from src.exploration.config import ExplorationConfig
-from src.bridge.sensor_types import CameraIntrinsics
+from src.bridge.sensor_types import BridgeProtocol, CameraIntrinsics
 
 from src.coordination.transport import pLCMTransport
 
@@ -87,7 +86,7 @@ class RobotInstance:
     def create(
         cls,
         robot_id: str,
-        bridge: Any,  # duck-typed; only used for ExplorationLoop backward compat
+        bridge: BridgeProtocol,
         intrinsics: CameraIntrinsics,
         config: ExplorationConfig | None = None,
         spawn_position: tuple[float, float, float] = (0.0, 0.0, 0.3),

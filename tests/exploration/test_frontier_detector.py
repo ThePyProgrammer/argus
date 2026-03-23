@@ -1,7 +1,7 @@
 """Tests for 2D occupancy grid frontier detection.
 
 Verifies FrontierDetector identifies FREE cells adjacent to UNKNOWN cells,
-clusters them via BFS, and filters by minimum size.
+clusters them via BFS, and filters by minimum cluster size.
 """
 
 import numpy as np
@@ -30,21 +30,21 @@ class TestFrontierDetector:
         """Empty voxel array returns empty frontier list."""
         detector = FrontierDetector(resolution=0.1, min_cluster_size=3)
         empty = np.empty((0, 3), dtype=np.float64)
-        result = detector.detect(empty, np.zeros((1, 3)))
+        result = detector.detect(empty)
         assert result == []
 
     def test_all_unknown_no_frontiers(self):
         """Grid with only UNKNOWN cells has no frontiers (need FREE cells)."""
         detector = FrontierDetector(resolution=0.1, min_cluster_size=3)
         grid = _make_grid(np.full((10, 10), CELL_UNKNOWN))
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert result == []
 
     def test_all_free_no_frontiers(self):
         """Grid with only FREE cells has no frontiers (need UNKNOWN neighbors)."""
         detector = FrontierDetector(resolution=0.1, min_cluster_size=3)
         grid = _make_grid(np.full((10, 10), CELL_FREE))
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert result == []
 
     def test_free_unknown_boundary(self):
@@ -54,7 +54,7 @@ class TestFrontierDetector:
         g = np.full((10, 20), CELL_UNKNOWN, dtype=np.int8)
         g[:, :10] = CELL_FREE
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
 
         assert len(result) >= 1
         # Frontier should be along the column 9 (last FREE column, adjacent to UNKNOWN)
@@ -68,7 +68,7 @@ class TestFrontierDetector:
         g = np.full((10, 10), CELL_UNKNOWN, dtype=np.int8)
         g[4:6, :] = CELL_OCCUPIED  # wall across the middle
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert result == []
 
     def test_free_next_to_occupied_not_frontier(self):
@@ -77,17 +77,17 @@ class TestFrontierDetector:
         g = np.full((10, 10), CELL_FREE, dtype=np.int8)
         g[5, 5] = CELL_OCCUPIED  # one obstacle in the middle
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert result == []  # no UNKNOWN cells means no frontiers
 
     def test_min_cluster_filter(self):
         """Small frontier clusters below min_cluster_size are filtered out."""
         detector = FrontierDetector(resolution=0.1, min_cluster_size=5)
-        # Create a grid with a tiny FREE→UNKNOWN boundary (2 cells)
+        # Create a grid with a tiny FREE->UNKNOWN boundary (2 cells)
         g = np.full((10, 10), CELL_UNKNOWN, dtype=np.int8)
         g[5, 4:6] = CELL_FREE  # only 2 FREE cells adjacent to UNKNOWN
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert result == []  # 2 cells < min_cluster_size of 5
 
     def test_two_separate_frontiers(self):
@@ -98,7 +98,7 @@ class TestFrontierDetector:
         g[2:5, 2:5] = CELL_FREE    # top-left patch
         g[15:18, 15:18] = CELL_FREE  # bottom-right patch
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert len(result) == 2
 
     def test_frontier_cluster_types(self):
@@ -107,7 +107,7 @@ class TestFrontierDetector:
         g = np.full((10, 20), CELL_UNKNOWN, dtype=np.int8)
         g[:, :10] = CELL_FREE
         grid = _make_grid(g)
-        result = detector.detect(np.zeros((1, 3)), np.zeros((1, 3)), grid_2d=grid)
+        result = detector.detect(np.zeros((1, 3)), grid_2d=grid)
         assert len(result) > 0
         cluster = result[0]
         assert isinstance(cluster, FrontierCluster)

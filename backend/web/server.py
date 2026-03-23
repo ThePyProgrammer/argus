@@ -20,14 +20,6 @@ from backend.web.streaming_viz import WebStreamingViz
 
 logger = logging.getLogger(__name__)
 
-# Module-level state (set by create_app)
-manager = ConnectionManager()
-streaming_viz: WebStreamingViz | None = None
-command_callback: Callable[[dict[str, Any]], None] | None = None
-_slam_reset_callback: Callable[[], None] | None = None
-_robot_ids: list[str] = []
-_cloud_config_fns: dict[str, Callable] | None = None
-
 app = FastAPI(title="C2 Interface")
 
 
@@ -40,6 +32,8 @@ def create_app(
 ) -> tuple[FastAPI, WebStreamingViz]:
     """Configure and return the FastAPI app.
 
+    Stores all shared state on app.state instead of module-level globals.
+
     Args:
         robot_ids: List of robot identifiers.
         command_cb: Callback for command messages from WebSocket clients.
@@ -51,19 +45,17 @@ def create_app(
     Returns:
         Tuple of (FastAPI app, WebStreamingViz instance).
     """
-    global manager, streaming_viz, command_callback, _slam_reset_callback, _robot_ids
-    global _cloud_config_fns
-    manager = ConnectionManager()
-    streaming_viz = WebStreamingViz(manager, robot_ids)
-    command_callback = command_cb
-    _slam_reset_callback = slam_reset_cb
-    _robot_ids = robot_ids
-    _cloud_config_fns = cloud_config_fns
+    app.state.manager = ConnectionManager()
+    app.state.streaming_viz = WebStreamingViz(app.state.manager, robot_ids)
+    app.state.command_callback = command_cb
+    app.state.slam_reset_callback = slam_reset_cb
+    app.state.robot_ids = robot_ids
+    app.state.cloud_config_fns = cloud_config_fns
 
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)
 
-    return app, streaming_viz
+    return app, app.state.streaming_viz
 
 
 def _mount_static_dirs() -> None:
@@ -87,28 +79,29 @@ def _mount_static_dirs() -> None:
 
 async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
     """Route an incoming WebSocket message to the appropriate handler."""
+    state = websocket.app.state
     msg_type = data.get("type")
-    if msg_type == "command" and command_callback is not None:
-        command_callback(data.get("payload", {}))
-    elif msg_type == "set_cloud_config" and _cloud_config_fns is not None:
+    if msg_type == "command" and state.command_callback is not None:
+        state.command_callback(data.get("payload", {}))
+    elif msg_type == "set_cloud_config" and state.cloud_config_fns is not None:
         key = data.get("config", "1")
-        _cloud_config_fns["set"](key)
-        configs = _cloud_config_fns["configs"]()
+        state.cloud_config_fns["set"](key)
+        configs = state.cloud_config_fns["configs"]()
         label = configs.get(key, {}).get("label", key)
         logger.info("Cloud config switched to %s: %s", key, label)
-        if streaming_viz is not None:
-            streaming_viz.reset_cloud_tracking()
-        if _slam_reset_callback is not None:
-            _slam_reset_callback()
+        if state.streaming_viz is not None:
+            state.streaming_viz.reset_cloud_tracking()
+        if state.slam_reset_callback is not None:
+            state.slam_reset_callback()
         await websocket.send_json({
             "type": "cloud_config_ack",
             "payload": {"config": key, "label": label},
         })
     elif msg_type == "set_color_mode":
         mode = data.get("mode", "robot_tint")
-        if streaming_viz is not None:
-            streaming_viz.set_color_mode(mode)
-            streaming_viz.reset_cloud_tracking()
+        if state.streaming_viz is not None:
+            state.streaming_viz.set_color_mode(mode)
+            state.streaming_viz.reset_cloud_tracking()
             logger.info("Color mode switched to %s", mode)
         await websocket.send_json({
             "type": "color_mode_ack",
@@ -124,17 +117,19 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     Loop: receives JSON messages; dispatches commands to callback.
     On disconnect: removes client from manager.
     """
+    state = websocket.app.state
+    manager = state.manager
     await manager.connect(websocket)
     try:
         # Send robot list on connect
         await websocket.send_json({
             "type": "robot_list",
-            "payload": {"robots": _robot_ids},
+            "payload": {"robots": state.robot_ids},
         })
         # Send available cloud configs if configured
-        if _cloud_config_fns is not None:
-            configs = _cloud_config_fns["configs"]()
-            active = _cloud_config_fns["get"]()
+        if state.cloud_config_fns is not None:
+            configs = state.cloud_config_fns["configs"]()
+            active = state.cloud_config_fns["get"]()
             await websocket.send_json({
                 "type": "cloud_configs",
                 "payload": {
@@ -180,8 +175,10 @@ async def push_loop(interval: float = 0.1) -> None:
     """
     while True:
         await asyncio.sleep(interval)
+        streaming_viz = getattr(app.state, "streaming_viz", None)
         if streaming_viz is not None:
             messages = streaming_viz.drain_pending_messages()
+            manager = app.state.manager
             for msg in messages:
                 if isinstance(msg, bytes):
                     await manager.broadcast_bytes(msg)

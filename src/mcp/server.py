@@ -15,19 +15,22 @@ Protocol: JSON-RPC 2.0 (same as DimOS MCP server)
 
 import json
 import logging
-from typing import Any, Callable
+from typing import Any, TYPE_CHECKING
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+if TYPE_CHECKING:
+    from src.coordination.coordinator import Coordinator
+
 logger = logging.getLogger(__name__)
 
 # Module-level state, set by configure()
-_coordinator = None
+_coordinator: "Coordinator | None" = None
 _robot_ids: list[str] = []
 
 
-def configure(coordinator: Any, robot_ids: list[str]) -> None:
+def configure(coordinator: "Coordinator", robot_ids: list[str]) -> None:
     """Set the coordinator reference for MCP tool calls."""
     global _coordinator, _robot_ids
     _coordinator = coordinator
@@ -93,21 +96,13 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
         return json.dumps({"error": "Coordinator not initialized"})
 
     if name == "get_status":
-        status = {
+        status: dict[str, Any] = {
             "step": _coordinator.step_count,
             "merge_count": _coordinator.merge_count,
             "robots": {},
         }
         for rid in _robot_ids:
-            robot = _coordinator.robots.get(rid)
-            if robot and robot.slam.slam_poses:
-                pos = robot.slam.slam_poses[-1][:3, 3].tolist()
-            else:
-                pos = [0, 0, 0]
-            status["robots"][rid] = {
-                "position": pos,
-                "voxels": robot.octomap.num_occupied if robot else 0,
-            }
+            status["robots"][rid] = _coordinator.get_robot_status(rid)
         return json.dumps(status)
 
     elif name == "get_detections":
@@ -133,24 +128,20 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
     elif name == "send_command":
         action = arguments.get("action", "")
         value = arguments.get("value")
-        cmd = {"action": action}
+        cmd: dict[str, Any] = {"action": action}
         if value is not None:
             cmd["value"] = value
         _coordinator.handle_command(cmd)
         return json.dumps({"status": "ok", "action": action})
 
     elif name == "get_coverage":
-        result = {
+        result: dict[str, Any] = {
             "step": _coordinator.step_count,
             "merge_count": _coordinator.merge_count,
             "per_robot": {},
         }
         for rid in _robot_ids:
-            robot = _coordinator.robots.get(rid)
-            result["per_robot"][rid] = {
-                "voxels": robot.octomap.num_occupied if robot else 0,
-                "slam_frames": robot.slam.num_frames_processed if robot else 0,
-            }
+            result["per_robot"][rid] = _coordinator.get_robot_coverage(rid)
         return json.dumps(result)
 
     return json.dumps({"error": f"Unknown tool: {name}"})

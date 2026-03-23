@@ -59,7 +59,7 @@ from src.viz.rerun_viz import RerunVisualizer
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
     parser.add_argument(
@@ -135,7 +135,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_controller(mode: str):
+def create_controller(mode: str) -> WaypointRunner | RandomWalkController:
     """Create the appropriate controller for the given mode.
 
     Args:
@@ -163,7 +163,7 @@ def create_controller(mode: str):
         raise ValueError(f"Unknown control mode: {mode}")
 
 
-def run_explore_mode(args):
+def run_explore_mode(args: argparse.Namespace) -> None:
     """Run autonomous frontier-based exploration."""
     config = MuJoCoEnvConfig()
     bridge = MuJoCoBridge(config)
@@ -215,7 +215,7 @@ def run_explore_mode(args):
     print("Done.")
 
 
-def run_multi_mode(args):
+def run_multi_mode(args: argparse.Namespace) -> None:
     """Run two-robot coordinated exploration with map merging."""
     scene = args.scene
     n_robots = args.num_robots
@@ -253,7 +253,7 @@ def run_multi_mode(args):
     viz = MultiRobotVisualizer(app_name="multi_robot_viz")
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config, viz=viz)
     if args.static:
-        coordinator.set_static(True)
+        coordinator.set_freeze_motion(True)
 
     print("Starting multi-robot exploration...")
     logger.info("Robots: %s", config.robot_ids)
@@ -296,7 +296,7 @@ def run_multi_mode(args):
     print("Done.")
 
 
-def run_web_mode(args):
+def run_web_mode(args: argparse.Namespace) -> None:
     """Run the C2 web interface: FastAPI + MuJoCo simulation together.
 
     Starts the multi-robot simulation in a background thread and serves
@@ -363,7 +363,7 @@ def run_web_mode(args):
     )
     coordinator.set_viz(streaming_viz)
     if args.static:
-        coordinator.set_static(True)
+        coordinator.set_freeze_motion(True)
     logger.info("MCP endpoint available at http://localhost:8000/mcp")
 
     # Build React frontend
@@ -467,7 +467,7 @@ def run_web_mode(args):
         print("Done.")
 
 
-def main():
+def main() -> None:
     """Run the single-robot SLAM loop."""
     args = parse_args()
 

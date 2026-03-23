@@ -15,10 +15,13 @@ Supports two modes:
 
 import logging
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from src.slam.slam_pipeline import SLAMPipeline
+    from src.slam.octomap_builder import OctoMapBuilder
 
 from src.bridge.sensor_types import BridgeProtocol, SensorFrame
 
@@ -124,7 +127,13 @@ class ExplorationLoop:
         config: Exploration configuration (uses defaults if None).
     """
 
-    def __init__(self, bridge: BridgeProtocol, slam, octomap, config: ExplorationConfig | None = None):
+    def __init__(
+        self,
+        bridge: BridgeProtocol,
+        slam: "SLAMPipeline",
+        octomap: "OctoMapBuilder",
+        config: ExplorationConfig | None = None,
+    ):
         self._bridge = bridge
         self._slam = slam
         self._octomap = octomap
@@ -304,7 +313,7 @@ class ExplorationLoop:
             )
 
             frontiers = self._frontier_detector.detect(
-                occupied, np.array(self._robot_positions),
+                occupied,
                 grid_2d=grid_2d,
             )
 

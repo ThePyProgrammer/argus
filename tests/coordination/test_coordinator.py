@@ -342,8 +342,8 @@ class TestCoordinatorRepartition:
             r.spawn_transform = np.eye(4, dtype=np.float64)
             r.publisher = MagicMock()
             r.exploration = MagicMock()
-            r.exploration._frontier_detector = MagicMock()
-            r.exploration._frontier_detector.detect.return_value = [
+            r.exploration.frontier_detector = MagicMock()
+            r.exploration.frontier_detector.detect.return_value = [
                 _make_cluster([5, 0, 0]),
             ]
             r.exploration.step_once.return_value = (

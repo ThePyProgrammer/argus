@@ -55,7 +55,7 @@ class FrontierDetector:
         self._min_cluster_size = min_cluster_size
 
     def detect(
-        self, occupied_voxels: np.ndarray, robot_positions: np.ndarray,
+        self, occupied_voxels: np.ndarray,
         grid_2d: OccupancyGrid2D | None = None,
     ) -> list[FrontierCluster]:
         """Detect frontier clusters.
@@ -63,8 +63,6 @@ class FrontierDetector:
         Args:
             occupied_voxels: (N, 3) float64 voxel centers (used to build
                 grid if grid_2d not provided).
-            robot_positions: (M, 3) float64 visited positions (unused,
-                kept for API compatibility).
             grid_2d: Pre-built 2D occupancy grid. If None, one is built
                 from occupied_voxels using default parameters.
 

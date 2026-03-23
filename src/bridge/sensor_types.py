@@ -12,16 +12,6 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 
-@runtime_checkable
-class BridgeProtocol(Protocol):
-    """Minimal interface for a simulation bridge used by ExplorationLoop."""
-
-    def start(self) -> SensorFrame: ...
-    def step(self) -> SensorFrame: ...
-    def set_velocity(self, linear: np.ndarray, angular: float) -> None: ...
-    def stop(self) -> None: ...
-
-
 # Standing joint positions from go2.xml keyframe (position-controlled).
 STANDING_QPOS = np.array([
     0.0, 0.9, -1.8,   # FR: hip, thigh, calf
@@ -85,3 +75,13 @@ class CameraIntrinsics:
         fov_rad = math.radians(fov_degrees)
         fx = height / (2.0 * math.tan(fov_rad / 2.0))
         return cls(fx=fx, fy=fx, cx=width / 2.0, cy=height / 2.0, width=width, height=height)
+
+
+@runtime_checkable
+class BridgeProtocol(Protocol):
+    """Minimal interface for a simulation bridge used by ExplorationLoop."""
+
+    def start(self) -> SensorFrame: ...
+    def step(self) -> SensorFrame: ...
+    def set_velocity(self, linear: np.ndarray, angular: float) -> None: ...
+    def stop(self) -> None: ...

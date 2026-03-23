@@ -103,7 +103,7 @@ class Coordinator:
         config: MultiRobotConfig,
         partitioner: VoronoiPartitioner | None = None,
         merger: MapMerger | None = None,
-        viz: Any = None,
+        viz: "MultiRobotVisualizer | None" = None,
     ):
         self._bridge = bridge
         self._robots = robots
@@ -139,7 +139,7 @@ class Coordinator:
         # Web control flags (set via _command_handler from C2 interface)
         self._should_stop: bool = False
         self._paused: bool = False
-        self._static: bool = False  # set True to keep robots stationary
+        self._freeze_motion: bool = False  # set True to keep robots stationary
 
         # Restart state
         self._restart_requested: bool = False
@@ -181,11 +181,11 @@ class Coordinator:
     def restart_positions(self) -> dict | None:
         return self._restart_positions
 
-    def set_viz(self, viz) -> None:
+    def set_viz(self, viz: "MultiRobotVisualizer | None") -> None:
         self._viz = viz
 
-    def set_static(self, static: bool) -> None:
-        self._static = static
+    def set_freeze_motion(self, freeze: bool) -> None:
+        self._freeze_motion = freeze
 
     def request_stop(self) -> None:
         self._should_stop = True
@@ -194,7 +194,37 @@ class Coordinator:
         """Clear the map merger's accumulated data."""
         self._merger.last_merged_voxels = np.empty((0, 3))
 
-    def reset_for_restart(self, bridge, robots: dict[str, RobotInstance]) -> None:
+    def get_robot_status(self, rid: str) -> dict:
+        """Return status data for a single robot (position, voxel count).
+
+        Used by MCP server to avoid reaching through coordinator.robots.
+        """
+        robot = self._robots.get(rid)
+        if robot is None:
+            return {"position": [0, 0, 0], "voxels": 0}
+        if robot.slam.slam_poses:
+            pos = robot.slam.slam_poses[-1][:3, 3].tolist()
+        else:
+            pos = [0, 0, 0]
+        return {
+            "position": pos,
+            "voxels": robot.octomap.num_occupied,
+        }
+
+    def get_robot_coverage(self, rid: str) -> dict:
+        """Return coverage data for a single robot (voxels, SLAM frames).
+
+        Used by MCP server to avoid reaching through coordinator.robots.
+        """
+        robot = self._robots.get(rid)
+        if robot is None:
+            return {"voxels": 0, "slam_frames": 0}
+        return {
+            "voxels": robot.octomap.num_occupied,
+            "slam_frames": robot.slam.num_frames_processed,
+        }
+
+    def reset_for_restart(self, bridge: MultiRobotBridge, robots: dict[str, RobotInstance]) -> None:
         """Reset coordinator state for a simulation restart."""
         self._bridge = bridge
         self._robots = robots
@@ -290,10 +320,9 @@ class Coordinator:
             occupied = robot.octomap.get_occupied_voxels()
             if len(occupied) == 0:
                 continue
-            sensor_pos = robot.slam.slam_poses[-1][:3, 3] if robot.slam.slam_poses else np.zeros(3)
             grid_2d = project_voxels_to_2d(occupied, robot.exploration.frontier_resolution)
             frontiers = robot.exploration.frontier_detector.detect(
-                occupied, np.array([sensor_pos]), grid_2d=grid_2d,
+                occupied, grid_2d=grid_2d,
             )
             for f in frontiers:
                 # Convert grid (row, col) to world XY with z=0
@@ -393,7 +422,7 @@ class Coordinator:
                         error=str(e),
                     )
 
-                if self._static:
+                if self._freeze_motion:
                     self._bridge.set_velocity(rid, np.zeros(2), 0.0)
                 else:
                     self._bridge.set_velocity(rid, linear, angular)
@@ -481,9 +510,6 @@ class Coordinator:
                 continue
             frontiers = robot.exploration.frontier_detector.detect(
                 occupied,
-                np.array([robot.slam.slam_poses[-1][:3, 3]])
-                if robot.slam.slam_poses
-                else np.zeros((1, 3)),
                 grid_2d=grid_2d,
             )
             if frontiers:

@@ -138,7 +138,7 @@ class TestExplorationLoop:
 
         call_count = 0
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
@@ -170,7 +170,7 @@ class TestExplorationLoop:
 
         detect_calls = [0]
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             detect_calls[0] += 1
             if detect_calls[0] <= 2:
                 return frontiers
@@ -212,7 +212,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             return [
                 _make_cluster([2.0, 0.0, 0.0]),
                 _make_cluster([5.0, 0.0, 0.0]),
@@ -234,7 +234,7 @@ class TestExplorationLoop:
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
         # Always return frontiers and valid paths so loop never terminates naturally
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             return [_make_cluster([10.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
@@ -258,7 +258,7 @@ class TestExplorationLoop:
 
         detect_call_count = [0]
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             detect_call_count[0] += 1
             # After a few detections, return empty to terminate
             if detect_call_count[0] > 3:
@@ -284,7 +284,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             return [_make_cluster([10.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
@@ -306,7 +306,7 @@ class TestExplorationLoop:
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             return []
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect):
@@ -338,7 +338,7 @@ class TestStuckRecovery:
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
         # Mock frontier detection to return frontiers (keep loop alive)
-        def fake_detect(occupied, robot_positions, grid_2d=None):
+        def fake_detect(occupied, grid_2d=None):
             return [_make_cluster([5.0, 0.0, 0.0])]
 
         with patch.object(loop._frontier_detector, "detect", side_effect=fake_detect), \
