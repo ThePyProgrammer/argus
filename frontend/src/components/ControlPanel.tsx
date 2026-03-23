@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
+import AlgorithmSection from './AlgorithmSection';
 
 export default function ControlPanel() {
   const [showCloudConfig, setShowCloudConfig] = useState(false);
@@ -137,6 +138,8 @@ export default function ControlPanel() {
           {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
         </button>
       </div>
+
+      <AlgorithmSection />
 
       {/* Restart section */}
       <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
