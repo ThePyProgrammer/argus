@@ -125,6 +125,16 @@ export class PointCloudManager {
     this.points.position.set(x, y, z);
   }
 
+  /** Control visibility for cross-fade transitions. */
+  setVisible(visible: boolean): void {
+    this.points.visible = visible;
+  }
+
+  /** Access material for opacity control during cross-fade. */
+  getMaterial(): THREE.PointsMaterial {
+    return this.points.material as THREE.PointsMaterial;
+  }
+
   /** Release GPU resources. */
   dispose(): void {
     this.geometry.dispose();

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointCloudManager } from './PointCloud';
+import { VoxelManager } from './VoxelManager';
+import { MeshManager } from './MeshManager';
 import { RobotMarkerManager } from './RobotMarker';
 import { TrajectoryTrailManager } from './TrajectoryTrail';
 import { DetectionBoxManager } from './DetectionBoxes';
@@ -9,6 +11,7 @@ import { CameraFrustumManager } from './CameraFrustum';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore } from '../stores/slamStore';
+import { useMetricsStore } from '../stores/metricsStore';
 import { RestartOverlay } from './RestartOverlay';
 import { CrashToast } from './CrashToast';
 import { useSceneLoader } from '../hooks/useSceneLoader';
@@ -83,6 +86,8 @@ export default function SceneViewer() {
 
     // --- Managers (added to worldRoot so Z-up rotation applies) ---
     const pointCloudManager = new PointCloudManager(worldRoot);
+    const voxelManager = new VoxelManager(worldRoot, 0.1);
+    const meshManager = new MeshManager(worldRoot);
     const robotMarkerManager = new RobotMarkerManager(worldRoot);
     const trailManager = new TrajectoryTrailManager(worldRoot);
     const detectionBoxManager = new DetectionBoxManager(worldRoot);
@@ -104,6 +109,11 @@ export default function SceneViewer() {
         state.colorMode !== prevState.colorMode
       ) {
         pointCloudManager.updateFull(
+          state.pointCloudPositions,
+          state.pointCloudColors,
+        );
+        // Also update voxel manager with same data (voxels use same positions/colors)
+        voxelManager.updateFull(
           state.pointCloudPositions,
           state.pointCloudColors,
         );
@@ -139,6 +149,65 @@ export default function SceneViewer() {
             robot.colorIndex,
           );
         }
+      }
+    });
+
+    // --- Cross-fade state ---
+    let fadeOutManager: { getMaterial(): THREE.Material; setVisible(v: boolean): void } | null = null;
+    let fadeInManager: { getMaterial(): THREE.Material; setVisible(v: boolean): void } | null = null;
+    let isFading = false;
+    let fadeStartTime = 0;
+    const FADE_DURATION = 300; // ms
+
+    const getManager = (mode: 'cloud' | 'voxel' | 'mesh') => {
+      switch (mode) {
+        case 'cloud': return { getMaterial: () => pointCloudManager.getMaterial() as THREE.Material, setVisible: (v: boolean) => pointCloudManager.setVisible(v) };
+        case 'voxel': return { getMaterial: () => voxelManager.getMaterial() as THREE.Material, setVisible: (v: boolean) => voxelManager.setVisible(v) };
+        case 'mesh': return { getMaterial: () => meshManager.getMaterial() as THREE.Material, setVisible: (v: boolean) => meshManager.setVisible(v) };
+      }
+    };
+
+    let currentMode: 'cloud' | 'voxel' | 'mesh' = 'cloud';
+    pointCloudManager.setVisible(true);
+
+    const unsubMetrics = useMetricsStore.subscribe((state, prev) => {
+      // Output mode change -> start cross-fade
+      if (state.outputMode !== prev.outputMode) {
+        const oldMode = currentMode;
+        const newMode = state.outputMode;
+        currentMode = newMode;
+
+        // Cancel any in-progress fade
+        if (isFading && fadeOutManager) {
+          const mat = fadeOutManager.getMaterial();
+          mat.opacity = 0;
+          (mat as any).transparent = false;
+          (mat as any).depthWrite = true;
+          fadeOutManager.setVisible(false);
+        }
+
+        fadeOutManager = getManager(oldMode);
+        fadeInManager = getManager(newMode);
+
+        // Prepare fade-in geometry to be visible but transparent
+        const fadeInMat = fadeInManager.getMaterial();
+        (fadeInMat as any).transparent = true;
+        fadeInMat.opacity = 0;
+        (fadeInMat as any).depthWrite = false;
+        fadeInManager.setVisible(true);
+
+        // Prepare fade-out
+        const fadeOutMat = fadeOutManager.getMaterial();
+        (fadeOutMat as any).transparent = true;
+        (fadeOutMat as any).depthWrite = false;
+
+        isFading = true;
+        fadeStartTime = performance.now();
+      }
+
+      // Mesh data update
+      if (state.meshVertices !== prev.meshVertices && state.meshVertices && state.meshFaces) {
+        meshManager.updateMesh(state.meshVertices, state.meshFaces, state.meshColors);
       }
     });
 
@@ -197,6 +266,35 @@ export default function SceneViewer() {
     let animationId = 0;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+
+      // Cross-fade animation
+      if (isFading && fadeOutManager && fadeInManager) {
+        const elapsed = performance.now() - fadeStartTime;
+        const t = Math.min(elapsed / FADE_DURATION, 1.0);
+
+        const fadeOutMat = fadeOutManager.getMaterial();
+        fadeOutMat.opacity = 1.0 - t;
+
+        const fadeInMat = fadeInManager.getMaterial();
+        fadeInMat.opacity = t;
+
+        if (t >= 1.0) {
+          // Fade complete
+          fadeOutMat.opacity = 0;
+          (fadeOutMat as any).transparent = false;
+          (fadeOutMat as any).depthWrite = true;
+          fadeOutManager.setVisible(false);
+
+          (fadeInMat as any).transparent = false;
+          fadeInMat.opacity = 1.0;
+          (fadeInMat as any).depthWrite = true;
+
+          isFading = false;
+          fadeOutManager = null;
+          fadeInManager = null;
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -222,12 +320,15 @@ export default function SceneViewer() {
       cancelAnimationFrame(animationId);
       unsub();
       unsubControl();
+      unsubMetrics();
       renderer.domElement.removeEventListener('click', handleClick);
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
       controls.dispose();
       pointCloudManager.dispose();
+      voxelManager.dispose();
+      meshManager.dispose();
       robotMarkerManager.dispose();
       trailManager.dispose();
       detectionBoxManager.dispose();
