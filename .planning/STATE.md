@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: active
-stopped_at: Roadmap created — ready to plan Phase 8
-last_updated: "2026-03-23"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-23T05:29:30Z"
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,29 +19,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 8 — Backend Abstraction + ICP Wrap
+**Current focus:** Phase 08 — backend-abstraction-icp-wrap
 
 ## Current Position
 
-Phase: 8 of 13 (Backend Abstraction + ICP Wrap) — first of 6 v2.0 phases
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-23 — v2.0 roadmap created
-
-Progress: [░░░░░░░░░░] 0% (0/6 v2.0 phases)
+Phase: 08 (backend-abstraction-icp-wrap) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (v2.0)
-- Average duration: —
-- Total execution time: —
+
+- Total plans completed: 1 (v2.0)
+- Average duration: 3min
+- Total execution time: 3min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 08 | 1/3 | 3min | 3min |
 
 ## Accumulated Context
 
@@ -50,6 +47,9 @@ Progress: [░░░░░░░░░░] 0% (0/6 v2.0 phases)
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [08-01]: SLAMProtocol uses runtime_checkable Protocol (same pattern as BridgeProtocol)
+- [08-01]: Registry stores class paths as strings for lazy import
+- [08-01]: ICPBackend copies points/colors arrays to prevent mutable reference bugs
 - [v2.0]: Generic SLAM API over hardcoded ICP — research shows ICP wrong for sparse point clouds
 - [v2.0]: 4 backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
 - [v2.0]: Pre-session algorithm selection primary; hot-swap deferred to v3.0
@@ -74,5 +74,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: v2.0 roadmap created — ready to plan Phase 8
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None

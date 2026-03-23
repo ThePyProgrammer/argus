@@ -9,12 +9,12 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 
 ### Backend Abstraction
 
-- [ ] **ABST-01**: System defines a SLAMProtocol interface with process_frame(rgb, depth, timestamp) -> SLAMResult(pose, points, metrics)
-- [ ] **ABST-02**: System provides a SLAMRegistry that discovers, lists, and instantiates available backends by name
-- [ ] **ABST-03**: Each backend declares its parameters as a JSON schema (voxel_size, feature_count, etc.)
-- [ ] **ABST-04**: Each backend declares capabilities (supports_imu, outputs_dense, supports_loop_closure, supports_stereo)
+- [x] **ABST-01**: System defines a SLAMProtocol interface with process_frame(rgb, depth, timestamp) -> SLAMResult(pose, points, metrics)
+- [x] **ABST-02**: System provides a SLAMRegistry that discovers, lists, and instantiates available backends by name
+- [x] **ABST-03**: Each backend declares its parameters as a JSON schema (voxel_size, feature_count, etc.)
+- [x] **ABST-04**: Each backend declares capabilities (supports_imu, outputs_dense, supports_loop_closure, supports_stereo)
 - [ ] **ABST-05**: User can select a SLAM algorithm via REST API before starting a session, triggering system restart with the new backend
-- [ ] **ABST-06**: Existing ICP-based SLAMPipeline is wrapped as the first backend with zero behavioral change
+- [x] **ABST-06**: Existing ICP-based SLAMPipeline is wrapped as the first backend with zero behavioral change
 
 ### SLAM Backends
 
@@ -77,12 +77,12 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ABST-01 | Phase 8 | Pending |
-| ABST-02 | Phase 8 | Pending |
-| ABST-03 | Phase 8 | Pending |
-| ABST-04 | Phase 8 | Pending |
+| ABST-01 | Phase 8 | Complete |
+| ABST-02 | Phase 8 | Complete |
+| ABST-03 | Phase 8 | Complete |
+| ABST-04 | Phase 8 | Complete |
 | ABST-05 | Phase 8 | Pending |
-| ABST-06 | Phase 8 | Pending |
+| ABST-06 | Phase 8 | Complete |
 | BACK-01 | Phase 11 | Pending |
 | BACK-02 | Phase 11 | Pending |
 | BACK-03 | Phase 12 | Pending |
