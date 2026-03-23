@@ -38,7 +38,7 @@ class MergeRegistry:
         capabilities, parameter_schema. Unavailable strategies include 'reason'.
         """
         result = []
-        for name, info in cls._strategies.items():
+        for name, info in list(cls._strategies.items()):
             entry: dict[str, Any] = {
                 "name": name,
                 "display": info["display"],
