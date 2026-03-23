@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
 status: executing
-stopped_at: Completed 08-01-PLAN.md
+stopped_at: Completed 08-02-PLAN.md
 last_updated: "2026-03-23T05:29:30Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,21 +24,21 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 08 (backend-abstraction-icp-wrap) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1 (v2.0)
-- Average duration: 3min
-- Total execution time: 3min
+- Total plans completed: 2 (v2.0)
+- Average duration: 13min
+- Total execution time: 25min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 08 | 1/3 | 3min | 3min |
+| 08 | 2/3 | 25min | 13min |
 
 ## Accumulated Context
 
@@ -50,6 +50,9 @@ Recent decisions affecting current work:
 - [08-01]: SLAMProtocol uses runtime_checkable Protocol (same pattern as BridgeProtocol)
 - [08-01]: Registry stores class paths as strings for lazy import
 - [08-01]: ICPBackend copies points/colors arrays to prevent mutable reference bugs
+- [08-02]: All SLAM consumers migrated to SLAMProtocol; no direct SLAMPipeline construction outside backends
+- [08-02]: Single-robot mode in main.py also uses protocol methods (SLAMResult, get_poses, get_global_cloud)
+- [08-02]: Coordinator passes slam_cloud=None to detector (last_frame_cloud no longer a direct attribute)
 - [v2.0]: Generic SLAM API over hardcoded ICP — research shows ICP wrong for sparse point clouds
 - [v2.0]: 4 backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
 - [v2.0]: Pre-session algorithm selection primary; hot-swap deferred to v3.0
@@ -74,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 08-01-PLAN.md
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None
