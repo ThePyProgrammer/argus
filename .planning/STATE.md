@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
 status: unknown
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-23T08:20:13.082Z"
+stopped_at: Completed 11-02-PLAN.md (Phase 11 complete)
+last_updated: "2026-03-23T16:39:01Z"
 progress:
   total_phases: 7
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # Project State
@@ -19,20 +19,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 09 — frontend-algorithm-controls
+**Current focus:** Phase 12 — openvins-svo-pro-backends (next)
 
 ## Current Position
 
-Phase: 09 (frontend-algorithm-controls) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 11 (orb-slam3-backend) — COMPLETE
+Plan: 2 of 2 (all complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 11 (v2.0)
+- Total plans completed: 13 (v2.0)
 - Average duration: 6min
-- Total execution time: 63min
+- Total execution time: ~133min (includes post-checkpoint ORB-SLAM3 fixes)
 
 **By Phase:**
 
@@ -41,7 +41,7 @@ Plan: 3 of 3 (all complete)
 | 08 | 3/3 | 33min | 11min |
 | 10 | 3/3 | 10min | 3min |
 | 09 | 3/3 | 12min | 4min |
-| 11 | 2/2 | 11min | 6min |
+| 11 | 2/2 | ~78min | ~39min |
 
 ## Accumulated Context
 
@@ -81,6 +81,9 @@ Recent decisions affecting current work:
 - [11-02]: Store last_tracking_status on ExplorationLoop (closest to SLAMResult) rather than RobotInstance
 - [11-02]: Propagate tracking_status via pose_update WS message (piggyback on frequent updates)
 - [11-02]: Use getattr with default "ok" for backward compat with ICP backend
+- [11-02]: ORB-SLAM3 returns T_cw; must invert to T_wc before frame conversion
+- [11-02]: Seed ground truth offset from first frame so map aligns with MuJoCo world origin
+- [11-02]: Return INITIALIZING status (not LOST) before first successful track; use ground truth pose during init
 - [09-02]: AlgorithmDropdown uses custom div-based dropdown (not native select) for rich badge rendering
 - [09-02]: Module-scope debouncedSendParam avoids recreating debounce timer per render
 - [09-02]: Robot poses/rotations/trajectories reset to identity/empty during algorithm restart
