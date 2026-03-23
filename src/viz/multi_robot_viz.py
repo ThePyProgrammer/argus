@@ -21,7 +21,6 @@ MAX_TRAIL_SEGMENTS = 50
 VORONOI_PLANE_HEIGHT = 5.0
 VORONOI_PLANE_HALF_WIDTH = 20.0
 VORONOI_PLANE_ALPHA = 80
-HEATMAP_RESOLUTION = 0.5
 
 
 class MultiRobotVisualizer:
@@ -112,6 +111,8 @@ class MultiRobotVisualizer:
                 - trajectory: list of (4, 4) transforms
                 - coverage_pct: float 0-100
             frontier_cells: Optional (K, 3) float array of frontier cell positions.
+                Currently unused in this Rerun visualizer; kept for API
+                compatibility with WebStreamingViz which shares the same signature.
             voronoi_midpoint: Optional (2,) midpoint of Voronoi bisector.
             voronoi_direction: Optional (2,) direction vector A->B.
             total_coverage: Combined coverage percentage.
@@ -233,71 +234,6 @@ class MultiRobotVisualizer:
             color_rgb = ROBOT_COLORS.get(rid, (128, 128, 128))
             colors = np.tile(list(color_rgb), (len(voxels), 1)).astype(np.uint8)
             rr.log(f"/{rid}/local_cloud", rr.Points3D(voxels, colors=colors))
-
-    def _log_coverage_heatmap(
-        self,
-        occupied_voxels: np.ndarray,
-        frontier_cells: np.ndarray | None = None,
-    ) -> None:
-        """Log coverage heatmap as colored floor grid at z=0.
-
-        Colors: green = explored, red = unexplored, yellow = frontier.
-        Grid resolution is HEATMAP_RESOLUTION (0.1m).
-
-        Args:
-            occupied_voxels: (N, 3) occupied voxel positions.
-            frontier_cells: Optional (K, 3) frontier cell positions.
-        """
-        if len(occupied_voxels) == 0:
-            return
-
-        res = HEATMAP_RESOLUTION
-
-        # Project occupied voxels to 2D XY grid
-        xy_occupied = occupied_voxels[:, :2]
-        grid_occupied = np.round(xy_occupied / res).astype(int)
-
-        # Compute bounding box with 1-cell margin
-        grid_min = grid_occupied.min(axis=0) - 1
-        grid_max = grid_occupied.max(axis=0) + 1
-
-        # Build frontier set for fast lookup
-        frontier_set = set()
-        if frontier_cells is not None and len(frontier_cells) > 0:
-            xy_frontier = frontier_cells[:, :2]
-            grid_frontier = np.round(xy_frontier / res).astype(int)
-            frontier_set = set(map(tuple, grid_frontier))
-
-        # Only render explored (green) and frontier (yellow) cells — skip
-        # unexplored (red) to avoid flooding Rerun with tens of thousands
-        # of points across the entire bounding box.
-        occupied_set = set(map(tuple, grid_occupied))
-        all_keys = occupied_set | frontier_set
-
-        if not all_keys:
-            return
-
-        positions = []
-        cell_colors = []
-        for gx, gy in all_keys:
-            center_x = gx * res
-            center_y = gy * res
-            if (gx, gy) in frontier_set:
-                cell_colors.append([200, 200, 0, 180])
-            else:
-                cell_colors.append([0, 200, 0, 180])
-            positions.append([center_x, center_y, -0.05])
-
-        positions = np.array(positions)
-        cell_colors = np.array(cell_colors, dtype=np.uint8)
-        rr.log(
-            "/merged/heatmap",
-            rr.Points3D(
-                positions=positions,
-                colors=cell_colors,
-                radii=res / 2,
-            ),
-        )
 
     def _log_voronoi_plane(
         self, midpoint_2d: np.ndarray, direction_2d: np.ndarray

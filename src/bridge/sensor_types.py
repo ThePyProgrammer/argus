@@ -79,7 +79,13 @@ class CameraIntrinsics:
 
 @runtime_checkable
 class BridgeProtocol(Protocol):
-    """Minimal interface for a simulation bridge used by ExplorationLoop."""
+    """Minimal interface for a single-robot simulation bridge.
+
+    Used by ExplorationLoop and RobotInstance. MuJoCoBridge implements
+    this directly. For multi-robot scenarios, the Coordinator provides
+    per-robot bridge wrappers that satisfy this protocol -- MultiRobotBridge
+    itself has a different (dict-based) API and does NOT implement this protocol.
+    """
 
     def start(self) -> SensorFrame: ...
     def step(self) -> SensorFrame: ...
