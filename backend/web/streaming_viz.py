@@ -15,6 +15,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from backend.web.connection_manager import ConnectionManager
+from src.metrics.metrics_tracker import MetricsTracker
 from backend.web.message_types import (
     CLOUD_DELTA,
     CLOUD_FULL,
@@ -55,10 +56,20 @@ class WebStreamingViz:
         self._color_mode: str = "robot_tint"
         self._start_time: float = time.monotonic()
         self._message_queue: list[dict | bytes] = []
+        self._metrics_tracker = MetricsTracker(history_size=60)
 
     def reset_cloud_tracking(self) -> None:
         """Clear cached voxel state to force a full cloud resend."""
         self._last_voxel_set = set()
+
+    @property
+    def metrics_tracker(self) -> MetricsTracker:
+        """Public access to the metrics tracker for coordinator wiring."""
+        return self._metrics_tracker
+
+    def reset_metrics(self) -> None:
+        """Reset per-robot metrics (preserves baseline for comparison)."""
+        self._metrics_tracker.reset()
 
     def update(
         self,
@@ -361,6 +372,9 @@ class WebStreamingViz:
                 "voxel_count": len(data.get("local_voxels", [])),
                 "action": "exploring",
             }
+        # Build SLAM metrics from tracker
+        metrics_payload = self._metrics_tracker.get_stats_payload()
+
         self._message_queue.append({
             "type": STATS,
             "payload": {
@@ -368,5 +382,8 @@ class WebStreamingViz:
                 "merge_count": merge_count,
                 "elapsed": elapsed,
                 "robots": robots,
+                "slam_metrics": metrics_payload["slam_metrics"],
+                "baseline": metrics_payload["baseline"],
+                "metric_history": metrics_payload["metric_history"],
             },
         })
