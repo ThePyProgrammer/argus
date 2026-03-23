@@ -44,7 +44,12 @@
   2. REST endpoint GET /api/slam/backends returns a list of available backends with their parameter schemas and capability badges
   3. REST endpoint POST /api/slam/select triggers a session restart with the chosen backend
   4. The full simulation runs identically to v1.0 when ICP backend is selected (zero behavioral regression)
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Protocol + Registry + ICPBackend with unit tests
+- [ ] 08-02-PLAN.md — Consumer migration (RobotInstance, ExplorationLoop, Coordinator, main.py)
+- [ ] 08-03-PLAN.md — REST API endpoints (/api/slam/*) + human regression verification
 
 ### Phase 9: Frontend Algorithm Controls
 **Goal**: Users can browse available SLAM algorithms, select one before a session, and tune its parameters -- all from the browser C2 interface
@@ -113,7 +118,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 5. Robot Locomotion Fix | v1.0 | 2/2 | Complete | 2026-03-18 |
 | 6. React C2 Web Interface | v1.0 | 3/4 | Complete | 2026-03-23 |
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
-| 8. Backend Abstraction + ICP Wrap | v2.0 | 0/? | Not started | - |
+| 8. Backend Abstraction + ICP Wrap | v2.0 | 0/3 | Planning complete | - |
 | 9. Frontend Algorithm Controls | v2.0 | 0/? | Not started | - |
 | 10. Pose-Graph Map Merger | v2.0 | 0/? | Not started | - |
 | 11. ORB-SLAM3 Backend | v2.0 | 0/? | Not started | - |
