@@ -3,6 +3,7 @@ import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore, fetchSlamState } from '../stores/slamStore';
 import { useMetricsStore } from '../stores/metricsStore';
+import { usePipelineStore } from '../stores/pipelineStore';
 import type {
   WSMessage,
   RobotListPayload,
@@ -171,6 +172,24 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
             `Backend ${payload.crashed_backend} crashed, fell back to ICP`
           );
           slamState.setActive('icp', 'ICP Odometry', {});
+          break;
+        }
+        case 'pipeline_status': {
+          const payload = msg.payload as {
+            node_statuses?: Record<string, string>;
+            edge_throughputs?: Record<string, number>;
+          };
+          const pipelineState = usePipelineStore.getState();
+          if (payload.node_statuses) {
+            for (const [nodeId, status] of Object.entries(payload.node_statuses)) {
+              pipelineState.setNodeStatus(nodeId, status);
+            }
+          }
+          if (payload.edge_throughputs) {
+            for (const [edgeId, fps] of Object.entries(payload.edge_throughputs)) {
+              pipelineState.setEdgeThroughput(edgeId, fps);
+            }
+          }
           break;
         }
       }

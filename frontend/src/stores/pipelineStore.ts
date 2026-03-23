@@ -4,6 +4,7 @@ import type { OnNodesChange, OnEdgesChange, OnConnect, XYPosition } from '@xyflo
 import type {
   PipelineNode,
   PipelineEdge,
+  PipelineNodeData,
   PresetInfo,
   ValidationError,
   PipelineConfig,
@@ -169,12 +170,22 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
   setNodeStatus: (nodeId, status) => {
     set((state) => ({
       nodeStatuses: { ...state.nodeStatuses, [nodeId]: status },
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, status: status as PipelineNodeData['status'] } }
+          : n,
+      ),
     }));
   },
 
   setEdgeThroughput: (edgeId, fps) => {
     set((state) => ({
       edgeThroughputs: { ...state.edgeThroughputs, [edgeId]: fps },
+      edges: state.edges.map((e) =>
+        e.id === edgeId && e.data
+          ? { ...e, data: { dataType: e.data.dataType, fps } }
+          : e,
+      ),
     }));
   },
 
@@ -204,3 +215,39 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
     });
   },
 }));
+
+/** Fetch node catalog from backend. Returns array of node descriptors. */
+export async function fetchNodeCatalog(): Promise<
+  Array<{
+    type: string;
+    label: string;
+    category: string;
+    parameterSchema: Record<string, unknown> | null;
+    registryName?: string;
+  }>
+> {
+  try {
+    const res = await fetch('/api/pipeline/node-catalog');
+    if (res.ok) {
+      const data = await res.json();
+      return data.nodes || [];
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+/** Fetch available presets from backend and populate store. */
+export async function fetchPresets(): Promise<void> {
+  const store = usePipelineStore.getState();
+  try {
+    const res = await fetch('/api/pipeline/presets');
+    if (res.ok) {
+      const data = await res.json();
+      store.setAvailablePresets(data.presets || []);
+    }
+  } catch {
+    /* ignore */
+  }
+}
