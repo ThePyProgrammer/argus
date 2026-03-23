@@ -20,7 +20,7 @@ from typing import Callable, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from src.slam.slam_pipeline import SLAMPipeline
+    from src.slam.protocol import SLAMProtocol
     from src.slam.octomap_builder import OctoMapBuilder
 
 from src.bridge.sensor_types import BridgeProtocol, SensorFrame
@@ -130,7 +130,7 @@ class ExplorationLoop:
     def __init__(
         self,
         bridge: BridgeProtocol,
-        slam: "SLAMPipeline",
+        slam: "SLAMProtocol",
         octomap: "OctoMapBuilder",
         config: ExplorationConfig | None = None,
     ):
@@ -195,13 +195,13 @@ class ExplorationLoop:
         Returns:
             (pose, current_pos) -- 4x4 pose matrix and (3,) position vector.
         """
-        pose = self._slam.process_frame(frame)
+        result = self._slam.process_frame(frame)
+        pose = result.pose
         current_pos = pose[:3, 3].copy()
 
         # Insert this frame's cloud directly into OctoMap (not the global accumulator)
-        frame_cloud = self._slam.last_frame_cloud
-        if len(frame_cloud) > 0:
-            self._octomap.insert_scan(frame_cloud, current_pos)
+        if len(result.points) > 0:
+            self._octomap.insert_scan(result.points, current_pos)
 
         self._robot_positions.append(current_pos)
         return pose, current_pos

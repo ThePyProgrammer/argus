@@ -13,7 +13,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.slam.slam_pipeline import SLAMPipeline
+from src.slam.protocol import SLAMProtocol
+from src.slam.registry import SLAMRegistry
 from src.slam.octomap_builder import OctoMapBuilder
 from src.exploration.exploration_loop import ExplorationLoop
 from src.exploration.config import ExplorationConfig
@@ -45,7 +46,7 @@ class RobotInstance:
     """
 
     robot_id: str
-    slam: SLAMPipeline
+    slam: SLAMProtocol
     octomap: OctoMapBuilder
     exploration: ExplorationLoop
     spawn_transform: np.ndarray  # (4, 4) world-frame offset (identity if at origin)
@@ -53,8 +54,9 @@ class RobotInstance:
 
     def get_pose(self) -> np.ndarray:
         """Return the latest SLAM pose, or identity if no poses yet."""
-        if self.slam.slam_poses:
-            return self.slam.slam_poses[-1]
+        poses = self.slam.get_poses()
+        if poses:
+            return poses[-1]
         return np.eye(4, dtype=np.float64)
 
     def get_occupied_voxels(self) -> np.ndarray:
@@ -63,7 +65,7 @@ class RobotInstance:
 
     def get_cloud_data(self) -> tuple[np.ndarray, np.ndarray]:
         """Return (points, colors) from this robot's SLAM global cloud."""
-        return self.slam.get_cloud_points(), self.slam.get_cloud_colors()
+        return self.slam.get_global_cloud()
 
     def publish_map_state(self, coverage_pct: float = 0.0) -> None:
         """Publish current occupancy grid and coverage via pLCM.
@@ -90,12 +92,16 @@ class RobotInstance:
         intrinsics: CameraIntrinsics,
         config: ExplorationConfig | None = None,
         spawn_position: tuple[float, float, float] = (0.0, 0.0, 0.3),
+        backend_name: str | None = None,
     ) -> "RobotInstance":
         """Factory method to create a fully wired robot instance with pLCM publisher.
 
         Creates a pLCMTransport publishing to /{robot_id}/occupancy channel.
+
+        Args:
+            backend_name: SLAM backend name, or None for registry default ('icp').
         """
-        slam = SLAMPipeline(intrinsics)
+        slam = SLAMRegistry.create(backend_name, intrinsics=intrinsics)
         octomap = OctoMapBuilder(
             resolution=(config or ExplorationConfig()).voxel_resolution,
         )
