@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
 status: unknown
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-23T15:37:29.199Z"
+stopped_at: Completed 14-04-PLAN.md
+last_updated: "2026-03-23T16:02:41.000Z"
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 22
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 14 (interactive-comfyui-esque-react-flow-pipeline-graph) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Plan: 3 of 6
 | Phase 13 P03 | 6min | 2 tasks | 6 files |
 | Phase 14 P01 | 3min | 2 tasks | 6 files |
 | Phase 14 P02 | 5min | 2 tasks | 9 files |
+| Phase 14 P03 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,10 @@ Recent decisions affecting current work:
 - [Phase 14]: Kahn's algorithm for DAG cycle detection in PipelineBuilder
 - [Phase 14]: param_scalar nodes override target params via edge targetHandle mapping
 - [Phase 14]: Pipeline presets use flat JSON files in data/presets/{builtin,user}/
+- [14-03]: Module-scope nodeTypes/edgeTypes prevents React Flow remounting nodes on re-render
+- [14-03]: getState() in isValidConnection callback avoids stale closure pitfall
+- [14-03]: Edge animation respects prefers-reduced-motion via module-level matchMedia check
+- [14-03]: IsValidConnection typed with PipelineEdge generic for @xyflow/react v12 compatibility
 
 ### Roadmap Evolution
 
@@ -150,5 +155,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23T15:37:29.196Z
-Stopped at: Completed 14-02-PLAN.md
+Stopped at: Completed 14-03-PLAN.md
 Resume file: None

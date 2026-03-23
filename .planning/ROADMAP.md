@@ -149,7 +149,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | Complete    | 2026-03-23 | 2026-03-23 |
 | 13. Live Metrics Dashboard + Output Toggle | 3/3 | Complete    | 2026-03-23 | - |
-| 14. Pipeline Graph Editor | 2/6 | In Progress|  | - |
+| 14. Pipeline Graph Editor | 4/6 | In Progress|  | - |
 
 ### Phase 14: Interactive ComfyUI-esque React Flow Pipeline Graph Editor
 **Goal:** Users can visually build and customize SLAM processing pipelines via a ComfyUI-style node-graph editor with typed ports, connection validation, parameter tuning, named presets, and backend pipeline apply
@@ -164,7 +164,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14
   6. Users can load/save named presets (3 built-in defaults ship: Default ICP, PGO High Quality, Comparison Mode)
   7. "Apply Pipeline" serializes the graph, POSTs to backend, and triggers coordinator restart
   8. Animated edges show data flow when pipeline is running
-**Plans:** 2/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 - [x] 14-01-PLAN.md — Pipeline types, node definitions, graph validation, serializer, pipelineStore
