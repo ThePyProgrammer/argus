@@ -62,6 +62,10 @@ def create_app(
     from backend.web.slam_routes import router as slam_router
     app.include_router(slam_router)
 
+    # Wire pipeline configuration routes
+    from backend.web.pipeline_routes import router as pipeline_router
+    app.include_router(pipeline_router)
+
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)
 

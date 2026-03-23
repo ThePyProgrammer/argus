@@ -1,0 +1,21 @@
+{
+  "name": "Comparison Mode",
+  "nodes": [
+    {"id": "sensor_1", "type": "sensor_rgbd", "params": {}, "position": {"x": 50, "y": 300}},
+    {"id": "splitter_1", "type": "splitter", "params": {}, "position": {"x": 250, "y": 300}},
+    {"id": "slam_icp", "type": "slam_icp", "params": {}, "position": {"x": 500, "y": 150}},
+    {"id": "slam_orb", "type": "slam_orbslam3", "params": {}, "position": {"x": 500, "y": 450}},
+    {"id": "combiner_1", "type": "combiner", "params": {}, "position": {"x": 750, "y": 300}},
+    {"id": "merger_1", "type": "merger_icp_union", "params": {}, "position": {"x": 950, "y": 300}},
+    {"id": "viz_1", "type": "viz_output", "params": {}, "position": {"x": 1150, "y": 300}}
+  ],
+  "edges": [
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "splitter_1", "targetHandle": "in"},
+    {"source": "splitter_1", "sourceHandle": "out_a", "target": "slam_icp", "targetHandle": "image_in"},
+    {"source": "splitter_1", "sourceHandle": "out_b", "target": "slam_orb", "targetHandle": "image_in"},
+    {"source": "slam_icp", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_a"},
+    {"source": "slam_orb", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_b"},
+    {"source": "combiner_1", "sourceHandle": "out", "target": "merger_1", "targetHandle": "cloud_in"},
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"}
+  ]
+}

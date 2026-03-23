@@ -1,0 +1,17 @@
+{
+  "name": "PGO High Quality",
+  "nodes": [
+    {"id": "sensor_1", "type": "sensor_rgbd", "params": {}, "position": {"x": 50, "y": 200}},
+    {"id": "filter_1", "type": "filter_voxel_downsample", "params": {"voxel_size": 0.02}, "position": {"x": 200, "y": 200}},
+    {"id": "slam_1", "type": "slam_icp", "params": {}, "position": {"x": 400, "y": 200}},
+    {"id": "merger_1", "type": "merger_pgo_open3d", "params": {}, "position": {"x": 650, "y": 200}},
+    {"id": "viz_1", "type": "viz_output", "params": {}, "position": {"x": 900, "y": 200}}
+  ],
+  "edges": [
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "filter_1", "targetHandle": "cloud_in"},
+    {"source": "filter_1", "sourceHandle": "cloud_out", "target": "slam_1", "targetHandle": "image_in"},
+    {"source": "slam_1", "sourceHandle": "cloud_out", "target": "merger_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "merger_1", "targetHandle": "pose_in"},
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"}
+  ]
+}
