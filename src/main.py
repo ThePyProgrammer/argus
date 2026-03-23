@@ -24,23 +24,39 @@ Control modes:
 
 import argparse
 import logging
+import subprocess
 import sys
+import threading
 import time
+from pathlib import Path
 
 import numpy as np
+import rerun as rr
+import uvicorn
 
-logger = logging.getLogger(__name__)
-
+from backend.web.server import create_app
+from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active_config
 from src.bridge.env_config import MuJoCoEnvConfig
+from src.bridge.multi_bridge import MultiRobotBridge
+from src.bridge.multi_robot_config import MultiRobotConfig
 from src.bridge.sensor_types import CameraIntrinsics
 from src.bridge.sim_bridge import MuJoCoBridge
 from src.control.random_walk import RandomWalkController
 from src.control.waypoint_runner import WaypointRunner
+from src.coordination.coordinator import Coordinator
+from src.coordination.robot_instance import RobotInstance
+from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
+from src.exploration.config import ExplorationConfig
+from src.exploration.exploration_loop import ExplorationLoop
+from src.mcp.server import configure as configure_mcp, mcp_endpoint
 from src.metrics.drift_metrics import compute_drift_metrics
 from src.metrics.ground_truth import GroundTruthCollector
 from src.slam.octomap_builder import OctoMapBuilder
 from src.slam.slam_pipeline import SLAMPipeline
+from src.viz.multi_robot_viz import MultiRobotVisualizer
 from src.viz.rerun_viz import RerunVisualizer
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -149,11 +165,6 @@ def create_controller(mode: str):
 
 def run_explore_mode(args):
     """Run autonomous frontier-based exploration."""
-
-
-    from src.exploration.config import ExplorationConfig
-    from src.exploration.exploration_loop import ExplorationLoop
-
     config = MuJoCoEnvConfig()
     bridge = MuJoCoBridge(config)
 
@@ -206,18 +217,6 @@ def run_explore_mode(args):
 
 def run_multi_mode(args):
     """Run two-robot coordinated exploration with map merging."""
-
-
-    from src.bridge.multi_robot_config import MultiRobotConfig
-    from src.bridge.multi_bridge import MultiRobotBridge
-    from src.coordination.robot_instance import RobotInstance
-    from src.coordination.coordinator import Coordinator
-    from src.bridge.sensor_types import CameraIntrinsics
-    from src.exploration.config import ExplorationConfig
-    from src.viz.multi_robot_viz import MultiRobotVisualizer
-
-    from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
-
     scene = getattr(args, 'scene', 'office')
     n_robots = getattr(args, 'num_robots', 2)
     robot_ids = generate_robot_ids(n_robots)
@@ -279,7 +278,6 @@ def run_multi_mode(args):
             logger.info("  %s: %d voxels", rid, count)
 
     # Keep MuJoCo viewer open until user closes it
-    import time
     viewer_handle = getattr(bridge, '_viewer_handle', None)
     if viewer_handle is not None:
         logger.info("Exploration complete. Close the MuJoCo viewer window to exit.")
@@ -293,7 +291,6 @@ def run_multi_mode(args):
     bridge.stop()
 
     # Clean shutdown of Rerun to avoid gRPC segfault on exit
-    import rerun as rr
     rr.disconnect()
     time.sleep(0.5)
     print("Done.")
@@ -305,21 +302,6 @@ def run_web_mode(args):
     Starts the multi-robot simulation in a background thread and serves
     the React C2 frontend via FastAPI at http://localhost:8000.
     """
-
-    import subprocess
-    import threading
-
-    import uvicorn
-
-    from src.bridge.multi_robot_config import MultiRobotConfig
-    from src.bridge.multi_bridge import MultiRobotBridge
-    from src.coordination.robot_instance import RobotInstance
-    from src.coordination.coordinator import Coordinator
-    from src.bridge.sensor_types import CameraIntrinsics
-    from src.exploration.config import ExplorationConfig
-    pass  # web server module imported below via configure_app
-
-    from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
 
     scene = getattr(args, "scene", "office")
     n_robots = getattr(args, 'num_robots', 2)
@@ -366,10 +348,6 @@ def run_web_mode(args):
         coordinator.reset_merger()
         logger.info("[cloud config] SLAM and OctoMap reset for all robots")
 
-    from backend.web.server import create_app
-    from src.mcp.server import configure as configure_mcp, mcp_endpoint
-    from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active_config
-
     configure_mcp(coordinator, list(config.robot_ids))
 
     app, streaming_viz = create_app(
@@ -389,7 +367,6 @@ def run_web_mode(args):
     logger.info("MCP endpoint available at http://localhost:8000/mcp")
 
     # Build React frontend
-    from pathlib import Path
     frontend_dir = Path(__file__).parent.parent / "frontend"
     if (frontend_dir / "package.json").exists():
         logger.info("Building React frontend...")
@@ -410,7 +387,6 @@ def run_web_mode(args):
     # Start simulation in background thread with restart support
     def _run_simulation_loop():
         nonlocal bridge, robots, coordinator, streaming_viz
-        import open3d as o3d
 
         while True:
             try:
