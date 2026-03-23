@@ -30,6 +30,7 @@ interface SlamStoreState {
   stagedParams: Record<string, unknown>;
   isRestarting: boolean;
   error: string | null;
+  crashMessage: string | null;
 
   setBackends: (backends: SLAMBackend[]) => void;
   setActive: (name: string, display: string, parameters: Record<string, unknown>) => void;
@@ -38,6 +39,8 @@ interface SlamStoreState {
   clearStagedParams: () => void;
   setError: (error: string | null) => void;
   updateActiveParam: (key: string, value: unknown) => void;
+  setCrashMessage: (msg: string | null) => void;
+  clearCrashMessage: () => void;
 }
 
 export const useSlamStore = create<SlamStoreState>((set) => ({
@@ -48,6 +51,7 @@ export const useSlamStore = create<SlamStoreState>((set) => ({
   stagedParams: {},
   isRestarting: false,
   error: null,
+  crashMessage: null,
 
   setBackends: (backends: SLAMBackend[]) => set({ backends }),
   setActive: (name: string, display: string, parameters: Record<string, unknown>) =>
@@ -59,6 +63,8 @@ export const useSlamStore = create<SlamStoreState>((set) => ({
   setError: (error: string | null) => set({ error }),
   updateActiveParam: (key: string, value: unknown) =>
     set((s) => ({ activeParameters: { ...s.activeParameters, [key]: value } })),
+  setCrashMessage: (msg: string | null) => set({ crashMessage: msg }),
+  clearCrashMessage: () => set({ crashMessage: null }),
 }));
 
 export async function fetchSlamState(): Promise<void> {

@@ -153,6 +153,15 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
           fetchSlamState();
           break;
         }
+        case 'crash_fallback': {
+          const payload = msg.payload as { crashed_backend: string; fallback_backend: string };
+          const slamState = useSlamStore.getState();
+          slamState.setCrashMessage(
+            `Backend ${payload.crashed_backend} crashed, fell back to ICP`
+          );
+          slamState.setActive('icp', 'ICP Odometry', {});
+          break;
+        }
       }
     }
 

@@ -133,11 +133,13 @@ class ExplorationLoop:
         slam: "SLAMProtocol",
         octomap: "OctoMapBuilder",
         config: ExplorationConfig | None = None,
+        streaming_viz: object | None = None,
     ):
         self._bridge = bridge
         self._slam = slam
         self._octomap = octomap
         self._config = config or ExplorationConfig()
+        self._streaming_viz = streaming_viz
 
         self._frontier_detector = FrontierDetector(
             resolution=self._config.voxel_resolution,
@@ -198,6 +200,21 @@ class ExplorationLoop:
         """
         result = self._slam.process_frame(frame)
         self.last_tracking_status: str = result.tracking_status.value
+
+        # Emit crash_fallback WS message when a subprocess backend returns LOST
+        if (result.tracking_status.value == "lost"
+                and hasattr(self._slam, '_bridge')
+                and self._streaming_viz is not None
+                and hasattr(self._streaming_viz, '_message_queue')):
+            backend_name = type(self._slam).__name__
+            self._streaming_viz._message_queue.append({
+                "type": "crash_fallback",
+                "payload": {
+                    "crashed_backend": backend_name,
+                    "fallback_backend": "icp",
+                },
+            })
+
         pose = result.pose
         current_pos = pose[:3, 3].copy()
 
