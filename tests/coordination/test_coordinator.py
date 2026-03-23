@@ -505,3 +505,155 @@ class TestPLCMSubscriptionSetup:
         assert "/robot_b/occupancy" in topics
         assert mock_transport.start.call_count == 2
         assert mock_transport.subscribe.call_count == 2
+
+
+class TestCoordinatorMergeProtocol:
+    """Tests for MergeProtocol integration in Coordinator."""
+
+    def _make_mock_protocol_merger(self):
+        """Create a mock that satisfies MergeProtocol runtime check."""
+        from src.coordination.merge_protocol import MergeProtocol, MergeResult
+        import open3d as o3d
+
+        merger = MagicMock()
+        merger.CAPABILITIES = {"supports_loop_closure": False, "incremental": False}
+        merger.PARAMETER_SCHEMA = {}
+        merger.last_merged_voxels = np.zeros((5, 3))
+        merger.last_merged_cloud = o3d.geometry.PointCloud()
+        merger.merge.return_value = MergeResult(
+            merged_voxels=np.zeros((10, 3)),
+            merged_cloud=o3d.geometry.PointCloud(),
+            optimized_poses={},
+            metrics={"strategy": "mock"},
+        )
+        # Make isinstance check pass by setting spec
+        merger.__class__ = type(
+            "MockMergeProtocol",
+            (),
+            {
+                "CAPABILITIES": {"supports_loop_closure": False, "incremental": False},
+                "PARAMETER_SCHEMA": {},
+                "merge": lambda self, data: None,
+                "reset": lambda self: None,
+                "last_merged_voxels": property(lambda self: np.empty((0, 3))),
+                "last_merged_cloud": property(lambda self: o3d.geometry.PointCloud()),
+            },
+        )
+        return merger
+
+    def test_coordinator_accepts_merge_protocol(self):
+        """Coordinator can be created with a MergeProtocol merger."""
+        from src.coordination.coordinator import Coordinator
+        from src.coordination.robot_instance import RobotInstance
+        from src.bridge.multi_robot_config import MultiRobotConfig
+        from src.coordination.merge_protocol import MergeProtocol
+
+        config = MultiRobotConfig()
+        mock_bridge = MagicMock()
+        robots = {}
+        for rid in ("robot_a",):
+            r = MagicMock(spec=RobotInstance)
+            r.robot_id = rid
+            r.spawn_transform = np.eye(4, dtype=np.float64)
+            r.publisher = MagicMock()
+            robots[rid] = r
+
+        merger = self._make_mock_protocol_merger()
+        coordinator = Coordinator(
+            bridge=mock_bridge, robots=robots, config=config,
+            merger=merger,
+        )
+        assert isinstance(coordinator._merger, MergeProtocol)
+
+    def test_merge_via_protocol_calls_strategy_merge(self):
+        """_merge_occupancy_maps calls strategy.merge() with RobotMapData when MergeProtocol."""
+        from src.coordination.coordinator import Coordinator
+        from src.coordination.robot_instance import RobotInstance
+        from src.bridge.multi_robot_config import MultiRobotConfig
+        from src.coordination.merge_protocol import RobotMapData
+
+        config = MultiRobotConfig()
+        mock_bridge = MagicMock()
+
+        robots = {}
+        for rid in ("robot_a", "robot_b"):
+            r = MagicMock(spec=RobotInstance)
+            r.robot_id = rid
+            r.slam = _MockSLAM()
+            r.slam.process_frame(_make_sensor_frame([0, 0, 0]))
+            r.octomap = _MockOctoMap()
+            r.get_cloud_data.return_value = (np.zeros((10, 3)), np.zeros((10, 3)))
+            r.spawn_transform = np.eye(4, dtype=np.float64)
+            r.publisher = MagicMock()
+            robots[rid] = r
+
+        merger = self._make_mock_protocol_merger()
+        coordinator = Coordinator(
+            bridge=mock_bridge, robots=robots, config=config,
+            merger=merger,
+        )
+
+        coordinator._merge_occupancy_maps(("robot_a", "robot_b"))
+
+        merger.merge.assert_called_once()
+        call_args = merger.merge.call_args[0][0]
+        assert "robot_a" in call_args
+        assert "robot_b" in call_args
+        assert isinstance(call_args["robot_a"], RobotMapData)
+
+    def test_reset_merger_calls_strategy_reset(self):
+        """reset_merger() calls strategy.reset() when MergeProtocol."""
+        from src.coordination.coordinator import Coordinator
+        from src.coordination.robot_instance import RobotInstance
+        from src.bridge.multi_robot_config import MultiRobotConfig
+
+        config = MultiRobotConfig()
+        mock_bridge = MagicMock()
+        robots = {}
+        for rid in ("robot_a",):
+            r = MagicMock(spec=RobotInstance)
+            r.robot_id = rid
+            r.spawn_transform = np.eye(4, dtype=np.float64)
+            r.publisher = MagicMock()
+            robots[rid] = r
+
+        merger = self._make_mock_protocol_merger()
+        coordinator = Coordinator(
+            bridge=mock_bridge, robots=robots, config=config,
+            merger=merger,
+        )
+
+        coordinator.reset_merger()
+        merger.reset.assert_called_once()
+
+    def test_last_merged_voxels_accessible_after_merge(self):
+        """self._merger.last_merged_voxels is accessible after merge (viz compat)."""
+        from src.coordination.coordinator import Coordinator
+        from src.coordination.robot_instance import RobotInstance
+        from src.bridge.multi_robot_config import MultiRobotConfig
+
+        config = MultiRobotConfig()
+        mock_bridge = MagicMock()
+
+        robots = {}
+        for rid in ("robot_a",):
+            r = MagicMock(spec=RobotInstance)
+            r.robot_id = rid
+            r.slam = _MockSLAM()
+            r.slam.process_frame(_make_sensor_frame([0, 0, 0]))
+            r.octomap = _MockOctoMap()
+            r.get_cloud_data.return_value = (np.zeros((10, 3)), np.zeros((10, 3)))
+            r.spawn_transform = np.eye(4, dtype=np.float64)
+            r.publisher = MagicMock()
+            robots[rid] = r
+
+        merger = self._make_mock_protocol_merger()
+        coordinator = Coordinator(
+            bridge=mock_bridge, robots=robots, config=config,
+            merger=merger,
+        )
+
+        coordinator._merge_occupancy_maps(("robot_a",))
+        # Verify last_merged_voxels is accessible (used by viz pipeline)
+        voxels = coordinator._merger.last_merged_voxels
+        assert isinstance(voxels, np.ndarray)

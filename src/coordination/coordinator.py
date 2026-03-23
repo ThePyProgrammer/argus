@@ -30,6 +30,8 @@ from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.bridge.multi_robot_config import MultiRobotConfig
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.coordination.map_merger import MapMerger
+from src.coordination.merge_protocol import MergeProtocol, RobotMapData
+from src.coordination.merge_registry import MergeRegistry
 from src.coordination.transport import pLCMTransport
 
 if TYPE_CHECKING:
@@ -105,19 +107,26 @@ class Coordinator:
         robots: dict[str, RobotInstance],
         config: MultiRobotConfig,
         partitioner: VoronoiPartitioner | None = None,
-        merger: MapMerger | None = None,
+        merger: "MergeProtocol | MapMerger | None" = None,
         viz: "MultiRobotVisualizer | None" = None,
     ):
         self._bridge = bridge
         self._robots = robots
         self._config = config
         self._partitioner = partitioner or VoronoiPartitioner()
-        self._merger = merger or MapMerger(
-            resolution=0.1,
-            spawn_transforms={
-                rid: robots[rid].spawn_transform for rid in robots
-            },
-        )
+        if merger is not None:
+            self._merger: Any = merger
+        else:
+            try:
+                import src.coordination.merge_strategies  # noqa: F401
+                self._merger = MergeRegistry.create()
+            except (ImportError, ValueError):
+                self._merger = MapMerger(
+                    resolution=0.1,
+                    spawn_transforms={
+                        rid: robots[rid].spawn_transform for rid in robots
+                    },
+                )
         self._viz = viz
         self._partitioned = False
         self._step_count = 0
@@ -196,7 +205,10 @@ class Coordinator:
 
     def reset_merger(self) -> None:
         """Clear the map merger's accumulated data."""
-        self._merger.last_merged_voxels = np.empty((0, 3))
+        if hasattr(self._merger, "reset"):
+            self._merger.reset()
+        else:
+            self._merger.last_merged_voxels = np.empty((0, 3))
 
     def get_robot_status(self, rid: str) -> dict:
         """Return status data for a single robot (position, voxel count).
@@ -536,11 +548,46 @@ class Coordinator:
     def _merge_occupancy_maps(self, robot_ids: tuple[str, ...]) -> None:
         """Merge maps using data received via pLCM subscriptions.
 
-        If pLCM data is available (from robot publish events), use the
-        pre-transformed voxels from subscriptions. Falls back to direct
-        OctoMapBuilder access if no pLCM data received yet (e.g., first merge).
+        If the merger satisfies MergeProtocol, builds RobotMapData per robot
+        and calls strategy.merge(). Otherwise falls back to legacy
+        merge_from_voxels path for raw MapMerger instances.
         """
-        # Collect all robot voxels and merge N-way
+        if isinstance(self._merger, MergeProtocol):
+            self._merge_via_protocol(robot_ids)
+        else:
+            self._legacy_merge(robot_ids)
+        self._merge_count += 1
+
+    def _merge_via_protocol(self, robot_ids: tuple[str, ...]) -> None:
+        """Merge using MergeProtocol strategy with RobotMapData."""
+        robot_data: dict[str, RobotMapData] = {}
+        for rid in robot_ids:
+            robot = self._robots.get(rid)
+            if robot is None:
+                continue
+
+            poses = robot.slam.get_poses()
+            cloud_pts, _ = robot.get_cloud_data()
+
+            if rid in self._latest_map_data:
+                current_voxels = self._latest_map_data[rid].occupied_voxels
+            else:
+                current_voxels = robot.octomap.get_occupied_voxels()
+
+            frame_clouds = [cloud_pts] if len(cloud_pts) > 0 else []
+
+            robot_data[rid] = RobotMapData(
+                robot_id=rid,
+                poses=poses,
+                frame_clouds=frame_clouds,
+                current_voxels=current_voxels,
+            )
+
+        if len(robot_data) >= 1:
+            self._merger.merge(robot_data)
+
+    def _legacy_merge(self, robot_ids: tuple[str, ...]) -> None:
+        """Merge using legacy MapMerger.merge_from_voxels path."""
         all_voxels = []
         for rid in robot_ids:
             if rid in self._latest_map_data:
@@ -559,7 +606,6 @@ class Coordinator:
             self._merger.merge_from_voxels(all_voxels[0], combined[len(all_voxels[0]):])
         elif len(all_voxels) == 1:
             self._merger.last_merged_voxels = all_voxels[0]
-        self._merge_count += 1
 
     def _send_viz_update(
         self,
