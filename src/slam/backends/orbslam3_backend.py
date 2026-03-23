@@ -37,6 +37,9 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Coordinate transform: ORB-SLAM3 camera-optical -> MuJoCo z-up world
+# ORB-SLAM3 camera-optical: x-right, y-down, z-forward
+# MuJoCo world:             x-forward, y-left, z-up
+# Transform: x_mj = z_orb, y_mj = -x_orb, z_mj = -y_orb
 # ---------------------------------------------------------------------------
 T_MUJOCO_FROM_OPTICAL = np.array(
     [
@@ -136,6 +139,10 @@ class ORBSlam3Backend:
         self._global_colors = np.empty((0, 3), dtype=np.float64)
         self._num_frames = 0
         self._config_path: str | None = None
+        # Ground truth offset: ORB-SLAM3 starts its world at origin,
+        # but MuJoCo robots spawn at known positions. We seed the offset
+        # from the first frame's ground truth pose so the map aligns.
+        self._gt_offset: np.ndarray | None = None
 
         # Resolve vocab path
         if vocab_path is None:
@@ -168,6 +175,11 @@ class ORBSlam3Backend:
 
     def process_frame(self, frame: SensorFrame) -> SLAMResult:
         """Process one frame via ORB-SLAM3, return SLAMResult with dense cloud."""
+        # Seed ground truth offset from first frame so ORB-SLAM3's world
+        # frame aligns with MuJoCo's world frame (robots spawn at known pos).
+        if self._gt_offset is None and frame.ground_truth_pose is not None:
+            self._gt_offset = frame.ground_truth_pose.copy()
+
         # Feed frame to ORB-SLAM3
         if self._mode == "monocular":
             self._slam.process_image_mono(frame.rgb, frame.sim_time)
@@ -179,16 +191,23 @@ class ORBSlam3Backend:
 
         # Check for lost tracking
         if raw_pose is None:
+            # During initialization, use ground truth so robot is visible
+            if self._num_frames == 0 and self._gt_offset is not None:
+                self._last_pose = self._gt_offset.copy()
             return SLAMResult(
                 pose=self._last_pose.copy(),
                 points=np.empty((0, 3), dtype=np.float64),
                 colors=np.empty((0, 3), dtype=np.float64),
                 metrics={"sparse_feature_count": 0, "tracking_status_raw": "lost"},
-                tracking_status=TrackingStatus.LOST,
+                tracking_status=TrackingStatus.INITIALIZING if self._num_frames == 0 else TrackingStatus.LOST,
             )
 
-        # Apply coordinate transform
+        # Apply coordinate transform (ORB-SLAM3 frame -> MuJoCo frame)
         pose = self._convert_pose(raw_pose)
+
+        # Apply ground truth offset so map is in MuJoCo world coordinates
+        if self._gt_offset is not None:
+            pose = self._gt_offset @ pose
         self._last_pose = pose.copy()
         self._poses.append(pose.copy())
         self._num_frames += 1
@@ -236,6 +255,7 @@ class ORBSlam3Backend:
         self._global_colors = np.empty((0, 3), dtype=np.float64)
         self._num_frames = 0
         self._last_pose = np.eye(4, dtype=np.float64)
+        self._gt_offset = None
 
         # Shutdown and reinitialize
         try:
@@ -273,8 +293,19 @@ class ORBSlam3Backend:
     # ------------------------------------------------------------------
 
     def _convert_pose(self, orbslam_pose: np.ndarray) -> np.ndarray:
-        """Apply T_MUJOCO_FROM_OPTICAL to convert ORB-SLAM3 pose to MuJoCo frame."""
-        return T_MUJOCO_FROM_OPTICAL @ orbslam_pose
+        """Convert ORB-SLAM3 pose to MuJoCo world frame.
+
+        ORB-SLAM3 get_frame_pose() returns T_cw (world-to-camera in optical frame).
+        We need T_wc in MuJoCo conventions. Steps:
+        1. Invert to get T_wc (camera-to-world in optical frame)
+        2. Apply T_MUJOCO_FROM_OPTICAL to rotate into MuJoCo z-up frame
+        """
+        # ORB-SLAM3 returns T_cw; invert to get T_wc
+        try:
+            t_wc = np.linalg.inv(orbslam_pose)
+        except np.linalg.LinAlgError:
+            return self._last_pose.copy()
+        return T_MUJOCO_FROM_OPTICAL @ t_wc
 
     def _write_config(self) -> None:
         """Generate ORB-SLAM3 YAML config from camera intrinsics."""
