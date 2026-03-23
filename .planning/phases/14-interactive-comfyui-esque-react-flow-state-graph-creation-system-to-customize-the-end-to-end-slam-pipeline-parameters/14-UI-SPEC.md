@@ -36,7 +36,7 @@ Declared values (must be multiples of 4):
 | xs | 4px | Port gaps, inline icon margins, badge margins |
 | sm | 8px | Intra-node padding, node body padding, palette item padding, compact element spacing |
 | lg | 16px | Section padding, inspector panel gutter, minimap margin from edges |
-| xl | 24px | Panel headers, node palette category spacing |
+| xl | 24px | Panel headers, node palette category spacing, port vertical distribution |
 | 2xl | 32px | Major section breaks between inspector sections |
 | 3xl | 48px | Not used in this phase |
 
@@ -213,8 +213,8 @@ Toggle style: Two adjacent buttons, 32px height, active button uses accent backg
 - Node body: #1e1e32 fill, 1px solid #2a2a4a border, 8px border-radius.
 - Node body padding: 8px (sm token).
 - Selected node: 2px solid #4fc3f7 border instead of #2a2a4a.
-- Input ports: left edge, vertically distributed with 20px spacing.
-- Output ports: right edge, vertically distributed with 20px spacing.
+- Input ports: left edge, vertically distributed with 24px spacing (xl token).
+- Output ports: right edge, vertically distributed with 24px spacing (xl token).
 - Port handle: 12px diameter circle (or diamond/square per type), centered on node edge. See Spacing Scale exceptions for rationale.
 - Inline params: only params with `primary: true` in schema. Rendered as compact 24px-tall sliders or mini-toggles.
 - Status badge: top-right of header. 8px circle. Green (#2ecc71) = processing, gray (#666) = idle, red (#d32f2f) = error, pulsing blue (#4fc3f7) = initializing.
