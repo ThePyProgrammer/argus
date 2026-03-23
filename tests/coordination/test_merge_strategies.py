@@ -255,8 +255,12 @@ class TestPGOLoopClosure:
     def test_overlapping_clouds_detect_loop_closure(self) -> None:
         """When two robots have overlapping point clouds, loop closure is detected."""
         # Both robots explore the same [0,2]^3 region
+        # Use larger correspondence distance for random test data
         strategy = MergeRegistry.create(
-            "pgo_open3d", loop_closure_interval=1
+            "pgo_open3d",
+            loop_closure_interval=1,
+            max_correspondence_distance=0.5,
+            loop_closure_fitness_threshold=0.3,
         )
         robot_data = {
             "robot_a": _make_robot_data_with_trajectory(
