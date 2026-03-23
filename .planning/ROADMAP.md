@@ -122,7 +122,12 @@ Plans:
   1. Live metrics panel shows ATE, RPE, processing time (ms/frame), and tracking status per robot, updating in real time
   2. Metrics comparison view shows current algorithm's metrics alongside ICP baseline numbers side-by-side
   3. Output format toggle switches the Three.js viewer between point cloud, voxel grid, and mesh rendering modes without restarting the session
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — MetricsTracker backend + metricsStore + messageTypes + useWebSocket dispatch
+- [ ] 13-02-PLAN.md — MetricsPanel + Sparkline + ControlPanel output toggle + App layout
+- [ ] 13-03-PLAN.md — VoxelManager + MeshManager + SceneViewer cross-fade + mesh reconstruction
 
 ## Progress
 
@@ -143,7 +148,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 10. Pose-Graph Map Merger | 3/3 | Complete    | 2026-03-23 | - |
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/4 | Not started | - |
-| 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
+| 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/3 | Not started | - |
 
 ### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
 
