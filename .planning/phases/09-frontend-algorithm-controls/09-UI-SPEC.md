@@ -37,13 +37,13 @@ Declared values (must be multiples of 4):
 |-------|-------|-------|
 | xs | 4px | Icon gaps, inline padding, gap between pill badges, axis label margin |
 | sm | 8px | Compact element spacing, button padding vertical, flex gaps between controls, error banner padding vertical, error banner margin vertical, capability badge horizontal padding |
-| md | 12px | Section padding (ControlPanel outer padding), collapsible section margins, section padding-top |
-| lg | 16px | Sidebar header padding, gap between stats items, dropdown item padding horizontal |
-| xl | 24px | Empty state padding, modal card padding |
-| 2xl | 32px | Not used in this phase |
+| md | 16px | Section padding (ControlPanel outer padding), collapsible section margins, section padding-top, sidebar header padding, gap between stats items, dropdown item padding horizontal, dropdown trigger padding horizontal |
+| lg | 24px | Empty state padding, modal card padding |
+| xl | 32px | Not used in this phase |
+| 2xl | 48px | Not used in this phase |
 | 3xl | 64px | Not used in this phase |
 
-Exceptions: none. All spacing values are multiples of 4. Pre-existing 6px and 10px values in older components (ControlPanel.tsx, RobotCard.tsx) are acknowledged but new Phase 9 components use the declared scale exclusively. Where Phase 9 elements sit adjacent to older elements, use 8px (replacing legacy 6px) and 12px (replacing legacy 10px) for visual alignment.
+Exceptions: none. All spacing values are multiples of 4. Pre-existing 6px and 10px values in older components (ControlPanel.tsx, RobotCard.tsx) are acknowledged but new Phase 9 components use the declared scale exclusively. Where Phase 9 elements sit adjacent to older elements, use 8px (replacing legacy 6px and legacy 10px) for visual alignment.
 
 Source: Extracted from ControlPanel.tsx, Sidebar.tsx, RobotCard.tsx measured values, normalized to 4px grid.
 
@@ -104,8 +104,8 @@ Source: ControlPanel.tsx (`#1a1a3e`, `#2a2a4a`, `#2ecc71`), App.css (`#0d0d1a`, 
 - Section header: `SLAM ALGORITHM` in 12px/600/#888, matching "CLOUD CONFIG" header
 - Collapse indicator: 10px triangle (U+25BC expanded, U+25B6 collapsed)
 - Top border: `1px solid #2a2a4a` matching other section dividers
-- Padding top: 12px (matching scale token `md`)
-- Margin top: 12px
+- Padding top: 16px (matching scale token `md`)
+- Margin top: 16px
 
 ### 2. AlgorithmDropdown
 
@@ -114,7 +114,7 @@ Source: ControlPanel.tsx (`#1a1a3e`, `#2a2a4a`, `#2ecc71`), App.css (`#0d0d1a`, 
 **Trigger element:**
 - Full-width div with border `1px solid #444`, border-radius 4px
 - Background: `#12122a`
-- Padding: 8px 12px
+- Padding: 8px 16px
 - Display: flex, justify-content: space-between, align-items: center
 - Left side: active backend display name in 13px/400/#e0e0e0
 - Right side: chevron indicator (U+25BC) in 10px/#888
@@ -131,7 +131,7 @@ Source: ControlPanel.tsx (`#1a1a3e`, `#2a2a4a`, `#2ecc71`), App.css (`#0d0d1a`, 
 - Box-shadow: `0 4px 12px rgba(0, 0, 0, 0.4)`
 
 **Dropdown item (available):**
-- Padding: 8px 12px
+- Padding: 8px 16px
 - Cursor: pointer
 - On hover: background `#222244`
 - Display name: 13px/400/#e0e0e0
@@ -227,7 +227,7 @@ Source: ControlPanel.tsx (`#1a1a3e`, `#2a2a4a`, `#2ecc71`), App.css (`#0d0d1a`, 
 
 **Content:**
 - Heading: "Switch Algorithm" in 16px/600/#e0e0e0
-- Body: confirmation message in 13px/400/#aaa, margin-top 12px
+- Body: confirmation message in 13px/400/#aaa, margin-top 16px
 - Button row: flex, gap 8px, margin-top 20px, justify-content: flex-end
 
 **Buttons:**
@@ -257,7 +257,7 @@ Source: ControlPanel.tsx (`#1a1a3e`, `#2a2a4a`, `#2ecc71`), App.css (`#0d0d1a`, 
 
 **Text:**
 - "Restarting with {algorithmDisplayName}..." in 13px/400/#aaa
-- Margin-top: 12px
+- Margin-top: 16px
 
 ### 7. Error Banner (inline)
 
