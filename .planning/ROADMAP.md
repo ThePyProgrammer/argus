@@ -26,7 +26,7 @@
 - Integer phases (8, 9, ...13): Planned milestone work
 - Decimal phases (e.g., 9.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
+- [x] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
 - [ ] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP
 - [ ] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization
 - [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python
@@ -47,9 +47,9 @@
 **Plans:** 3 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Protocol + Registry + ICPBackend with unit tests
-- [ ] 08-02-PLAN.md — Consumer migration (RobotInstance, ExplorationLoop, Coordinator, main.py)
-- [ ] 08-03-PLAN.md — REST API endpoints (/api/slam/*) + human regression verification
+- [x] 08-01-PLAN.md — Protocol + Registry + ICPBackend with unit tests
+- [x] 08-02-PLAN.md — Consumer migration (RobotInstance, ExplorationLoop, Coordinator, main.py)
+- [x] 08-03-PLAN.md — REST API endpoints (/api/slam/*) + human regression verification
 
 ### Phase 9: Frontend Algorithm Controls
 **Goal**: Users can browse available SLAM algorithms, select one before a session, and tune its parameters -- all from the browser C2 interface
@@ -118,7 +118,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 5. Robot Locomotion Fix | v1.0 | 2/2 | Complete | 2026-03-18 |
 | 6. React C2 Web Interface | v1.0 | 3/4 | Complete | 2026-03-23 |
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
-| 8. Backend Abstraction + ICP Wrap | v2.0 | 0/3 | Planning complete | - |
+| 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 9. Frontend Algorithm Controls | v2.0 | 0/? | Not started | - |
 | 10. Pose-Graph Map Merger | v2.0 | 0/? | Not started | - |
 | 11. ORB-SLAM3 Backend | v2.0 | 0/? | Not started | - |

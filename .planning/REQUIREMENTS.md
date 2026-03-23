@@ -13,7 +13,7 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 - [x] **ABST-02**: System provides a SLAMRegistry that discovers, lists, and instantiates available backends by name
 - [x] **ABST-03**: Each backend declares its parameters as a JSON schema (voxel_size, feature_count, etc.)
 - [x] **ABST-04**: Each backend declares capabilities (supports_imu, outputs_dense, supports_loop_closure, supports_stereo)
-- [ ] **ABST-05**: User can select a SLAM algorithm via REST API before starting a session, triggering system restart with the new backend
+- [x] **ABST-05**: User can select a SLAM algorithm via REST API before starting a session, triggering system restart with the new backend
 - [x] **ABST-06**: Existing ICP-based SLAMPipeline is wrapped as the first backend with zero behavioral change
 
 ### SLAM Backends

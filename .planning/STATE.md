@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-23T05:29:30Z"
+status: phase-complete
+stopped_at: Completed 08-03-PLAN.md (Phase 08 complete)
+last_updated: "2026-03-23T05:38:00Z"
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -19,26 +19,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 08 — backend-abstraction-icp-wrap
+**Current focus:** Phase 08 complete — ready for Phase 09
 
 ## Current Position
 
-Phase: 08 (backend-abstraction-icp-wrap) — EXECUTING
-Plan: 3 of 3
+Phase: 08 (backend-abstraction-icp-wrap) — COMPLETE
+Plan: 3 of 3 (all done)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 2 (v2.0)
-- Average duration: 13min
-- Total execution time: 25min
+- Total plans completed: 3 (v2.0)
+- Average duration: 11min
+- Total execution time: 33min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 08 | 2/3 | 25min | 13min |
+| 08 | 3/3 | 33min | 11min |
 
 ## Accumulated Context
 
@@ -53,6 +53,9 @@ Recent decisions affecting current work:
 - [08-02]: All SLAM consumers migrated to SLAMProtocol; no direct SLAMPipeline construction outside backends
 - [08-02]: Single-robot mode in main.py also uses protocol methods (SLAMResult, get_poses, get_global_cloud)
 - [08-02]: Coordinator passes slam_cloud=None to detector (last_frame_cloud no longer a direct attribute)
+- [08-03]: SLAM routes use app.state for pending/active backend tracking across requests
+- [08-03]: Select endpoint reuses command_callback restart mechanism (no new restart path)
+- [08-03]: Parameter patch distinguishes live_tunable vs startup-only via schema metadata
 - [v2.0]: Generic SLAM API over hardcoded ICP — research shows ICP wrong for sparse point clouds
 - [v2.0]: 4 backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
 - [v2.0]: Pre-session algorithm selection primary; hot-swap deferred to v3.0
@@ -77,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 08-02-PLAN.md
+Stopped at: Completed 08-03-PLAN.md (Phase 08 complete)
 Resume file: None
