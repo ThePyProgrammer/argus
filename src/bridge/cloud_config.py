@@ -5,6 +5,8 @@ dependency cycle.  Bridge, SLAM, perception, and main all import from
 here instead of depth_to_cloud.
 """
 
+import threading
+
 # Each config: (flip_y, flip_z, pose_mode)
 # flip_y/flip_z: whether to negate that axis after Open3D unprojection
 # pose_mode: "cam" (cam_mat, no transpose) or "cam_T" (cam_mat.T)
@@ -20,18 +22,22 @@ CLOUD_CONFIGS = {
 }
 
 _active_config: str = "1"  # Y-Z- cam (standardized with offset correction)
+_config_lock = threading.Lock()
 
 
 def get_active_config() -> str:
-    return _active_config
+    with _config_lock:
+        return _active_config
 
 
 def set_active_config(key: str) -> None:
     global _active_config
-    if key in CLOUD_CONFIGS:
-        _active_config = key
+    with _config_lock:
+        if key in CLOUD_CONFIGS:
+            _active_config = key
 
 
 def get_pose_mode() -> str:
     """Return the pose transform mode for the active config."""
-    return CLOUD_CONFIGS[_active_config]["pose"]
+    with _config_lock:
+        return CLOUD_CONFIGS[_active_config]["pose"]

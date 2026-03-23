@@ -52,6 +52,12 @@ class TrotGaitController:
         """
         p = self._params
 
+        # Input validation: clamp to safe ranges
+        dt = float(np.clip(dt, 0.001, 1.0))
+        vx = float(np.clip(vx, -p.max_speed, p.max_speed))
+        vy = float(np.clip(vy, -p.max_speed, p.max_speed))
+        omega = float(np.clip(omega, -3.0, 3.0))
+
         # Clamp speed
         speed = min(float(np.sqrt(vx ** 2 + vy ** 2)), p.max_speed)
 

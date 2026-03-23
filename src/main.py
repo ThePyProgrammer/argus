@@ -383,6 +383,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
             logger.warning("Frontend build failed (%s). Serving pre-built files if available.", e)
 
     max_steps = args.multi_max_steps
+    _restart_lock = threading.Lock()
 
     # Start simulation in background thread with restart support
     def _run_simulation_loop():
@@ -403,42 +404,46 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 break
 
             logger.info("=== RESTARTING SIMULATION ===")
-            new_positions = coordinator.restart_positions
 
-            # Stop old bridge
-            try:
-                bridge.stop()
-            except Exception:
-                pass  # best-effort cleanup during restart
+            with _restart_lock:
+                coordinator._restarting = True
+                new_positions = coordinator.restart_positions
 
-            # Update config with new or random positions
-            if new_positions:
-                config.spawn_positions = {
-                    rid: (float(p[0]), float(p[1]), float(p[2]))
-                    for rid, p in new_positions.items()
-                    if rid in config.robot_ids
-                }
-            elif config.scene != "flat":
-                config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
-            logger.info("Spawn positions: %s", config.spawn_positions)
+                # Stop old bridge
+                try:
+                    bridge.stop()
+                except Exception:
+                    pass  # best-effort cleanup during restart
 
-            # Recreate bridge + robots
-            bridge = MultiRobotBridge(config)
-            robots = {}
-            for rid in config.robot_ids:
-                robots[rid] = RobotInstance.create(
-                    robot_id=rid,
-                    bridge=bridge,
-                    intrinsics=intrinsics,
-                    config=explore_config,
-                    spawn_position=config.spawn_positions[rid],
-                )
+                # Update config with new or random positions
+                if new_positions:
+                    config.spawn_positions = {
+                        rid: (float(p[0]), float(p[1]), float(p[2]))
+                        for rid, p in new_positions.items()
+                        if rid in config.robot_ids
+                    }
+                elif config.scene != "flat":
+                    config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
+                logger.info("Spawn positions: %s", config.spawn_positions)
 
-            coordinator.reset_for_restart(bridge, robots)
+                # Recreate bridge + robots
+                bridge = MultiRobotBridge(config)
+                robots = {}
+                for rid in config.robot_ids:
+                    robots[rid] = RobotInstance.create(
+                        robot_id=rid,
+                        bridge=bridge,
+                        intrinsics=intrinsics,
+                        config=explore_config,
+                        spawn_position=config.spawn_positions[rid],
+                    )
 
-            # Reset streaming viz cloud tracking
-            if streaming_viz is not None:
-                streaming_viz.reset_cloud_tracking()
+                coordinator.reset_for_restart(bridge, robots)
+                coordinator._restarting = False
+
+                # Reset streaming viz cloud tracking
+                if streaming_viz is not None:
+                    streaming_viz.reset_cloud_tracking()
 
             logger.info("Simulation restarted.")
 

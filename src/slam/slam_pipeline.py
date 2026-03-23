@@ -17,6 +17,9 @@ from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.slam.depth_to_cloud import depth_to_pointcloud
 
 
+MAX_CLOUD_POINTS = 500_000
+
+
 class SLAMPipeline:
     """ICP-based visual odometry with global point cloud accumulation.
 
@@ -109,6 +112,14 @@ class SLAMPipeline:
             self._global_cloud = self._global_cloud.voxel_down_sample(
                 self._voxel_size
             )
+            # Hard cap: progressively downsample with 2x voxel size until
+            # the cloud fits under MAX_CLOUD_POINTS to prevent OOM.
+            cap_voxel = self._voxel_size * 2
+            while len(self._global_cloud.points) > MAX_CLOUD_POINTS:
+                self._global_cloud = self._global_cloud.voxel_down_sample(
+                    cap_voxel
+                )
+                cap_voxel *= 2
 
         self._slam_poses.append(self._current_pose.copy())
         self._prev_cloud = depth_to_pointcloud(

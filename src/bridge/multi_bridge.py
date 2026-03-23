@@ -292,12 +292,13 @@ class MultiRobotBridge:
         if self._overview_renderer is not None:
             self._overview_renderer.close()
             self._overview_renderer = None
-        if self._viewer_handle is not None:
+        viewer = self._viewer_handle
+        self._viewer_handle = None
+        if viewer is not None:
             try:
-                self._viewer_handle.close()
+                viewer.close()
             except Exception:
                 logger.debug("Viewer handle close failed (may already be closed)")
-            self._viewer_handle = None
         self._model = None
         self._data = None
         self._step_count = 0

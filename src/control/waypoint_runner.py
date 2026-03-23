@@ -109,6 +109,7 @@ class WaypointRunner:
                 target = self._waypoints[i] + t * (self._waypoints[i + 1] - self._waypoints[i])
                 break
             cumulative += seg
+            # Fallback: use last waypoint if lookahead exceeds total path length
             target = self._waypoints[i + 1]
 
         # Check if we've reached the final waypoint

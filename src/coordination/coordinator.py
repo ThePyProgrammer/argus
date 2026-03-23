@@ -144,6 +144,7 @@ class Coordinator:
         # Restart state
         self._restart_requested: bool = False
         self._restart_positions: dict | None = None
+        self._restarting: bool = False
 
         # pLCM subscription state
         self._latest_map_data: dict[str, RobotMapMessage] = {}
@@ -198,7 +199,10 @@ class Coordinator:
         """Return status data for a single robot (position, voxel count).
 
         Used by MCP server to avoid reaching through coordinator.robots.
+        Returns safe defaults while a restart is in progress.
         """
+        if self._restarting:
+            return {"position": [0, 0, 0], "voxels": 0}
         robot = self._robots.get(rid)
         if robot is None:
             return {"position": [0, 0, 0], "voxels": 0}
@@ -215,7 +219,10 @@ class Coordinator:
         """Return coverage data for a single robot (voxels, SLAM frames).
 
         Used by MCP server to avoid reaching through coordinator.robots.
+        Returns safe defaults while a restart is in progress.
         """
+        if self._restarting:
+            return {"voxels": 0, "slam_frames": 0}
         robot = self._robots.get(rid)
         if robot is None:
             return {"voxels": 0, "slam_frames": 0}
