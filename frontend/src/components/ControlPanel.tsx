@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
+import { useMetricsStore } from '../stores/metricsStore';
 import AlgorithmSection from './AlgorithmSection';
 
 export default function ControlPanel() {
@@ -24,6 +25,8 @@ export default function ControlPanel() {
   const showScene = useControlStore((s) => s.showScene);
   const toggleScene = useControlStore((s) => s.toggleScene);
   const colorMode = useRobotStore((s) => s.colorMode);
+  const outputMode = useMetricsStore((s) => s.outputMode);
+  const setOutputMode = useMetricsStore((s) => s.setOutputMode);
 
   const handleStartStop = () => {
     const action = isRunning ? 'stop' : 'start';
@@ -137,6 +140,37 @@ export default function ControlPanel() {
         >
           {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
         </button>
+      </div>
+
+      {/* RENDERING section - output format toggle */}
+      <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#888' }}>
+          RENDERING
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(['cloud', 'voxel', 'mesh'] as const).map((mode) => {
+            const labels: Record<string, string> = { cloud: 'Point Cloud', voxel: 'Voxel Grid', mesh: 'Mesh' };
+            const isActive = outputMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => setOutputMode(mode)}
+                aria-pressed={isActive}
+                style={{
+                  ...buttonStyle,
+                  flex: 1,
+                  background: isActive ? '#1a3a2a' : '#263238',
+                  color: isActive ? '#2ecc71' : '#666',
+                  border: isActive ? '2px solid #2ecc71' : '1px solid #444',
+                  fontSize: '11px',
+                  padding: '6px 4px',
+                }}
+              >
+                {labels[mode]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <AlgorithmSection />

@@ -16,7 +16,7 @@ body {
 .app-container {
   display: grid;
   grid-template-columns: 1fr 320px;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -32,15 +32,20 @@ body {
 
 .sidebar-area {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 1 / 3;
   background: #1a1a2e;
   overflow-y: auto;
   border-left: 1px solid #2a2a4a;
 }
 
+.metrics-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
 .camera-strip-area {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 /* Scrollbar styling for dark theme */

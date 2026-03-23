@@ -2,6 +2,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import Sidebar from './components/Sidebar';
 import CameraStrip from './components/CameraStrip';
 import SceneViewer from './components/SceneViewer';
+import MetricsPanel from './components/MetricsPanel';
 
 /**
  * Root layout: CSS Grid with named areas.
@@ -19,6 +20,9 @@ export default function App() {
       </div>
       <div className="sidebar-area">
         <Sidebar />
+      </div>
+      <div className="metrics-area">
+        <MetricsPanel />
       </div>
       <div className="camera-strip-area">
         <CameraStrip />
