@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: unknown
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-03-23T09:47:46Z"
+status: phase_complete
+stopped_at: Completed 12-04-PLAN.md
+last_updated: "2026-03-23T09:57:39Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 13
+  completed_plans: 15
 ---
 
 # Project State
@@ -23,16 +23,16 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 
 ## Current Position
 
-Phase: 12 (openvins-svo-pro-backends) — EXECUTING
-Plan: 3 of 4
+Phase: 12 (openvins-svo-pro-backends) — COMPLETE
+Plan: 4 of 4 (all done)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 15 (v2.0)
+- Total plans completed: 17 (v2.0)
 - Average duration: 6min
-- Total execution time: ~133min (includes post-checkpoint ORB-SLAM3 fixes)
+- Total execution time: ~145min (includes post-checkpoint ORB-SLAM3 fixes)
 
 **By Phase:**
 
@@ -42,7 +42,7 @@ Plan: 3 of 4
 | 10 | 3/3 | 10min | 3min |
 | 09 | 3/3 | 12min | 4min |
 | 11 | 2/2 | ~78min | ~39min |
-| 12 | 2/4 | 6min | 3min |
+| 12 | 4/4 | 12min | 3min |
 
 ## Accumulated Context
 
@@ -101,6 +101,11 @@ Recent decisions affecting current work:
 - [12-02]: Duck-typed IMU readings in SubprocessSLAMBridge (no hard dependency on IMUReading class)
 - [12-02]: ZMQ PAIR socket with IPC transport for low-latency C++ subprocess communication
 - [12-02]: Unique IPC endpoint per PID+instance ID to prevent address collisions
+- [12-04]: DSO is visual-only (no IMU) -- send_frame called without imu_readings
+- [12-04]: Reuse T_MUJOCO_FROM_OPTICAL from ORB-SLAM3 for DSO (same camera-optical convention)
+- [12-04]: CrashToast uses createPortal to document.body (same z-index pattern as ConfirmModal)
+- [12-04]: ExplorationLoop accepts optional streaming_viz parameter for crash_fallback WS emission
+- [12-04]: Crash notification pipeline: exploration_loop -> crash_fallback WS -> slamStore.crashMessage -> CrashToast
 
 ### Roadmap Evolution
 
@@ -120,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T09:47:46Z
-Stopped at: Completed 12-02-PLAN.md
-Resume file: .planning/phases/12-openvins-svo-pro-backends/12-03-PLAN.md
+Last session: 2026-03-23T09:57:39Z
+Stopped at: Completed 12-04-PLAN.md (Phase 12 complete)
+Resume file: Next phase

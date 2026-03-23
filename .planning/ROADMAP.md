@@ -30,7 +30,7 @@
 - [x] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP (completed 2026-03-23)
 - [x] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization (completed 2026-03-23)
 - [x] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python (1/2 plans complete) (completed 2026-03-23)
-- [ ] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline
+- [x] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline (completed 2026-03-23)
 - [ ] **Phase 13: Live Metrics Dashboard + Output Toggle** — Metrics comparison and visualization modes
 
 ## Phase Details
@@ -111,8 +111,8 @@ Plans:
 Plans:
 - [x] 12-01-PLAN.md — IMU sensor types + MuJoCo bridge IMU sub-stepping + Go2 XML sensors
 - [x] 12-02-PLAN.md — SubprocessSLAMBridge generic class + ZMQ IPC + crash detection
-- [ ] 12-03-PLAN.md — OpenVINS backend + C++ harness
-- [ ] 12-04-PLAN.md — SVO Pro / DSO backend + C++ harness + crash toast notification
+- [x] 12-03-PLAN.md — OpenVINS backend + C++ harness
+- [x] 12-04-PLAN.md — SVO Pro / DSO backend + C++ harness + crash toast notification
 
 ### Phase 13: Live Metrics Dashboard + Output Toggle
 **Goal**: Users can compare SLAM algorithm performance in real time and switch between visualization modes to inspect map quality
@@ -147,7 +147,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 9. Frontend Algorithm Controls | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 10. Pose-Graph Map Merger | 3/3 | Complete    | 2026-03-23 | - |
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
-| 12. OpenVINS + SVO Pro Backends | v2.0 | 2/4 | In progress | - |
+| 12. OpenVINS + SVO Pro Backends | v2.0 | 4/4 | Complete | 2026-03-23 |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/3 | Not started | - |
 
 ### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
