@@ -27,7 +27,7 @@ def test_multi_robot_config_defaults():
     assert config.spawn_positions["robot_b"] == (5.0, 0.0, 0.3)
     assert config.resolution == (320, 240)
     assert config.boot_phase_steps == 200
-    assert config.sim_steps_per_frame == 10
+    assert config.sim_steps_per_frame == 5
     assert config.model_dir == "models/unitree_go2"
 
 

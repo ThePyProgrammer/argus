@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 # Path to the upstream Go2 model (must not be modified by tests)
-GO2_XML = str(Path(__file__).parent.parent / "models" / "unitree_go2" / "go2.xml")
+GO2_XML = str(Path(__file__).parent.parent.parent / "models" / "unitree_go2" / "go2.xml")
 
 
 # ------------------------------------------------------------------ #

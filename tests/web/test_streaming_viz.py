@@ -298,9 +298,10 @@ class TestWebStreamingViz:
         json_msgs = [m for m in msgs if isinstance(m, dict)]
         cloud_deltas = [m for m in json_msgs if m.get("type") == CLOUD_DELTA]
         assert len(cloud_deltas) == 1
-        # true_rgb mode: colors should be white placeholder (255,255,255)
+        # true_rgb mode with no per-point RGB data falls back to robot_tint;
+        # voxel (1,2,3) is nearest to robot_b (index 1) => color_for_robot(1)
         colors = cloud_deltas[0]["payload"]["colors"]
-        assert colors[0] == [255, 255, 255]
+        assert colors[0] == [230, 159, 0]
 
     def test_full_sync_after_interval(self):
         import time
