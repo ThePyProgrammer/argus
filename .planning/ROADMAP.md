@@ -109,7 +109,7 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — IMU sensor types + MuJoCo bridge IMU sub-stepping + Go2 XML sensors
+- [x] 12-01-PLAN.md — IMU sensor types + MuJoCo bridge IMU sub-stepping + Go2 XML sensors
 - [ ] 12-02-PLAN.md — SubprocessSLAMBridge generic class + ZMQ IPC + crash detection
 - [ ] 12-03-PLAN.md — OpenVINS backend + C++ harness
 - [ ] 12-04-PLAN.md — SVO Pro / DSO backend + C++ harness + crash toast notification
@@ -147,7 +147,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 9. Frontend Algorithm Controls | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 10. Pose-Graph Map Merger | 3/3 | Complete    | 2026-03-23 | - |
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
-| 12. OpenVINS + SVO Pro Backends | v2.0 | 0/4 | Not started | - |
+| 12. OpenVINS + SVO Pro Backends | v2.0 | 1/4 | In progress | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/3 | Not started | - |
 
 ### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
 status: unknown
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-03-23T09:29:25.736Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-23T09:47:46Z"
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 11
+  total_plans: 18
+  completed_plans: 13
 ---
 
 # Project State
@@ -19,18 +19,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 12 — openvins-svo-pro-backends (next)
+**Current focus:** Phase 12 — openvins-svo-pro-backends
 
 ## Current Position
 
-Phase: 11 (orb-slam3-backend) — COMPLETE
-Plan: 2 of 2 (all complete)
+Phase: 12 (openvins-svo-pro-backends) — EXECUTING
+Plan: 3 of 4
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 13 (v2.0)
+- Total plans completed: 15 (v2.0)
 - Average duration: 6min
 - Total execution time: ~133min (includes post-checkpoint ORB-SLAM3 fixes)
 
@@ -42,6 +42,7 @@ Plan: 2 of 2 (all complete)
 | 10 | 3/3 | 10min | 3min |
 | 09 | 3/3 | 12min | 4min |
 | 11 | 2/2 | ~78min | ~39min |
+| 12 | 2/4 | 6min | 3min |
 
 ## Accumulated Context
 
@@ -94,6 +95,12 @@ Recent decisions affecting current work:
 - [09-03]: Backend WS handler reuses SLAMRegistry schema lookup (same as REST PATCH /params) for consistency
 - [09-03]: slam_param_ack sent per-param immediately (not batched) for responsive UI feedback
 - [09-03]: RestartOverlay rendered inside SceneViewer container div as sibling to imperatively-appended Three.js canvas
+- [12-01]: IMU sensor addresses cached in start() for zero-overhead per-step access
+- [12-01]: Graceful _has_imu fallback: models without sensor elements get empty imu_readings list
+- [12-01]: SensorFrame.imu_readings uses field(default_factory=list) for backward compatibility
+- [12-02]: Duck-typed IMU readings in SubprocessSLAMBridge (no hard dependency on IMUReading class)
+- [12-02]: ZMQ PAIR socket with IPC transport for low-latency C++ subprocess communication
+- [12-02]: Unique IPC endpoint per PID+instance ID to prevent address collisions
 
 ### Roadmap Evolution
 
@@ -113,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T09:29:25.709Z
-Stopped at: Phase 13 UI-SPEC approved
-Resume file: .planning/phases/13-live-metrics-dashboard-output-toggle/13-UI-SPEC.md
+Last session: 2026-03-23T09:47:20Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: .planning/phases/12-openvins-svo-pro-backends/12-02-PLAN.md
