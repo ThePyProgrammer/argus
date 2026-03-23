@@ -36,7 +36,7 @@ class SLAMRegistry:
         capabilities, parameter_schema. Unavailable backends include 'reason'.
         """
         result = []
-        for name, info in cls._backends.items():
+        for name, info in list(cls._backends.items()):
             entry: dict[str, Any] = {
                 "name": name,
                 "display": info["display"],
