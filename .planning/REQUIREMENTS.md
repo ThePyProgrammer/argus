@@ -42,9 +42,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Visualization
 
-- [ ] **VIZ-01**: System displays the merged 3D map in real-time via Rerun or RViz2
-- [ ] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
-- [ ] **VIZ-03**: System displays a coverage heatmap showing explored vs unexplored regions
+- [x] **VIZ-01**: System displays the merged 3D map in real-time (WebStreamingViz + Three.js replaces Rerun)
+- [x] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
+- [x] **VIZ-03**: System displays coverage data showing explored vs unexplored regions (robot-tinted point cloud + coverage % stats)
 
 ### Locomotion
 
@@ -128,9 +128,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MERGE-02 | Phase 3 | Complete (03-02) |
 | MERGE-03 | Phase 3 | Complete (03-02) |
 | MERGE-04 | Phase 3 | Complete |
-| VIZ-01 | Phase 4 → Phase 7 | Pending (verification gap — code exists in WebStreamingViz) |
-| VIZ-02 | Phase 4 → Phase 7 | Pending (verification gap — code exists in WebStreamingViz) |
-| VIZ-03 | Phase 4 → Phase 7 | Pending (verification gap — heatmap dead code in Rerun, not in web) |
+| VIZ-01 | Phase 4 -> Phase 6 | Complete (WebStreamingViz streams merged 3D map via WebSocket to Three.js viewer) |
+| VIZ-02 | Phase 4 -> Phase 6 | Complete (WebStreamingViz sends POSE_UPDATE + TRAJECTORY messages; Three.js renders markers + trails) |
+| VIZ-03 | Phase 4 -> Phase 6 | Complete (robot-tinted point cloud + coverage % in stats panel; Rerun heatmap dead code removed in Phase 7) |
 | LOCO-01 | Phase 5 | Complete (05-01) |
 | LOCO-02 | Phase 5 | Complete (05-01) |
 | LOCO-03 | Phase 5 | Complete (05-01, human verification pending) |
@@ -149,8 +149,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | C2-10 | Phase 6 | Complete (06-02) |
 
 **Coverage:**
-- v1 requirements: 21 total (+ 16 added: LOCO-01-06, C2-01-10)
+- v1 requirements: 37 total (SIM-04, SLAM-04, EXPL-03, COORD-03, MERGE-04, VIZ-03, LOCO-06, C2-10)
 - Mapped to phases: 37
+- Satisfied: 37 (all complete)
 - Unmapped: 0
 
 ---
