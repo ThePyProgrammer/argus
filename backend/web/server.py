@@ -52,6 +52,15 @@ def create_app(
     app.state.robot_ids = robot_ids
     app.state.cloud_config_fns = cloud_config_fns
 
+    # SLAM backend selection state
+    app.state.active_slam_backend = "icp"
+    app.state.pending_slam_backend = None
+    app.state.pending_slam_params = {}
+
+    # Wire SLAM REST API routes
+    from backend.web.slam_routes import router as slam_router
+    app.include_router(slam_router)
+
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)
 

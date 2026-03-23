@@ -428,6 +428,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
                 logger.info("Spawn positions: %s", config.spawn_positions)
 
+                # Read pending SLAM backend from REST API selection
+                pending_backend = getattr(app.state, "pending_slam_backend", None)
+
                 # Recreate bridge + robots
                 bridge = MultiRobotBridge(config)
                 robots = {}
@@ -438,10 +441,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         intrinsics=intrinsics,
                         config=explore_config,
                         spawn_position=config.spawn_positions[rid],
+                        backend_name=pending_backend,
                     )
 
                 coordinator.reset_for_restart(bridge, robots)
                 coordinator._restarting = False
+
+                # Update active backend and clear pending state
+                app.state.active_slam_backend = pending_backend or "icp"
+                app.state.pending_slam_backend = None
 
                 # Reset streaming viz cloud tracking
                 if streaming_viz is not None:
