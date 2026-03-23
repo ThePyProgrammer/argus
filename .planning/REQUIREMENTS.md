@@ -77,35 +77,35 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ABST-01 | — | Pending |
-| ABST-02 | — | Pending |
-| ABST-03 | — | Pending |
-| ABST-04 | — | Pending |
-| ABST-05 | — | Pending |
-| ABST-06 | — | Pending |
-| BACK-01 | — | Pending |
-| BACK-02 | — | Pending |
-| BACK-03 | — | Pending |
-| BACK-04 | — | Pending |
-| BACK-05 | — | Pending |
-| BACK-06 | — | Pending |
-| MERG-01 | — | Pending |
-| MERG-02 | — | Pending |
-| MERG-03 | — | Pending |
-| MERG-04 | — | Pending |
-| CTRL-01 | — | Pending |
-| CTRL-02 | — | Pending |
-| CTRL-03 | — | Pending |
-| CTRL-04 | — | Pending |
-| CTRL-05 | — | Pending |
-| CTRL-06 | — | Pending |
-| CTRL-07 | — | Pending |
+| ABST-01 | Phase 8 | Pending |
+| ABST-02 | Phase 8 | Pending |
+| ABST-03 | Phase 8 | Pending |
+| ABST-04 | Phase 8 | Pending |
+| ABST-05 | Phase 8 | Pending |
+| ABST-06 | Phase 8 | Pending |
+| BACK-01 | Phase 11 | Pending |
+| BACK-02 | Phase 11 | Pending |
+| BACK-03 | Phase 12 | Pending |
+| BACK-04 | Phase 12 | Pending |
+| BACK-05 | Phase 12 | Pending |
+| BACK-06 | Phase 12 | Pending |
+| MERG-01 | Phase 10 | Pending |
+| MERG-02 | Phase 10 | Pending |
+| MERG-03 | Phase 10 | Pending |
+| MERG-04 | Phase 10 | Pending |
+| CTRL-01 | Phase 9 | Pending |
+| CTRL-02 | Phase 9 | Pending |
+| CTRL-03 | Phase 9 | Pending |
+| CTRL-04 | Phase 9 | Pending |
+| CTRL-05 | Phase 13 | Pending |
+| CTRL-06 | Phase 13 | Pending |
+| CTRL-07 | Phase 13 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 after roadmap creation*

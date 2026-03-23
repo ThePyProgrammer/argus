@@ -3,11 +3,12 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-7 (shipped 2026-03-23)
+- 🚧 **v2.0 Generic SLAM API** — Phases 8-13 (in progress)
 
 ## Phases
 
 <details>
-<summary>✅ v1.0 MVP (Phases 1-7) — SHIPPED 2026-03-23</summary>
+<summary>v1.0 MVP (Phases 1-7) — SHIPPED 2026-03-23</summary>
 
 - [x] Phase 1: Simulation Bridge and Single-Robot SLAM (4/4 plans) — completed 2026-03-17
 - [x] Phase 2: Autonomous Exploration (3/3 plans) — completed 2026-03-17
@@ -19,7 +20,89 @@
 
 </details>
 
+### v2.0 Generic SLAM API
+
+**Phase Numbering:**
+- Integer phases (8, 9, ...13): Planned milestone work
+- Decimal phases (e.g., 9.1): Urgent insertions (marked with INSERTED)
+
+- [ ] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
+- [ ] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP
+- [ ] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization
+- [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python
+- [ ] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline
+- [ ] **Phase 13: Live Metrics Dashboard + Output Toggle** — Metrics comparison and visualization modes
+
+## Phase Details
+
+### Phase 8: Backend Abstraction + ICP Wrap
+**Goal**: Any SLAM algorithm can plug into the system through a standard interface, with the existing ICP pipeline running unchanged as proof
+**Depends on**: Phase 7 (v1.0 complete)
+**Requirements**: ABST-01, ABST-02, ABST-03, ABST-04, ABST-05, ABST-06
+**Success Criteria** (what must be TRUE):
+  1. A new backend can be registered by implementing SLAMProtocol and calling SLAMRegistry.register() -- no other files need to change
+  2. REST endpoint GET /api/slam/backends returns a list of available backends with their parameter schemas and capability badges
+  3. REST endpoint POST /api/slam/select triggers a session restart with the chosen backend
+  4. The full simulation runs identically to v1.0 when ICP backend is selected (zero behavioral regression)
+**Plans**: TBD
+
+### Phase 9: Frontend Algorithm Controls
+**Goal**: Users can browse available SLAM algorithms, select one before a session, and tune its parameters -- all from the browser C2 interface
+**Depends on**: Phase 8
+**Requirements**: CTRL-01, CTRL-02, CTRL-03, CTRL-04
+**Success Criteria** (what must be TRUE):
+  1. Algorithm picker dropdown in C2 shows all registered backends with capability badges (supports_imu, outputs_dense, etc.)
+  2. Selecting an algorithm and clicking start restarts the session with that backend active
+  3. Parameter tuning panel renders controls dynamically from the backend's JSON schema (sliders for numeric, toggles for boolean)
+  4. Changing a parameter value in the panel sends it via WebSocket and the backend applies it within the current session
+**Plans**: TBD
+
+### Phase 10: Pose-Graph Map Merger
+**Goal**: Multi-robot maps merge via pose-graph optimization instead of naive ICP union, producing globally consistent reconstructions
+**Depends on**: Phase 8
+**Requirements**: MERG-01, MERG-02, MERG-03, MERG-04
+**Success Criteria** (what must be TRUE):
+  1. System supports three merge strategies selectable at session start: ICP union (existing), Open3D PGO, and GTSAM incremental PGO
+  2. Merge strategy selector appears in frontend alongside algorithm picker
+  3. Pose-graph merger accepts inter-robot loop closure constraints and produces globally consistent aligned maps
+  4. Merged map output feeds the existing Three.js visualization pipeline without changes (last_merged_voxels, last_merged_cloud)
+**Plans**: TBD
+
+### Phase 11: ORB-SLAM3 Backend
+**Goal**: Users can run ORB-SLAM3 as an alternative SLAM backend, validating that the abstraction layer works with a real feature-based algorithm
+**Depends on**: Phase 8
+**Requirements**: BACK-01, BACK-02
+**Success Criteria** (what must be TRUE):
+  1. Selecting "ORB-SLAM3" from the algorithm picker and starting a session produces pose estimates and 3D map output
+  2. ORB-SLAM3 provides pose estimates while the system generates dense point clouds from depth images using those poses (not sparse ORB features)
+  3. The full exploration-to-merged-map pipeline works end-to-end with ORB-SLAM3 selected
+**Plans**: TBD
+
+### Phase 12: OpenVINS + SVO Pro Backends
+**Goal**: Users can run visual-inertial (OpenVINS) and semi-direct (SVO Pro) SLAM methods, each isolated in subprocesses so crashes cannot take down the system
+**Depends on**: Phase 8, Phase 11 (validates pattern)
+**Requirements**: BACK-03, BACK-04, BACK-05, BACK-06
+**Success Criteria** (what must be TRUE):
+  1. OpenVINS backend accepts RGB frames and IMU data (accelerometer + gyroscope extracted from MuJoCo) and produces pose estimates
+  2. SVO Pro backend accepts RGB-D frames via subprocess bridge and produces pose estimates
+  3. Both C++ backends run in subprocess isolation -- a backend crash is caught and reported without killing the main simulation process
+  4. Selecting either backend from the algorithm picker and running a session produces a merged 3D map end-to-end
+**Plans**: TBD
+
+### Phase 13: Live Metrics Dashboard + Output Toggle
+**Goal**: Users can compare SLAM algorithm performance in real time and switch between visualization modes to inspect map quality
+**Depends on**: Phase 8, Phase 9 (frontend infrastructure)
+**Requirements**: CTRL-05, CTRL-06, CTRL-07
+**Success Criteria** (what must be TRUE):
+  1. Live metrics panel shows ATE, RPE, processing time (ms/frame), and tracking status per robot, updating in real time
+  2. Metrics comparison view shows current algorithm's metrics alongside ICP baseline numbers side-by-side
+  3. Output format toggle switches the Three.js viewer between point cloud, voxel grid, and mesh rendering modes without restarting the session
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -30,3 +113,9 @@
 | 5. Robot Locomotion Fix | v1.0 | 2/2 | Complete | 2026-03-18 |
 | 6. React C2 Web Interface | v1.0 | 3/4 | Complete | 2026-03-23 |
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
+| 8. Backend Abstraction + ICP Wrap | v2.0 | 0/? | Not started | - |
+| 9. Frontend Algorithm Controls | v2.0 | 0/? | Not started | - |
+| 10. Pose-Graph Map Merger | v2.0 | 0/? | Not started | - |
+| 11. ORB-SLAM3 Backend | v2.0 | 0/? | Not started | - |
+| 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
+| 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
