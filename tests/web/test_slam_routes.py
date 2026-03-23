@@ -7,8 +7,16 @@ from fastapi.testclient import TestClient
 from backend.web.slam_routes import router
 from src.slam.registry import SLAMRegistry
 
-# Ensure ICP backend is registered
-import src.slam.backends  # noqa: F401
+
+@pytest.fixture(autouse=True)
+def _ensure_icp_registered():
+    """Re-register ICP backend if another test cleared the registry."""
+    if "icp" not in SLAMRegistry._backends:
+        SLAMRegistry.register(
+            "icp", "ICP Odometry",
+            "src.slam.backends.icp_backend.ICPBackend",
+        )
+    yield
 
 
 @pytest.fixture
