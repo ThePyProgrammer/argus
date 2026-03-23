@@ -90,7 +90,7 @@ class RobotInstance:
         intrinsics: CameraIntrinsics,
         config: ExplorationConfig | None = None,
         spawn_position: tuple[float, float, float] = (0.0, 0.0, 0.3),
-    ) -> RobotInstance:
+    ) -> "RobotInstance":
         """Factory method to create a fully wired robot instance with pLCM publisher.
 
         Creates a pLCMTransport publishing to /{robot_id}/occupancy channel.
