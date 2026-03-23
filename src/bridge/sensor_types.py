@@ -6,7 +6,7 @@ Backend-agnostic: works with MuJoCo or any future sim.
 """
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 import numpy as np
@@ -32,6 +32,21 @@ def quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
 
 
 @dataclass
+class IMUReading:
+    """A single IMU measurement from the simulation.
+
+    Attributes:
+        accel: Accelerometer reading (3,) in m/s^2, body frame.
+        gyro: Gyroscope reading (3,) in rad/s, body frame.
+        timestamp: Simulation timestamp in seconds.
+    """
+
+    accel: np.ndarray  # (3,) float64
+    gyro: np.ndarray   # (3,) float64
+    timestamp: float
+
+
+@dataclass
 class SensorFrame:
     """A single timestep of sensor data from the simulation.
 
@@ -46,6 +61,7 @@ class SensorFrame:
     depth: np.ndarray | None  # (H, W) float32 or (H, W, 3) uint8 JET; None if unavailable
     ground_truth_pose: np.ndarray  # (4, 4) float64 homogeneous transform
     sim_time: float  # simulation timestamp in seconds
+    imu_readings: list[IMUReading] = field(default_factory=list)
 
 
 @dataclass
