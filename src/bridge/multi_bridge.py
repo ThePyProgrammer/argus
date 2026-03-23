@@ -383,7 +383,7 @@ class MultiRobotBridge:
         depth = np.clip(depth, 0, 20.0).astype(np.float32)  # cap at 20m
 
         # Pose transform depends on active cloud config
-        from src.slam.depth_to_cloud import get_pose_mode
+        from src.bridge.cloud_config import get_pose_mode
         pose_mode = get_pose_mode()
         if pose_mode == "body":
             pose = self._extract_pose(robot_id)

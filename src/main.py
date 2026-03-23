@@ -23,10 +23,13 @@ Control modes:
 """
 
 import argparse
+import logging
 import sys
 import time
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import CameraIntrinsics
@@ -169,31 +172,32 @@ def run_explore_mode(args):
 
     loop = ExplorationLoop(bridge=bridge, slam=slam, octomap=octomap, config=explore_config)
 
-    print(f"Starting autonomous exploration...")
-    print(f"Max steps: {explore_config.max_steps}")
-    print(f"Rescan distance: {explore_config.rescan_distance_m}m")
-    print(f"Voxel resolution: {explore_config.voxel_resolution}m")
-    print("Press Ctrl+C to stop\n")
+    print("Starting autonomous exploration...")
+    logger.info("Max steps: %d", explore_config.max_steps)
+    logger.info("Rescan distance: %.1fm", explore_config.rescan_distance_m)
+    logger.info("Voxel resolution: %.2fm", explore_config.voxel_resolution)
+    logger.info("Press Ctrl+C to stop")
 
     try:
         result = loop.run()
     except KeyboardInterrupt:
-        print("\nExploration interrupted by user.")
+        logger.info("Exploration interrupted by user.")
         result = None
 
-    # Print results
+    # Log results
     if result is not None:
-        print(f"\n=== Exploration Complete ===")
-        print(f"Terminated: {result.terminated_reason}")
-        print(f"Total steps: {result.total_steps}")
-        print(f"Coverage (frontier exhaustion): {result.final_coverage_pct:.1f}%")
-        print(f"Coverage (bounding box): {result.final_bbox_coverage_pct:.1f}%")
-        print(f"Remaining frontiers: {result.final_frontier_count}")
+        logger.info("=== Exploration Complete ===")
+        logger.info("Terminated: %s", result.terminated_reason)
+        logger.info("Total steps: %d", result.total_steps)
+        logger.info("Coverage (frontier exhaustion): %.1f%%", result.final_coverage_pct)
+        logger.info("Coverage (bounding box): %.1f%%", result.final_bbox_coverage_pct)
+        logger.info("Remaining frontiers: %d", result.final_frontier_count)
 
-    print(
-        f"\nFinal stats: {slam.num_frames_processed} frames, "
-        f"{len(slam.get_cloud_points())} cloud points, "
-        f"{octomap.num_occupied} occupied voxels"
+    logger.info(
+        "Final stats: %d frames, %d cloud points, %d occupied voxels",
+        slam.num_frames_processed,
+        len(slam.get_cloud_points()),
+        octomap.num_occupied,
     )
 
     bridge.stop()
@@ -252,33 +256,33 @@ def run_multi_mode(args):
     if getattr(args, 'static', False):
         coordinator.set_static(True)
 
-    print(f"Starting multi-robot exploration...")
-    print(f"Robots: {config.robot_ids}")
-    print(f"Spawn positions: {config.spawn_positions}")
-    print(f"Boot phase: {config.boot_phase_steps} steps")
-    print(f"Max steps: {args.multi_max_steps}")
-    print("Press Ctrl+C to stop\n")
+    print("Starting multi-robot exploration...")
+    logger.info("Robots: %s", config.robot_ids)
+    logger.info("Spawn positions: %s", config.spawn_positions)
+    logger.info("Boot phase: %d steps", config.boot_phase_steps)
+    logger.info("Max steps: %d", args.multi_max_steps)
+    logger.info("Press Ctrl+C to stop")
 
     try:
         result = coordinator.run(max_steps=args.multi_max_steps)
     except KeyboardInterrupt:
-        print("\nMulti-robot exploration interrupted.")
+        logger.info("Multi-robot exploration interrupted.")
         result = None
 
     if result is not None:
-        print(f"\n=== Multi-Robot Exploration Complete ===")
-        print(f"Terminated: {result.terminated_reason}")
-        print(f"Total steps: {result.total_steps}")
-        print(f"Merge count: {result.merge_count}")
-        print(f"Merged voxels: {result.merged_voxel_count}")
+        logger.info("=== Multi-Robot Exploration Complete ===")
+        logger.info("Terminated: %s", result.terminated_reason)
+        logger.info("Total steps: %d", result.total_steps)
+        logger.info("Merge count: %d", result.merge_count)
+        logger.info("Merged voxels: %d", result.merged_voxel_count)
         for rid, count in result.per_robot_voxels.items():
-            print(f"  {rid}: {count} voxels")
+            logger.info("  %s: %d voxels", rid, count)
 
     # Keep MuJoCo viewer open until user closes it
     import time
     viewer_handle = getattr(bridge, '_viewer_handle', None)
     if viewer_handle is not None:
-        print("\nExploration complete. Close the MuJoCo viewer window to exit.")
+        logger.info("Exploration complete. Close the MuJoCo viewer window to exit.")
         try:
             while viewer_handle.is_running():
                 viewer_handle.sync()
@@ -360,11 +364,11 @@ def run_web_mode(args):
             robot.slam.reset()
             robot.octomap.reset()
         coordinator.reset_merger()
-        print("[cloud config] SLAM and OctoMap reset for all robots")
+        logger.info("[cloud config] SLAM and OctoMap reset for all robots")
 
     from backend.web.server import create_app
     from src.mcp.server import configure as configure_mcp, mcp_endpoint
-    from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config, set_active_config
+    from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active_config
 
     configure_mcp(coordinator, list(config.robot_ids))
 
@@ -382,13 +386,13 @@ def run_web_mode(args):
     coordinator.set_viz(streaming_viz)
     if getattr(args, 'static', False):
         coordinator.set_static(True)
-    print("MCP endpoint available at http://localhost:8000/mcp")
+    logger.info("MCP endpoint available at http://localhost:8000/mcp")
 
     # Build React frontend
     from pathlib import Path
     frontend_dir = Path(__file__).parent.parent / "frontend"
     if (frontend_dir / "package.json").exists():
-        print("Building React frontend...")
+        logger.info("Building React frontend...")
         try:
             subprocess.run(
                 ["npm", "run", "build"],
@@ -397,9 +401,9 @@ def run_web_mode(args):
                 capture_output=True,
                 timeout=120,
             )
-            print("Frontend build complete.")
+            logger.info("Frontend build complete.")
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"Warning: frontend build failed ({e}). Serving pre-built files if available.")
+            logger.warning("Frontend build failed (%s). Serving pre-built files if available.", e)
 
     max_steps = args.multi_max_steps
 
@@ -411,16 +415,18 @@ def run_web_mode(args):
         while True:
             try:
                 result = coordinator.run(max_steps=max_steps)
-                print(f"\nSimulation complete: {result.terminated_reason}, "
-                      f"{result.total_steps} steps, {result.merge_count} merges")
+                logger.info(
+                    "Simulation complete: %s, %d steps, %d merges",
+                    result.terminated_reason, result.total_steps, result.merge_count,
+                )
             except Exception as e:
-                print(f"\nSimulation error: {e}")
+                logger.warning("Simulation error: %s", e)
 
             # Check if restart was requested
             if not coordinator.restart_requested:
                 break
 
-            print("\n=== RESTARTING SIMULATION ===")
+            logger.info("=== RESTARTING SIMULATION ===")
             new_positions = coordinator.restart_positions
 
             # Stop old bridge
@@ -438,7 +444,7 @@ def run_web_mode(args):
                 }
             elif config.scene != "flat":
                 config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
-            print(f"Spawn positions: {config.spawn_positions}")
+            logger.info("Spawn positions: %s", config.spawn_positions)
 
             # Recreate bridge + robots
             bridge = MultiRobotBridge(config)
@@ -458,23 +464,23 @@ def run_web_mode(args):
             if streaming_viz is not None:
                 streaming_viz.reset_cloud_tracking()
 
-            print("Simulation restarted.\n")
+            logger.info("Simulation restarted.")
 
     sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)
     sim_thread.start()
 
-    print(f"\nC2 Interface running at http://localhost:8000")
-    print(f"Robots: {config.robot_ids}")
-    print(f"Scene: {scene}")
+    print("Starting C2 interface at http://localhost:8000")
+    logger.info("Robots: %s", config.robot_ids)
+    logger.info("Scene: %s", scene)
     for rid, pos in config.spawn_positions.items():
-        print(f"  {rid}: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})")
-    print(f"Max steps: {max_steps}")
-    print("Press Ctrl+C to stop\n")
+        logger.info("  %s: (%.2f, %.2f, %.2f)", rid, pos[0], pos[1], pos[2])
+    logger.info("Max steps: %d", max_steps)
+    logger.info("Press Ctrl+C to stop")
 
     try:
         uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
     except (KeyboardInterrupt, SystemExit):
-        print("\nShutting down C2 interface...")
+        logger.info("Shutting down C2 interface...")
     finally:
         coordinator.request_stop()
         sim_thread.join(timeout=5.0)
@@ -523,8 +529,8 @@ def main():
         controller.start()
 
     print(f"Starting SLAM with {args.control} control...")
-    print(f"Max steps: {args.max_steps}")
-    print("Press Ctrl+C to stop\n")
+    logger.info("Max steps: %d", args.max_steps)
+    logger.info("Press Ctrl+C to stop")
 
     try:
         # ------------------------------------------------------------------
@@ -543,7 +549,7 @@ def main():
                 )
                 linear, angular = controller.get_velocity(current_pose)
                 if controller.is_complete:
-                    print("All waypoints reached.")
+                    logger.info("All waypoints reached.")
                     break
             elif args.control == "random":
                 linear, angular = controller.get_velocity(frame.sim_time)
@@ -580,42 +586,44 @@ def main():
                     if len(voxels) > 0:
                         viz.log_occupancy_grid(voxels, octomap.resolution)
 
-            # Print progress
+            # Log progress
             if step_i % 50 == 0:
-                print(
-                    f"Step {step_i}: "
-                    f"cloud={len(slam.get_cloud_points())} pts, "
-                    f"voxels={octomap.num_occupied}, "
-                    f"pose=[{slam_pose[0, 3]:.2f}, "
-                    f"{slam_pose[1, 3]:.2f}, "
-                    f"{slam_pose[2, 3]:.2f}]"
+                logger.info(
+                    "Step %d: cloud=%d pts, voxels=%d, pose=[%.2f, %.2f, %.2f]",
+                    step_i,
+                    len(slam.get_cloud_points()),
+                    octomap.num_occupied,
+                    slam_pose[0, 3],
+                    slam_pose[1, 3],
+                    slam_pose[2, 3],
                 )
 
     except KeyboardInterrupt:
-        print("\nStopping...")
+        logger.info("Stopping...")
     finally:
         # ------------------------------------------------------------------
-        # Compute and print drift metrics
+        # Compute and log drift metrics
         # ------------------------------------------------------------------
         if len(gt_collector) >= 2 and len(slam.slam_poses) >= 2:
-            print("\n=== Drift Metrics ===")
+            logger.info("=== Drift Metrics ===")
             try:
                 metrics = compute_drift_metrics(
                     slam_poses=slam.slam_poses,
                     gt_poses=gt_collector.poses,
                     timestamps=gt_collector.timestamps,
                 )
-                print(f"ATE RMSE: {metrics['ate_rmse']:.4f} m")
-                print(f"ATE Mean: {metrics['ate_mean']:.4f} m")
-                print(f"RPE RMSE: {metrics['rpe_rmse']:.4f} m")
-                print(f"RPE Mean: {metrics['rpe_mean']:.4f} m")
+                logger.info("ATE RMSE: %.4f m", metrics['ate_rmse'])
+                logger.info("ATE Mean: %.4f m", metrics['ate_mean'])
+                logger.info("RPE RMSE: %.4f m", metrics['rpe_rmse'])
+                logger.info("RPE Mean: %.4f m", metrics['rpe_mean'])
             except Exception as e:
-                print(f"Could not compute drift metrics: {e}")
+                logger.warning("Could not compute drift metrics: %s", e)
 
-        print(
-            f"\nFinal stats: {slam.num_frames_processed} frames, "
-            f"{len(slam.get_cloud_points())} cloud points, "
-            f"{octomap.num_occupied} occupied voxels"
+        logger.info(
+            "Final stats: %d frames, %d cloud points, %d occupied voxels",
+            slam.num_frames_processed,
+            len(slam.get_cloud_points()),
+            octomap.num_occupied,
         )
 
         # Cleanup

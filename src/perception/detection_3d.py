@@ -67,7 +67,7 @@ def project_detections_to_3d(
         cam_y = (cy - intrinsics.cy) * median_depth / intrinsics.fy
 
         # Apply same Y/Z flip as depth_to_cloud config
-        from src.slam.depth_to_cloud import CLOUD_CONFIGS, get_active_config
+        from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config
         cfg = CLOUD_CONFIGS[get_active_config()]
         cam_point = np.array([
             cfg["fy"] * cam_x if cfg.get("sx") is not None else cam_x,

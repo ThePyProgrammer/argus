@@ -9,37 +9,12 @@ import numpy as np
 import open3d as o3d
 
 from src.bridge.sensor_types import CameraIntrinsics
-
-# Each config: (flip_y, flip_z, pose_mode)
-# flip_y/flip_z: whether to negate that axis after Open3D unprojection
-# pose_mode: "cam" (cam_mat, no transpose) or "cam_T" (cam_mat.T)
-CLOUD_CONFIGS = {
-    "1": {"label": "Y- Z- | cam",    "fy": -1, "fz": -1, "pose": "cam_noT"},
-    "2": {"label": "Y- Z- | cam.T",  "fy": -1, "fz": -1, "pose": "cam_T"},
-    "3": {"label": "Y- Z+ | cam",    "fy": -1, "fz":  1, "pose": "cam_noT"},
-    "4": {"label": "Y- Z+ | cam.T",  "fy": -1, "fz":  1, "pose": "cam_T"},
-    "5": {"label": "Y+ Z- | cam",    "fy":  1, "fz": -1, "pose": "cam_noT"},
-    "6": {"label": "Y+ Z- | cam.T",  "fy":  1, "fz": -1, "pose": "cam_T"},
-    "7": {"label": "Y+ Z+ | cam",    "fy":  1, "fz":  1, "pose": "cam_noT"},
-    "8": {"label": "Y+ Z+ | cam.T",  "fy":  1, "fz":  1, "pose": "cam_T"},
-}
-
-_active_config: str = "1"  # Y-Z- cam (standardized with offset correction)
-
-
-def get_active_config() -> str:
-    return _active_config
-
-
-def set_active_config(key: str) -> None:
-    global _active_config
-    if key in CLOUD_CONFIGS:
-        _active_config = key
-
-
-def get_pose_mode() -> str:
-    """Return the pose transform mode for the active config."""
-    return CLOUD_CONFIGS[_active_config]["pose"]
+from src.bridge.cloud_config import (
+    CLOUD_CONFIGS,
+    get_active_config,
+    set_active_config,
+    get_pose_mode,
+)
 
 
 def depth_to_pointcloud(
@@ -63,7 +38,7 @@ def depth_to_pointcloud(
         Open3D PointCloud with points and colors.
     """
     h, w = depth.shape
-    cfg = CLOUD_CONFIGS[_active_config]
+    cfg = CLOUD_CONFIGS[get_active_config()]
 
     o3d_intrinsics = o3d.camera.PinholeCameraIntrinsic(
         w, h, intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy,

@@ -26,8 +26,40 @@ from typing import Any, TYPE_CHECKING
 import numpy as np
 
 from src.bridge.multi_bridge import MultiRobotBridge
+from src.bridge.sensor_types import SensorFrame
 from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.bridge.multi_robot_config import MultiRobotConfig
+
+
+@dataclass
+class RobotVizData:
+    """Typed container for per-robot visualization data.
+
+    Replaces the untyped 9-key dict previously built in _send_viz_update.
+    Supports dict-style access (``data["pose"]``, ``data.get("pose")``)
+    for backward compatibility with viz consumers.
+    """
+
+    frame: SensorFrame
+    local_voxels: np.ndarray
+    slam_cloud_pts: np.ndarray
+    slam_cloud_rgb: np.ndarray
+    pose: np.ndarray
+    trajectory: list[np.ndarray]
+    coverage_pct: float
+    detections: list[dict]
+    scene_description: dict | None
+
+    # -- dict-style compatibility helpers ----------------------------------
+
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
 
 
 @dataclass
@@ -522,29 +554,30 @@ class Coordinator:
                     for d in self._detector.get_detections(rid)
                 ]
 
-            robot_data[rid] = {
-                "frame": frames[rid],
-                "local_voxels": robot.get_occupied_voxels(),
-                "slam_cloud_pts": cloud_pts,
-                "slam_cloud_rgb": cloud_rgb,
-                "pose": pose,
-                "trajectory": list(robot.slam.slam_poses),
-                "coverage_pct": robot.exploration.last_coverage,
-                "detections": detections,
-                "scene_description": None,
-            }
-
+            scene_desc = None
             if self._describer is not None:
                 desc = self._describer.get_description(rid)
                 if desc is not None:
-                    robot_data[rid]["scene_description"] = {
+                    scene_desc = {
                         "text": desc.description,
                         "objects": desc.objects,
                     }
 
+            robot_data[rid] = RobotVizData(
+                frame=frames[rid],
+                local_voxels=robot.get_occupied_voxels(),
+                slam_cloud_pts=cloud_pts,
+                slam_cloud_rgb=cloud_rgb,
+                pose=pose,
+                trajectory=list(robot.slam.slam_poses),
+                coverage_pct=robot.exploration.last_coverage,
+                detections=detections,
+                scene_description=scene_desc,
+            )
+
         voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
         frontier_cells = self._gather_frontier_cells(robot_ids)
-        total_cov = sum(d["coverage_pct"] for d in robot_data.values()) / len(robot_data)
+        total_cov = sum(d.coverage_pct for d in robot_data.values()) / len(robot_data)
 
         self._viz.update(
             merged_voxels=self._merger.last_merged_voxels,
