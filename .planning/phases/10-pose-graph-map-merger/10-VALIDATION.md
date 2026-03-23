@@ -38,15 +38,14 @@ created: 2026-03-23
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 10-01-01 | 01 | 1 | MERG-01 | unit | `python -m pytest tests/coordination/test_merge_registry.py -x` | ❌ W0 | ⬜ pending |
-| 10-01-02 | 01 | 1 | MERG-01 | unit | `python -m pytest tests/coordination/test_merge_strategies.py -x` | ❌ W0 | ⬜ pending |
-| 10-02-01 | 02 | 1 | MERG-02 | unit | `python -m pytest tests/web/test_merge_routes.py -x` | ❌ W0 | ⬜ pending |
-| 10-03-01 | 03 | 2 | MERG-03 | unit | `python -m pytest tests/coordination/test_merge_strategies.py::TestPGOLoopClosure -x` | ❌ W0 | ⬜ pending |
-| 10-03-02 | 03 | 2 | MERG-03 | unit | `python -m pytest tests/coordination/test_merge_strategies.py::TestLoopClosureFallback -x` | ❌ W0 | ⬜ pending |
-| 10-04-01 | 04 | 2 | MERG-04 | unit | `python -m pytest tests/coordination/test_merge_strategies.py::TestMergeOutputCompat -x` | ❌ W0 | ⬜ pending |
-| 10-04-02 | 04 | 2 | MERG-04 | unit | `python -m pytest tests/coordination/test_coordinator.py -x` | ✅ (update) | ⬜ pending |
+| 10-01-T1 | 01 | 1 | MERG-01 | unit | `python -m pytest tests/coordination/test_merge_registry.py -x` | W0 | pending |
+| 10-01-T2 | 01 | 1 | MERG-01 | unit | `python -m pytest tests/coordination/test_merge_strategies.py -x` | W0 | pending |
+| 10-02-T1 | 02 | 2 | MERG-01, MERG-03 | unit | `python -m pytest tests/coordination/test_merge_strategies.py::TestOpen3DPGO tests/coordination/test_merge_strategies.py::TestPGOLoopClosure tests/coordination/test_merge_strategies.py::TestLoopClosureFallback -x` | W0 | pending |
+| 10-02-T2 | 02 | 2 | MERG-01, MERG-03 | unit | `python -m pytest tests/coordination/test_merge_strategies.py::TestGTSAMPGO -x` | W0 | pending |
+| 10-03-T1 | 03 | 2 | MERG-02 | unit | `python -m pytest tests/web/test_merge_routes.py -x` | W0 | pending |
+| 10-03-T2 | 03 | 2 | MERG-04 | unit | `python -m pytest tests/coordination/test_coordinator.py -x` | update | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
