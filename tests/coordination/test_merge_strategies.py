@@ -322,3 +322,122 @@ class TestLoopClosureFallback:
         # Should still produce a result (graceful degradation)
         assert result.merged_voxels.shape[0] > 0
         assert result.metrics.get("loop_closure_fallbacks", 0) > 0
+
+
+# ---------------------------------------------------------------------------
+# Helper to check gtsam availability
+# ---------------------------------------------------------------------------
+
+
+def _gtsam_available() -> bool:
+    """Check if gtsam module is importable."""
+    try:
+        import gtsam  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+class TestGTSAMPGO:
+    """GTSAM iSAM2 PGO strategy tests."""
+
+    def test_registered_in_registry(self) -> None:
+        strategies = MergeRegistry.list_strategies()
+        names = [s["name"] for s in strategies]
+        assert "pgo_gtsam" in names
+
+    def test_unavailable_shows_install_hint(self) -> None:
+        """When gtsam is NOT importable, strategy shows available=False."""
+        from src.coordination.merge_strategies import pgo_gtsam
+
+        original = pgo_gtsam.GTSAMPGOStrategy.AVAILABLE
+        try:
+            pgo_gtsam.GTSAMPGOStrategy.AVAILABLE = False
+            strategies = MergeRegistry.list_strategies()
+            gtsam_entry = [s for s in strategies if s["name"] == "pgo_gtsam"][0]
+            assert gtsam_entry["available"] is False
+            assert "pip install gtsam" in gtsam_entry.get("reason", "")
+        finally:
+            pgo_gtsam.GTSAMPGOStrategy.AVAILABLE = original
+
+    def test_available_check_reflects_gtsam_import(self) -> None:
+        """If gtsam is importable, strategy shows available=True in listing."""
+        from src.coordination.merge_strategies import pgo_gtsam
+
+        strategies = MergeRegistry.list_strategies()
+        gtsam_entry = [s for s in strategies if s["name"] == "pgo_gtsam"][0]
+        # Available should match whether gtsam is actually importable
+        assert gtsam_entry["available"] is pgo_gtsam.GTSAM_AVAILABLE
+
+    @pytest.mark.skipif(
+        not _gtsam_available(), reason="gtsam not installed"
+    )
+    def test_merge_two_robots_produces_non_empty_voxels(self) -> None:
+        strategy = MergeRegistry.create("pgo_gtsam")
+        robot_data = {
+            "robot_a": _make_robot_data_with_trajectory("robot_a"),
+            "robot_b": _make_robot_data_with_trajectory(
+                "robot_b", offset=np.array([0.5, 0.0, 0.0])
+            ),
+        }
+        result = strategy.merge(robot_data)
+        assert isinstance(result, MergeResult)
+        assert result.merged_voxels.shape[0] > 0
+
+    @pytest.mark.skipif(
+        not _gtsam_available(), reason="gtsam not installed"
+    )
+    def test_incremental_isam2_updates(self) -> None:
+        """Calling merge() twice reuses iSAM2 state."""
+        strategy = MergeRegistry.create("pgo_gtsam")
+        robot_data = {
+            "robot_a": _make_robot_data_with_trajectory("robot_a"),
+            "robot_b": _make_robot_data_with_trajectory(
+                "robot_b", offset=np.array([0.5, 0.0, 0.0])
+            ),
+        }
+        strategy.merge(robot_data)
+        result2 = strategy.merge(robot_data)
+        assert result2.metrics.get("isam2_updates", 0) == 2
+
+    @pytest.mark.skipif(
+        not _gtsam_available(), reason="gtsam not installed"
+    )
+    def test_reset_clears_isam2_state(self) -> None:
+        strategy = MergeRegistry.create("pgo_gtsam")
+        robot_data = {
+            "robot_a": _make_robot_data_with_trajectory("robot_a"),
+            "robot_b": _make_robot_data_with_trajectory(
+                "robot_b", offset=np.array([0.5, 0.0, 0.0])
+            ),
+        }
+        strategy.merge(robot_data)
+        strategy.reset()
+        assert strategy.last_merged_voxels.shape == (0, 3)
+
+    @pytest.mark.skipif(
+        not _gtsam_available(), reason="gtsam not installed"
+    )
+    def test_fallback_with_spawn_transforms(self) -> None:
+        """When ICP fails and spawn_transforms are provided, fallback uses
+        relative spawn transform."""
+        t_b = np.eye(4)
+        t_b[:3, 3] = [100.0, 0.0, 0.0]
+        strategy = MergeRegistry.create(
+            "pgo_gtsam",
+            loop_closure_interval=1,
+            spawn_transforms={"robot_a": np.eye(4), "robot_b": t_b},
+        )
+        data_a = _make_robot_data_with_trajectory(
+            "robot_a", cloud_range=(0.0, 1.0), n_points_per_frame=100
+        )
+        data_b = _make_robot_data_with_trajectory(
+            "robot_b",
+            offset=np.array([100.0, 0.0, 0.0]),
+            cloud_range=(0.0, 1.0),
+            n_points_per_frame=100,
+        )
+        robot_data = {"robot_a": data_a, "robot_b": data_b}
+        result = strategy.merge(robot_data)
+        assert result.metrics.get("loop_closure_fallbacks", 0) > 0
