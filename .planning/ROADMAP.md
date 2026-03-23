@@ -95,7 +95,7 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md — ORB-SLAM3 backend implementation + tests + vocab download script
-- [ ] 11-02-PLAN.md — MuJoCo scene textures + frontend tracking status + end-to-end verification
+- [x] 11-02-PLAN.md — MuJoCo scene textures + frontend tracking status + end-to-end verification
 
 ### Phase 12: OpenVINS + SVO Pro Backends
 **Goal**: Users can run visual-inertial (OpenVINS) and semi-direct (SVO Pro) SLAM methods, each isolated in subprocesses so crashes cannot take down the system
