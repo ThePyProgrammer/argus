@@ -1,99 +1,94 @@
-# Research Summary: Multi-Robot 3D Reconstruction (SimWorld)
+# Research Summary: v2.0 Generic SLAM API
 
-**Domain:** Multi-robot autonomous exploration and 3D reconstruction in simulation
-**Researched:** 2026-03-17
+**Domain:** Pluggable SLAM backend system for multi-robot 3D reconstruction
+**Researched:** 2026-03-23
 **Overall confidence:** MEDIUM
 
 ## Executive Summary
 
-This project builds a multi-robot autonomous exploration and 3D reconstruction system where two simulated Unitree Go2 quadrupeds explore a SimWorld-Robotics (UE5) environment, each running independent SLAM, and merge their maps into a unified real-time 3D reconstruction. DimOS serves as the orchestration framework, providing module composition, typed pub/sub streams, and LLM-powered agent coordination.
+The v2.0 milestone adds a generic SLAM API abstraction layer with four backends (existing ICP, ORB-SLAM3, OpenVINS, SVO Pro), frontend controls for algorithm selection and parameter tuning, live metrics comparison, and pose-graph optimization for map merging. The existing v1.0 system (7,609 LOC Python + 2,486 LOC TypeScript) provides a solid foundation with MuJoCo simulation, ICP-based SLAM, FastAPI/WebSocket backend, and React/Three.js frontend.
 
-The recommended stack centers on RTAB-Map v0.23.1 for per-robot visual SLAM (RGB-D), OctoMap v1.10.0 for 3D occupancy grid generation, and Open3D for point cloud processing. ROS 2 Humble serves as the SLAM computation backbone, with DimOS's built-in ROSTransport bridging data between the two frameworks. The architecture uses separate DimOS blueprint instances per robot (NOT fleet mode, which is broadcast-only) communicating via LCM inter-process messaging to a centralized map merge server and exploration coordinator.
+The three new SLAM backends present a gradient of integration difficulty. **ORB-SLAM3** is the easiest: `orbslam3-python` v2.0.0 is pip-installable with pre-built wheels for Python 3.8-3.12. **OpenVINS** is moderate: it has an official ROS-free build path with standard dependencies (Eigen, Ceres, Boost, OpenCV) but requires writing a subprocess wrapper and adding IMU data extraction from MuJoCo (a new sensor path not present in v1.0). **SVO Pro** is the highest risk: the open-source release (rpg_svo_pro_open, last commit 2021) is entangled with the catkin build system and requires significant de-catkinization effort.
 
-The biggest technical risk is the SimWorld gym interface. Its exact observation space, multi-agent stepping semantics, and achievable frame rate are not documented in the project files and must be discovered empirically in Phase 1. The architecture is designed to isolate this risk -- the SimWorldGymBridge module is the only component touching the gym API, so downstream modules are insulated from API surprises. If SimWorld's step rate cannot support real-time SLAM, the entire approach needs revision.
+For pose-graph optimization, two viable paths exist. **Open3D's built-in GlobalOptimization** (already a project dependency) handles basic pose-graph optimization without new dependencies. **GTSAM** (pip-installable, v4.2 for Python 3.11 or v4.3a1 pre-release for 3.12) provides incremental optimization via iSAM2, which is better for real-time use but adds a dependency. Recommendation: start with Open3D PGO, upgrade to GTSAM if incremental updates are needed.
 
-Multi-robot SLAM is a well-studied domain. The key architectural insight is to avoid the complexity of true multi-robot SLAM (which requires inter-robot loop closure and distributed pose graph optimization) by exploiting simulation's advantage: known spawn positions provide the global frame transform for each robot's local map, making merging a straightforward coordinate transformation plus voxel fusion operation.
+The most critical architectural insight from research: **sparse vs dense cloud mismatch**. ORB-SLAM3 and SVO Pro produce sparse feature maps (hundreds of points), while the existing pipeline expects dense clouds (tens of thousands of points) for OctoMap and visualization. The solution is to decouple: use SLAM backends for pose estimation only, and continue generating dense clouds from depth images using the SLAM-estimated pose. This preserves all downstream consumers.
 
 ## Key Findings
 
-**Stack:** DimOS 0.0.11 + RTAB-Map 0.23.1 (via ROS 2 Humble) + OctoMap 1.10.0 + Open3D 0.18+ + gymnasium for SimWorld bridge
+**Stack:** orbslam3-python 2.0.0 (pip), OpenVINS (C++ source build), SVO Pro (C++ source build, high risk), GTSAM 4.2 or Open3D PGO for map merging. No new frontend dependencies.
 
-**Architecture:** Two-instance DimOS architecture -- separate blueprint process per robot, LCM cross-process communication, centralized map merge + exploration coordination in a third process
+**Architecture:** Strategy pattern with backend registry. In-process for ICP and ORB-SLAM3 (pybind11). Subprocess isolation for OpenVINS and SVO Pro (shared memory + Unix socket IPC). PoseGraphMerger replaces MapMerger.
 
-**Critical pitfall:** DimOS fleet mode is broadcast-only (same commands to all robots, sensors from primary only). Must use separate blueprint instances for independent robot control.
-
-**Exploration approach:** Frontier-based with Voronoi region splitting. Each robot targets frontiers only within its assigned partition. Re-partition when one robot's region is exhausted.
-
-**Simulation advantage:** Known spawn transforms eliminate the need for ICP-based or feature-based map alignment. Ground-truth poses can anchor SLAM estimates to prevent drift.
+**Critical pitfall:** OpenVINS requires IMU data that the v1.0 sensor pipeline does not provide. Must add accelerometer/gyroscope extraction from MuJoCo before OpenVINS can work.
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-1. **SimWorld Gym Bridge** - Resolve the biggest unknown first
-   - Addresses: SimWorld gym connection, sensor data format discovery, achievable step rate
-   - Avoids: Building downstream on unverified assumptions about data format
-   - Risk: HIGH (SimWorld API is LOW confidence)
+1. **Backend Abstraction + ICP Wrap** -- Foundation, zero behavioral change
+   - Addresses: SLAMProtocol, SLAMRegistry, ICPBackend wrapping existing SLAMPipeline
+   - Avoids: New backends (prove the interface first)
+   - Risk: LOW (pure refactoring)
 
-2. **Single-Robot SLAM Pipeline** - Core technical complexity
-   - Addresses: Depth-to-pointcloud, RTAB-Map integration, occupancy grid (OctoMap), local map building
-   - Avoids: Multi-robot complexity while validating fundamental pipeline
-   - Risk: MEDIUM (RTAB-Map is proven; integration with SimWorld sensor format is the risk)
+2. **Frontend Algorithm Controls** -- End-to-end communication path
+   - Addresses: Algorithm picker, parameter panel, WebSocket messages
+   - Avoids: New backends (test plumbing with ICP only)
+   - Risk: LOW (standard frontend components)
 
-3. **Single-Robot Autonomous Exploration** - Prove the autonomy loop
-   - Addresses: Frontier detection, navigation goal selection, autonomous explore-map-navigate cycle
-   - Avoids: Multi-robot coordination (validate single-robot first)
-   - Risk: LOW (frontier-based exploration is well-understood)
+3. **Pose-Graph Map Merger** -- Fix the merge strategy
+   - Addresses: Replace union-OR voxel merge with Open3D PGO or GTSAM
+   - Avoids: Backend-specific complexity (works with ICP poses)
+   - Risk: MEDIUM (PGO parameter tuning)
 
-4. **Two-Robot Independent Operation** - Mechanical duplication + frame alignment
-   - Addresses: Second robot instance, stream namespacing, frame alignment using spawn transforms
-   - Avoids: Map merging yet (just verify two independent pipelines work)
-   - Risk: MEDIUM (DimOS multi-process coordination is non-trivial)
+4. **ORB-SLAM3 Backend** -- First new backend, pip-installable
+   - Addresses: orbslam3-python integration, sparse cloud handling
+   - Avoids: C++ source builds (pip-installable)
+   - Risk: MEDIUM (community package quality)
 
-5. **Map Merging + Coordinated Exploration** - The core deliverable
-   - Addresses: Map merge server, voxel fusion, split-room region assignment, coordinated frontiers
-   - Avoids: Complex inter-robot loop closure (use known transforms instead)
-   - Risk: MEDIUM (map fusion quality; exploration deadlocks)
+5. **OpenVINS Backend** -- VIO category, requires new sensor path
+   - Addresses: IMU extraction from MuJoCo, OpenVINS C++ build, subprocess wrapper
+   - Avoids: SVO Pro (easier build than SVO Pro)
+   - Risk: MEDIUM-HIGH (new sensor dependency + C++ build)
 
-6. **Polish and Integration** - Visualization, performance, optional LLM agent
-   - Addresses: Rerun dashboard, transport tuning, DimOS agent skills, ground-truth metrics
-   - Avoids: Premature optimization in earlier phases
-   - Risk: LOW (standard DimOS patterns)
+6. **SVO Pro Backend + Live Metrics Dashboard** -- Highest risk backend + polish
+   - Addresses: SVO Pro de-catkinization, metrics comparison UI
+   - Avoids: Nothing left
+   - Risk: HIGH (catkin build system, 2021 codebase)
 
 **Phase ordering rationale:**
-- Phase 1 resolves the riskiest unknown (SimWorld gym API) and determines feasibility
-- SLAM (Phase 2) is isolated to single-robot to reduce debugging surface area
-- Autonomous exploration (Phase 3) validates the full single-robot loop before adding multi-robot
-- Two-robot (Phase 4) is primarily mechanical duplication once single-robot works
-- Map merge + exploration coordination (Phase 5) is the final integration
-- Polish (Phase 6) should not happen before correctness is established
+- Phase 1 creates the foundation every other phase depends on
+- Phase 2 establishes the frontend-backend communication before adding complexity
+- Phase 3 fixes map merging early so all backends benefit from day one
+- Phase 4 (ORB-SLAM3) is the easiest new backend -- validates the subprocess/binding pattern
+- Phase 5 (OpenVINS) adds IMU pipeline -- bigger scope but documented build path
+- Phase 6 (SVO Pro) is highest risk -- doing it last means failure does not block other features
 
 **Research flags for phases:**
-- Phase 1: NEEDS deeper research -- SimWorld gym API format is LOW confidence, must be investigated empirically
-- Phase 2: NEEDS research -- SLAM algorithm selection depends on Phase 1 sensor findings; RTAB-Map ROS 2 bridge vs Python bindings decision
-- Phase 3: Standard patterns, unlikely to need research
-- Phase 4: May need research on DimOS multi-process LCM coordination patterns
-- Phase 5: Standard map merge and frontier exploration patterns, may need research on OctoMap merging specifics
-- Phase 6: Standard DimOS visualization patterns, unlikely to need research
+- Phase 1-2: Standard patterns, unlikely to need research
+- Phase 3: May need deeper research on Open3D PGO vs GTSAM tradeoffs
+- Phase 4: NEEDS validation -- test orbslam3-python on target Python version early
+- Phase 5: NEEDS research -- MuJoCo IMU sensor configuration, OpenVINS data format expectations
+- Phase 6: LIKELY needs research -- SVO Pro build system, possible fallback to DSO
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM | DimOS well-documented locally; RTAB-Map v0.23.1 verified; SLAM choice depends on SimWorld sensor format |
-| Features | HIGH | Requirements clearly defined in PROJECT.md; feature dependencies straightforward |
-| Architecture | HIGH | DimOS module/stream pattern maps directly to multi-robot SLAM; two-instance approach avoids fleet mode limitations |
-| Pitfalls | MEDIUM-HIGH | Fleet mode broadcast limitation verified from docs; common multi-robot pitfalls well-known; SimWorld-specific risks need Phase 1 |
+| Stack | MEDIUM | ORB-SLAM3 pip package verified on PyPI; GTSAM verified; OpenVINS/SVO Pro build paths documented but untested |
+| Features | HIGH | Requirements clearly defined in PROJECT.md; feature dependencies well-mapped |
+| Architecture | HIGH | Strategy + Registry pattern is standard; subprocess isolation well-understood; codebase integration points identified |
+| Pitfalls | MEDIUM-HIGH | C++ build issues well-documented; sparse/dense mismatch identified from research; IMU requirement discovered |
 
 ## Gaps to Address
 
-- **SimWorld gym observation/action space format** -- must be discovered empirically in Phase 1. Cannot verify remotely.
-- **Available sensors on simulated Go2 in SimWorld** -- LiDAR vs depth camera vs both determines SLAM algorithm choice
-- **SimWorld multi-agent stepping semantics** -- synchronous (one `step()` advances all robots) vs independent stepping
-- **RTAB-Map Python bindings quality** -- may need ROS 2 bridge instead of direct Python integration
-- **DimOS multi-process LCM topic namespacing** -- fleet blueprint may have reusable patterns
-- **OctoMap incremental update API** -- need to verify the OctoMap ROS 2 node supports incremental point cloud insertion (not full rebuild each frame)
+- **orbslam3-python actual API surface** -- need to verify `get_frame_pose()` and `get_current_points()` methods exist and work correctly
+- **MuJoCo Go2 model IMU sensors** -- need to check if accelerometer/gyroscope sensors are defined in the Go2 XML model, or if they need to be added
+- **OpenVINS IMU-camera synchronization requirements** -- OpenVINS expects IMU at higher rate than camera; need to determine exact ratio
+- **SVO Pro license** -- rpg_svo_pro_open uses GPL-3.0 but some docs mention "non-commercial" restrictions; clarify before integrating
+- **Open3D PGO performance at scale** -- how many pose graph nodes before batch optimization becomes too slow for real-time?
+- **Python version decision** -- 3.11 (broad wheel compatibility) vs 3.12 (current project default). GTSAM compatibility is the deciding factor.
 
 ---
 
-*Research summary: 2026-03-17*
+*Research summary: 2026-03-23 -- v2.0 Generic SLAM API milestone*
