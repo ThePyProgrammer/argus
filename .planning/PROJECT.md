@@ -24,8 +24,8 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 - [ ] Generic SLAM API abstraction layer with pluggable backends
 - [ ] 4 real SLAM backends: existing ICP, ORB-SLAM3, OpenVINS, SVO Pro
-- [ ] Frontend algorithm picker with pre-session selection (hot-swap as stretch)
-- [ ] Per-algorithm parameter tuning panel in C2 interface
+- ✓ Frontend algorithm picker with pre-session selection — Phase 9
+- ✓ Per-algorithm parameter tuning panel in C2 interface — Phase 9
 - [ ] Live SLAM metrics comparison (accuracy, FPS, memory)
 - [ ] Output format toggle (point cloud, voxel grid, mesh visualization)
 - ✓ Replace ICP-based map merging with pose-graph optimization — Phase 10
@@ -82,4 +82,4 @@ Conducted systematic SLAM literature review (.research/) covering 40+ methods �
 | Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | — Pending |
 
 ---
-*Last updated: 2026-03-23 after Phase 10 completion*
+*Last updated: 2026-03-23 after Phase 9 completion*
