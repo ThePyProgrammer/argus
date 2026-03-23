@@ -138,3 +138,13 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 11. ORB-SLAM3 Backend | v2.0 | 1/2 | In progress | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
+
+### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 13
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 14 to break down)
