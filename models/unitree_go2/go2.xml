@@ -200,6 +200,11 @@
     <motor class="knee" name="RR_calf" joint="RR_calf_joint"/>
   </actuator>
 
+  <sensor>
+    <accelerometer site="imu" name="accelerometer"/>
+    <gyro site="imu" name="gyro"/>
+  </sensor>
+
   <keyframe>
     <key name="home" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
       ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"/>

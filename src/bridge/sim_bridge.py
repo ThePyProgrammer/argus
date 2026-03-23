@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
-from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
+from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix, IMUReading
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.gait_params import GaitParams
 from src.locomotion.xml_patcher import patch_actuators_to_position, patch_actuators_to_position_with_floor
@@ -52,6 +52,10 @@ class MuJoCoBridge:
         self._cam_id: int = -1
         # Trot gait controller for locomotion
         self._gait = TrotGaitController()
+        # IMU sensor addresses (populated in start() if sensors exist)
+        self._has_imu: bool = False
+        self._accel_adr: int = 0
+        self._gyro_adr: int = 0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -88,6 +92,19 @@ class MuJoCoBridge:
         self._model = mujoco.MjModel.from_xml_string(patched_xml, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
+
+        # Look up IMU sensor addresses (will be -1 if sensors not in XML)
+        accel_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SENSOR, "accelerometer")
+        gyro_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SENSOR, "gyro")
+        if accel_id >= 0 and gyro_id >= 0:
+            self._accel_adr = self._model.sensor_adr[accel_id]
+            self._gyro_adr = self._model.sensor_adr[gyro_id]
+            self._has_imu = True
+            logger.info("IMU sensors found: accel_adr=%d, gyro_adr=%d", self._accel_adr, self._gyro_adr)
+        else:
+            self._has_imu = False
+            self._accel_adr = 0
+            self._gyro_adr = 0
 
         # Set initial standing pose (skip the 7 free-joint qpos: 3 pos + 4 quat)
         if self._model.nq >= 19:  # 7 (freejoint) + 12 (actuators)
@@ -128,12 +145,23 @@ class MuJoCoBridge:
             ctrl = self._velocity_to_ctrl()
             self._data.ctrl[:] = ctrl
 
-        # Step physics multiple times per frame
-        for _ in range(self._config.sim_steps_per_frame):
+        # Step physics multiple times per frame, collecting IMU at each sub-step
+        imu_readings: list[IMUReading] = []
+        sim_time_base = self._step_count * self._dt
+
+        for i in range(self._config.sim_steps_per_frame):
             mujoco.mj_step(self._model, self._data)
 
+            if self._has_imu:
+                accel = self._data.sensordata[self._accel_adr:self._accel_adr + 3].copy()
+                gyro = self._data.sensordata[self._gyro_adr:self._gyro_adr + 3].copy()
+                t = sim_time_base + (i + 1) * self._model.opt.timestep
+                imu_readings.append(IMUReading(accel=accel, gyro=gyro, timestamp=t))
+
         self._step_count += 1
-        return self._capture_frame()
+        frame = self._capture_frame()
+        frame.imu_readings = imu_readings
+        return frame
 
     def stop(self) -> None:
         """Clean up MuJoCo resources."""
