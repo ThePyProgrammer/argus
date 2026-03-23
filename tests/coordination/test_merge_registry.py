@@ -8,6 +8,38 @@ from src.coordination.merge_protocol import MergeProtocol, MergeResult, RobotMap
 from src.coordination.merge_registry import MergeRegistry, merge_strategy
 
 
+class _MockStrategy:
+    """Module-level mock strategy for registry tests (importable by _load_class)."""
+
+    CAPABILITIES = {"supports_loop_closure": False}
+    PARAMETER_SCHEMA = {"type": "object", "properties": {"resolution": {"type": "number"}}}
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def merge(self, robot_data):
+        return MergeResult(
+            merged_voxels=np.empty((0, 3)),
+            merged_cloud=o3d.geometry.PointCloud(),
+            optimized_poses={},
+            metrics={},
+        )
+
+    def reset(self):
+        pass
+
+    @property
+    def last_merged_voxels(self) -> np.ndarray:
+        return np.empty((0, 3))
+
+    @property
+    def last_merged_cloud(self) -> o3d.geometry.PointCloud:
+        return o3d.geometry.PointCloud()
+
+
+_MOCK_CLASS_PATH = f"{_MockStrategy.__module__}.{_MockStrategy.__qualname__}"
+
+
 class TestRobotMapData:
     """RobotMapData dataclass construction."""
 
@@ -99,40 +131,28 @@ class TestMergeRegistry:
         MergeRegistry._clear()
 
     def test_register_stores_strategy(self) -> None:
-        MergeRegistry.register(
-            "test_strat", "Test Strategy", "tests.fake_module.FakeClass"
-        )
+        MergeRegistry.register("test_strat", "Test Strategy", _MOCK_CLASS_PATH)
         strategies = MergeRegistry.list_strategies()
         assert len(strategies) == 1
         assert strategies[0]["name"] == "test_strat"
         assert strategies[0]["display"] == "Test Strategy"
 
     def test_list_strategies_returns_metadata(self) -> None:
-        @merge_strategy("stub", "Stub Strategy")
-        class StubStrategy:
-            CAPABILITIES = {"supports_loop_closure": False}
-            PARAMETER_SCHEMA = {"type": "object"}
-
+        MergeRegistry.register("mock", "Mock Strategy", _MOCK_CLASS_PATH)
         strategies = MergeRegistry.list_strategies()
         assert len(strategies) == 1
         entry = strategies[0]
-        assert entry["name"] == "stub"
-        assert entry["display"] == "Stub Strategy"
+        assert entry["name"] == "mock"
+        assert entry["display"] == "Mock Strategy"
         assert entry["available"] is True
-        assert entry["capabilities"] == {"supports_loop_closure": False}
-        assert entry["parameter_schema"] == {"type": "object"}
+        assert entry["capabilities"] == _MockStrategy.CAPABILITIES
+        assert entry["parameter_schema"] == _MockStrategy.PARAMETER_SCHEMA
 
     def test_create_instantiates_registered_strategy(self) -> None:
-        @merge_strategy("dummy", "Dummy")
-        class DummyStrategy:
-            CAPABILITIES = {}
-            PARAMETER_SCHEMA = {}
-
-            def __init__(self, resolution: float = 0.1):
-                self.resolution = resolution
-
-        instance = MergeRegistry.create("dummy", resolution=0.2)
-        assert instance.resolution == 0.2
+        MergeRegistry.register("mock", "Mock Strategy", _MOCK_CLASS_PATH)
+        instance = MergeRegistry.create("mock", resolution=0.2)
+        assert isinstance(instance, _MockStrategy)
+        assert instance.kwargs == {"resolution": 0.2}
 
     def test_create_raises_for_unknown_name(self) -> None:
         with pytest.raises(ValueError, match="Unknown merge strategy"):
@@ -142,7 +162,7 @@ class TestMergeRegistry:
         assert MergeRegistry.get_default() == "icp_union"
 
     def test_clear_empties_registry(self) -> None:
-        MergeRegistry.register("x", "X", "some.path.X")
+        MergeRegistry.register("x", "X", _MOCK_CLASS_PATH)
         assert len(MergeRegistry.list_strategies()) == 1
         MergeRegistry._clear()
         assert len(MergeRegistry.list_strategies()) == 0
@@ -153,6 +173,5 @@ class TestMergeRegistry:
             CAPABILITIES = {}
             PARAMETER_SCHEMA = {}
 
-        strategies = MergeRegistry.list_strategies()
-        names = [s["name"] for s in strategies]
-        assert "deco_test" in names
+        assert "deco_test" in MergeRegistry._strategies
+        assert MergeRegistry._strategies["deco_test"]["display"] == "Decorator Test"
