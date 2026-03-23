@@ -132,7 +132,11 @@ Plans:
   3. VIZ-01/02/03 marked satisfied with evidence pointing to WebStreamingViz (Phase 6 supersedes Rerun)
   4. Dead code removed: unreachable _log_coverage_heatmap() path, BridgeProtocol type mismatch resolved
   5. No remaining gaps in v1.0-MILESTONE-AUDIT.md after re-audit
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Fix stale test assertions, missing model paths, install pytest-asyncio
+- [ ] 07-02-PLAN.md — Remove dead code, fix BridgeProtocol docstring, mark VIZ requirements satisfied
 
 ## Progress
 
@@ -147,4 +151,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Visualization and Integration | 1/2 | In progress | - |
 | 5. Robot Locomotion Fix | 2/2 | Complete    | 2026-03-18 |
 | 6. React C2 Web Interface | 3/4 | In progress | - |
-| 7. Cleanup and Verification Gaps | 0/? | Not started | - |
+| 7. Cleanup and Verification Gaps | 0/2 | Not started | - |
