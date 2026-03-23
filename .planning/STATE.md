@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: unknown
-stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-03-23T15:09:14.234Z"
+status: executing
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-23T15:34:28Z"
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 24
+  completed_plans: 19
 ---
 
 # Project State
@@ -19,18 +19,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 13 — live-metrics-dashboard-output-toggle
+**Current focus:** Phase 14 — interactive-comfyui-esque-react-flow-pipeline-graph
 
 ## Current Position
 
-Phase: 13 (live-metrics-dashboard-output-toggle) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 14 (interactive-comfyui-esque-react-flow-pipeline-graph) — EXECUTING
+Plan: 2 of 6
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 18 (v2.0) -- ALL COMPLETE
+- Total plans completed: 19 (v2.0)
 - Average duration: 6min
 - Total execution time: ~145min (includes post-checkpoint ORB-SLAM3 fixes)
 
@@ -46,6 +46,7 @@ Plan: 3 of 3 (all complete)
 | Phase 13 P01 | 5min | 2 tasks | 9 files |
 | Phase 13 P02 | 3min | 2 tasks | 5 files |
 | Phase 13 P03 | 6min | 2 tasks | 6 files |
+| Phase 14 P01 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Cross-fade uses transparent=true and depthWrite=false during 300ms transition
 - [Phase 13]: mesh_reconstruction.py follows _AVAILABLE/INSTALL_HINT pattern for graceful Open3D degradation
 - [Phase 13]: Poisson reconstruction chosen over BPA for robustness with noisy SLAM data
+- [14-01]: Used type alias (not interface) for PipelineNodeData/PipelineEdgeData to satisfy React Flow Record<string, unknown> constraint
+- [14-01]: Parameter node override resolution in serializer via edge traversal -- parameter nodes inject value into connected target node params
 
 ### Roadmap Evolution
 
@@ -142,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:09:14.228Z
-Stopped at: Phase 14 UI-SPEC approved
-Resume file: .planning/phases/14-interactive-comfyui-esque-react-flow-state-graph-creation-system-to-customize-the-end-to-end-slam-pipeline-parameters/14-UI-SPEC.md
+Last session: 2026-03-23T15:34:28Z
+Stopped at: Completed 14-01-PLAN.md
+Resume file: .planning/phases/14-interactive-comfyui-esque-react-flow-state-graph-creation-system-to-customize-the-end-to-end-slam-pipeline-parameters/14-02-PLAN.md
