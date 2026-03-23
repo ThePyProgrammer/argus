@@ -296,9 +296,11 @@ Camera.p2: 0.0
 Camera.width: {self._intrinsics.width}
 Camera.height: {self._intrinsics.height}
 
+Camera.bf: {self._intrinsics.fx * 0.04}
 Camera.fps: 30.0
 Camera.RGB: 1
 
+ThDepth: 40.0
 DepthMapFactor: 1.0
 
 ORBextractor.nFeatures: {self._nFeatures}

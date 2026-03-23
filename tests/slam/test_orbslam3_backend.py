@@ -285,8 +285,9 @@ class TestORBSlam3Unavailable:
 
     def test_unavailable_raises_import_error(self, mock_intrinsics, tmp_path):
         """When orbslam3 not installed, _ORBSLAM3_AVAILABLE is False and constructor raises."""
-        # Remove orbslam3 from sys.modules to simulate not installed
         old = sys.modules.pop("orbslam3", None)
+        # Insert None sentinel to block re-import during reload
+        sys.modules["orbslam3"] = None  # type: ignore[assignment]
         SLAMRegistry._clear()
 
         try:
@@ -303,3 +304,5 @@ class TestORBSlam3Unavailable:
             SLAMRegistry._clear()
             if old is not None:
                 sys.modules["orbslam3"] = old
+            else:
+                sys.modules.pop("orbslam3", None)
