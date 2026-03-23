@@ -18,6 +18,7 @@ import pytest
 
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.exploration.config import ExplorationConfig
+from src.exploration.exploration_loop import StepMetrics
 from src.exploration.frontier_detector import FrontierCluster
 from src.exploration.goal_selector import GoalSelector
 
@@ -51,16 +52,23 @@ class _MockSLAM:
     def __init__(self):
         self._poses = []
         self._frame_count = 0
+        self._last_frame_cloud: np.ndarray = np.empty((0, 3))
 
     def process_frame(self, frame):
         self._frame_count += 1
         pose = frame.ground_truth_pose.copy()
         self._poses.append(pose)
+        rng = np.random.default_rng(self._frame_count)
+        self._last_frame_cloud = rng.random((50, 3)) * 5.0
         return pose
 
     def get_cloud_points(self):
         rng = np.random.default_rng(self._frame_count)
         return rng.random((50, 3)) * 5.0
+
+    @property
+    def last_frame_cloud(self) -> np.ndarray:
+        return self._last_frame_cloud
 
     @property
     def slam_poses(self):
@@ -180,8 +188,8 @@ class TestCoordinatorBootPhase:
             r.exploration = MagicMock()
             r.exploration.step_once.return_value = (
                 np.zeros(2), 0.0,
-                {"frontiers": 5, "coverage": 0.0, "terminated": True,
-                 "voxels": 100, "rescan_triggered": False},
+                StepMetrics(frontiers=5, coverage=0.0, terminated=True,
+                            voxels=100, rescan_triggered=False),
             )
             robots[rid] = r
 
@@ -232,9 +240,10 @@ class TestCoordinatorMerge:
                 terminated = (step >= 5)
                 return (
                     np.zeros(2), 0.0,
-                    {"frontiers": 0 if terminated else 5, "coverage": 0.0,
-                     "terminated": terminated, "voxels": 100,
-                     "rescan_triggered": rescan},
+                    StepMetrics(
+                        frontiers=0 if terminated else 5, coverage=0.0,
+                        terminated=terminated, voxels=100,
+                        rescan_triggered=rescan),
                 )
             return step_once
 
@@ -293,8 +302,8 @@ class TestCoordinatorMerge:
             # Never rescan, terminate at step 99
             r.exploration.step_once.return_value = (
                 np.zeros(2), 0.0,
-                {"frontiers": 5, "coverage": 0.0, "terminated": False,
-                 "voxels": 100, "rescan_triggered": False},
+                StepMetrics(frontiers=5, coverage=0.0, terminated=False,
+                            voxels=100, rescan_triggered=False),
             )
             robots[rid] = r
 
@@ -348,8 +357,8 @@ class TestCoordinatorRepartition:
             ]
             r.exploration.step_once.return_value = (
                 np.zeros(2), 0.0,
-                {"frontiers": 1, "coverage": 0.0, "terminated": True,
-                 "voxels": 100, "rescan_triggered": False},
+                StepMetrics(frontiers=1, coverage=0.0, terminated=True,
+                            voxels=100, rescan_triggered=False),
             )
             robots[rid] = r
 

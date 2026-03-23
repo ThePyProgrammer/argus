@@ -185,38 +185,16 @@ class ExplorationLoop:
             angular_speed=self._config.angular_speed,
         )
 
-    def step_once(
-        self,
-        frame: SensorFrame,
-        step: int,
-        score_fn: Callable[[np.ndarray], float] | None = None,
-    ) -> tuple[np.ndarray, float, StepMetrics]:
-        """Process one exploration step without owning the bridge lifecycle.
+    # ------------------------------------------------------------------
+    # Extracted helpers (called only from step_once)
+    # ------------------------------------------------------------------
 
-        This is the multi-robot entry point. The Coordinator calls this per-robot
-        per-step, providing the SensorFrame from the shared MultiRobotBridge.
-
-        Does NOT call bridge.start(), bridge.step(), or bridge.set_velocity().
-        The caller (Coordinator) manages those.
-
-        Args:
-            frame: Current sensor frame (from bridge.step()[robot_id]).
-            step: Current global step count (for logging and stuck detection).
-            score_fn: Optional frontier scoring function for Voronoi bias.
+    def _update_slam(self, frame: SensorFrame) -> tuple[np.ndarray, np.ndarray]:
+        """Process frame through SLAM and OctoMap.
 
         Returns:
-            (linear_vel, angular_vel, metrics) where:
-                linear_vel: (2,) float64 velocity command
-                angular_vel: float
-                metrics: StepMetrics with frontier count, coverage, termination
-                    status, voxel count, and rescan trigger flag.
-                    CRITICAL: Coordinator uses rescan_triggered to trigger map merge.
+            (pose, current_pos) -- 4x4 pose matrix and (3,) position vector.
         """
-        config = self._config
-
-        # ----------------------------------------------------------
-        # a. Update SLAM and OctoMap
-        # ----------------------------------------------------------
         pose = self._slam.process_frame(frame)
         current_pos = pose[:3, 3].copy()
 
@@ -226,10 +204,19 @@ class ExplorationLoop:
             self._octomap.insert_scan(frame_cloud, current_pos)
 
         self._robot_positions.append(current_pos)
+        return pose, current_pos
 
-        # ----------------------------------------------------------
-        # b. Stuck detection
-        # ----------------------------------------------------------
+    def _check_stuck(
+        self, step: int, current_pos: np.ndarray,
+    ) -> tuple[bool, tuple[np.ndarray, float, StepMetrics] | None]:
+        """Run stuck detection and recovery logic.
+
+        Returns:
+            (force_rescan, early_return) where early_return is a full
+            step_once return tuple when recovery is mid-execution, else None.
+        """
+        config = self._config
+
         if step > 0:
             dist_moved = float(np.linalg.norm(current_pos - self._last_position))
             if dist_moved < config.stuck_distance_m:
@@ -245,7 +232,7 @@ class ExplorationLoop:
             recovery_cmd = self._stuck_recovery.step(dt)
             if recovery_cmd is not None:
                 vx, vy, omega = recovery_cmd
-                return (
+                early = (
                     np.array([vx, vy], dtype=np.float64),
                     omega,
                     StepMetrics(
@@ -256,6 +243,7 @@ class ExplorationLoop:
                         rescan_triggered=False,
                     ),
                 )
+                return False, early
             else:
                 # Recovery just completed -- force rescan for new frontier
                 logger.info(
@@ -273,9 +261,14 @@ class ExplorationLoop:
             self._stuck_recovery.trigger()
             self._stuck_counter = 0
 
-        # ----------------------------------------------------------
-        # c. Check re-evaluation trigger
-        # ----------------------------------------------------------
+        return force_rescan, None
+
+    def _should_rescan(
+        self, step: int, current_pos: np.ndarray, force_rescan: bool,
+    ) -> bool:
+        """Evaluate whether a frontier rescan should be triggered."""
+        config = self._config
+
         # Don't rescan in first 30 steps -- drive forward to build initial
         # map data before frontier detection has enough to work with
         min_scan_step = 30
@@ -293,87 +286,137 @@ class ExplorationLoop:
                     or waypoint_done):
                 should_rescan = True
 
-        # ----------------------------------------------------------
+        return should_rescan
+
+    def _evaluate_frontiers(
+        self,
+        current_pos: np.ndarray,
+        pose: np.ndarray,
+        score_fn: Callable[[np.ndarray], float] | None,
+    ) -> tuple[int, bool]:
+        """Detect frontiers, select a goal, and plan a path.
+
+        Returns:
+            (frontier_count, terminated) -- number of frontiers found and
+            whether exploration should terminate.
+        """
+        config = self._config
+        occupied = self._octomap.get_occupied_voxels()
+
+        grid_2d = project_voxels_to_2d(
+            occupied,
+            config.voxel_resolution,
+            config.z_min,
+            config.z_max,
+            robot_positions=np.array(self._robot_positions),
+        )
+
+        frontiers = self._frontier_detector.detect(
+            occupied,
+            grid_2d=grid_2d,
+        )
+
+        frontier_count = len(frontiers)
+        terminated = False
+
+        if not frontiers:
+            terminated = True
+        else:
+            # Try to find a reachable frontier
+            remaining = list(frontiers)
+            goal = None
+            path = None
+
+            while remaining:
+                if score_fn is not None:
+                    candidate = self._goal_selector.select_with_bias(
+                        remaining, pose, score_fn,
+                    )
+                else:
+                    candidate = self._goal_selector.select(remaining, pose)
+                if candidate is None:
+                    break
+
+                planned_path = self._path_planner.plan(
+                    current_pos, candidate, grid_2d,
+                )
+                if planned_path is not None:
+                    goal = candidate
+                    path = planned_path
+                    break
+
+                remaining = [
+                    f for f in remaining
+                    if not np.allclose(f.centroid, candidate)
+                ]
+
+            if goal is None or path is None:
+                terminated = True
+            else:
+                self._current_waypoint_runner = WaypointRunner(
+                    path,
+                    linear_speed=config.linear_speed,
+                    angular_speed=config.angular_speed,
+                    arrival_threshold=config.waypoint_arrival_threshold,
+                )
+
+        self._last_rescan_pos = current_pos.copy()
+        self._last_voxel_count = self._octomap.num_occupied
+
+        # Update coverage
+        cov, bbox_cov = self._coverage_tracker.update(
+            self._octomap.get_occupied_voxels(), frontier_count,
+        )
+        self._last_coverage = cov
+        self._last_bbox_coverage = bbox_cov
+        self._last_frontier_count = frontier_count
+
+        return frontier_count, terminated
+
+    # ------------------------------------------------------------------
+    # Main per-step entry point
+    # ------------------------------------------------------------------
+
+    def step_once(
+        self,
+        frame: SensorFrame,
+        step: int,
+        score_fn: Callable[[np.ndarray], float] | None = None,
+    ) -> tuple[np.ndarray, float, StepMetrics]:
+        """Process one exploration step without owning the bridge lifecycle.
+
+        Multi-robot entry point: Coordinator calls this per-robot per-step.
+        Does NOT call bridge.start/step/set_velocity (caller manages those).
+
+        Returns:
+            (linear_vel, angular_vel, metrics) -- velocity commands and
+            StepMetrics. Coordinator uses metrics.rescan_triggered for merges.
+        """
+        config = self._config
+
+        # a. Update SLAM and OctoMap
+        pose, current_pos = self._update_slam(frame)
+
+        # b. Stuck detection and recovery
+        force_rescan, early_return = self._check_stuck(step, current_pos)
+        if early_return is not None:
+            return early_return
+
+        # c. Check re-evaluation trigger
+        should_rescan = self._should_rescan(step, current_pos, force_rescan)
+
         # d. Frontier re-evaluation
-        # ----------------------------------------------------------
         linear_vel = np.zeros(2, dtype=np.float64)
         angular_vel = 0.0
         terminated = False
         frontier_count = self._last_frontier_count
 
         if should_rescan:
-            occupied = self._octomap.get_occupied_voxels()
-
-            grid_2d = project_voxels_to_2d(
-                occupied,
-                config.voxel_resolution,
-                config.z_min,
-                config.z_max,
-                robot_positions=np.array(self._robot_positions),
+            frontier_count, terminated = self._evaluate_frontiers(
+                current_pos, pose, score_fn,
             )
 
-            frontiers = self._frontier_detector.detect(
-                occupied,
-                grid_2d=grid_2d,
-            )
-
-            frontier_count = len(frontiers)
-
-            if not frontiers:
-                terminated = True
-            else:
-                # Try to find a reachable frontier
-                remaining = list(frontiers)
-                goal = None
-                path = None
-
-                while remaining:
-                    if score_fn is not None:
-                        candidate = self._goal_selector.select_with_bias(
-                            remaining, pose, score_fn,
-                        )
-                    else:
-                        candidate = self._goal_selector.select(remaining, pose)
-                    if candidate is None:
-                        break
-
-                    planned_path = self._path_planner.plan(
-                        current_pos, candidate, grid_2d,
-                    )
-                    if planned_path is not None:
-                        goal = candidate
-                        path = planned_path
-                        break
-
-                    remaining = [
-                        f for f in remaining
-                        if not np.allclose(f.centroid, candidate)
-                    ]
-
-                if goal is None or path is None:
-                    terminated = True
-                else:
-                    self._current_waypoint_runner = WaypointRunner(
-                        path,
-                        linear_speed=config.linear_speed,
-                        angular_speed=config.angular_speed,
-                        arrival_threshold=config.waypoint_arrival_threshold,
-                    )
-
-            self._last_rescan_pos = current_pos.copy()
-            self._last_voxel_count = self._octomap.num_occupied
-
-            # Update coverage
-            cov, bbox_cov = self._coverage_tracker.update(
-                self._octomap.get_occupied_voxels(), frontier_count,
-            )
-            self._last_coverage = cov
-            self._last_bbox_coverage = bbox_cov
-            self._last_frontier_count = frontier_count
-
-        # ----------------------------------------------------------
         # e. Execute navigation
-        # ----------------------------------------------------------
         if (self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
             # Mid-path replanning: check if upcoming path is still clear
@@ -386,25 +429,18 @@ class ExplorationLoop:
             if self._current_waypoint_runner is not None:
                 linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
         elif self._current_waypoint_runner is None:
-            # No waypoints yet -- just drive forward. Don't check depth for
-            # obstacles because the camera looks sideways (body -Y) while the
-            # robot moves forward (body +X). Depth avoidance would falsely
-            # detect walls to the side. Rely on stuck recovery instead.
+            # No waypoints yet -- just drive forward
             linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)
             angular_vel = 0.0
 
-        # ----------------------------------------------------------
         # f. Periodic logging
-        # ----------------------------------------------------------
         if step % config.log_interval_steps == 0:
             self._coverage_tracker.log(
                 step, self._last_coverage, self._last_bbox_coverage,
                 self._last_frontier_count,
             )
 
-        # ----------------------------------------------------------
         # g. Update last_position for stuck detection
-        # ----------------------------------------------------------
         self._last_position = current_pos.copy()
 
         metrics = StepMetrics(

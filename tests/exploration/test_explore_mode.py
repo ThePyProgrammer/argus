@@ -23,73 +23,14 @@ from src.exploration.frontier_detector import FrontierCluster
 from src.slam.octomap_builder import OctoMapBuilder
 from src.slam.slam_pipeline import SLAMPipeline
 
-
-# ---------------------------------------------------------------------------
-# MockMuJoCoBridge -- simulates MuJoCoBridge for testing without MuJoCo
-# ---------------------------------------------------------------------------
-
-class MockMuJoCoBridge:
-    """Simulates MuJoCoBridge for testing without MuJoCo installed.
-
-    Returns synthetic SensorFrames with:
-    - RGB: 320x240 black image
-    - Depth: 320x240 float32 with uniform 2.0m depth (simulates a room)
-    - Ground-truth pose: advances position by 0.05m in X per step
-    - sim_time: step_count * 0.02
-    """
-
-    def __init__(self) -> None:
-        self._step_count = 0
-        self._position = np.array([0.0, 0.0, 0.3])
-        self._linear_vel = np.zeros(2)
-        self._angular_vel = 0.0
-
-    def start(self) -> SensorFrame:
-        self._step_count = 0
-        return self._make_frame()
-
-    def step(self, action=None) -> SensorFrame:
-        # Move robot based on velocity command
-        self._position[0] += self._linear_vel[0] * 0.02
-        self._position[1] += self._linear_vel[1] * 0.02
-        self._step_count += 1
-        return self._make_frame()
-
-    def set_velocity(self, linear: np.ndarray, angular: float) -> None:
-        self._linear_vel = np.asarray(linear)
-        self._angular_vel = angular
-
-    def stop(self) -> None:
-        pass
-
-    @property
-    def step_count(self) -> int:
-        return self._step_count
-
-    @property
-    def is_running(self) -> bool:
-        return True
-
-    def _make_frame(self) -> SensorFrame:
-        pose = np.eye(4)
-        pose[:3, 3] = self._position
-        return SensorFrame(
-            rgb=np.zeros((240, 320, 3), dtype=np.uint8),
-            depth=np.full((240, 320), 2.0, dtype=np.float32),
-            ground_truth_pose=pose,
-            sim_time=self._step_count * 0.02,
-        )
+# MockMuJoCoBridge was removed from this file -- the canonical version
+# lives in tests/conftest.py and is auto-discovered as the
+# mock_mujoco_bridge fixture.
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-@pytest.fixture
-def mock_mujoco_bridge() -> MockMuJoCoBridge:
-    """Return a fresh MockMuJoCoBridge instance."""
-    return MockMuJoCoBridge()
-
 
 @pytest.fixture
 def mock_intrinsics() -> CameraIntrinsics:

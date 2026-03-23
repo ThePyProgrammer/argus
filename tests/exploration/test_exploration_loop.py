@@ -69,14 +69,21 @@ class MockSLAM:
     def __init__(self) -> None:
         self._frame_count = 0
         self._cloud_size = 100
+        self._last_frame_cloud: np.ndarray = np.empty((0, 3))
 
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         self._frame_count += 1
+        rng = np.random.default_rng(self._frame_count)
+        self._last_frame_cloud = rng.random((self._cloud_size, 3)) * 5.0
         return frame.ground_truth_pose.copy()
 
     def get_cloud_points(self) -> np.ndarray:
         rng = np.random.default_rng(self._frame_count)
         return rng.random((self._cloud_size, 3)) * 5.0
+
+    @property
+    def last_frame_cloud(self) -> np.ndarray:
+        return self._last_frame_cloud
 
 
 class MockOctoMap:
@@ -396,7 +403,7 @@ class TestStuckRecovery:
             np.random.seed(seed)
             recovery.trigger()
             # Step through the reverse phase to reach the turn phase
-            for _ in range(20):
+            for _ in range(40):
                 result = recovery.step(0.1)
                 if result is not None and abs(result[2]) > 0.01:
                     # Found the turn phase -- record direction
