@@ -318,3 +318,25 @@ class TestWebStreamingViz:
         full_syncs = [m for m in json_msgs if m.get("type") == CLOUD_FULL]
         assert len(full_syncs) == 1
         assert "positions" in full_syncs[0]["payload"]
+
+    def test_stats_includes_slam_metrics(self):
+        """Stats payload contains slam_metrics, baseline, and metric_history keys."""
+        viz, cm = self._make_viz()
+        # Feed some data into the tracker so payload is populated
+        viz.metrics_tracker.record_frame("robot_a", {"processing_time_ms": 12.5}, "ok")
+        viz.metrics_tracker.record_frame("robot_b", {"processing_time_ms": 8.3}, "ok")
+
+        merged = np.array([[1.0, 2.0, 3.0]])
+        robot_data = _make_robot_data(["robot_a", "robot_b"])
+        with patch("backend.web.streaming_viz.encode_camera_frame", return_value=b"\x01\x00"):
+            viz.update(merged, robot_data, total_coverage=50.0, merge_count=1)
+        msgs = viz.drain_pending_messages()
+        json_msgs = [m for m in msgs if isinstance(m, dict)]
+        stats = [m for m in json_msgs if m.get("type") == STATS]
+        assert len(stats) == 1
+        payload = stats[0]["payload"]
+        assert "slam_metrics" in payload
+        assert "baseline" in payload
+        assert "metric_history" in payload
+        assert "robot_a" in payload["slam_metrics"]
+        assert payload["slam_metrics"]["robot_a"]["ms_per_frame"] == 12.5
