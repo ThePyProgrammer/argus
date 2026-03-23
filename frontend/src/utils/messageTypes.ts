@@ -15,7 +15,8 @@ export interface WSMessage {
     | 'scene_description'
     | 'color_mode_ack'
     | 'slam_param_ack'
-    | 'slam_restart_complete';
+    | 'slam_restart_complete'
+    | 'crash_fallback';
   robot_id?: string;
   payload: unknown;
 }
