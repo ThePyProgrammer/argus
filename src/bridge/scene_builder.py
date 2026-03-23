@@ -111,6 +111,19 @@ def build_two_robot_scene(
     ET.SubElement(merged_asset, "material", name="groundplane",
                   texture="groundplane", texuniform="true",
                   texrepeat="5 5", reflectance="0.2")
+    # Wall textures for ORB feature extraction (ORB-SLAM3 needs visual texture on surfaces)
+    ET.SubElement(merged_asset, "texture", type="2d", name="wall_checker",
+                  builtin="checker",
+                  rgb1="0.8 0.7 0.6", rgb2="0.6 0.5 0.4",
+                  width="512", height="512")
+    ET.SubElement(merged_asset, "material", name="wall_checker",
+                  texture="wall_checker", texrepeat="4 4", texuniform="true")
+    ET.SubElement(merged_asset, "texture", type="2d", name="wall_gradient",
+                  builtin="gradient",
+                  rgb1="0.9 0.85 0.8", rgb2="0.7 0.65 0.6",
+                  width="512", height="512")
+    ET.SubElement(merged_asset, "material", name="wall_gradient",
+                  texture="wall_gradient", texrepeat="2 2", texuniform="true")
     scene.append(merged_asset)
 
     # Worldbody: floor + light + N robot bodies
@@ -118,6 +131,15 @@ def build_two_robot_scene(
     ET.SubElement(wb, "light", pos="0 0 3", dir="0 0 -1", directional="true")
     ET.SubElement(wb, "geom", name="floor", size="100 100 0.05", type="plane",
                   material="groundplane")
+    # Boundary walls with textures for ORB feature extraction
+    ET.SubElement(wb, "geom", name="wall_north", type="box",
+                  size="10 0.1 2", pos="0 10 1", material="wall_checker")
+    ET.SubElement(wb, "geom", name="wall_south", type="box",
+                  size="10 0.1 2", pos="0 -10 1", material="wall_gradient")
+    ET.SubElement(wb, "geom", name="wall_east", type="box",
+                  size="0.1 10 2", pos="10 0 1", material="wall_checker")
+    ET.SubElement(wb, "geom", name="wall_west", type="box",
+                  size="0.1 10 2", pos="-10 0 1", material="wall_gradient")
 
     # Create N robot bodies from spawn_positions
     for robot_id, (sx, sy, sz) in spawn_positions.items():
