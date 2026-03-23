@@ -66,6 +66,9 @@ class RobotVizData:
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
 
 @dataclass
 class CoordinationResult:

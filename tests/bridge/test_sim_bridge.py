@@ -52,13 +52,15 @@ class TestMuJoCoBridgeUnit:
 
     def test_quat_to_rotation_identity(self):
         """Identity quaternion gives identity rotation matrix."""
-        R = MuJoCoBridge._quat_to_rotation_matrix(np.array([1, 0, 0, 0]))
+        from src.bridge.sensor_types import quat_to_rotation_matrix
+        R = quat_to_rotation_matrix(np.array([1, 0, 0, 0]))
         assert np.allclose(R, np.eye(3))
 
     def test_quat_to_rotation_orthonormal(self):
         """Rotation matrix from arbitrary quaternion is orthonormal."""
+        from src.bridge.sensor_types import quat_to_rotation_matrix
         q = np.array([0.5, 0.5, 0.5, 0.5])  # 120 deg rotation
-        R = MuJoCoBridge._quat_to_rotation_matrix(q)
+        R = quat_to_rotation_matrix(q)
         assert abs(np.linalg.det(R) - 1.0) < 1e-10
         assert np.allclose(R @ R.T, np.eye(3), atol=1e-10)
 
