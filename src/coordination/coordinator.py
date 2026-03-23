@@ -56,6 +56,7 @@ class RobotVizData:
     coverage_pct: float
     detections: list[dict]
     scene_description: dict | None
+    tracking_status: str = "ok"
 
     # -- dict-style compatibility helpers ----------------------------------
 
@@ -217,18 +218,20 @@ class Coordinator:
         Returns safe defaults while a restart is in progress.
         """
         if self._restarting:
-            return {"position": [0, 0, 0], "voxels": 0}
+            return {"position": [0, 0, 0], "voxels": 0, "tracking_status": "ok"}
         robot = self._robots.get(rid)
         if robot is None:
-            return {"position": [0, 0, 0], "voxels": 0}
+            return {"position": [0, 0, 0], "voxels": 0, "tracking_status": "ok"}
         poses = robot.slam.get_poses()
         if poses:
             pos = poses[-1][:3, 3].tolist()
         else:
             pos = [0, 0, 0]
+        tracking_status_str = getattr(robot.exploration, "last_tracking_status", "ok")
         return {
             "position": pos,
             "voxels": robot.octomap.num_occupied,
+            "tracking_status": tracking_status_str,
         }
 
     def get_robot_coverage(self, rid: str) -> dict:
@@ -658,6 +661,7 @@ class Coordinator:
                 coverage_pct=robot.exploration.last_coverage,
                 detections=detections,
                 scene_description=scene_desc,
+                tracking_status=getattr(robot.exploration, "last_tracking_status", "ok"),
             )
 
         voronoi_mid, voronoi_dir = self._get_voronoi_geometry()

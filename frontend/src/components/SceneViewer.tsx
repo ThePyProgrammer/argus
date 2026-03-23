@@ -109,8 +109,8 @@ export default function SceneViewer() {
       // Robot markers and trails
       for (const [id, robot] of state.robots) {
         const prev = prevState.robots.get(id);
-        if (!prev || prev.position !== robot.position || prev.rotation !== robot.rotation) {
-          robotMarkerManager.updateRobot(id, robot.position, robot.colorIndex, robot.rotation);
+        if (!prev || prev.position !== robot.position || prev.rotation !== robot.rotation || prev.trackingStatus !== robot.trackingStatus) {
+          robotMarkerManager.updateRobot(id, robot.position, robot.colorIndex, robot.rotation, robot.trackingStatus);
         }
         if (!prev || prev.trajectory !== robot.trajectory) {
           trailManager.updateTrail(

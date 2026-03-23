@@ -25,6 +25,7 @@ export interface RobotListPayload {
 export interface PoseUpdatePayload {
   position: [number, number, number];
   rotation: number[]; // 9-element flat 3x3
+  tracking_status?: string; // "ok" | "lost" | "initializing" | "relocalizing"
 }
 
 export interface CloudDeltaPayload {

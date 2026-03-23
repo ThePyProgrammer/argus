@@ -160,6 +160,7 @@ class ExplorationLoop:
         self._last_coverage = 0.0
         self._last_bbox_coverage = 0.0
         self._last_frontier_count = 0
+        self.last_tracking_status: str = "ok"
 
     @property
     def frontier_detector(self) -> FrontierDetector:
@@ -196,6 +197,7 @@ class ExplorationLoop:
             (pose, current_pos) -- 4x4 pose matrix and (3,) position vector.
         """
         result = self._slam.process_frame(frame)
+        self.last_tracking_status: str = result.tracking_status.value
         pose = result.pose
         current_pos = pose[:3, 3].copy()
 

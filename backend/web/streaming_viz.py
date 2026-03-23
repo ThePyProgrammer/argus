@@ -282,6 +282,7 @@ class WebStreamingViz:
                 "payload": {
                     "position": pose[:3, 3].tolist(),
                     "rotation": pose[:3, :3].flatten().tolist(),
+                    "tracking_status": data.get("tracking_status", "ok"),
                 },
             })
 

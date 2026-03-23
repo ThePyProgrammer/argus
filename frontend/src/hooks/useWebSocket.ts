@@ -74,7 +74,7 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
         case 'pose_update': {
           const payload = msg.payload as PoseUpdatePayload;
           if (msg.robot_id) {
-            store.updatePose(msg.robot_id, payload.position, payload.rotation);
+            store.updatePose(msg.robot_id, payload.position, payload.rotation, payload.tracking_status);
             if (msg.robot_id === 'robot_a') {
               const p = payload.position;
               console.log(`[pose] robot_a: [${p[0].toFixed(2)}, ${p[1].toFixed(2)}, ${p[2].toFixed(2)}]`);

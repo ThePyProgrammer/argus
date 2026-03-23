@@ -23,6 +23,7 @@ export interface RobotInfo {
   detections: Detection[];
   sceneDescription: string | null;
   sceneObjects: string[];
+  trackingStatus: string; // "ok" | "lost" | "initializing" | "relocalizing"
 }
 
 export interface RobotStoreState {
@@ -39,6 +40,7 @@ export interface RobotStoreState {
     robotId: string,
     position: [number, number, number],
     rotation: number[],
+    trackingStatus?: string,
   ) => void;
   updateStats: (stats: {
     total_coverage: number;
@@ -91,6 +93,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         detections: existing?.detections ?? [],
         sceneDescription: existing?.sceneDescription ?? null,
         sceneObjects: existing?.sceneObjects ?? [],
+        trackingStatus: existing?.trackingStatus ?? 'ok',
       });
     });
     set({ robots });
@@ -100,11 +103,17 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
     robotId: string,
     position: [number, number, number],
     rotation: number[],
+    trackingStatus?: string,
   ) => {
     const robots = new Map(get().robots);
     const robot = robots.get(robotId);
     if (robot) {
-      robots.set(robotId, { ...robot, position, rotation });
+      robots.set(robotId, {
+        ...robot,
+        position,
+        rotation,
+        trackingStatus: trackingStatus ?? robot.trackingStatus,
+      });
       set({ robots });
     }
   },

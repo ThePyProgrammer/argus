@@ -2,6 +2,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OKABE_ITO } from '../utils/palette';
 
+/** Tracking status colors for robot markers (SLAM tracking state). */
+const STATUS_COLORS: Record<string, number> = {
+  ok: 0x00cc00,            // green
+  lost: 0xcc0000,          // red
+  relocalizing: 0xcccc00,  // yellow
+  initializing: 0xcccc00,  // yellow
+};
+
 /**
  * Manages per-robot Go2 mesh markers in the Three.js scene.
  *
@@ -116,6 +124,7 @@ export class RobotMarkerManager {
     position: [number, number, number],
     colorIndex: number,
     rotation?: number[],
+    trackingStatus?: string,
   ): void {
     const existing = this.markers.get(robotId);
 
@@ -129,6 +138,18 @@ export class RobotMarkerManager {
         const lookY = -rotation[7];
         const yaw = Math.atan2(lookY, lookX) + Math.PI / 2;
         existing.rotation.set(0, 0, yaw);
+      }
+
+      // Tint robot marker by SLAM tracking status
+      if (trackingStatus) {
+        const statusColor = new THREE.Color(STATUS_COLORS[trackingStatus] ?? 0x00cc00);
+        existing.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+            mat.color.copy(statusColor);
+            mat.emissive.copy(statusColor);
+          }
+        });
       }
       return;
     }
