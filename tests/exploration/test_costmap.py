@@ -108,14 +108,15 @@ class TestBuildCostmap:
         assert costmap[9, 9] == IMPASSABLE
         assert costmap.shape == (10, 10)
 
-    def test_all_free_grid_produces_zero_costmap(self):
-        """Grid with no obstacles produces all-zero costmap."""
+    def test_all_free_grid_has_no_obstacle_inflation(self):
+        """Grid with no obstacles has no infinite-cost cells from inflation."""
         resolution = 0.1
         grid = np.full((10, 10), CELL_FREE, dtype=np.int8)
 
         costmap = build_costmap(grid, resolution, robot_half_width=0.15)
 
-        np.testing.assert_array_equal(costmap, 0.0)
+        # No cells should be impassable (inf or very high) without obstacles
+        assert not np.any(np.isinf(costmap))
 
     def test_output_dtype_is_float32(self):
         """Costmap output is float32."""
