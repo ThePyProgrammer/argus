@@ -10,3 +10,7 @@ dist/
 .desloppify/
 
 .claude/
+
+# ORB-SLAM3 vocabulary (too large for git, ~40MB)
+models/orbslam3/ORBvoc.txt
+models/orbslam3/ORBvoc.bin
