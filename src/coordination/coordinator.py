@@ -28,6 +28,12 @@ from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.sensor_types import SensorFrame
 from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.bridge.multi_robot_config import MultiRobotConfig
+from src.coordination.voronoi_partitioner import VoronoiPartitioner
+from src.coordination.map_merger import MapMerger
+from src.coordination.transport import pLCMTransport
+
+if TYPE_CHECKING:
+    from src.viz.multi_robot_viz import MultiRobotVisualizer
 
 
 @dataclass
@@ -70,12 +76,6 @@ class CoordinationResult:
     terminated_reason: str
     merged_voxel_count: int
     per_robot_voxels: dict[str, int] = field(default_factory=dict)
-from src.coordination.voronoi_partitioner import VoronoiPartitioner
-from src.coordination.map_merger import MapMerger
-
-if TYPE_CHECKING:
-    from src.viz.multi_robot_viz import MultiRobotVisualizer
-from src.coordination.transport import pLCMTransport
 
 logger = logging.getLogger(__name__)
 
@@ -432,8 +432,8 @@ class Coordinator:
                 if self._merge_count == 0:
                     try:
                         self._merge_occupancy_maps(robot_ids)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Viz merge skipped: %s", e)
                 self._send_viz_update(robot_ids, frames)
 
         # Final merge
@@ -514,7 +514,6 @@ class Coordinator:
                         all_voxels.append(v)
 
         if len(all_voxels) >= 2:
-            import numpy as np
             combined = np.vstack(all_voxels)
             self._merger.merge_from_voxels(all_voxels[0], combined[len(all_voxels[0]):])
         elif len(all_voxels) == 1:

@@ -85,7 +85,7 @@ class CoverageTracker:
 
         # Secondary metric: bounding box fill ratio
         bbox_coverage = 0.0
-        if occupied_voxels.size > 0 and len(occupied_voxels) > 0:
+        if len(occupied_voxels) > 0:
             vmin = occupied_voxels.min(axis=0)
             vmax = occupied_voxels.max(axis=0)
             extents = vmax - vmin

@@ -179,15 +179,15 @@ class WebStreamingViz:
         return result
 
     def _build_rgb_lookup(self, robot_data: dict) -> dict[tuple[int, int, int], list[int]]:
-        """Build voxel-grid→RGB color lookup from SLAM point cloud.
+        """Build voxel-grid->RGB color lookup from SLAM point cloud.
 
         Uses slam_cloud_pts and slam_cloud_rgb from robot_data (the raw
         SLAM global cloud before octomap voxelization). Quantizes points
         to the same 0.1m grid and averages colors per cell.
         """
-        color_sums: dict[tuple[int, int, int], list[float]] = {}
-        color_counts: dict[tuple[int, int, int], int] = {}
         resolution = 0.1
+        all_keys = []
+        all_colors = []
 
         for rid, data in robot_data.items():
             pts = data.get("slam_cloud_pts")
@@ -198,28 +198,35 @@ class WebStreamingViz:
                 continue
 
             n = min(len(pts), len(cols))
-            for i in range(n):
-                key = (
-                    int(round(float(pts[i][0]) / resolution)),
-                    int(round(float(pts[i][1]) / resolution)),
-                    int(round(float(pts[i][2]) / resolution)),
-                )
-                if key not in color_sums:
-                    color_sums[key] = [0.0, 0.0, 0.0]
-                    color_counts[key] = 0
-                color_sums[key][0] += float(cols[i][0])
-                color_sums[key][1] += float(cols[i][1])
-                color_sums[key][2] += float(cols[i][2])
-                color_counts[key] += 1
+            pts_arr = np.asarray(pts[:n], dtype=np.float64)
+            cols_arr = np.asarray(cols[:n], dtype=np.float64)
+
+            # Quantize points to grid cells (vectorized)
+            keys = np.round(pts_arr / resolution).astype(np.int64)
+            all_keys.append(keys)
+            all_colors.append(cols_arr)
+
+        if not all_keys:
+            return {}
+
+        all_keys_arr = np.concatenate(all_keys, axis=0)
+        all_colors_arr = np.concatenate(all_colors, axis=0)
+
+        # Find unique grid cells and average colors per cell
+        unique_keys, inverse = np.unique(all_keys_arr, axis=0, return_inverse=True)
+        n_unique = len(unique_keys)
+        color_sums = np.zeros((n_unique, 3), dtype=np.float64)
+        color_counts = np.zeros(n_unique, dtype=np.int64)
+        np.add.at(color_sums, inverse, all_colors_arr)
+        np.add.at(color_counts, inverse, 1)
+
+        avg_colors = color_sums / color_counts[:, np.newaxis]
+        rgb_values = np.minimum(255, (avg_colors * 255).astype(np.int64))
 
         lookup: dict[tuple[int, int, int], list[int]] = {}
-        for key, sums in color_sums.items():
-            count = color_counts[key]
-            lookup[key] = [
-                min(255, int(sums[0] / count * 255)),
-                min(255, int(sums[1] / count * 255)),
-                min(255, int(sums[2] / count * 255)),
-            ]
+        for i in range(n_unique):
+            key = (int(unique_keys[i, 0]), int(unique_keys[i, 1]), int(unique_keys[i, 2]))
+            lookup[key] = [int(rgb_values[i, 0]), int(rgb_values[i, 1]), int(rgb_values[i, 2])]
         return lookup
 
     def _compute_colors(

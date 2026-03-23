@@ -217,8 +217,8 @@ def run_explore_mode(args):
 
 def run_multi_mode(args):
     """Run two-robot coordinated exploration with map merging."""
-    scene = getattr(args, 'scene', 'office')
-    n_robots = getattr(args, 'num_robots', 2)
+    scene = args.scene
+    n_robots = args.num_robots
     robot_ids = generate_robot_ids(n_robots)
     spawn_positions = generate_spawn_positions(robot_ids, scene)
 
@@ -252,7 +252,7 @@ def run_multi_mode(args):
 
     viz = MultiRobotVisualizer(app_name="multi_robot_viz")
     coordinator = Coordinator(bridge=bridge, robots=robots, config=config, viz=viz)
-    if getattr(args, 'static', False):
+    if args.static:
         coordinator.set_static(True)
 
     print("Starting multi-robot exploration...")
@@ -303,8 +303,8 @@ def run_web_mode(args):
     the React C2 frontend via FastAPI at http://localhost:8000.
     """
 
-    scene = getattr(args, "scene", "office")
-    n_robots = getattr(args, 'num_robots', 2)
+    scene = args.scene
+    n_robots = args.num_robots
     robot_ids = generate_robot_ids(n_robots)
     spawn_positions = generate_spawn_positions(robot_ids, scene)
 
@@ -362,7 +362,7 @@ def run_web_mode(args):
         },
     )
     coordinator.set_viz(streaming_viz)
-    if getattr(args, 'static', False):
+    if args.static:
         coordinator.set_static(True)
     logger.info("MCP endpoint available at http://localhost:8000/mcp")
 
