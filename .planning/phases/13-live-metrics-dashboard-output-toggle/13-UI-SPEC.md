@@ -29,23 +29,20 @@ Source: Extracted from `frontend/src/App.css` body rule. This phase adds no new 
 
 ## Spacing Scale
 
-Declared values. The existing codebase uses practical spacing that clusters around multiples of 4 with occasional 6px and 10px. This phase follows the same established values.
+Declared values (multiples of 4 only):
 
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon gaps, inline padding, dot indicator margins |
-| sm | 8px | Compact element spacing, sparkline-to-label gap, toggle button gaps |
-| md | 12px | Panel internal padding, section separators |
+| sm | 8px | Compact element spacing, sparkline-to-label gap, toggle button gaps, metric row gaps within per-robot columns |
+| md | 12px | Panel internal padding, section separators, toggle button group margins |
 | lg | 16px | Section header padding, layout-level gaps |
 | xl | 24px | Major section breaks, empty state padding |
 | 2xl | 32px | Collapsed bar height (metrics toggle bar) |
 
-Exceptions:
-- 6px: Used between metric rows within per-robot columns (matches existing RobotCard 6px marginBottom pattern)
-- 10px: Used for marginTop between toggle button groups (matches existing ControlPanel 10px marginTop pattern)
-- 30px: Sparkline SVG height (content-driven dimension, not a layout spacing token)
+Exceptions: none
 
-Source: Extracted from existing component inline styles (ControlPanel.tsx, CameraStrip.tsx, RobotCard.tsx). Not a strict 8-point grid -- follows the project's established practical spacing.
+Source: Derived from existing component inline styles (ControlPanel.tsx, CameraStrip.tsx, RobotCard.tsx), normalized to strict multiples of 4.
 
 ---
 
@@ -56,7 +53,6 @@ Source: Extracted from existing component inline styles (ControlPanel.tsx, Camer
 | Body | 13px | 400 | 1.5 | Metric values in live table, sparkline percentage deltas |
 | Label | 12px | 600 | 1.3 | Section headers ("METRICS", "RENDERING"), metric labels (ATE, RPE, ms/frame), toggle bar text |
 | Small | 11px | 400 | 1.3 | Metric units, baseline reference text, tooltip content |
-| Heading | 16px | 700 | 1.2 | Not used in this phase (only in Sidebar header "C2 Command") |
 
 Monospace override: Metric numeric values (ATE, RPE, ms/frame) use `fontFamily: 'monospace'` at 13px weight 400 for tabular alignment. This matches the existing cloud config button pattern in ControlPanel.tsx.
 
@@ -72,6 +68,10 @@ Source: Extracted from existing components. ControlPanel buttons use 13px/600, l
 | Secondary (30%) | #1a1a2e / #1a1a3e | Sidebar background (#1a1a2e), panel backgrounds (#1a1a3e), metrics panel background (#111122) |
 | Accent (10%) | #2ecc71 | Active toggle indicator borders, active output mode button border, sparkline current-value stroke, tracking OK dot |
 | Destructive | #e74c3c | Tracking LOST dot only |
+
+### Visual Focal Point
+
+The robot column header row with colored left borders (Okabe-Ito palette) is the primary visual anchor of the expanded metrics panel. In "Live" view, the per-robot column headers with their 3px colored left borders draw the eye first and orient the user to which robot's data they are reading. In "vs Baseline" view, the sparkline polylines serve as the primary focal element.
 
 ### Semantic Status Colors
 
@@ -196,7 +196,7 @@ Source: Collapse toggle copy from CameraStrip.tsx. Section header pattern from C
 ### Output Mode Toggle (ControlPanel)
 
 - **Location:** ControlPanel.tsx, new "RENDERING" section below existing color mode toggle
-- **Layout:** 3 buttons in a horizontal row with 6px gap
+- **Layout:** 3 buttons in a horizontal row with 8px gap
 - **Active state:** Background #1a3a2a, border 2px solid #2ecc71, text color #2ecc71
 - **Inactive state:** Background #263238, border 1px solid #444, text color #666
 - **Disabled state (mesh unavailable):** opacity 0.3, cursor not-allowed, title tooltip with unavailability reason
@@ -212,9 +212,9 @@ Source: Collapse toggle copy from CameraStrip.tsx. Section header pattern from C
 - **Overlap:** Both geometries visible during transition (staggered is acceptable; simultaneous is ideal)
 - **Edge case:** If user clicks a new mode during an in-progress fade, cancel current fade, immediately set old geometry opacity to 0 and remove, then start new fade-in
 
-### Sparkline Interaction
+### Sparkline Component Spec
 
-- **Dimensions:** 120px wide x 30px tall
+- **Dimensions:** 120px wide x 30px tall (SVG viewport height; 30px is a content dimension, not a layout spacing token)
 - **Data:** Array of up to 60 entries (ring buffer size from backend)
 - **Current value stroke:** 1.5px solid, color #2ecc71 (or robot-specific Okabe-Ito color if per-robot sparklines)
 - **Baseline reference line:** 1px dashed #555 (stroke-dasharray "3,2"), horizontal at baseline Y position
@@ -226,6 +226,7 @@ Source: Collapse toggle copy from CameraStrip.tsx. Section header pattern from C
 - **Structure:** Horizontal per-robot columns side by side
 - **Each column contains:** Robot name header (colored left border), 4 metric rows (ATE, RPE, ms/frame, Status)
 - **Metric row:** Label left-aligned (12px, #888), value right-aligned (13px monospace, #e0e0e0)
+- **Metric row gap:** 8px between rows within a column
 - **Tracking status:** Colored dot (8px diameter circle) + status text (13px)
 - **Update frequency:** Values update in-place; no flash or highlight animation on update (flight telemetry density aesthetic)
 
@@ -298,7 +299,7 @@ Existing:
 
 New (appended below):
   RENDERING                              (section label)
-  [Point Cloud] [Voxel Grid] [Mesh]      (3 toggle buttons, horizontal)
+  [Point Cloud] [Voxel Grid] [Mesh]      (3 toggle buttons, horizontal, 8px gap)
 ```
 
 ---
