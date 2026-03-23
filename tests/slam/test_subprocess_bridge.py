@@ -201,15 +201,13 @@ class TestKillProcess:
         mock_proc = MagicMock()
         mock_popen.return_value = mock_proc
 
-        sock_path = "/tmp/test_bridge_kill_sock"
+        sock_path = f"/tmp/test_bridge_kill_{os.getpid()}"
         bridge = _make_bridge(ipc_endpoint=f"ipc://{sock_path}")
         try:
             bridge.start()
             assert bridge.alive is True
-
-            # Create a fake socket file
-            with open(sock_path, "w") as f:
-                f.write("")
+            # ZMQ bind creates the IPC socket file
+            assert os.path.exists(sock_path)
 
             bridge._kill_process()
 
@@ -217,7 +215,9 @@ class TestKillProcess:
             mock_proc.kill.assert_called_once()
             assert not os.path.exists(sock_path)
         finally:
-            bridge.shutdown()
+            # Ensure cleanup even if test fails
+            if os.path.exists(sock_path):
+                os.unlink(sock_path)
 
 
 class TestUniqueEndpoint:
