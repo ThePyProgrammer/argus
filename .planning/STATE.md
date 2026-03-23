@@ -41,7 +41,7 @@ Plan: 3 of 3
 | 08 | 3/3 | 33min | 11min |
 | 10 | 3/3 | 10min | 3min |
 | 09 | 2/3 | 7min | 4min |
-| 11 | 1/2 | 4min | 4min |
+| 11 | 2/2 | 11min | 6min |
 
 ## Accumulated Context
 
@@ -78,6 +78,9 @@ Recent decisions affecting current work:
 - [11-01]: vocab_path param allows test injection; defaults to models/orbslam3/ORBvoc.txt
 - [11-01]: Dense cloud from depth_to_pointcloud, sparse ORB count in metrics only (BACK-02)
 - [11-01]: Optional dependency pattern: try/import, _AVAILABLE flag, ImportError in __init__
+- [11-02]: Store last_tracking_status on ExplorationLoop (closest to SLAMResult) rather than RobotInstance
+- [11-02]: Propagate tracking_status via pose_update WS message (piggyback on frequent updates)
+- [11-02]: Use getattr with default "ok" for backward compat with ICP backend
 - [09-02]: AlgorithmDropdown uses custom div-based dropdown (not native select) for rich badge rendering
 - [09-02]: Module-scope debouncedSendParam avoids recreating debounce timer per render
 - [09-02]: Robot poses/rotations/trajectories reset to identity/empty during algorithm restart

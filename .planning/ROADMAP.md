@@ -29,7 +29,7 @@
 - [x] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
 - [ ] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP
 - [x] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization (completed 2026-03-23)
-- [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python (1/2 plans complete)
+- [x] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python (1/2 plans complete) (completed 2026-03-23)
 - [ ] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline
 - [ ] **Phase 13: Live Metrics Dashboard + Output Toggle** — Metrics comparison and visualization modes
 
@@ -91,7 +91,7 @@ Plans:
   1. Selecting "ORB-SLAM3" from the algorithm picker and starting a session produces pose estimates and 3D map output
   2. ORB-SLAM3 provides pose estimates while the system generates dense point clouds from depth images using those poses (not sparse ORB features)
   3. The full exploration-to-merged-map pipeline works end-to-end with ORB-SLAM3 selected
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 11-01-PLAN.md — ORB-SLAM3 backend implementation + tests + vocab download script
@@ -135,7 +135,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 9. Frontend Algorithm Controls | 2/3 | In Progress|  | - |
 | 10. Pose-Graph Map Merger | 3/3 | Complete    | 2026-03-23 | - |
-| 11. ORB-SLAM3 Backend | v2.0 | 1/2 | In progress | - |
+| 11. ORB-SLAM3 Backend | 2/2 | Complete   | 2026-03-23 | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
 
