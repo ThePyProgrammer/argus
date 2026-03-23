@@ -13,7 +13,9 @@ export interface WSMessage {
     | 'cloud_config_ack'
     | 'detections'
     | 'scene_description'
-    | 'color_mode_ack';
+    | 'color_mode_ack'
+    | 'slam_param_ack'
+    | 'slam_restart_complete';
   robot_id?: string;
   payload: unknown;
 }
