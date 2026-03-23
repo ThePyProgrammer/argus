@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: phase_complete
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-03-23T09:57:39Z"
+status: unknown
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-03-23T11:20:32.137Z"
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 12 — openvins-svo-pro-backends
+**Current focus:** Phase 13 — live-metrics-dashboard-output-toggle
 
 ## Current Position
 
-Phase: 12 (openvins-svo-pro-backends) — COMPLETE
-Plan: 4 of 4 (all done)
+Phase: 13 (live-metrics-dashboard-output-toggle) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -43,6 +43,7 @@ Plan: 4 of 4 (all done)
 | 09 | 3/3 | 12min | 4min |
 | 11 | 2/2 | ~78min | ~39min |
 | 12 | 4/4 | 12min | 3min |
+| Phase 13 P01 | 5min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,11 @@ Recent decisions affecting current work:
 - [12-04]: CrashToast uses createPortal to document.body (same z-index pattern as ConfirmModal)
 - [12-04]: ExplorationLoop accepts optional streaming_viz parameter for crash_fallback WS emission
 - [12-04]: Crash notification pipeline: exploration_loop -> crash_fallback WS -> slamStore.crashMessage -> CrashToast
+- [Phase 13]: MetricsTracker uses deque(maxlen=60) ring buffers -- bounded memory, O(1) append
+- [Phase 13]: Drift computed every 100 sim steps (10 viz updates) with rolling 50-pose window
+- [Phase 13]: Baseline persists across MetricsTracker.reset() for cross-session comparison
+- [Phase 13]: updateAllMetrics uses single set() call to avoid 3 re-renders per stats message
+- [Phase 13]: ExplorationLoop stores last_slam_metrics for coordinator access
 
 ### Roadmap Evolution
 
@@ -125,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T09:57:39Z
-Stopped at: Completed 12-04-PLAN.md (Phase 12 complete)
-Resume file: Next phase
+Last session: 2026-03-23T11:20:32.134Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: None

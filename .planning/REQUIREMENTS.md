@@ -38,8 +38,8 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 - [x] **CTRL-02**: Selecting an algorithm triggers pre-session restart with the chosen backend
 - [x] **CTRL-03**: Parameter tuning panel renders dynamically from backend's JSON schema
 - [x] **CTRL-04**: Parameter changes are sent to backend via WebSocket and applied (where supported)
-- [ ] **CTRL-05**: Live metrics dashboard shows ATE, RPE, processing time (ms/frame), and tracking status per robot
-- [ ] **CTRL-06**: Metrics comparison view shows current algorithm vs baseline ICP side-by-side
+- [x] **CTRL-05**: Live metrics dashboard shows ATE, RPE, processing time (ms/frame), and tracking status per robot
+- [x] **CTRL-06**: Metrics comparison view shows current algorithm vs baseline ICP side-by-side
 - [ ] **CTRL-07**: Output format toggle switches Three.js viewer between point cloud, voxel grid, and mesh rendering modes
 
 ## v3.0 Requirements
@@ -97,8 +97,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | CTRL-02 | Phase 9 | Complete |
 | CTRL-03 | Phase 9 | Complete |
 | CTRL-04 | Phase 9 | Complete |
-| CTRL-05 | Phase 13 | Pending |
-| CTRL-06 | Phase 13 | Pending |
+| CTRL-05 | Phase 13 | Complete |
+| CTRL-06 | Phase 13 | Complete |
 | CTRL-07 | Phase 13 | Pending |
 
 **Coverage:**
