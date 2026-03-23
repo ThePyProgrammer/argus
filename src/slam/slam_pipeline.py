@@ -1,12 +1,13 @@
 """SLAM pipeline using Open3D ICP odometry.
 
 Processes RGB-D frames to estimate camera poses via frame-to-frame ICP
-alignment and accumulates a global point cloud. This "lite" pipeline
-replaces RTAB-Map standalone (whose Python bindings are limited) and is
-sufficient for Phase 1 single-robot mapping.
+alignment and accumulates a global point cloud. Each frame's point cloud
+is aligned to the previous frame and the relative transform is chained
+into a cumulative pose estimate.
 
-Can be replaced with RTAB-Map ROS 2 integration in later phases if
-loop closure and pose graph optimization are needed.
+No loop closure or pose graph optimization — drift will accumulate over
+long trajectories. Can be replaced with a more sophisticated backend
+(e.g., RTAB-Map, ORB-SLAM3) via the same interface.
 """
 
 import numpy as np
@@ -49,24 +50,21 @@ class SLAMPipeline:
         self._last_frame_colors = np.empty((0, 3))
 
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
-        """Process one RGB-D frame. Returns estimated (4,4) pose.
+        """Process one RGB-D frame. Returns ICP-estimated (4,4) pose.
 
-        Uses ground-truth pose for point cloud placement in world frame.
-        ICP odometry is run for drift metric computation but the
-        ground-truth pose is authoritative for multi-robot map merging
-        where all clouds must share a consistent world frame.
+        Aligns each frame's point cloud to the previous via ICP and chains
+        the relative transforms to produce a cumulative pose estimate.
+        Falls back to ground-truth on the first frame or when ICP fails.
 
         Args:
             frame: SensorFrame with rgb, depth, ground_truth_pose, sim_time.
 
         Returns:
-            (4, 4) float64 homogeneous transform (ground-truth pose).
+            (4, 4) float64 homogeneous transform (ICP-estimated pose).
         """
-        gt_pose = frame.ground_truth_pose.copy()
-
         if frame.depth is None:
-            self._slam_poses.append(gt_pose)
-            return gt_pose
+            self._slam_poses.append(self._current_pose.copy())
+            return self._current_pose.copy()
 
         # Convert depth to point cloud in camera frame
         cloud = depth_to_pointcloud(
@@ -80,7 +78,7 @@ class SLAMPipeline:
                 nb_neighbors=10, std_ratio=2.0,
             )
 
-        # ICP for drift metrics (optional — does not affect pose output)
+        # ICP frame-to-frame alignment
         if self._prev_cloud is not None and len(cloud.points) > 100:
             result = o3d.pipelines.registration.registration_icp(
                 cloud,
@@ -92,8 +90,8 @@ class SLAMPipeline:
             if result.fitness > 0.3:
                 self._current_pose = self._current_pose @ result.transformation
 
-        # Transform cloud to world frame using ground-truth pose
-        cloud.transform(gt_pose)
+        # Transform cloud to world frame using ICP-estimated pose
+        cloud.transform(self._current_pose)
 
         # Store per-frame cloud for direct OctoMap insertion
         self._last_frame_cloud = np.asarray(cloud.points).copy()
@@ -107,12 +105,12 @@ class SLAMPipeline:
                 self._voxel_size
             )
 
-        self._slam_poses.append(gt_pose)
+        self._slam_poses.append(self._current_pose.copy())
         self._prev_cloud = depth_to_pointcloud(
             frame.depth, frame.rgb, self._intrinsics, max_depth=10.0
         ).voxel_down_sample(self._voxel_size)
 
-        return gt_pose
+        return self._current_pose.copy()
 
     @property
     def global_cloud(self) -> o3d.geometry.PointCloud:
