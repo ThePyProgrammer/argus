@@ -28,7 +28,7 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - [ ] Per-algorithm parameter tuning panel in C2 interface
 - [ ] Live SLAM metrics comparison (accuracy, FPS, memory)
 - [ ] Output format toggle (point cloud, voxel grid, mesh visualization)
-- [ ] Replace ICP-based map merging with pose-graph optimization
+- ✓ Replace ICP-based map merging with pose-graph optimization — Phase 10
 
 ### Out of Scope
 
@@ -82,4 +82,4 @@ Conducted systematic SLAM literature review (.research/) covering 40+ methods �
 | Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | — Pending |
 
 ---
-*Last updated: 2026-03-23 after v2.0 milestone start*
+*Last updated: 2026-03-23 after Phase 10 completion*
