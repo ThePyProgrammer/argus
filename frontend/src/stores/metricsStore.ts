@@ -1,0 +1,73 @@
+import { create } from 'zustand';
+import type { SlamMetrics, MetricHistory } from '../utils/messageTypes';
+
+interface MetricsStoreState {
+  /** Per-robot live metrics */
+  perRobot: Record<string, SlamMetrics>;
+  /** Baseline from last ICP session */
+  baseline: Record<string, SlamMetrics> | null;
+  /** View mode: "live" or "baseline" */
+  viewMode: 'live' | 'baseline';
+  /** Output rendering mode */
+  outputMode: 'cloud' | 'voxel' | 'mesh';
+  /** Per-robot metric history arrays (ring buffers from backend) */
+  history: Record<string, MetricHistory>;
+  /** Mesh data from server (for CTRL-07) */
+  meshVertices: number[][] | null;
+  meshFaces: number[][] | null;
+  meshColors: number[][] | null;
+
+  // Setters
+  updateMetrics: (robotId: string, metrics: SlamMetrics) => void;
+  updateAllMetrics: (
+    slam_metrics: Record<string, SlamMetrics>,
+    baseline: Record<string, SlamMetrics> | null,
+    history: Record<string, MetricHistory>,
+  ) => void;
+  setBaseline: (baseline: Record<string, SlamMetrics> | null) => void;
+  setViewMode: (mode: 'live' | 'baseline') => void;
+  setOutputMode: (mode: 'cloud' | 'voxel' | 'mesh') => void;
+  updateHistory: (robotId: string, history: MetricHistory) => void;
+  setMeshData: (
+    vertices: number[][],
+    faces: number[][],
+    colors?: number[][] | null,
+  ) => void;
+  clearMeshData: () => void;
+}
+
+export const useMetricsStore = create<MetricsStoreState>()((set) => ({
+  perRobot: {},
+  baseline: null,
+  viewMode: 'live',
+  outputMode: 'cloud',
+  history: {},
+  meshVertices: null,
+  meshFaces: null,
+  meshColors: null,
+
+  updateMetrics: (robotId, metrics) =>
+    set((state) => ({
+      perRobot: { ...state.perRobot, [robotId]: metrics },
+    })),
+
+  // Single set() call with all three fields to avoid 3 re-renders per stats message
+  updateAllMetrics: (slam_metrics, baseline, history) =>
+    set({
+      perRobot: slam_metrics,
+      baseline: baseline,
+      history,
+    }),
+
+  setBaseline: (baseline) => set({ baseline }),
+  setViewMode: (mode) => set({ viewMode: mode }),
+  setOutputMode: (mode) => set({ outputMode: mode }),
+  updateHistory: (robotId, history) =>
+    set((state) => ({
+      history: { ...state.history, [robotId]: history },
+    })),
+  setMeshData: (vertices, faces, colors = null) =>
+    set({ meshVertices: vertices, meshFaces: faces, meshColors: colors }),
+  clearMeshData: () =>
+    set({ meshVertices: null, meshFaces: null, meshColors: null }),
+}));

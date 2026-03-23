@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore, fetchSlamState } from '../stores/slamStore';
+import { useMetricsStore } from '../stores/metricsStore';
 import type {
   WSMessage,
   RobotListPayload,
@@ -10,6 +11,8 @@ import type {
   CloudFullPayload,
   StatsPayload,
   TrajectoryPayload,
+  SlamMetrics,
+  MetricHistory,
 } from '../utils/messageTypes';
 
 /**
@@ -101,6 +104,14 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
         case 'stats': {
           const payload = msg.payload as StatsPayload;
           store.updateStats(payload);
+          // Dispatch SLAM metrics to metricsStore
+          if (payload.slam_metrics) {
+            useMetricsStore.getState().updateAllMetrics(
+              payload.slam_metrics as Record<string, SlamMetrics>,
+              (payload.baseline as Record<string, SlamMetrics> | null) ?? null,
+              (payload.metric_history as Record<string, MetricHistory>) ?? {},
+            );
+          }
           break;
         }
         case 'trajectory': {

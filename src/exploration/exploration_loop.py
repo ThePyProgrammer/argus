@@ -200,6 +200,7 @@ class ExplorationLoop:
         """
         result = self._slam.process_frame(frame)
         self.last_tracking_status: str = result.tracking_status.value
+        self.last_slam_metrics: dict = result.metrics
 
         # Emit crash_fallback WS message when a subprocess backend returns LOST
         if (result.tracking_status.value == "lost"

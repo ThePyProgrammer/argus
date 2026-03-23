@@ -40,6 +40,22 @@ export interface CloudFullPayload {
   colors?: number[][];
 }
 
+export interface SlamMetrics {
+  ate_rmse: number;
+  ate_mean: number;
+  rpe_rmse: number;
+  rpe_mean: number;
+  ms_per_frame: number;
+  tracking_status: string;
+}
+
+export interface MetricHistory {
+  ate_rmse: number[];
+  rpe_rmse: number[];
+  ms_per_frame: number[];
+  timestamps: number[];
+}
+
 export interface StatsPayload {
   total_coverage: number;
   merge_count: number;
@@ -48,6 +64,9 @@ export interface StatsPayload {
     string,
     { coverage_pct: number; voxel_count: number; action: string }
   >;
+  slam_metrics?: Record<string, SlamMetrics>;
+  baseline?: Record<string, SlamMetrics> | null;
+  metric_history?: Record<string, MetricHistory>;
 }
 
 export interface TrajectoryPayload {

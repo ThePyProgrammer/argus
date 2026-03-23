@@ -33,6 +33,7 @@ from src.coordination.map_merger import MapMerger
 from src.coordination.merge_protocol import MergeProtocol, RobotMapData
 from src.coordination.merge_registry import MergeRegistry
 from src.coordination.transport import pLCMTransport
+from src.metrics.drift_metrics import compute_drift_metrics
 
 if TYPE_CHECKING:
     from src.viz.multi_robot_viz import MultiRobotVisualizer
@@ -159,6 +160,9 @@ class Coordinator:
         self._restart_positions: dict | None = None
         self._restarting: bool = False
 
+        # Metrics feed counter (drift computed every 10 viz updates = 100 sim steps)
+        self._viz_update_count: int = 0
+
         # pLCM subscription state
         self._latest_map_data: dict[str, RobotMapMessage] = {}
         self._subscribers: list = []
@@ -262,6 +266,12 @@ class Coordinator:
         self._body_trajectories = {}
         self._restart_requested = False
         self._restart_positions = None
+        self._viz_update_count = 0
+
+        # Capture baseline metrics from the ending session (for comparison display)
+        if self._viz is not None and hasattr(self._viz, 'metrics_tracker'):
+            self._viz.metrics_tracker.capture_baseline()
+            self._viz.reset_metrics()
 
         # pLCM subscription state: latest received map data per robot
         self._latest_map_data: dict[str, RobotMapMessage] = {}
@@ -663,6 +673,46 @@ class Coordinator:
                 scene_description=scene_desc,
                 tracking_status=getattr(robot.exploration, "last_tracking_status", "ok"),
             )
+
+        # --- Feed metrics into tracker ---
+        if hasattr(self._viz, 'metrics_tracker'):
+            tracker = self._viz.metrics_tracker
+            self._viz_update_count += 1
+
+            for rid in robot_ids:
+                robot = self._robots[rid]
+                # Access per-frame SLAM metrics stored by exploration loop
+                slam_metrics_dict = getattr(robot.exploration, 'last_slam_metrics', {})
+                tracking_str = robot_data[rid].tracking_status
+                tracker.record_frame(rid, slam_metrics_dict, tracking_str)
+
+            # Compute drift every 10 viz updates (= every 100 simulation steps)
+            # This keeps the expensive evo computation from running too often
+            if self._viz_update_count % 10 == 0:
+                for rid in robot_ids:
+                    robot = self._robots[rid]
+                    slam_poses = robot.slam.get_poses()
+                    if len(slam_poses) < 2:
+                        continue
+                    # Ground truth: use slam poses as both (drift will be 0 without GT)
+                    # When GroundTruthCollector is wired to coordinator, use that instead
+                    gt_poses = slam_poses  # placeholder -- real GT requires GroundTruthCollector
+                    timestamps = list(range(len(slam_poses)))
+                    try:
+                        drift = compute_drift_metrics(
+                            slam_poses=slam_poses[-50:],  # rolling window of last 50
+                            gt_poses=gt_poses[-50:],
+                            timestamps=timestamps[-50:],
+                        )
+                        tracker.record_drift(
+                            rid,
+                            ate_rmse=drift["ate_rmse"],
+                            ate_mean=drift["ate_mean"],
+                            rpe_rmse=drift["rpe_rmse"],
+                            rpe_mean=drift["rpe_mean"],
+                        )
+                    except Exception:
+                        pass  # drift computation can fail with insufficient data
 
         voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
         frontier_cells = self._gather_frontier_cells(robot_ids)
