@@ -29,7 +29,7 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 
 - [x] **MERG-01**: System supports pluggable merge strategies: ICP union (existing), Open3D pose-graph optimization, and GTSAM incremental PGO
 - [x] **MERG-02**: User can select merge strategy from frontend alongside SLAM algorithm selection
-- [ ] **MERG-03**: Pose-graph merger accepts inter-robot loop closure constraints for globally consistent maps
+- [x] **MERG-03**: Pose-graph merger accepts inter-robot loop closure constraints for globally consistent maps
 - [x] **MERG-04**: Merged map output is API-compatible with existing visualization pipeline (last_merged_voxels, last_merged_cloud)
 
 ### Frontend Controls
@@ -91,7 +91,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | BACK-06 | Phase 12 | Pending |
 | MERG-01 | Phase 10 | Complete |
 | MERG-02 | Phase 10 | Complete |
-| MERG-03 | Phase 10 | Pending |
+| MERG-03 | Phase 10 | Complete |
 | MERG-04 | Phase 10 | Complete |
 | CTRL-01 | Phase 9 | Pending |
 | CTRL-02 | Phase 9 | Pending |
