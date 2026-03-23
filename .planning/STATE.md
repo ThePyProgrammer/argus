@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
 status: unknown
-stopped_at: Completed 14-04-PLAN.md
-last_updated: "2026-03-23T16:02:41.000Z"
+stopped_at: Completed 14-05-PLAN.md
+last_updated: "2026-03-23T15:49:13.000Z"
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 24
-  completed_plans: 22
+  completed_plans: 23
 ---
 
 # Project State
@@ -24,13 +24,13 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 14 (interactive-comfyui-esque-react-flow-pipeline-graph) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 19 (v2.0)
+- Total plans completed: 20 (v2.0)
 - Average duration: 6min
 - Total execution time: ~145min (includes post-checkpoint ORB-SLAM3 fixes)
 
@@ -50,6 +50,7 @@ Plan: 5 of 6
 | Phase 14 P02 | 5min | 2 tasks | 9 files |
 | Phase 14 P03 | 4min | 2 tasks | 4 files |
 | Phase 14 P04 | 4min | 2 tasks | 4 files |
+| Phase 14 P05 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,10 @@ Recent decisions affecting current work:
 - [14-04]: NodeInspector uses typeof narrowing for schema description rendering to satisfy TS unknown type
 - [14-04]: PresetSelector dropdown positioned above bar (bottom: 100%) for bottom-bar context
 - [14-04]: Outside-click handler via mousedown event listener for dropdown dismiss
+- [14-05]: InspectorWrapper subscribes reactively to selectedNodeId (not getState()) for proper re-render
+- [14-05]: Node catalog fetched on activeView change to 'pipeline', not on mount
+- [14-05]: setNodeStatus/setEdgeThroughput update both status maps and node/edge data arrays
+- [14-05]: pipeline_status added to WSMessage type union for type-safe dispatch
 
 ### Roadmap Evolution
 
@@ -158,6 +163,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:02:41Z
-Stopped at: Completed 14-04-PLAN.md
+Last session: 2026-03-23T15:49:13Z
+Stopped at: Completed 14-05-PLAN.md
 Resume file: None
