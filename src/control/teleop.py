@@ -8,7 +8,6 @@ Controls:
     Q / E  -- strafe left / strafe right (vy)
 """
 
-from __future__ import annotations
 
 import logging
 import threading

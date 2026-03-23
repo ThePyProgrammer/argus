@@ -10,7 +10,6 @@ Turning uses differential stride: one side takes longer strides than the
 other, creating a yaw torque through asymmetric ground reaction forces.
 """
 
-from __future__ import annotations
 
 import numpy as np
 

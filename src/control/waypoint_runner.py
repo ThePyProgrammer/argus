@@ -4,7 +4,6 @@ Drives the robot through a sequence of 3D waypoints using proportional
 control, producing (linear_vel, angular_vel) velocity commands.
 """
 
-from __future__ import annotations
 
 import logging
 import math

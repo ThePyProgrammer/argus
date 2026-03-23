@@ -17,7 +17,6 @@ Data flow (per user decision -- DimOS pLCM transport):
 - Partition assignment uses direct calls (allowed per CONTEXT.md hybrid model)
 """
 
-from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

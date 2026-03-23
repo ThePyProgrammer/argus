@@ -14,7 +14,6 @@ via raw voxel arrays (for pLCM-based data flow where Coordinator passes
 deserialized voxels received from subscriptions).
 """
 
-from __future__ import annotations
 
 import numpy as np
 import open3d as o3d

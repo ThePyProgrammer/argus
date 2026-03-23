@@ -8,7 +8,6 @@ Per CONTEXT.md locked decision: each robot publishes its occupancy grid +
 coverage status via pLCM. The Coordinator subscribes to these channels.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any

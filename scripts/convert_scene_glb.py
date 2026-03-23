@@ -16,7 +16,6 @@ Usage:
     python scripts/convert_scene_glb.py --input-dir path/to/objs --output path/to/scene.glb
 """
 
-from __future__ import annotations
 
 import argparse
 import shutil

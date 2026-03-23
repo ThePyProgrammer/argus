@@ -5,7 +5,6 @@ downstream consumers (SLAM pipeline, visualization, metrics).
 Backend-agnostic: works with MuJoCo or any future sim.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable

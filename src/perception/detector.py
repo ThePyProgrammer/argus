@@ -8,7 +8,6 @@ Requires: pip install ultralytics
 Falls back gracefully if not installed.
 """
 
-from __future__ import annotations
 
 import logging
 import threading

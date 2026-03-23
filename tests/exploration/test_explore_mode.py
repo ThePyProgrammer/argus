@@ -8,7 +8,6 @@ with a mock MuJoCo bridge (no real MuJoCo required). Tests cover:
 - run_explore_mode function existence and callability
 """
 
-from __future__ import annotations
 
 import sys
 from unittest.mock import patch

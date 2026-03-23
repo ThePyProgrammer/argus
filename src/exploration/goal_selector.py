@@ -7,7 +7,6 @@ Supports optional region bias via select_with_bias() for multi-robot
 Voronoi-partitioned exploration.
 """
 
-from __future__ import annotations
 
 from typing import Callable
 

@@ -8,7 +8,6 @@ The result is a costmap where A* naturally produces paths that stay
 centered in corridors and maintain clearance from all obstacles.
 """
 
-from __future__ import annotations
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt, label, binary_dilation

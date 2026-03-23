@@ -13,7 +13,6 @@ MultiRobotBridge can discover qpos/ctrl indices via mj_name2id()
 instead of hardcoding them.
 """
 
-from __future__ import annotations
 
 import copy
 import xml.etree.ElementTree as ET

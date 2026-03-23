@@ -5,7 +5,6 @@ by the server push loop. Supports cloud delta/full sync, per-robot
 pose, trajectory, camera frames, and stats.
 """
 
-from __future__ import annotations
 
 import logging
 import time

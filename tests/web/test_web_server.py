@@ -3,7 +3,6 @@
 Tests WebSocket connection, robot_list handshake, and command dispatch.
 """
 
-from __future__ import annotations
 
 import json
 from unittest.mock import MagicMock

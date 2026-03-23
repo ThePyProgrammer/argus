@@ -4,7 +4,6 @@ Takes a jagged A* grid path and produces a smooth, evenly-spaced path
 suitable for pure pursuit following.
 """
 
-from __future__ import annotations
 
 import numpy as np
 from scipy.ndimage import uniform_filter1d

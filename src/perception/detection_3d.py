@@ -8,7 +8,6 @@ This gives each detected object a world-frame 3D position that can
 be displayed as a label in the web UI's 3D viewer.
 """
 
-from __future__ import annotations
 
 import numpy as np
 

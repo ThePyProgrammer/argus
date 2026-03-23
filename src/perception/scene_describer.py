@@ -12,7 +12,6 @@ Requires: pip install transformers torch
 Falls back gracefully if not installed.
 """
 
-from __future__ import annotations
 
 import logging
 import threading

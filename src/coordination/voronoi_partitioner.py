@@ -9,7 +9,6 @@ Per CONTEXT.md: soft constraint -- frontiers in own region are prioritized
 (higher score) but robot CAN enter other's region if no local frontiers remain.
 """
 
-from __future__ import annotations
 
 import numpy as np
 

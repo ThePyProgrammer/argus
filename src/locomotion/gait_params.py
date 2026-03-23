@@ -1,6 +1,5 @@
 """Tunable gait parameters for the Unitree Go2 trot gait controller."""
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 

@@ -4,7 +4,6 @@ Produces velocity commands that change direction periodically, biased
 toward forward motion to encourage exploration.
 """
 
-from __future__ import annotations
 
 import logging
 

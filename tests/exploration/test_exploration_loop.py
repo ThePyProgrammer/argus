@@ -4,7 +4,6 @@ Uses mock bridge, SLAM, and OctoMap objects to test the full
 detect-select-plan-navigate cycle with various termination conditions.
 """
 
-from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 

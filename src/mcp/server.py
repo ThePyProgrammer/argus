@@ -12,7 +12,6 @@ Runs as a FastAPI HTTP endpoint at /mcp alongside the C2 WebSocket.
 Protocol: JSON-RPC 2.0 (same as DimOS MCP server)
 """
 
-from __future__ import annotations
 
 import json
 import logging

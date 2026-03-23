@@ -8,7 +8,6 @@ Maintains a history log for post-run analysis and produces an
 ExplorationResult summary on termination.
 """
 
-from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

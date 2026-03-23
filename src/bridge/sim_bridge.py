@@ -6,7 +6,6 @@ ground-truth poses directly from the simulation state. No GPU required.
 The Go2 model comes from mujoco_menagerie (models/unitree_go2/).
 """
 
-from __future__ import annotations
 
 import logging
 from pathlib import Path

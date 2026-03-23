@@ -4,7 +4,6 @@ Defines spawn positions, robot IDs, and shared parameters for the
 two-robot coordination setup.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass, field
 

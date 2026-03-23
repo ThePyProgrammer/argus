@@ -6,7 +6,6 @@ and WebStreamingViz for data serialization. Serves React frontend
 build as static files at /.
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging

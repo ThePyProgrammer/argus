@@ -7,7 +7,6 @@ ctrl[i] = desired_joint_angle works correctly.
 The original XML file is never modified on disk.
 """
 
-from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 

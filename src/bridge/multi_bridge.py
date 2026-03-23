@@ -5,7 +5,6 @@ controlled robots. Each robot gets its own renderer, camera, and velocity
 buffer. Joint/actuator indices are discovered dynamically via mj_name2id().
 """
 
-from __future__ import annotations
 
 import logging
 from typing import Any

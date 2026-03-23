@@ -5,7 +5,6 @@ camera frame binary encode/decode, cloud delta tracking, color palette,
 color modes, and trajectory messages.
 """
 
-from __future__ import annotations
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch

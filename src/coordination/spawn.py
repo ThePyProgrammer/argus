@@ -4,7 +4,6 @@ Provides curated office positions and a greedy spread algorithm
 to place N robots as far apart as possible.
 """
 
-from __future__ import annotations
 
 import random
 

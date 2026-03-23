@@ -5,7 +5,6 @@ for both JSON and binary payloads. Dead connections are silently
 removed on send failure.
 """
 
-from __future__ import annotations
 
 import logging
 from typing import Any

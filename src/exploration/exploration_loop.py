@@ -12,7 +12,6 @@ Supports two modes:
 - step_once(): Single-step mode for multi-robot coordination (Coordinator calls).
 """
 
-from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
