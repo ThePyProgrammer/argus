@@ -106,7 +106,13 @@ Plans:
   2. SVO Pro backend accepts RGB-D frames via subprocess bridge and produces pose estimates
   3. Both C++ backends run in subprocess isolation -- a backend crash is caught and reported without killing the main simulation process
   4. Selecting either backend from the algorithm picker and running a session produces a merged 3D map end-to-end
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — IMU sensor types + MuJoCo bridge IMU sub-stepping + Go2 XML sensors
+- [ ] 12-02-PLAN.md — SubprocessSLAMBridge generic class + ZMQ IPC + crash detection
+- [ ] 12-03-PLAN.md — OpenVINS backend + C++ harness
+- [ ] 12-04-PLAN.md — SVO Pro / DSO backend + C++ harness + crash toast notification
 
 ### Phase 13: Live Metrics Dashboard + Output Toggle
 **Goal**: Users can compare SLAM algorithm performance in real time and switch between visualization modes to inspect map quality
@@ -136,7 +142,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 9. Frontend Algorithm Controls | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 10. Pose-Graph Map Merger | 3/3 | Complete    | 2026-03-23 | - |
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
-| 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
+| 12. OpenVINS + SVO Pro Backends | v2.0 | 0/4 | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
 
 ### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
