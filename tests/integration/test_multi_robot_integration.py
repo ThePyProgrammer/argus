@@ -18,6 +18,7 @@ from src.coordination.map_merger import MapMerger
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.bridge.sensor_types import CameraIntrinsics
 from src.exploration.config import ExplorationConfig
+import src.slam.backends  # noqa: F401 -- triggers backend registration
 
 
 @pytest.fixture

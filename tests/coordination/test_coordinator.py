@@ -21,6 +21,7 @@ from src.exploration.config import ExplorationConfig
 from src.exploration.exploration_loop import StepMetrics
 from src.exploration.frontier_detector import FrontierCluster
 from src.exploration.goal_selector import GoalSelector
+from src.slam.protocol import SLAMResult, TrackingStatus
 
 
 # ---------------------------------------------------------------------------
@@ -52,27 +53,34 @@ class _MockSLAM:
     def __init__(self):
         self._poses = []
         self._frame_count = 0
-        self._last_frame_cloud: np.ndarray = np.empty((0, 3))
 
     def process_frame(self, frame):
         self._frame_count += 1
         pose = frame.ground_truth_pose.copy()
         self._poses.append(pose)
         rng = np.random.default_rng(self._frame_count)
-        self._last_frame_cloud = rng.random((50, 3)) * 5.0
-        return pose
+        points = rng.random((50, 3)) * 5.0
+        colors = rng.random((50, 3))
+        return SLAMResult(
+            pose=pose,
+            points=points,
+            colors=colors,
+            metrics={},
+            tracking_status=TrackingStatus.OK,
+        )
 
-    def get_cloud_points(self):
+    def get_global_cloud(self):
         rng = np.random.default_rng(self._frame_count)
-        return rng.random((50, 3)) * 5.0
+        pts = rng.random((50, 3)) * 5.0
+        clr = rng.random((50, 3))
+        return pts, clr
 
-    @property
-    def last_frame_cloud(self) -> np.ndarray:
-        return self._last_frame_cloud
-
-    @property
-    def slam_poses(self):
+    def get_poses(self):
         return list(self._poses)
+
+    def reset(self):
+        self._poses.clear()
+        self._frame_count = 0
 
     @property
     def num_frames_processed(self):
@@ -112,10 +120,13 @@ class TestRobotInstance:
         mock_bridge = MagicMock()
         intrinsics = CameraIntrinsics(fx=32, fy=32, cx=32, cy=32, width=64, height=64)
 
-        with patch("src.coordination.robot_instance.pLCMTransport") as MockTransport:
+        mock_slam = _MockSLAM()
+        with patch("src.coordination.robot_instance.pLCMTransport") as MockTransport, \
+             patch("src.coordination.robot_instance.SLAMRegistry") as MockRegistry:
             mock_pub = MagicMock()
             mock_pub.topic = "/test_bot/occupancy"
             MockTransport.return_value = mock_pub
+            MockRegistry.create.return_value = mock_slam
 
             robot = RobotInstance.create(
                 robot_id="test_bot",
@@ -129,6 +140,7 @@ class TestRobotInstance:
         assert robot.exploration is not None
         assert robot.publisher is not None
         MockTransport.assert_called_once_with(topic="/test_bot/occupancy")
+        MockRegistry.create.assert_called_once_with(None, intrinsics=intrinsics)
 
     def test_robot_instance_publish_map_state(self):
         """publish_map_state broadcasts RobotMapMessage via pLCM."""

@@ -21,7 +21,8 @@ from src.exploration.coverage_tracker import ExplorationResult
 from src.exploration.exploration_loop import ExplorationLoop
 from src.exploration.frontier_detector import FrontierCluster
 from src.slam.octomap_builder import OctoMapBuilder
-from src.slam.slam_pipeline import SLAMPipeline
+from src.slam.registry import SLAMRegistry
+import src.slam.backends  # noqa: F401 -- triggers backend registration
 
 # MockMuJoCoBridge was removed from this file -- the canonical version
 # lives in tests/conftest.py and is auto-discovered as the
@@ -81,7 +82,7 @@ class TestExplorationLoopIntegration:
 
     def test_exploration_loop_max_steps(self, mock_mujoco_bridge, mock_intrinsics) -> None:
         """ExplorationLoop terminates with 'max_steps' and correct step count."""
-        slam = SLAMPipeline(mock_intrinsics)
+        slam = SLAMRegistry.create("icp", intrinsics=mock_intrinsics)
         octomap = OctoMapBuilder(resolution=0.1)
 
         config = ExplorationConfig(
@@ -113,7 +114,7 @@ class TestExplorationLoopIntegration:
 
     def test_exploration_loop_produces_voxels(self, mock_mujoco_bridge, mock_intrinsics) -> None:
         """Exploration loop produces occupied voxels (map grows)."""
-        slam = SLAMPipeline(mock_intrinsics)
+        slam = SLAMRegistry.create("icp", intrinsics=mock_intrinsics)
         octomap = OctoMapBuilder(resolution=0.1)
 
         config = ExplorationConfig(
@@ -137,7 +138,7 @@ class TestExplorationLoopIntegration:
 
     def test_exploration_result_has_valid_fields(self, mock_mujoco_bridge, mock_intrinsics) -> None:
         """ExplorationResult has all required fields populated."""
-        slam = SLAMPipeline(mock_intrinsics)
+        slam = SLAMRegistry.create("icp", intrinsics=mock_intrinsics)
         octomap = OctoMapBuilder(resolution=0.1)
 
         config = ExplorationConfig(

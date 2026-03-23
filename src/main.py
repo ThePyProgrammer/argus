@@ -52,7 +52,8 @@ from src.mcp.server import configure as configure_mcp, mcp_endpoint
 from src.metrics.drift_metrics import compute_drift_metrics
 from src.metrics.ground_truth import GroundTruthCollector
 from src.slam.octomap_builder import OctoMapBuilder
-from src.slam.slam_pipeline import SLAMPipeline
+from src.slam.registry import SLAMRegistry
+import src.slam.backends  # noqa: F401 -- triggers backend registration
 from src.viz.multi_robot_viz import MultiRobotVisualizer
 from src.viz.rerun_viz import RerunVisualizer
 
@@ -172,7 +173,7 @@ def run_explore_mode(args: argparse.Namespace) -> None:
     w, h = config.resolution
     intrinsics = CameraIntrinsics.from_fov(w, h)
 
-    slam = SLAMPipeline(intrinsics)
+    slam = SLAMRegistry.create("icp", intrinsics=intrinsics)
     octomap = OctoMapBuilder(resolution=args.octomap_resolution)
 
     explore_config = ExplorationConfig(
@@ -204,10 +205,11 @@ def run_explore_mode(args: argparse.Namespace) -> None:
         logger.info("Coverage (bounding box): %.1f%%", result.final_bbox_coverage_pct)
         logger.info("Remaining frontiers: %d", result.final_frontier_count)
 
+    explore_cloud, _ = slam.get_global_cloud()
     logger.info(
         "Final stats: %d frames, %d cloud points, %d occupied voxels",
         slam.num_frames_processed,
-        len(slam.get_cloud_points()),
+        len(explore_cloud),
         octomap.num_occupied,
     )
 
@@ -500,7 +502,7 @@ def main() -> None:
     w, h = config.resolution
     intrinsics = CameraIntrinsics.from_fov(w, h)
 
-    slam = SLAMPipeline(intrinsics)
+    slam = SLAMRegistry.create("icp", intrinsics=intrinsics)
     octomap = OctoMapBuilder(resolution=args.octomap_resolution)
     gt_collector = GroundTruthCollector()
     viz = RerunVisualizer() if not args.no_viz else None
@@ -525,9 +527,8 @@ def main() -> None:
             if args.control == "teleop":
                 linear, angular = controller.get_velocity()
             elif args.control == "waypoint":
-                current_pose = (
-                    slam.slam_poses[-1] if slam.slam_poses else np.eye(4)
-                )
+                poses = slam.get_poses()
+                current_pose = poses[-1] if poses else np.eye(4)
                 linear, angular = controller.get_velocity(current_pose)
                 if controller.is_complete:
                     logger.info("All waypoints reached.")
@@ -541,14 +542,15 @@ def main() -> None:
             gt_collector.record(frame)
 
             # Process through SLAM
-            slam_pose = slam.process_frame(frame)
+            slam_result = slam.process_frame(frame)
+            slam_pose = slam_result.pose
 
             # Update OctoMap periodically
             if (
                 step_i % args.octomap_interval == 0
                 and slam.num_frames_processed > 0
             ):
-                cloud_points = slam.get_cloud_points()
+                cloud_points, _ = slam.get_global_cloud()
                 if len(cloud_points) > 0:
                     sensor_origin = slam_pose[:3, 3]
                     octomap.insert_scan(cloud_points, sensor_origin)
@@ -558,21 +560,21 @@ def main() -> None:
                 viz.log_frame(frame)
                 viz.log_robot_pose(slam_pose)
                 if step_i % 10 == 0:
-                    cloud_pts = slam.get_cloud_points()
-                    cloud_colors = slam.get_cloud_colors()
+                    cloud_pts, cloud_colors = slam.get_global_cloud()
                     if len(cloud_pts) > 0:
                         viz.log_point_cloud(cloud_pts, cloud_colors)
-                    viz.log_trajectory(slam.slam_poses)
+                    viz.log_trajectory(slam.get_poses())
                     voxels = octomap.get_occupied_voxels()
                     if len(voxels) > 0:
                         viz.log_occupancy_grid(voxels, octomap.resolution)
 
             # Log progress
             if step_i % 50 == 0:
+                cloud_pts_log, _ = slam.get_global_cloud()
                 logger.info(
                     "Step %d: cloud=%d pts, voxels=%d, pose=[%.2f, %.2f, %.2f]",
                     step_i,
-                    len(slam.get_cloud_points()),
+                    len(cloud_pts_log),
                     octomap.num_occupied,
                     slam_pose[0, 3],
                     slam_pose[1, 3],
@@ -585,11 +587,12 @@ def main() -> None:
         # ------------------------------------------------------------------
         # Compute and log drift metrics
         # ------------------------------------------------------------------
-        if len(gt_collector) >= 2 and len(slam.slam_poses) >= 2:
+        slam_poses = slam.get_poses()
+        if len(gt_collector) >= 2 and len(slam_poses) >= 2:
             logger.info("=== Drift Metrics ===")
             try:
                 metrics = compute_drift_metrics(
-                    slam_poses=slam.slam_poses,
+                    slam_poses=slam_poses,
                     gt_poses=gt_collector.poses,
                     timestamps=gt_collector.timestamps,
                 )
@@ -600,10 +603,11 @@ def main() -> None:
             except Exception as e:
                 logger.warning("Could not compute drift metrics: %s", e)
 
+        final_cloud, _ = slam.get_global_cloud()
         logger.info(
             "Final stats: %d frames, %d cloud points, %d occupied voxels",
             slam.num_frames_processed,
-            len(slam.get_cloud_points()),
+            len(final_cloud),
             octomap.num_occupied,
         )
 

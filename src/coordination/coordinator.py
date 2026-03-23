@@ -209,8 +209,9 @@ class Coordinator:
         robot = self._robots.get(rid)
         if robot is None:
             return {"position": [0, 0, 0], "voxels": 0}
-        if robot.slam.slam_poses:
-            pos = robot.slam.slam_poses[-1][:3, 3].tolist()
+        poses = robot.slam.get_poses()
+        if poses:
+            pos = poses[-1][:3, 3].tolist()
         else:
             pos = [0, 0, 0]
         return {
@@ -291,8 +292,9 @@ class Coordinator:
                 target_pos = np.array(target, dtype=np.float64)
                 robot = self._robots[robot_id]
                 # Get current pose for path planning
-                if robot.slam.slam_poses:
-                    current_pos = robot.slam.slam_poses[-1][:3, 3]
+                poses = robot.slam.get_poses()
+                if poses:
+                    current_pos = poses[-1][:3, 3]
                 else:
                     current_pos = np.array(robot.spawn_transform[:3, 3])
                 robot.exploration.set_waypoint_target([target_pos])
@@ -410,14 +412,16 @@ class Coordinator:
                     # Build score function if partitioned
                     score_fn = None
                     if self._partitioned:
-                        score_fn = lambda centroid, _rid=rid: (
-                            self._partitioner.score_frontier_with_bias(
-                                centroid,
-                                _rid,
-                                robot.slam.slam_poses[-1] if robot.slam.slam_poses else np.eye(4),
-                                robot_ids,
+                        _poses = robot.slam.get_poses()
+                        _current_pose = _poses[-1] if _poses else np.eye(4)
+                        score_fn = lambda centroid, _rid=rid, _cp=_current_pose: (
+                                self._partitioner.score_frontier_with_bias(
+                                    centroid,
+                                    _rid,
+                                    _cp,
+                                    robot_ids,
+                                )
                             )
-                        )
 
                     linear, angular, metrics = robot.exploration.step_once(
                         frame, step, score_fn=score_fn,
@@ -499,8 +503,9 @@ class Coordinator:
         positions = {}
         for rid in robot_ids:
             robot = self._robots[rid]
-            if robot.slam.slam_poses:
-                positions[rid] = robot.slam.slam_poses[-1][:3, 3]
+            poses = robot.slam.get_poses()
+            if poses:
+                positions[rid] = poses[-1][:3, 3]
             else:
                 positions[rid] = robot.spawn_transform[:3, 3]
         self._partitioner.update_positions(positions)
@@ -572,7 +577,7 @@ class Coordinator:
             if self._detector is not None:
                 self._detector.submit_frame(
                     rid, frames[rid].rgb, frames[rid].depth, pose,
-                    slam_cloud=robot.slam.last_frame_cloud if hasattr(robot.slam, 'last_frame_cloud') else None,
+                    slam_cloud=None,
                 )
             if self._describer is not None:
                 self._describer.submit_frame(rid, frames[rid].rgb)
@@ -603,7 +608,7 @@ class Coordinator:
                 slam_cloud_pts=cloud_pts,
                 slam_cloud_rgb=cloud_rgb,
                 pose=pose,
-                trajectory=list(robot.slam.slam_poses),
+                trajectory=robot.slam.get_poses(),
                 coverage_pct=robot.exploration.last_coverage,
                 detections=detections,
                 scene_description=scene_desc,

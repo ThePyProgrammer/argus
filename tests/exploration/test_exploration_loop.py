@@ -15,6 +15,7 @@ from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import ExplorationResult
 from src.exploration.exploration_loop import ExplorationLoop, StuckRecovery
 from src.exploration.frontier_detector import FrontierCluster
+from src.slam.protocol import SLAMResult, TrackingStatus
 
 
 # ---------------------------------------------------------------------------
@@ -64,26 +65,37 @@ class MockBridge:
 
 
 class MockSLAM:
-    """Simulates SLAMPipeline for testing."""
+    """Simulates SLAMProtocol for testing."""
 
     def __init__(self) -> None:
         self._frame_count = 0
         self._cloud_size = 100
-        self._last_frame_cloud: np.ndarray = np.empty((0, 3))
 
-    def process_frame(self, frame: SensorFrame) -> np.ndarray:
+    def process_frame(self, frame: SensorFrame) -> SLAMResult:
         self._frame_count += 1
         rng = np.random.default_rng(self._frame_count)
-        self._last_frame_cloud = rng.random((self._cloud_size, 3)) * 5.0
-        return frame.ground_truth_pose.copy()
+        points = rng.random((self._cloud_size, 3)) * 5.0
+        colors = rng.random((self._cloud_size, 3))
+        return SLAMResult(
+            pose=frame.ground_truth_pose.copy(),
+            points=points,
+            colors=colors,
+            metrics={},
+            tracking_status=TrackingStatus.OK,
+        )
 
-    def get_cloud_points(self) -> np.ndarray:
+    def get_global_cloud(self) -> tuple[np.ndarray, np.ndarray]:
         rng = np.random.default_rng(self._frame_count)
-        return rng.random((self._cloud_size, 3)) * 5.0
+        pts = rng.random((self._cloud_size, 3)) * 5.0
+        clr = rng.random((self._cloud_size, 3))
+        return pts, clr
+
+    def get_poses(self) -> list[np.ndarray]:
+        return [np.eye(4, dtype=np.float64)] * self._frame_count
 
     @property
-    def last_frame_cloud(self) -> np.ndarray:
-        return self._last_frame_cloud
+    def num_frames_processed(self) -> int:
+        return self._frame_count
 
 
 class MockOctoMap:
