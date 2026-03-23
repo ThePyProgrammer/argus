@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Visualization and Integration** - Real-time 3D dashboard showing merged map, robot positions, and exploration progress (1/2 plans complete)
 - [x] **Phase 5: Robot Locomotion Fix** - Fix actuator mismatch and replace sinusoidal gait with proper trot locomotion so robots actually walk (completed 2026-03-18)
 - [ ] **Phase 6: React C2 Web Interface** - Browser-based Command & Control interface replacing desktop Rerun viewer with Three.js 3D visualization and WebSocket streaming
+- [ ] **Phase 7: Cleanup and Verification Gaps** - Fix stale tests, remove dead code, update requirements traceability, close all v1.0 audit gaps
 
 ## Phase Details
 
@@ -120,10 +121,23 @@ Plans:
 - [x] 06-03-PLAN.md — Three.js 3D viewer: scene setup, point cloud manager, robot markers, trajectory trails, GLB loader
 - [ ] 06-04-PLAN.md — End-to-end integration: Coordinator wiring, main.py --control web, scene GLB conversion, human verification
 
+### Phase 7: Cleanup and Verification Gaps
+**Goal**: Close all audit gaps from v1.0 milestone: fix stale tests, remove dead code, update REQUIREMENTS.md traceability, and resolve type inconsistencies
+**Depends on:** Phase 6
+**Requirements**: VIZ-01, VIZ-02, VIZ-03 (mark satisfied via web interface), LOCO-01-06, C2-01-10 (add to traceability)
+**Gap Closure:** Closes gaps from v1.0-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. `pytest tests/` runs without collection errors (stale test_sim_bridge.py fixed)
+  2. All LOCO and C2 requirements present in REQUIREMENTS.md traceability table
+  3. VIZ-01/02/03 marked satisfied with evidence pointing to WebStreamingViz (Phase 6 supersedes Rerun)
+  4. Dead code removed: unreachable _log_coverage_heatmap() path, BridgeProtocol type mismatch resolved
+  5. No remaining gaps in v1.0-MILESTONE-AUDIT.md after re-audit
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -133,3 +147,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 4. Visualization and Integration | 1/2 | In progress | - |
 | 5. Robot Locomotion Fix | 2/2 | Complete    | 2026-03-18 |
 | 6. React C2 Web Interface | 3/4 | In progress | - |
+| 7. Cleanup and Verification Gaps | 0/? | Not started | - |

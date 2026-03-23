@@ -42,9 +42,31 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Visualization
 
-- [x] **VIZ-01**: System displays the merged 3D map in real-time via Rerun or RViz2
-- [x] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
-- [x] **VIZ-03**: System displays a coverage heatmap showing explored vs unexplored regions
+- [ ] **VIZ-01**: System displays the merged 3D map in real-time via Rerun or RViz2
+- [ ] **VIZ-02**: System overlays both robots' current positions and trajectories on the merged map
+- [ ] **VIZ-03**: System displays a coverage heatmap showing explored vs unexplored regions
+
+### Locomotion
+
+- [x] **LOCO-01**: XML patcher converts motor actuators to position-controlled servos
+- [x] **LOCO-02**: TrotGaitController produces 12 joint targets from (vx, vy, omega)
+- [x] **LOCO-03**: Robot translates >0.5m in 100 steps / turns >45 degrees in 50 steps
+- [x] **LOCO-04**: Both single-robot and multi-robot bridges use TrotGaitController
+- [x] **LOCO-05**: Scene builder patches actuators before multi-robot assembly
+- [x] **LOCO-06**: Stuck detection triggers turn-in-place physical recovery
+
+### C2 Web Interface
+
+- [x] **C2-01**: `python src/main.py --control web` launches FastAPI + MuJoCo, serving React app at localhost:8000
+- [x] **C2-02**: Browser displays mission control layout: 3D viewer, right sidebar, camera strip
+- [x] **C2-03**: Merged point cloud updates in real-time via WebSocket delta + periodic full sync
+- [x] **C2-04**: Per-robot camera feeds stream as JPEG binary WebSocket messages
+- [x] **C2-05**: Robot status cards show coverage %, action, voxel count
+- [x] **C2-06**: Control panel sends start/stop/pause/speed commands to Coordinator
+- [x] **C2-07**: UI adapts dynamically to N robots without frontend code changes
+- [x] **C2-08**: Three.js 3D viewer with point cloud, robot markers, trajectory trails
+- [x] **C2-09**: Optional GLB scene loader with graceful fallback
+- [x] **C2-10**: Zustand state management with selective subscriptions for performance
 
 ## v2 Requirements
 
@@ -106,15 +128,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MERGE-02 | Phase 3 | Complete (03-02) |
 | MERGE-03 | Phase 3 | Complete (03-02) |
 | MERGE-04 | Phase 3 | Complete |
-| VIZ-01 | Phase 4 | Complete |
-| VIZ-02 | Phase 4 | Complete |
-| VIZ-03 | Phase 4 | Complete |
+| VIZ-01 | Phase 4 → Phase 7 | Pending (verification gap — code exists in WebStreamingViz) |
+| VIZ-02 | Phase 4 → Phase 7 | Pending (verification gap — code exists in WebStreamingViz) |
+| VIZ-03 | Phase 4 → Phase 7 | Pending (verification gap — heatmap dead code in Rerun, not in web) |
+| LOCO-01 | Phase 5 | Complete (05-01) |
+| LOCO-02 | Phase 5 | Complete (05-01) |
+| LOCO-03 | Phase 5 | Complete (05-01, human verification pending) |
+| LOCO-04 | Phase 5 | Complete (05-02) |
+| LOCO-05 | Phase 5 | Complete (05-02) |
+| LOCO-06 | Phase 5 | Complete (05-02) |
+| C2-01 | Phase 6 | Complete (06-01) |
+| C2-02 | Phase 6 | Complete (06-02) |
+| C2-03 | Phase 6 | Complete (06-01) |
+| C2-04 | Phase 6 | Complete (06-01) |
+| C2-05 | Phase 6 | Complete (06-02) |
+| C2-06 | Phase 6 | Complete (06-01) |
+| C2-07 | Phase 6 | Complete (06-02) |
+| C2-08 | Phase 6 | Complete (06-03) |
+| C2-09 | Phase 6 | Complete (06-03) |
+| C2-10 | Phase 6 | Complete (06-02) |
 
 **Coverage:**
-- v1 requirements: 21 total
-- Mapped to phases: 21
+- v1 requirements: 21 total (+ 16 added: LOCO-01-06, C2-01-10)
+- Mapped to phases: 37
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after roadmap creation*
+*Last updated: 2026-03-23 after milestone audit gap closure*
