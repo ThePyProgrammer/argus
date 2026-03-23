@@ -29,7 +29,7 @@
 - [x] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
 - [ ] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP
 - [x] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization (completed 2026-03-23)
-- [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python
+- [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python (1/2 plans complete)
 - [ ] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline
 - [ ] **Phase 13: Live Metrics Dashboard + Output Toggle** — Metrics comparison and visualization modes
 
@@ -94,7 +94,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — ORB-SLAM3 backend implementation + tests + vocab download script
+- [x] 11-01-PLAN.md — ORB-SLAM3 backend implementation + tests + vocab download script
 - [ ] 11-02-PLAN.md — MuJoCo scene textures + frontend tracking status + end-to-end verification
 
 ### Phase 12: OpenVINS + SVO Pro Backends
@@ -135,6 +135,6 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 9. Frontend Algorithm Controls | v2.0 | 0/3 | Not started | - |
 | 10. Pose-Graph Map Merger | 3/3 | Complete   | 2026-03-23 | - |
-| 11. ORB-SLAM3 Backend | v2.0 | 0/2 | Not started | - |
+| 11. ORB-SLAM3 Backend | v2.0 | 1/2 | In progress | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |

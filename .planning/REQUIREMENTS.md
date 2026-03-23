@@ -18,8 +18,8 @@ Requirements for the Generic SLAM API milestone. Each maps to roadmap phases.
 
 ### SLAM Backends
 
-- [ ] **BACK-01**: ORB-SLAM3 backend integrates via orbslam3-python, producing pose estimates from RGB-D frames
-- [ ] **BACK-02**: ORB-SLAM3 backend uses SLAM-estimated poses with depth-image-generated dense clouds (not sparse ORB features) for downstream consumers
+- [x] **BACK-01**: ORB-SLAM3 backend integrates via orbslam3-python, producing pose estimates from RGB-D frames
+- [x] **BACK-02**: ORB-SLAM3 backend uses SLAM-estimated poses with depth-image-generated dense clouds (not sparse ORB features) for downstream consumers
 - [ ] **BACK-03**: OpenVINS backend integrates via subprocess bridge, accepting RGB + IMU data
 - [ ] **BACK-04**: System extracts accelerometer and gyroscope data from MuJoCo simulation to feed VIO backends
 - [ ] **BACK-05**: SVO Pro backend integrates via subprocess bridge with de-catkinized build
@@ -83,8 +83,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | ABST-04 | Phase 8 | Complete |
 | ABST-05 | Phase 8 | Pending |
 | ABST-06 | Phase 8 | Complete |
-| BACK-01 | Phase 11 | Pending |
-| BACK-02 | Phase 11 | Pending |
+| BACK-01 | Phase 11 | Complete |
+| BACK-02 | Phase 11 | Complete |
 | BACK-03 | Phase 12 | Pending |
 | BACK-04 | Phase 12 | Pending |
 | BACK-05 | Phase 12 | Pending |
