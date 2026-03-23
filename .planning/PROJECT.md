@@ -22,7 +22,13 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 ### Active
 
-(None — planning next milestone)
+- [ ] Generic SLAM API abstraction layer with pluggable backends
+- [ ] 4 real SLAM backends: existing ICP, ORB-SLAM3, OpenVINS, SVO Pro
+- [ ] Frontend algorithm picker with pre-session selection (hot-swap as stretch)
+- [ ] Per-algorithm parameter tuning panel in C2 interface
+- [ ] Live SLAM metrics comparison (accuracy, FPS, memory)
+- [ ] Output format toggle (point cloud, voxel grid, mesh visualization)
+- [ ] Replace ICP-based map merging with pose-graph optimization
 
 ### Out of Scope
 
@@ -31,6 +37,20 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - Post-processing refinement pipeline — real-time map is the deliverable
 - Offline mode — real-time is core value
 - DimOS dependency — replaced with in-process transport (v1.0)
+- Deep learning SLAM backends (DROID-SLAM, DPV-SLAM, SL-SLAM) — requires NVIDIA GPU, defer to v3.0
+- Neural representation SLAM backends (Photo-SLAM, SplaTAM) — requires GPU, defer to v3.0
+- LiDAR SLAM — cameras only, system exists to replace LiDAR
+
+## Current Milestone: v2.0 Generic SLAM API
+
+**Goal:** Architect a pluggable SLAM backend abstraction that supports traditional, VIO, and classical methods with frontend controls for algorithm selection, parameter tuning, and live metrics comparison.
+
+**Target features:**
+- Generic SLAM API with registry pattern for pluggable backends
+- 4 real backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
+- Replace ICP map merging with pose-graph optimization
+- Frontend algorithm picker, parameter tuning, live metrics, output format toggle
+- Pre-session algorithm selection with hot-swap as stretch goal
 
 ## Context
 
@@ -38,6 +58,7 @@ Shipped v1.0 with 7,609 LOC Python + 2,486 LOC TypeScript.
 Tech stack: MuJoCo, Open3D (ICP + VoxelGrid), FastAPI, React, Three.js, Zustand.
 Pivoted from SimWorld (UE5, needed NVIDIA GPU) to MuJoCo (CPU-only) early in development.
 Removed dimos dependency — replaced pLCM transport with in-process pub/sub.
+Conducted systematic SLAM literature review (.research/) covering 40+ methods — informs backend selection and merge strategy.
 
 ## Constraints
 
@@ -58,5 +79,7 @@ Removed dimos dependency — replaced pLCM transport with in-process pub/sub.
 | WebStreamingViz over Rerun | Browser-accessible, no desktop app needed | ✓ Good — replaced Phase 4 Rerun path |
 | Position actuators over torque | Go2 XML uses motor (torque); position servos needed for gait control | ✓ Good — reliable trot gait |
 
+| Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | — Pending |
+
 ---
-*Last updated: 2026-03-23 after v1.0 milestone*
+*Last updated: 2026-03-23 after v2.0 milestone start*
