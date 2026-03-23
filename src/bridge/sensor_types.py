@@ -5,9 +5,22 @@ downstream consumers (SLAM pipeline, visualization, metrics).
 Backend-agnostic: works with MuJoCo or any future sim.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 import numpy as np
+
+
+@runtime_checkable
+class BridgeProtocol(Protocol):
+    """Minimal interface for a simulation bridge used by ExplorationLoop."""
+
+    def start(self) -> SensorFrame: ...
+    def step(self) -> SensorFrame: ...
+    def set_velocity(self, linear: np.ndarray, angular: float) -> None: ...
+    def stop(self) -> None: ...
 
 
 # Standing joint positions from go2.xml keyframe (position-controlled).

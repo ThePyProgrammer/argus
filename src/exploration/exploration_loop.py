@@ -21,7 +21,7 @@ from typing import Callable
 import numpy as np
 
 
-from src.bridge.sensor_types import SensorFrame
+from src.bridge.sensor_types import BridgeProtocol, SensorFrame
 
 
 @dataclass
@@ -125,7 +125,7 @@ class ExplorationLoop:
         config: Exploration configuration (uses defaults if None).
     """
 
-    def __init__(self, bridge, slam, octomap, config: ExplorationConfig | None = None):
+    def __init__(self, bridge: BridgeProtocol, slam, octomap, config: ExplorationConfig | None = None):
         self._bridge = bridge
         self._slam = slam
         self._octomap = octomap
