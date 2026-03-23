@@ -132,7 +132,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -149,13 +149,27 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 11. ORB-SLAM3 Backend | 2/2 | Complete    | 2026-03-23 | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | Complete    | 2026-03-23 | 2026-03-23 |
 | 13. Live Metrics Dashboard + Output Toggle | 3/3 | Complete    | 2026-03-23 | - |
+| 14. Pipeline Graph Editor | v2.0 | 0/6 | Planning | - |
 
-### Phase 14: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
-
-**Goal:** [To be planned]
-**Requirements**: TBD
+### Phase 14: Interactive ComfyUI-esque React Flow Pipeline Graph Editor
+**Goal:** Users can visually build and customize SLAM processing pipelines via a ComfyUI-style node-graph editor with typed ports, connection validation, parameter tuning, named presets, and backend pipeline apply
 **Depends on:** Phase 13
-**Plans:** 0 plans
+**Requirements**: P14-TYPES, P14-STORE, P14-BUILDER, P14-ROUTES, P14-CANVAS, P14-PALETTE, P14-INSPECTOR, P14-APPLY, P14-TOGGLE, P14-ANIMATE, P14-PRESETS
+**Success Criteria** (what must be TRUE):
+  1. Users can toggle between 3D Viewer and Pipeline Editor in the hero area
+  2. Node palette shows all available node types (auto-discovered from registries + static definitions) and supports drag-to-add
+  3. Custom nodes display colored headers per category, typed port handles, inline primary params, and status badges
+  4. Only compatible port types can connect (typed connection validation)
+  5. Clicking a node opens an inspector panel with full JSON Schema parameter rendering (sliders, toggles, live-tunable indicators)
+  6. Users can load/save named presets (3 built-in defaults ship: Default ICP, PGO High Quality, Comparison Mode)
+  7. "Apply Pipeline" serializes the graph, POSTs to backend, and triggers coordinator restart
+  8. Animated edges show data flow when pipeline is running
+**Plans:** 6 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 14 to break down)
+- [ ] 14-01-PLAN.md — Pipeline types, node definitions, graph validation, serializer, pipelineStore
+- [ ] 14-02-PLAN.md — PipelineBuilder, pipeline REST routes, preset storage, backend tests
+- [ ] 14-03-PLAN.md — PipelineNode, PortHandle, EdgeAnimated, PipelineEditor canvas
+- [ ] 14-04-PLAN.md — NodePalette, NodeInspector, PresetSelector, ApplyBar
+- [ ] 14-05-PLAN.md — ViewToggle, App.tsx integration, WebSocket pipeline status, catalog fetch
+- [ ] 14-06-PLAN.md — Human verification of complete pipeline graph editor
