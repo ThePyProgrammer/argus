@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.web.connection_manager import ConnectionManager
 from backend.web.streaming_viz import WebStreamingViz
+from src.slam.registry import SLAMRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,34 @@ async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
             "type": "color_mode_ack",
             "payload": {"mode": mode},
         })
+    elif msg_type == "slam_param_update":
+        param = data.get("param")
+        value = data.get("value")
+        active = getattr(state, "active_slam_backend", SLAMRegistry.get_default())
+        backends = {b["name"]: b for b in SLAMRegistry.list_backends()}
+        info = backends.get(active, {})
+        schema_props = info.get("parameter_schema", {}).get("properties", {})
+
+        if param not in schema_props:
+            await websocket.send_json({
+                "type": "slam_param_ack",
+                "payload": {"param": param, "status": "unknown_parameter"},
+            })
+        elif schema_props[param].get("live_tunable", False):
+            # Store the live update for the coordinator to pick up
+            pending = getattr(state, "pending_slam_params", {})
+            pending[param] = value
+            state.pending_slam_params = pending
+            logger.info("Live param update: %s = %s", param, value)
+            await websocket.send_json({
+                "type": "slam_param_ack",
+                "payload": {"param": param, "status": "applied", "value": value},
+            })
+        else:
+            await websocket.send_json({
+                "type": "slam_param_ack",
+                "payload": {"param": param, "status": "requires_restart"},
+            })
 
 
 @app.websocket("/ws")

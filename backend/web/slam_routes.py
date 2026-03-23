@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/slam", tags=["slam"])
 
 class SelectRequest(BaseModel):
     backend: str
+    params: dict | None = None
 
 
 class MergeSelectRequest(BaseModel):
@@ -47,6 +48,10 @@ async def select_backend(req: SelectRequest, request: Request):
 
     # Store pending backend selection on app.state
     request.app.state.pending_slam_backend = req.backend
+
+    # Store any staged startup-only params the frontend sent
+    if req.params:
+        request.app.state.pending_slam_params = req.params
 
     # Trigger restart via coordinator (same mechanism as "restart" command)
     command_cb = getattr(request.app.state, "command_callback", None)

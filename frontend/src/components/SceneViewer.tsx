@@ -8,6 +8,8 @@ import { DetectionBoxManager } from './DetectionBoxes';
 import { CameraFrustumManager } from './CameraFrustum';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
+import { useSlamStore } from '../stores/slamStore';
+import { RestartOverlay } from './RestartOverlay';
 import { useSceneLoader } from '../hooks/useSceneLoader';
 
 /**
@@ -237,6 +239,8 @@ export default function SceneViewer() {
   }, []);
 
   const placingRobot = useControlStore((s) => s.placingRobot);
+  const isRestarting = useSlamStore((s) => s.isRestarting);
+  const activeDisplay = useSlamStore((s) => s.activeDisplay);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -257,6 +261,7 @@ export default function SceneViewer() {
           Click on the scene to send {placingRobot} to that position
         </div>
       )}
+      {isRestarting && <RestartOverlay algorithmName={activeDisplay} />}
     </div>
   );
 }

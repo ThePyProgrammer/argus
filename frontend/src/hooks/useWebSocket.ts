@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
+import { useSlamStore, fetchSlamState } from '../stores/slamStore';
 import type {
   WSMessage,
   RobotListPayload,
@@ -137,6 +138,19 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
           useControlStore.getState().setActiveCloudConfig(payload.config);
           // Clear existing cloud so new config data replaces it
           store.setCloudFull([], []);
+          break;
+        }
+        case 'slam_param_ack': {
+          const payload = msg.payload as { param: string; status: string; value?: unknown };
+          if (payload.status === 'unknown_parameter') {
+            useSlamStore.getState().setError('Parameter update rejected by backend.');
+          }
+          console.log(`[slam] param ${payload.param}: ${payload.status}`);
+          break;
+        }
+        case 'slam_restart_complete': {
+          useSlamStore.getState().setRestarting(false);
+          fetchSlamState();
           break;
         }
       }
