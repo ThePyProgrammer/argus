@@ -28,7 +28,7 @@
 
 - [x] **Phase 8: Backend Abstraction + ICP Wrap** — SLAMProtocol interface, registry, and ICP baseline backend
 - [ ] **Phase 9: Frontend Algorithm Controls** — Algorithm picker, parameter panel, end-to-end plumbing with ICP
-- [ ] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization
+- [x] **Phase 10: Pose-Graph Map Merger** — Replace ICP union merge with pose-graph optimization (completed 2026-03-23)
 - [ ] **Phase 11: ORB-SLAM3 Backend** — First new backend via pip-installable orbslam3-python
 - [ ] **Phase 12: OpenVINS + SVO Pro Backends** — C++ subprocess-isolated backends with IMU pipeline
 - [ ] **Phase 13: Live Metrics Dashboard + Output Toggle** — Metrics comparison and visualization modes
@@ -76,7 +76,7 @@ Plans:
   2. Merge strategy selector appears in frontend alongside algorithm picker
   3. Pose-graph merger accepts inter-robot loop closure constraints and produces globally consistent aligned maps
   4. Merged map output feeds the existing Three.js visualization pipeline without changes (last_merged_voxels, last_merged_cloud)
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 10-01-PLAN.md — MergeProtocol + MergeRegistry + ICP Union baseline strategy
@@ -134,7 +134,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
 | 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 9. Frontend Algorithm Controls | v2.0 | 0/3 | Not started | - |
-| 10. Pose-Graph Map Merger | 1/3 | In Progress|  | - |
+| 10. Pose-Graph Map Merger | 3/3 | Complete   | 2026-03-23 | - |
 | 11. ORB-SLAM3 Backend | v2.0 | 0/2 | Not started | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
