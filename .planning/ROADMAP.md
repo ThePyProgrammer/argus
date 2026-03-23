@@ -71,7 +71,7 @@ Plans:
   2. Merge strategy selector appears in frontend alongside algorithm picker
   3. Pose-graph merger accepts inter-robot loop closure constraints and produces globally consistent aligned maps
   4. Merged map output feeds the existing Three.js visualization pipeline without changes (last_merged_voxels, last_merged_cloud)
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 10-01-PLAN.md — MergeProtocol + MergeRegistry + ICP Union baseline strategy
@@ -129,7 +129,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
 | 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
 | 9. Frontend Algorithm Controls | v2.0 | 0/? | Not started | - |
-| 10. Pose-Graph Map Merger | v2.0 | 0/3 | Not started | - |
+| 10. Pose-Graph Map Merger | 1/3 | In Progress|  | - |
 | 11. ORB-SLAM3 Backend | v2.0 | 0/2 | Not started | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
 | 13. Live Metrics Dashboard + Output Toggle | v2.0 | 0/? | Not started | - |
