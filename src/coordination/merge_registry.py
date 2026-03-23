@@ -45,7 +45,12 @@ class MergeRegistry:
             }
             klass = cls._load_class(info["class_path"])
             if klass is not None:
-                entry["available"] = True
+                available = getattr(klass, "AVAILABLE", True)
+                entry["available"] = available
+                if not available:
+                    entry["reason"] = getattr(
+                        klass, "INSTALL_HINT", "Optional dependency not installed"
+                    )
                 entry["capabilities"] = getattr(klass, "CAPABILITIES", {})
                 entry["parameter_schema"] = getattr(klass, "PARAMETER_SCHEMA", {})
             else:
@@ -85,6 +90,13 @@ class MergeRegistry:
         if klass is None:
             raise ImportError(
                 f"Cannot load strategy class: {info['class_path']}"
+            )
+
+        available = getattr(klass, "AVAILABLE", True)
+        if not available:
+            hint = getattr(klass, "INSTALL_HINT", "missing dependency")
+            raise ImportError(
+                f"Strategy '{name}' is not available: {hint}"
             )
 
         return klass(**kwargs)

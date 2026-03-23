@@ -5,3 +5,4 @@ Import all strategies to trigger @merge_strategy decorator registration.
 
 from src.coordination.merge_strategies import icp_union  # noqa: F401
 from src.coordination.merge_strategies import pgo_open3d  # noqa: F401
+from src.coordination.merge_strategies import pgo_gtsam  # noqa: F401
