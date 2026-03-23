@@ -60,7 +60,12 @@ Plans:
   2. Selecting an algorithm and clicking start restarts the session with that backend active
   3. Parameter tuning panel renders controls dynamically from the backend's JSON schema (sliders for numeric, toggles for boolean)
   4. Changing a parameter value in the panel sends it via WebSocket and the backend applies it within the current session
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — slamStore, Vite proxy, messageTypes, leaf components (CapabilityBadge, ConfirmModal, RestartOverlay)
+- [ ] 09-02-PLAN.md — AlgorithmDropdown, ParameterPanel, AlgorithmSection, ControlPanel wiring
+- [ ] 09-03-PLAN.md — Backend WS handler, useWebSocket SLAM handlers, SceneViewer overlay, human verification
 
 ### Phase 10: Pose-Graph Map Merger
 **Goal**: Multi-robot maps merge via pose-graph optimization instead of naive ICP union, producing globally consistent reconstructions
@@ -128,7 +133,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 6. React C2 Web Interface | v1.0 | 3/4 | Complete | 2026-03-23 |
 | 7. Cleanup & Verification Gaps | v1.0 | 2/2 | Complete | 2026-03-23 |
 | 8. Backend Abstraction + ICP Wrap | v2.0 | 3/3 | Complete | 2026-03-23 |
-| 9. Frontend Algorithm Controls | v2.0 | 0/? | Not started | - |
+| 9. Frontend Algorithm Controls | v2.0 | 0/3 | Not started | - |
 | 10. Pose-Graph Map Merger | 1/3 | In Progress|  | - |
 | 11. ORB-SLAM3 Backend | v2.0 | 0/2 | Not started | - |
 | 12. OpenVINS + SVO Pro Backends | v2.0 | 0/? | Not started | - |
