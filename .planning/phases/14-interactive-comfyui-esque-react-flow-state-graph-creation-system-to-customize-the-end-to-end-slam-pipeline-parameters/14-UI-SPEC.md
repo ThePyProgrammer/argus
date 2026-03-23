@@ -34,16 +34,15 @@ Declared values (must be multiples of 4):
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Port gaps, inline icon margins, badge margins |
-| sm | 8px | Intra-node padding, compact element spacing |
-| md | 12px | Node body padding, palette item padding |
-| lg | 16px | Section padding, inspector panel gutter |
+| sm | 8px | Intra-node padding, node body padding, palette item padding, compact element spacing |
+| lg | 16px | Section padding, inspector panel gutter, minimap margin from edges |
 | xl | 24px | Panel headers, node palette category spacing |
 | 2xl | 32px | Major section breaks between inspector sections |
 | 3xl | 48px | Not used in this phase |
 
 Exceptions:
-- Node port handles: 12px diameter (centered on node edge)
-- Minimap: 160x120px fixed in bottom-right corner with 12px margin from edges
+- Node port handles: 12px diameter (centered on node edge). Rationale: 12px is a component dimension for the port socket graphic, not a layout spacing token. 8px is too small for a click/drag target and 16px creates visual clutter at node edges. 12px balances hit-area and compactness.
+- Minimap: 160x120px fixed in bottom-right corner with 16px margin from edges
 - Node minimum width: 220px
 - Node maximum width: 320px
 - Inspector panel width: 320px (matches existing sidebar width)
@@ -212,10 +211,11 @@ Toggle style: Two adjacent buttons, 32px height, active button uses accent backg
 
 - Header bar: 28px tall, category color fill, 8px horizontal padding.
 - Node body: #1e1e32 fill, 1px solid #2a2a4a border, 8px border-radius.
+- Node body padding: 8px (sm token).
 - Selected node: 2px solid #4fc3f7 border instead of #2a2a4a.
 - Input ports: left edge, vertically distributed with 20px spacing.
 - Output ports: right edge, vertically distributed with 20px spacing.
-- Port handle: 12px diameter circle (or diamond/square per type), centered on node edge.
+- Port handle: 12px diameter circle (or diamond/square per type), centered on node edge. See Spacing Scale exceptions for rationale.
 - Inline params: only params with `primary: true` in schema. Rendered as compact 24px-tall sliders or mini-toggles.
 - Status badge: top-right of header. 8px circle. Green (#2ecc71) = processing, gray (#666) = idle, red (#d32f2f) = error, pulsing blue (#4fc3f7) = initializing.
 
