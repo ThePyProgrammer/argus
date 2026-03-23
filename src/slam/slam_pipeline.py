@@ -62,6 +62,11 @@ class SLAMPipeline:
         Returns:
             (4, 4) float64 homogeneous transform (ICP-estimated pose).
         """
+        # Seed initial pose from ground truth so ICP chains from the
+        # correct world-frame position and orientation.
+        if not self._slam_poses:
+            self._current_pose = frame.ground_truth_pose.copy()
+
         if frame.depth is None:
             self._slam_poses.append(self._current_pose.copy())
             return self._current_pose.copy()
@@ -78,7 +83,7 @@ class SLAMPipeline:
                 nb_neighbors=10, std_ratio=2.0,
             )
 
-        # ICP frame-to-frame alignment
+        # ICP frame-to-frame alignment (skip first frame — no previous cloud yet)
         if self._prev_cloud is not None and len(cloud.points) > 100:
             result = o3d.pipelines.registration.registration_icp(
                 cloud,
