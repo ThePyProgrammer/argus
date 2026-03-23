@@ -9,7 +9,7 @@ progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,15 +24,15 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 09 (frontend-algorithm-controls) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 9 (v2.0)
+- Total plans completed: 10 (v2.0)
 - Average duration: 6min
-- Total execution time: 54min
+- Total execution time: 58min
 
 **By Phase:**
 
@@ -40,7 +40,7 @@ Plan: 2 of 3
 |-------|-------|-------|----------|
 | 08 | 3/3 | 33min | 11min |
 | 10 | 3/3 | 10min | 3min |
-| 09 | 1/3 | 3min | 3min |
+| 09 | 2/3 | 7min | 4min |
 | 11 | 1/2 | 4min | 4min |
 
 ## Accumulated Context
@@ -78,6 +78,10 @@ Recent decisions affecting current work:
 - [11-01]: vocab_path param allows test injection; defaults to models/orbslam3/ORBvoc.txt
 - [11-01]: Dense cloud from depth_to_pointcloud, sparse ORB count in metrics only (BACK-02)
 - [11-01]: Optional dependency pattern: try/import, _AVAILABLE flag, ImportError in __init__
+- [09-02]: AlgorithmDropdown uses custom div-based dropdown (not native select) for rich badge rendering
+- [09-02]: Module-scope debouncedSendParam avoids recreating debounce timer per render
+- [09-02]: Robot poses/rotations/trajectories reset to identity/empty during algorithm restart
+- [09-02]: Staged params captured before clearStagedParams to prevent loss on failed POST
 - [09-01]: slamStore follows controlStore flat state + setter pattern for consistency
 - [09-01]: fetchSlamState uses Promise.all for parallel backend and active endpoint fetches
 - [09-01]: ConfirmModal uses ReactDOM.createPortal to document.body for proper z-index stacking
@@ -100,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T07:50:11Z
-Stopped at: Completed 09-01-PLAN.md
-Resume file: .planning/phases/09-frontend-algorithm-controls/09-02-PLAN.md
+Last session: 2026-03-23T07:59:31Z
+Stopped at: Completed 09-02-PLAN.md
+Resume file: .planning/phases/09-frontend-algorithm-controls/09-03-PLAN.md
