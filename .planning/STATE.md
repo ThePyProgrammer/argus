@@ -171,8 +171,9 @@ None yet.
 | 260324-gov | extract SliderField reusable component | 2026-03-24 | 9943ba9 | [260324-gov-extract-slider-number-field-as-reusable-](./quick/260324-gov-extract-slider-number-field-as-reusable-/) |
 | 260324-h1l | polish SliderField dark mode styling + sig figs | 2026-03-24 | 3aee430 | — |
 | 260324-hb0 | add colored scene GLB with material colors from MuJoCo XML | 2026-03-24 | a28d18f | [260324-hb0-add-colored-scene-glb-with-material-colo](./quick/260324-hb0-add-colored-scene-glb-with-material-colo/) |
+| 260324-ksf | spawn robots facing opposite directions | 2026-03-24 | ffb3df0 | — |
 
 ## Session Continuity
 
-Last activity: 2026-03-24 - Added colored scene GLB with frontend toggle (260324-hb0)
+Last activity: 2026-03-24 - Spawn robots facing opposite directions (260324-ksf)
 Resume file: None
