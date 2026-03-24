@@ -428,8 +428,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
                 logger.info("Spawn positions: %s", config.spawn_positions)
 
-                # Read pending SLAM backend from REST API selection
+                # Read pending config: pipeline graph config takes priority over individual selections
+                pipeline_config = getattr(app.state, "pending_pipeline_config", None)
                 pending_backend = getattr(app.state, "pending_slam_backend", None)
+                pending_merger = getattr(app.state, "pending_merge_strategy", None)
+
+                # Pipeline config overrides individual backend/merger selections
+                if pipeline_config is not None:
+                    pending_backend = pipeline_config.backend_name
+                    pending_merger = pipeline_config.merger_name
 
                 # Recreate bridge + robots
                 bridge = MultiRobotBridge(config)
@@ -444,12 +451,32 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         backend_name=pending_backend,
                     )
 
+                # Create merge strategy from pending selection
+                merger = None
+                if pending_merger:
+                    try:
+                        from src.coordination.merge_registry import MergeRegistry
+                        import src.coordination.merge_strategies  # noqa: F401
+                        merger = MergeRegistry.create(
+                            name=pending_merger,
+                            spawn_transforms={
+                                rid: robots[rid].spawn_transform for rid in robots
+                            },
+                        )
+                    except (ImportError, ValueError) as exc:
+                        logger.warning("Failed to create merge strategy '%s': %s", pending_merger, exc)
+
                 coordinator.reset_for_restart(bridge, robots)
+                if merger is not None:
+                    coordinator._merger = merger
                 coordinator._restarting = False
 
-                # Update active backend and clear pending state
+                # Update active backend/merger and clear pending state
                 app.state.active_slam_backend = pending_backend or "icp"
+                app.state.active_merge_strategy = pending_merger or "icp_union"
                 app.state.pending_slam_backend = None
+                app.state.pending_merge_strategy = None
+                app.state.pending_pipeline_config = None
 
                 # Reset streaming viz cloud tracking
                 if streaming_viz is not None:
