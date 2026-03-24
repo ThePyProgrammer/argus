@@ -91,24 +91,23 @@ export default function App() {
     <div className="app-container">
       <div className="viewer-area" id="scene-container" style={{ position: 'relative' }}>
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />
-        {activeView === '3d' ? (
+        <div style={{ width: '100%', height: '100%', display: activeView === '3d' ? 'block' : 'none' }}>
           <SceneViewer />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              <NodePalette
-                collapsed={paletteCollapsed}
-                onToggleCollapse={() => setPaletteCollapsed((c) => !c)}
-                registryNodes={registryNodes}
-              />
-              <div style={{ flex: 1, position: 'relative' }}>
-                <PipelineEditor />
-              </div>
-              <InspectorWrapper />
+        </div>
+        <div style={{ width: '100%', height: '100%', display: activeView === 'pipeline' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            <NodePalette
+              collapsed={paletteCollapsed}
+              onToggleCollapse={() => setPaletteCollapsed((c) => !c)}
+              registryNodes={registryNodes}
+            />
+            <div style={{ flex: 1, position: 'relative' }}>
+              <PipelineEditor />
             </div>
-            <ApplyBar />
+            <InspectorWrapper />
           </div>
-        )}
+          <ApplyBar />
+        </div>
       </div>
       <div className="sidebar-area">
         <Sidebar />
