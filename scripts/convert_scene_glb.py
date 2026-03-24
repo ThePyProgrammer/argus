@@ -306,6 +306,10 @@ def convert_colored_with_trimesh(input_dir: Path, output: Path, xml_path: Path) 
 
         if not textured and mat_name in material_colors:
             rgba = material_colors[mat_name]
+            # Force untextured light-grey materials (0.8,0.8,0.8) to white
+            # so bare floor/ceiling areas match the white background
+            if all(0.75 < c < 0.85 for c in rgba[:3]) and rgba[3] >= 1.0:
+                rgba = (1.0, 1.0, 1.0, 1.0)
             rgba_uint8 = tuple(int(c * 255) for c in rgba)
             face_colors = np.full((len(mesh.faces), 4), rgba_uint8, dtype=np.uint8)
             mesh.visual.face_colors = face_colors
