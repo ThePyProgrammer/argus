@@ -41,6 +41,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<ViewMode>('3d');
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [registryNodes, setRegistryNodes] = useState<RegistryNode[]>([]);
+  const [outputHidden, setOutputHidden] = useState(false);
 
   // Fetch node catalog and load default preset when switching to pipeline view
   useEffect(() => {
@@ -88,37 +89,46 @@ export default function App() {
   }, [activeView]);
 
   return (
-    <div className="app-container">
-      <div className="viewer-area" id="scene-container" style={{ position: 'relative' }}>
-        <ViewToggle activeView={activeView} onViewChange={setActiveView} />
-        {activeView === '3d' ? (
-          <SceneViewer />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              <NodePalette
-                collapsed={paletteCollapsed}
-                onToggleCollapse={() => setPaletteCollapsed((c) => !c)}
-                registryNodes={registryNodes}
-              />
-              <div style={{ flex: 1, position: 'relative' }}>
-                <PipelineEditor />
+    <div className={outputHidden ? 'app-container output-hidden' : 'app-container'}>
+      {!outputHidden && (
+        <div className="viewer-area" id="scene-container" style={{ position: 'relative' }}>
+          <ViewToggle activeView={activeView} onViewChange={setActiveView} />
+          {activeView === '3d' ? (
+            <SceneViewer />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <NodePalette
+                  collapsed={paletteCollapsed}
+                  onToggleCollapse={() => setPaletteCollapsed((c) => !c)}
+                  registryNodes={registryNodes}
+                />
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <PipelineEditor />
+                </div>
+                <InspectorWrapper />
               </div>
-              <InspectorWrapper />
+              <ApplyBar />
             </div>
-            <ApplyBar />
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       <div className="sidebar-area">
-        <Sidebar />
+        <Sidebar
+          outputHidden={outputHidden}
+          onToggleOutput={() => setOutputHidden((h) => !h)}
+        />
       </div>
-      <div className="metrics-area">
-        <MetricsPanel />
-      </div>
-      <div className="camera-strip-area">
-        <CameraStrip />
-      </div>
+      {!outputHidden && (
+        <div className="metrics-area">
+          <MetricsPanel />
+        </div>
+      )}
+      {!outputHidden && (
+        <div className="camera-strip-area">
+          <CameraStrip />
+        </div>
+      )}
     </div>
   );
 }
