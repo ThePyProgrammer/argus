@@ -167,8 +167,12 @@ export default function SceneViewer() {
       }
     };
 
-    let currentMode: 'cloud' | 'voxel' | 'mesh' = 'cloud';
-    pointCloudManager.setVisible(true);
+    let currentMode = useMetricsStore.getState().outputMode;
+    const initialHidden = useMetricsStore.getState().outputHidden;
+    if (!initialHidden) {
+      const initialManager = getManager(currentMode);
+      initialManager.setVisible(true);
+    }
 
     const unsubMetrics = useMetricsStore.subscribe((state, prev) => {
       // Output mode change -> start cross-fade (skip if output is hidden)
