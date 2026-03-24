@@ -103,30 +103,20 @@
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Number input — clean, no spinners */
+/* Number input — text-based, no spinners */
 .slider-field__number {
-  width: 56px;
+  width: 72px;
+  min-width: 72px;
   background: #1a1a2e;
   color: #e0e0e0;
   border: 1px solid #333;
   border-radius: 4px;
-  padding: 4px 6px;
+  padding: 4px 8px;
   font-size: 13px;
-  font-family: inherit;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;
   text-align: right;
   box-sizing: border-box;
-}
-
-/* Hide native number spinners */
-.slider-field__number::-webkit-inner-spin-button,
-.slider-field__number::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.slider-field__number {
-  -moz-appearance: textfield;
 }
 
 .slider-field__number:focus {
