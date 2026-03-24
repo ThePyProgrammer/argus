@@ -65,12 +65,21 @@ export default function SceneViewer() {
     camera.position.set(0, 10, 10);
     camera.lookAt(0, 0, 0);
 
-    // --- Lights ---
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    // --- Lights (intensity adjusts when colored scene is active) ---
+    const isColored = useControlStore.getState().sceneColored;
+    const ambient = new THREE.AmbientLight(0xffffff, isColored ? 1.0 : 0.4);
     scene.add(ambient);
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directional = new THREE.DirectionalLight(0xffffff, isColored ? 1.2 : 0.8);
     directional.position.set(10, 20, 15);
     scene.add(directional);
+
+    // Adjust lighting when toggling colored/grey scene
+    const unsubSceneColor = useControlStore.subscribe((state, prev) => {
+      if (state.sceneColored !== prev.sceneColored) {
+        ambient.intensity = state.sceneColored ? 1.0 : 0.4;
+        directional.intensity = state.sceneColored ? 1.2 : 0.8;
+      }
+    });
 
     // --- Grid helper ---
     const grid = new THREE.GridHelper(50, 50, 0x444466, 0x222244);
@@ -344,6 +353,7 @@ export default function SceneViewer() {
       unsubControl();
       unsubMetrics();
       unsubOutputHidden();
+      unsubSceneColor();
       renderer.domElement.removeEventListener('click', handleClick);
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);
