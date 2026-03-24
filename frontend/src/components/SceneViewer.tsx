@@ -66,21 +66,17 @@ export default function SceneViewer() {
     camera.position.set(0, 10, 10);
     camera.lookAt(0, 0, 0);
 
-    // --- Lights (colored scene uses flat ambient to match MuJoCo rendering) ---
-    const isColored = useControlStore.getState().sceneColored;
-    const ambient = new THREE.AmbientLight(0xffffff, isColored ? 2.0 : 0.4);
+    // --- Lights ---
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambient);
-    const directional = new THREE.DirectionalLight(0xffffff, isColored ? 0 : 0.8);
+    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
     directional.position.set(10, 20, 15);
     scene.add(directional);
 
-    // Adjust background + lighting when toggling colored/grey scene
+    // Adjust background when toggling colored/grey scene
     const unsubSceneColor = useControlStore.subscribe((state, prev) => {
       if (state.sceneColored !== prev.sceneColored) {
         scene.background = new THREE.Color(state.sceneColored ? 0xffffff : 0x0d0d1a);
-        // Colored: full ambient, no directional → flat shading matching MuJoCo
-        ambient.intensity = state.sceneColored ? 2.0 : 0.4;
-        directional.intensity = state.sceneColored ? 0 : 0.8;
       }
     });
 
