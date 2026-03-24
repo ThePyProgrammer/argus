@@ -37,6 +37,7 @@ export class PointCloudManager {
     });
 
     this.points = new THREE.Points(this.geometry, material);
+    this.points.visible = false; // Hidden by default; SceneViewer enables the active mode
     scene.add(this.points);
   }
 

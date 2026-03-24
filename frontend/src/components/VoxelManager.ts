@@ -22,6 +22,11 @@ export class VoxelManager {
     this.mesh = new THREE.InstancedMesh(geometry, material, this.maxVoxels);
     this.mesh.count = 0;
     this.mesh.visible = false; // Hidden by default (cloud mode is default)
+    // Disable frustum culling: bounding sphere is computed from the BoxGeometry
+    // (a single tiny cube at origin), not from the spread of instance positions.
+    // Without this, Three.js culls the entire mesh when the camera gets close
+    // because the bounding sphere fails the frustum test.
+    this.mesh.frustumCulled = false;
     scene.add(this.mesh);
   }
 
