@@ -168,9 +168,10 @@ None yet.
 | 260324-euj | allow me to hide the output rendering on the C2 portal | 2026-03-24 | f87a052 | [260324-euj-allow-me-to-hide-the-output-rendering-on](./quick/260324-euj-allow-me-to-hide-the-output-rendering-on/) |
 | 260324-ffy | persist output mode across page reloads | 2026-03-24 | ee4b663 | [260324-ffy-persist-output-mode-across-page-reloads](./quick/260324-ffy-persist-output-mode-across-page-reloads/) |
 | 260324-gfi | fix scene mesh not rendering (Strict Mode) | 2026-03-24 | c69227a | — |
+| 260324-hb0 | add colored scene GLB with material colors from MuJoCo XML | 2026-03-24 | b00b228, a28d18f | [260324-hb0-add-colored-scene-glb-with-material-colo](./quick/260324-hb0-add-colored-scene-glb-with-material-colo/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-24 - Fixed scene mesh not rendering (260324-gfi)
-Stopped at: Completed quick task 260324-ffy
+Last activity: 2026-03-24 - Added colored scene GLB with frontend toggle (260324-hb0)
+Stopped at: Completed quick task 260324-hb0
 Resume file: None
