@@ -150,8 +150,11 @@ def build_two_robot_scene(
         _prefix_element(body, prefix)
         body.attrib["pos"] = f"{sx} {sy} {sz}"
         # Spread headings evenly around 360° so robots face away from each other
+        # Use quat (w,x,y,z) for Z-axis rotation: cos(yaw/2), 0, 0, sin(yaw/2)
         yaw = (2 * math.pi * i) / n_robots
-        body.attrib["euler"] = f"0 0 {yaw}"
+        qw = math.cos(yaw / 2)
+        qz = math.sin(yaw / 2)
+        body.attrib["quat"] = f"{qw} 0 0 {qz}"
         ET.SubElement(body, "camera", name=f"{robot_id}_cam",
                       pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
         wb.append(body)
