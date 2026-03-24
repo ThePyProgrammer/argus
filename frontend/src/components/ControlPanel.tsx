@@ -3,6 +3,7 @@ import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
 import { useMetricsStore } from '../stores/metricsStore';
 import AlgorithmSection from './AlgorithmSection';
+import SliderField from './SliderField';
 
 export default function ControlPanel() {
   const [showCloudConfig, setShowCloudConfig] = useState(false);
@@ -43,8 +44,7 @@ export default function ControlPanel() {
     setPaused(!isPaused);
   };
 
-  const handleSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const speed = parseFloat(e.target.value);
+  const handleSpeedChange = (speed: number) => {
     setSimSpeed(speed);
     sendCommand?.({ action: 'set_speed', value: speed });
   };
@@ -100,15 +100,7 @@ export default function ControlPanel() {
         >
           Speed: {simSpeed.toFixed(1)}x
         </label>
-        <input
-          type="range"
-          min="0.1"
-          max="5.0"
-          step="0.1"
-          value={simSpeed}
-          onChange={handleSpeedChange}
-          style={{ width: '100%' }}
-        />
+        <SliderField min={0.1} max={5.0} step={0.1} value={simSpeed} onChange={handleSpeedChange} showInput={false} />
       </div>
 
       <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -326,19 +318,15 @@ export default function ControlPanel() {
                       <span>{axis}</span>
                       <span>{cloudOffset[i].toFixed(1)}m</span>
                     </div>
-                    <input
-                      type="range"
-                      min="-10"
-                      max="10"
-                      step="0.1"
+                    <SliderField
+                      min={-10} max={10} step={0.1}
                       value={cloudOffset[i]}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
+                      onChange={(val) => {
                         const newOffset: [number, number, number] = [...cloudOffset];
                         newOffset[i] = val;
                         setCloudOffset(newOffset);
                       }}
-                      style={{ width: '100%', height: '14px' }}
+                      showInput={false}
                     />
                   </div>
                 ))}
