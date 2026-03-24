@@ -21,7 +21,12 @@ function useStableRobotList(): RobotInfo[] {
   return robots;
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  outputHidden?: boolean;
+  onToggleOutput?: () => void;
+}
+
+export default function Sidebar({ outputHidden, onToggleOutput }: SidebarProps) {
   const robots = useStableRobotList();
   const totalCoverage = useRobotStore((s) => s.totalCoverage);
   const mergeCount = useRobotStore((s) => s.mergeCount);
@@ -70,10 +75,33 @@ export default function Sidebar() {
             marginTop: '8px',
             fontSize: '12px',
             color: '#aaa',
+            alignItems: 'center',
           }}
         >
           <span>Coverage: {totalCoverage.toFixed(1)}%</span>
           <span>Merges: {mergeCount}</span>
+          {onToggleOutput && (
+            <button
+              onClick={onToggleOutput}
+              style={{
+                marginLeft: 'auto',
+                background: '#2a2a4a',
+                border: 'none',
+                borderRadius: '4px',
+                height: '28px',
+                padding: '0 10px',
+                fontSize: '11px',
+                fontWeight: 500,
+                color: '#aaa',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget.style.background = '#3a3a5a'); }}
+              onMouseLeave={(e) => { (e.currentTarget.style.background = '#2a2a4a'); }}
+            >
+              {outputHidden ? 'Show Output' : 'Hide Output'}
+            </button>
+          )}
         </div>
       </div>
 
