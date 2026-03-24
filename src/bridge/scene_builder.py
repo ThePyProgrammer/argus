@@ -141,12 +141,17 @@ def build_two_robot_scene(
     ET.SubElement(wb, "geom", name="wall_west", type="box",
                   size="0.1 10 2", pos="-10 0 1", material="wall_gradient")
 
-    # Create N robot bodies from spawn_positions
-    for robot_id, (sx, sy, sz) in spawn_positions.items():
+    # Create N robot bodies from spawn_positions, facing opposite directions
+    import math
+    n_robots = len(spawn_positions)
+    for i, (robot_id, (sx, sy, sz)) in enumerate(spawn_positions.items()):
         prefix = f"{robot_id}_"
         body = copy.deepcopy(robot_body)
         _prefix_element(body, prefix)
         body.attrib["pos"] = f"{sx} {sy} {sz}"
+        # Spread headings evenly around 360° so robots face away from each other
+        yaw = (2 * math.pi * i) / n_robots
+        body.attrib["euler"] = f"0 0 {yaw}"
         ET.SubElement(body, "camera", name=f"{robot_id}_cam",
                       pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
         wb.append(body)
