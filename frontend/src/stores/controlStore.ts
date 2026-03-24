@@ -38,7 +38,7 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   activeCloudConfig: '1',
   cloudOffset: [0, 0, 0] as [number, number, number],
   showScene: true,
-  sceneColored: false,
+  sceneColored: localStorage.getItem('c2-sceneColored') === 'true',
   placingRobot: null,
 
   setRunning: (running: boolean) => set({ isRunning: running }),
@@ -50,6 +50,10 @@ export const useControlStore = create<ControlStoreState>((set) => ({
   setActiveCloudConfig: (key) => set({ activeCloudConfig: key }),
   setCloudOffset: (offset) => set({ cloudOffset: offset }),
   toggleScene: () => set((s) => ({ showScene: !s.showScene })),
-  toggleSceneColored: () => set((s) => ({ sceneColored: !s.sceneColored })),
+  toggleSceneColored: () => set((s) => {
+    const next = !s.sceneColored;
+    localStorage.setItem('c2-sceneColored', String(next));
+    return { sceneColored: next };
+  }),
   setPlacingRobot: (robotId) => set({ placingRobot: robotId }),
 }));
