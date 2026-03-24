@@ -13,6 +13,7 @@ Methods (tried in order):
 
 Usage:
     python scripts/convert_scene_glb.py
+    python scripts/convert_scene_glb.py --colored
     python scripts/convert_scene_glb.py --input-dir path/to/objs --output path/to/scene.glb
 """
 
@@ -20,6 +21,7 @@ Usage:
 import argparse
 import shutil
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -170,6 +172,162 @@ def convert_with_gltfpack(input_dir: Path, output: Path) -> bool:
     return True
 
 
+def parse_mujoco_materials(xml_path: Path) -> dict:
+    """Parse MuJoCo XML for material RGBA colors, textures, and mesh-to-material mappings.
+
+    Args:
+        xml_path: Path to the MuJoCo XML scene file.
+
+    Returns:
+        Dict with keys: colors, textures, mesh_to_material, texture_dir
+    """
+    tree = ET.parse(str(xml_path))
+    root = tree.getroot()
+
+    # Get texture directory from compiler element
+    compiler = root.find("compiler")
+    texture_dir_rel = compiler.get("texturedir", "") if compiler is not None else ""
+    texture_dir = xml_path.parent / texture_dir_rel if texture_dir_rel else xml_path.parent
+
+    # Build texture name -> file mapping
+    texture_files: dict[str, str] = {}
+    for tex in root.iter("texture"):
+        name = tex.get("name", "")
+        file_ = tex.get("file", "")
+        if name and file_:
+            texture_files[name] = file_
+
+    # Build material name -> RGBA and material name -> texture file
+    material_colors: dict[str, tuple[float, float, float, float]] = {}
+    material_textures: dict[str, str] = {}
+    for mat in root.iter("material"):
+        name = mat.get("name", "")
+        if not name:
+            continue
+        rgba_str = mat.get("rgba", "")
+        if rgba_str:
+            parts = rgba_str.split()
+            if len(parts) == 4:
+                material_colors[name] = tuple(float(x) for x in parts)  # type: ignore[assignment]
+        tex_ref = mat.get("texture", "")
+        if tex_ref and tex_ref in texture_files:
+            material_textures[name] = texture_files[tex_ref]
+
+    # Build mesh name -> material name from geom elements
+    mesh_to_material: dict[str, str] = {}
+    for geom in root.iter("geom"):
+        mesh_name = geom.get("mesh", "")
+        mat_name = geom.get("material", "")
+        if mesh_name and mat_name:
+            mesh_to_material[mesh_name] = mat_name
+
+    return {
+        "colors": material_colors,
+        "textures": material_textures,
+        "mesh_to_material": mesh_to_material,
+        "texture_dir": texture_dir,
+    }
+
+
+def convert_colored_with_trimesh(input_dir: Path, output: Path, xml_path: Path) -> bool:
+    """Convert OBJ files to a colored GLB using MuJoCo XML material data.
+
+    Args:
+        input_dir: Directory containing .obj files.
+        output: Output .glb file path.
+        xml_path: Path to MuJoCo XML with material definitions.
+
+    Returns:
+        True if conversion succeeded.
+    """
+    try:
+        import numpy as np
+        import trimesh
+    except ImportError:
+        print("trimesh or numpy not installed. Install with: pip install trimesh numpy")
+        return False
+
+    mat_data = parse_mujoco_materials(xml_path)
+    material_colors = mat_data["colors"]
+    material_textures = mat_data["textures"]
+    mesh_to_material = mat_data["mesh_to_material"]
+    texture_dir = mat_data["texture_dir"]
+
+    obj_files = sorted(input_dir.glob("*.obj"))
+    if not obj_files:
+        print(f"No .obj files found in {input_dir}")
+        return False
+
+    print(f"Found {len(obj_files)} OBJ files in {input_dir}")
+    print(f"Materials: {len(material_colors)} colors, {len(material_textures)} textured")
+    print(f"Mesh-to-material mappings: {len(mesh_to_material)}")
+    scene = trimesh.Scene()
+    loaded_count = 0
+    skipped_count = 0
+
+    for obj_file in obj_files:
+        stem = obj_file.stem
+
+        # Skip collision meshes
+        if "_convex_" in stem:
+            skipped_count += 1
+            continue
+
+        mat_name = mesh_to_material.get(stem, "")
+
+        # Skip invisible materials
+        if mat_name == "mat_invisible":
+            skipped_count += 1
+            continue
+
+        try:
+            mesh = trimesh.load(str(obj_file), force="mesh")
+        except Exception as e:
+            print(f"  Warning: could not load {obj_file.name}: {e}")
+            continue
+
+        # Try texture first, fall back to flat color
+        textured = False
+        if mat_name in material_textures:
+            tex_file = texture_dir / material_textures[mat_name]
+            if tex_file.exists():
+                try:
+                    from PIL import Image
+                    img = Image.open(str(tex_file))
+                    material = trimesh.visual.texture.SimpleMaterial(image=img)
+                    if hasattr(mesh.visual, "uv") and mesh.visual.uv is not None and len(mesh.visual.uv) > 0:
+                        mesh.visual = trimesh.visual.TextureVisuals(
+                            uv=mesh.visual.uv, material=material
+                        )
+                        textured = True
+                        print(f"  Textured: {stem} -> {material_textures[mat_name]}")
+                except Exception as e:
+                    print(f"  Texture fallback for {stem}: {e}")
+
+        if not textured and mat_name in material_colors:
+            rgba = material_colors[mat_name]
+            rgba_uint8 = tuple(int(c * 255) for c in rgba)
+            face_colors = np.full((len(mesh.faces), 4), rgba_uint8, dtype=np.uint8)
+            mesh.visual.face_colors = face_colors
+            print(f"  Colored: {stem} -> {mat_name} rgba={rgba}")
+        elif not textured:
+            print(f"  No material: {stem}")
+
+        scene.add_geometry(mesh, node_name=stem)
+        loaded_count += 1
+
+    if loaded_count == 0:
+        print("No geometry loaded -- cannot export colored GLB.")
+        return False
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    print(f"\nExporting {loaded_count} colored meshes to {output} (skipped {skipped_count} convex/invisible)")
+    scene.export(str(output), file_type="glb")
+    size_mb = output.stat().st_size / (1024 * 1024)
+    print(f"Colored GLB written: {output} ({size_mb:.1f} MB)")
+    return True
+
+
 def main():
     """Run the OBJ-to-GLB conversion."""
     parser = argparse.ArgumentParser(description="Convert OBJ scene files to GLB")
@@ -184,6 +342,18 @@ def main():
         type=Path,
         default=None,
         help="Output .glb file path (default: frontend/public/scene.glb)",
+    )
+    parser.add_argument(
+        "--colored",
+        action="store_true",
+        default=False,
+        help="Also generate scene_colored.glb with MuJoCo material colors",
+    )
+    parser.add_argument(
+        "--xml",
+        type=Path,
+        default=None,
+        help="MuJoCo XML path (default: dimos/data/mujoco_sim/scene_office1.xml)",
     )
     args = parser.parse_args()
 
@@ -204,17 +374,35 @@ def main():
     # Try trimesh first (most portable), then gltfpack
     if convert_with_trimesh(input_dir, output):
         print("\nConversion complete (trimesh).")
-        return
+    else:
+        print("\nFalling back to gltfpack...")
+        if convert_with_gltfpack(input_dir, output):
+            print("\nConversion complete (gltfpack).")
+        else:
+            print("\nERROR: All conversion methods failed.")
+            print("Install trimesh: pip install trimesh")
+            print("Or install gltfpack: https://github.com/zeux/meshoptimizer/releases")
+            sys.exit(1)
 
-    print("\nFalling back to gltfpack...")
-    if convert_with_gltfpack(input_dir, output):
-        print("\nConversion complete (gltfpack).")
-        return
+    # Generate colored GLB if requested
+    if args.colored:
+        project_root = Path(__file__).parent.parent
+        xml_path = args.xml or (project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1.xml")
+        colored_output = output.parent / "scene_colored.glb"
 
-    print("\nERROR: All conversion methods failed.")
-    print("Install trimesh: pip install trimesh")
-    print("Or install gltfpack: https://github.com/zeux/meshoptimizer/releases")
-    sys.exit(1)
+        if not xml_path.exists():
+            print(f"\nERROR: MuJoCo XML not found: {xml_path}")
+            print("Provide --xml path/to/scene_office1.xml")
+            sys.exit(1)
+
+        print(f"\n--- Generating colored GLB ---")
+        print(f"  XML:    {xml_path}")
+        print(f"  Output: {colored_output}")
+        if convert_colored_with_trimesh(input_dir, colored_output, xml_path):
+            print("\nColored GLB generation complete.")
+        else:
+            print("\nERROR: Colored GLB generation failed.")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
