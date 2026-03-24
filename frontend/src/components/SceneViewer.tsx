@@ -80,13 +80,11 @@ export default function SceneViewer() {
         scene.background = new THREE.Color(state.sceneColored ? 0xffffff : 0x0d0d1a);
         ambient.intensity = state.sceneColored ? 1.0 : 0.4;
         directional.intensity = state.sceneColored ? 1.2 : 0.8;
-        grid.visible = !state.sceneColored;
       }
     });
 
-    // --- Grid helper (hidden when colored scene active) ---
+    // --- Grid helper ---
     const grid = new THREE.GridHelper(50, 50, 0x444466, 0x222244);
-    grid.visible = !isColoredInit;
     scene.add(grid);
 
     // --- OrbitControls ---
