@@ -12,28 +12,26 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
 } {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const loadedRef = useRef(false);
   const sceneObjRef = useRef<THREE.Object3D | null>(null);
+  const sceneColored = useControlStore((s) => s.sceneColored);
 
   useEffect(() => {
     if (!parent) return;
 
-    // If already loaded into THIS parent, skip
-    if (loadedRef.current && sceneObjRef.current?.parent === parent) return;
-
-    // Clean up any previously loaded scene (e.g. after Strict Mode remount)
+    // Clean up any previously loaded scene
     if (sceneObjRef.current?.parent) {
       sceneObjRef.current.parent.remove(sceneObjRef.current);
     }
+    sceneObjRef.current = null;
 
-    loadedRef.current = true;
     let cancelled = false;
-
     const loader = new GLTFLoader();
+    const glbUrl = sceneColored ? '/scene_colored.glb' : '/scene.glb';
     setLoading(true);
+    setError(null);
 
     loader.load(
-      '/scene.glb',
+      glbUrl,
       (gltf) => {
         if (cancelled) return;
         sceneObjRef.current = gltf.scene;
@@ -45,7 +43,7 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
       (err) => {
         if (cancelled) return;
         const message =
-          err instanceof Error ? err.message : 'Failed to load scene.glb';
+          err instanceof Error ? err.message : `Failed to load ${glbUrl}`;
         console.warn('[useSceneLoader] GLB not available, using empty scene:', message);
         setError(message);
         setLoading(false);
@@ -59,9 +57,8 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
         parent.remove(sceneObjRef.current);
       }
       sceneObjRef.current = null;
-      loadedRef.current = false;
     };
-  }, [parent]);
+  }, [parent, sceneColored]);
 
   // Subscribe to showScene toggle
   useEffect(() => {
