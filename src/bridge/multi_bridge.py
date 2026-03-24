@@ -149,10 +149,18 @@ class MultiRobotBridge:
                 raise RuntimeError(f"Camera '{cam_name}' not found in model")
             self._cam_ids[robot_id] = cam_id
 
-        # Set initial standing pose for both robots
-        for robot_id in self._config.robot_ids:
+        # Set initial standing pose and heading for both robots
+        import math
+        n_robots = len(self._config.robot_ids)
+        for i, robot_id in enumerate(self._config.robot_ids):
             qstart = self._qpos_starts[robot_id]
             # qpos layout: [x, y, z, qw, qx, qy, qz, joint1..joint12]
+            # Set yaw: spread robots evenly around 360°
+            yaw = (2 * math.pi * i) / n_robots
+            self._data.qpos[qstart + 3] = math.cos(yaw / 2)  # qw
+            self._data.qpos[qstart + 4] = 0.0                 # qx
+            self._data.qpos[qstart + 5] = 0.0                 # qy
+            self._data.qpos[qstart + 6] = math.sin(yaw / 2)   # qz
             self._data.qpos[qstart + 7 : qstart + 19] = STANDING_QPOS
             # Set ctrl to standing via gait controller (zero velocity = standing)
             standing = self._gaits[robot_id].compute(0.0, 0.0, 0.0, 0.0)
