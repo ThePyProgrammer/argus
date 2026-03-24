@@ -94,8 +94,10 @@ function PipelineEditorInner() {
         proOptions={{ hideAttribution: true }}
       >
         <MiniMap
-          style={{ width: 160, height: 120, bottom: 16, right: 16 }}
+          style={{ width: 160, height: 120, bottom: 16, right: 16, backgroundColor: '#0a0a14' }}
           nodeStrokeWidth={3}
+          nodeColor="#1e1e32"
+          maskColor="rgba(10, 10, 20, 0.7)"
           pannable
           zoomable
         />
