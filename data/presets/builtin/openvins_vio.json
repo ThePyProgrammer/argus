@@ -1,0 +1,18 @@
+{
+  "name": "OpenVINS (Visual-Inertial)",
+  "nodes": [
+    {"id": "sensor_1", "type": "sensor_rgbd", "params": {}, "position": {"x": 50, "y": 150}},
+    {"id": "imu_1", "type": "sensor_imu", "params": {}, "position": {"x": 50, "y": 350}},
+    {"id": "slam_1", "type": "slam_openvins", "params": {}, "position": {"x": 400, "y": 200}},
+    {"id": "merger_1", "type": "merger_icp_union", "params": {}, "position": {"x": 700, "y": 200}},
+    {"id": "viz_1", "type": "viz_output", "params": {}, "position": {"x": 1000, "y": 200}}
+  ],
+  "edges": [
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "slam_1", "targetHandle": "image_in"},
+    {"source": "imu_1", "sourceHandle": "imu_out", "target": "slam_1", "targetHandle": "imu_in"},
+    {"source": "slam_1", "sourceHandle": "cloud_out", "target": "merger_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "merger_1", "targetHandle": "pose_in"},
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "viz_1", "targetHandle": "pose_in"}
+  ]
+}

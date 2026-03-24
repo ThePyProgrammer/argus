@@ -10,12 +10,12 @@
     {"id": "viz_1", "type": "viz_output", "params": {}, "position": {"x": 1150, "y": 300}}
   ],
   "edges": [
-    {"source": "sensor_1", "sourceHandle": "image_out", "target": "splitter_1", "targetHandle": "in"},
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "splitter_1", "targetHandle": "data_in"},
     {"source": "splitter_1", "sourceHandle": "out_a", "target": "slam_icp", "targetHandle": "image_in"},
     {"source": "splitter_1", "sourceHandle": "out_b", "target": "slam_orb", "targetHandle": "image_in"},
     {"source": "slam_icp", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_a"},
     {"source": "slam_orb", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_b"},
-    {"source": "combiner_1", "sourceHandle": "out", "target": "merger_1", "targetHandle": "cloud_in"},
+    {"source": "combiner_1", "sourceHandle": "data_out", "target": "merger_1", "targetHandle": "cloud_in"},
     {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"},
     {"source": "slam_icp", "sourceHandle": "pose_out", "target": "viz_1", "targetHandle": "pose_in"}
   ]

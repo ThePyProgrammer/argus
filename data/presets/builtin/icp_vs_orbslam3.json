@@ -1,0 +1,26 @@
+{
+  "name": "ICP vs ORB-SLAM3",
+  "nodes": [
+    {"id": "sensor_1", "type": "sensor_rgbd", "params": {}, "position": {"x": 50, "y": 300}},
+    {"id": "splitter_1", "type": "splitter", "params": {}, "position": {"x": 300, "y": 300}},
+    {"id": "slam_icp", "type": "slam_icp", "params": {}, "position": {"x": 550, "y": 130}},
+    {"id": "slam_orb", "type": "slam_orbslam3", "params": {}, "position": {"x": 550, "y": 470}},
+    {"id": "merger_icp", "type": "merger_icp_union", "params": {}, "position": {"x": 850, "y": 130}},
+    {"id": "merger_orb", "type": "merger_pgo_open3d", "params": {}, "position": {"x": 850, "y": 470}},
+    {"id": "viz_icp", "type": "viz_output", "params": {}, "position": {"x": 1150, "y": 130}},
+    {"id": "viz_orb", "type": "viz_output", "params": {}, "position": {"x": 1150, "y": 470}}
+  ],
+  "edges": [
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "splitter_1", "targetHandle": "data_in"},
+    {"source": "splitter_1", "sourceHandle": "out_a", "target": "slam_icp", "targetHandle": "image_in"},
+    {"source": "splitter_1", "sourceHandle": "out_b", "target": "slam_orb", "targetHandle": "image_in"},
+    {"source": "slam_icp", "sourceHandle": "cloud_out", "target": "merger_icp", "targetHandle": "cloud_in"},
+    {"source": "slam_icp", "sourceHandle": "pose_out", "target": "merger_icp", "targetHandle": "pose_in"},
+    {"source": "slam_orb", "sourceHandle": "cloud_out", "target": "merger_orb", "targetHandle": "cloud_in"},
+    {"source": "slam_orb", "sourceHandle": "pose_out", "target": "merger_orb", "targetHandle": "pose_in"},
+    {"source": "merger_icp", "sourceHandle": "merged_out", "target": "viz_icp", "targetHandle": "cloud_in"},
+    {"source": "slam_icp", "sourceHandle": "pose_out", "target": "viz_icp", "targetHandle": "pose_in"},
+    {"source": "merger_orb", "sourceHandle": "merged_out", "target": "viz_orb", "targetHandle": "cloud_in"},
+    {"source": "slam_orb", "sourceHandle": "pose_out", "target": "viz_orb", "targetHandle": "pose_in"}
+  ]
+}
