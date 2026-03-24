@@ -1,6 +1,7 @@
 import { useSlamStore } from '../stores/slamStore';
 import { useControlStore } from '../stores/controlStore';
 import { debounce } from '../utils/debounce';
+import SliderField from './SliderField';
 
 const debouncedSendParam = debounce((key: unknown, value: unknown) => {
   const sendRaw = useControlStore.getState().sendRaw;
@@ -71,43 +72,14 @@ export function ParameterPanel() {
 
             {/* Numeric control */}
             {(prop.type === 'number' || prop.type === 'integer') && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="range"
-                  min={prop.minimum}
-                  max={prop.maximum}
-                  step={prop.type === 'integer' ? 1 : ((prop.maximum ?? 1) - (prop.minimum ?? 0)) / 100}
-                  value={currentValue as number}
-                  onChange={(e) => {
-                    handleParamChange(key, parseFloat(e.target.value), prop.live_tunable);
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <input
-                  type="number"
-                  min={prop.minimum}
-                  max={prop.maximum}
-                  step={prop.type === 'integer' ? 1 : 0.001}
-                  value={currentValue as number}
-                  onChange={(e) => {
-                    const parsed = parseFloat(e.target.value);
-                    if (isNaN(parsed)) return;
-                    const min = prop.minimum ?? -Infinity;
-                    const max = prop.maximum ?? Infinity;
-                    const clamped = Math.min(Math.max(parsed, min), max);
-                    handleParamChange(key, clamped, prop.live_tunable);
-                  }}
-                  style={{
-                    width: '64px',
-                    background: '#1a1a2e',
-                    color: '#e0e0e0',
-                    border: '1px solid #444',
-                    borderRadius: '3px',
-                    padding: '3px 5px',
-                    fontSize: '11px',
-                  }}
-                />
-              </div>
+              <SliderField
+                min={prop.minimum ?? 0}
+                max={prop.maximum ?? 1}
+                step={prop.type === 'integer' ? 1 : ((prop.maximum ?? 1) - (prop.minimum ?? 0)) / 100}
+                value={currentValue as number}
+                onChange={(val) => handleParamChange(key, val, prop.live_tunable)}
+                isInteger={prop.type === 'integer'}
+              />
             )}
 
             {/* Boolean control */}
