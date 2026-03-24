@@ -382,21 +382,12 @@ class MultiRobotBridge:
 
         depth = np.clip(depth, 0, 20.0).astype(np.float32)  # cap at 20m
 
-        # Pose transform depends on active cloud config
-        from src.bridge.cloud_config import get_pose_mode
-        pose_mode = get_pose_mode()
-        if pose_mode == "body":
-            pose = self._extract_pose(robot_id)
-        else:
-            cam_id = self._cam_ids[robot_id]
-            pose = np.eye(4, dtype=np.float64)
-            pose[:3, 3] = self._data.cam_xpos[cam_id]
-            cam_mat = self._data.cam_xmat[cam_id].reshape(3, 3)
-            if pose_mode == "cam_T":
-                pose[:3, :3] = cam_mat.T
-            else:
-                # "cam_noT" and "cam_direct" (DimOS) both use cam_mat directly
-                pose[:3, :3] = cam_mat
+        # Pose from camera transform (not body qpos).
+        # cam_xmat is R_world_from_cam (columns = camera axes in world).
+        cam_id = self._cam_ids[robot_id]
+        pose = np.eye(4, dtype=np.float64)
+        pose[:3, 3] = self._data.cam_xpos[cam_id]
+        pose[:3, :3] = self._data.cam_xmat[cam_id].reshape(3, 3)
         sim_time = self._step_count * self._dt
 
         return SensorFrame(

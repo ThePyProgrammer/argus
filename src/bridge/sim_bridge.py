@@ -120,6 +120,14 @@ class MuJoCoBridge:
         w, h = self._config.resolution
         self._renderer = mujoco.Renderer(self._model, height=h, width=w)
 
+        # Resolve camera ID for pose extraction (cam_xpos / cam_xmat)
+        import mujoco as _mj
+        cam_name = self._config.camera_name
+        if isinstance(cam_name, str):
+            self._cam_id = _mj.mj_name2id(self._model, _mj.mjtObj.mjOBJ_CAMERA, cam_name)
+        else:
+            self._cam_id = int(cam_name)
+
         self._step_count = 0
         return self._capture_frame()
 
@@ -230,8 +238,13 @@ class MuJoCoBridge:
 
         depth = np.clip(depth, 0, 20.0).astype(np.float32)
 
-        # Ground-truth pose from freejoint qpos
-        pose = self._extract_pose()
+        # Ground-truth pose from camera transform (not body qpos).
+        # Depth is rendered from the camera, so the pose must match the
+        # camera's position and orientation -- not the robot body's.
+        # cam_xmat is R_world_from_cam (columns = camera axes in world).
+        pose = np.eye(4, dtype=np.float64)
+        pose[:3, 3] = self._data.cam_xpos[self._cam_id]
+        pose[:3, :3] = self._data.cam_xmat[self._cam_id].reshape(3, 3)
 
         sim_time = self._step_count * self._dt
 

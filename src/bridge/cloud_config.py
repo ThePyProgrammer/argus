@@ -1,24 +1,28 @@
-"""Cloud configuration for depth-to-pointcloud axis flips and pose modes.
+"""Cloud configuration for depth-to-pointcloud axis flips.
 
 Extracted from src/slam/depth_to_cloud.py to break the bridge<->slam
 dependency cycle.  Bridge, SLAM, perception, and main all import from
 here instead of depth_to_cloud.
+
+cam_xmat from MuJoCo is R_world_from_cam (columns = camera axes in
+world coords).  Only the direct matrix is correct for transforming
+camera-frame points to world frame.  The transposed variants (cam.T)
+were an early debugging artifact and have been removed -- they apply
+R_cam_from_world which scatters ~30% of points below ground.
 """
 
 import threading
 
-# Each config: (flip_y, flip_z, pose_mode)
-# flip_y/flip_z: whether to negate that axis after Open3D unprojection
-# pose_mode: "cam" (cam_mat, no transpose) or "cam_T" (cam_mat.T)
+# Each config: (flip_y, flip_z)
+# flip_y/flip_z: whether to negate that axis after Open3D unprojection.
+# Open3D camera convention is x-right, y-down, z-forward.
+# MuJoCo camera convention is x-right, y-up, z-backward.
+# Config "1" (Y- Z-) converts Open3D -> MuJoCo camera frame correctly.
 CLOUD_CONFIGS = {
-    "1": {"label": "Y- Z- | cam",    "fy": -1, "fz": -1, "pose": "cam_noT"},
-    "2": {"label": "Y- Z- | cam.T",  "fy": -1, "fz": -1, "pose": "cam_T"},
-    "3": {"label": "Y- Z+ | cam",    "fy": -1, "fz":  1, "pose": "cam_noT"},
-    "4": {"label": "Y- Z+ | cam.T",  "fy": -1, "fz":  1, "pose": "cam_T"},
-    "5": {"label": "Y+ Z- | cam",    "fy":  1, "fz": -1, "pose": "cam_noT"},
-    "6": {"label": "Y+ Z- | cam.T",  "fy":  1, "fz": -1, "pose": "cam_T"},
-    "7": {"label": "Y+ Z+ | cam",    "fy":  1, "fz":  1, "pose": "cam_noT"},
-    "8": {"label": "Y+ Z+ | cam.T",  "fy":  1, "fz":  1, "pose": "cam_T"},
+    "1": {"label": "Y- Z-",  "fy": -1, "fz": -1},
+    "2": {"label": "Y- Z+",  "fy": -1, "fz":  1},
+    "3": {"label": "Y+ Z-",  "fy":  1, "fz": -1},
+    "4": {"label": "Y+ Z+",  "fy":  1, "fz":  1},
 }
 
 _active_config: str = "1"  # Y-Z- cam (standardized with offset correction)
@@ -38,6 +42,10 @@ def set_active_config(key: str) -> None:
 
 
 def get_pose_mode() -> str:
-    """Return the pose transform mode for the active config."""
-    with _config_lock:
-        return CLOUD_CONFIGS[_active_config]["pose"]
+    """Return the pose transform mode.
+
+    Always returns "cam_noT" (direct cam_xmat, R_world_from_cam).
+    The cam.T variants were removed -- they applied the inverse
+    rotation which scattered points below ground.
+    """
+    return "cam_noT"
