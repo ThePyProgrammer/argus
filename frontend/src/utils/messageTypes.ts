@@ -30,6 +30,7 @@ export interface PoseUpdatePayload {
   position: [number, number, number];
   rotation: number[]; // 9-element flat 3x3
   tracking_status?: string; // "ok" | "lost" | "initializing" | "relocalizing"
+  body_yaw?: number; // MuJoCo body heading in radians
 }
 
 export interface CloudDeltaPayload {

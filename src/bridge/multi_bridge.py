@@ -427,6 +427,20 @@ class MultiRobotBridge:
 
         return pose
 
+    def get_body_yaw(self, robot_id: str) -> float:
+        """Extract body heading (yaw around Z) from freejoint quaternion.
+
+        Returns:
+            Yaw angle in radians.
+        """
+        import math
+        if self._data is None:
+            return 0.0
+        start = self._qpos_starts[robot_id]
+        qw = self._data.qpos[start + 3]
+        qz = self._data.qpos[start + 6]
+        return 2.0 * math.atan2(qz, qw)
+
     def _velocity_to_ctrl(self, robot_id: str) -> np.ndarray:
         """Convert buffered velocity to 12-element joint position targets.
 

@@ -294,6 +294,7 @@ class WebStreamingViz:
                     "position": pose[:3, 3].tolist(),
                     "rotation": pose[:3, :3].flatten().tolist(),
                     "tracking_status": data.get("tracking_status", "ok"),
+                    "body_yaw": data.get("body_yaw", 0.0),
                 },
             })
 

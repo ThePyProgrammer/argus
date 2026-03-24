@@ -111,13 +111,14 @@ export class RobotMarkerManager {
   }
 
   /**
-   * Create or update a robot marker. Heading uses the actual camera
-   * rotation matrix (same as frustum) for accurate orientation.
+   * Create or update a robot marker.
    *
    * @param robotId Unique robot identifier
    * @param position [x, y, z] world position
    * @param colorIndex Index into the Okabe-Ito palette
    * @param rotation Optional 9-element flat 3x3 cam_xmat (row-major)
+   * @param trackingStatus SLAM tracking state
+   * @param bodyYaw MuJoCo body heading in radians (Z-axis rotation)
    */
   updateRobot(
     robotId: string,
@@ -125,15 +126,18 @@ export class RobotMarkerManager {
     colorIndex: number,
     rotation?: number[],
     trackingStatus?: string,
+    bodyYaw?: number,
   ): void {
     const existing = this.markers.get(robotId);
 
     if (existing) {
       existing.position.set(position[0], position[1], position[2]);
 
-      // Use rotation matrix for heading: camera look = -Z of cam_xmat
-      if (rotation && rotation.length === 9) {
-        // Camera looks along body -Y. Robot forward = +X = 90° CCW from -Y.
+      // Use MuJoCo body yaw directly for robot heading
+      if (bodyYaw !== undefined) {
+        existing.rotation.set(0, 0, bodyYaw);
+      } else if (rotation && rotation.length === 9) {
+        // Fallback: derive yaw from camera rotation matrix
         const lookX = -rotation[6];
         const lookY = -rotation[7];
         const yaw = Math.atan2(lookY, lookX) + Math.PI / 2;

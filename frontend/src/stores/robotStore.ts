@@ -24,6 +24,7 @@ export interface RobotInfo {
   sceneDescription: string | null;
   sceneObjects: string[];
   trackingStatus: string; // "ok" | "lost" | "initializing" | "relocalizing"
+  bodyYaw: number; // MuJoCo body heading in radians
 }
 
 export interface RobotStoreState {
@@ -41,6 +42,7 @@ export interface RobotStoreState {
     position: [number, number, number],
     rotation: number[],
     trackingStatus?: string,
+    bodyYaw?: number,
   ) => void;
   updateStats: (stats: {
     total_coverage: number;
@@ -94,6 +96,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         sceneDescription: existing?.sceneDescription ?? null,
         sceneObjects: existing?.sceneObjects ?? [],
         trackingStatus: existing?.trackingStatus ?? 'ok',
+        bodyYaw: existing?.bodyYaw ?? 0,
       });
     });
     set({ robots });
@@ -104,6 +107,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
     position: [number, number, number],
     rotation: number[],
     trackingStatus?: string,
+    bodyYaw?: number,
   ) => {
     const robots = new Map(get().robots);
     const robot = robots.get(robotId);
@@ -113,6 +117,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         position,
         rotation,
         trackingStatus: trackingStatus ?? robot.trackingStatus,
+        bodyYaw: bodyYaw ?? robot.bodyYaw,
       });
       set({ robots });
     }

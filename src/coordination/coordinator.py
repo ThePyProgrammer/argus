@@ -58,6 +58,7 @@ class RobotVizData:
     detections: list[dict]
     scene_description: dict | None
     tracking_status: str = "ok"
+    body_yaw: float = 0.0
 
     # -- dict-style compatibility helpers ----------------------------------
 
@@ -661,6 +662,11 @@ class Coordinator:
                         "objects": desc.objects,
                     }
 
+            # Get body yaw from bridge (actual MuJoCo heading)
+            body_yaw = 0.0
+            if hasattr(self._bridge, 'get_body_yaw'):
+                body_yaw = self._bridge.get_body_yaw(rid)
+
             robot_data[rid] = RobotVizData(
                 frame=frames[rid],
                 local_voxels=robot.get_occupied_voxels(),
@@ -672,6 +678,7 @@ class Coordinator:
                 detections=detections,
                 scene_description=scene_desc,
                 tracking_status=getattr(robot.exploration, "last_tracking_status", "ok"),
+                body_yaw=body_yaw,
             )
 
         # --- Feed metrics into tracker ---
