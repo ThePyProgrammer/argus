@@ -24,6 +24,8 @@ export default function ControlPanel() {
   const setCloudOffset = useControlStore((s) => s.setCloudOffset);
   const showScene = useControlStore((s) => s.showScene);
   const toggleScene = useControlStore((s) => s.toggleScene);
+  const sceneColored = useControlStore((s) => s.sceneColored);
+  const toggleSceneColored = useControlStore((s) => s.toggleSceneColored);
   const colorMode = useRobotStore((s) => s.colorMode);
   const outputMode = useMetricsStore((s) => s.outputMode);
   const setOutputMode = useMetricsStore((s) => s.setOutputMode);
@@ -124,6 +126,20 @@ export default function ControlPanel() {
         >
           {showScene ? 'Hide Scene Mesh' : 'Show Scene Mesh'}
         </button>
+        {showScene && (
+          <button
+            onClick={toggleSceneColored}
+            style={{
+              ...buttonStyle,
+              width: '100%',
+              background: sceneColored ? '#1b5e20' : '#37474f',
+              color: '#e0e0e0',
+              border: '1px solid #444',
+            }}
+          >
+            {sceneColored ? 'Grey Scene' : 'Colored Scene'}
+          </button>
+        )}
         <button
           onClick={() => {
             const newMode = colorMode === 'robot_tint' ? 'true_rgb' : 'robot_tint';
