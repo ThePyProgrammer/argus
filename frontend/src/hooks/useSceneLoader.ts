@@ -37,15 +37,24 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
         // For colored scene, swap to unlit MeshBasicMaterial so colors
         // render exactly as authored (matching MuJoCo's flat rendering)
         if (sceneColored) {
+          const transparentNames = /glass|window|invisible/i;
           gltf.scene.traverse((child) => {
             if (child instanceof THREE.Mesh && child.material) {
               const mat = child.material as THREE.MeshStandardMaterial;
+              const isTransparent = transparentNames.test(child.name);
               const basic = new THREE.MeshBasicMaterial();
-              if (mat.map) basic.map = mat.map;
-              if (mat.color) basic.color.copy(mat.color);
-              if (mat.vertexColors) basic.vertexColors = true;
-              basic.transparent = mat.transparent;
-              basic.opacity = mat.opacity;
+              if (isTransparent) {
+                basic.color.set(0xffffff);
+                basic.transparent = true;
+                basic.opacity = 0.15;
+                basic.depthWrite = false;
+              } else {
+                if (mat.map) basic.map = mat.map;
+                if (mat.color) basic.color.copy(mat.color);
+                if (mat.vertexColors) basic.vertexColors = true;
+                basic.transparent = mat.transparent;
+                basic.opacity = mat.opacity;
+              }
               basic.side = mat.side;
               child.material = basic;
             }
