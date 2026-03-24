@@ -171,8 +171,8 @@ export default function SceneViewer() {
     pointCloudManager.setVisible(true);
 
     const unsubMetrics = useMetricsStore.subscribe((state, prev) => {
-      // Output mode change -> start cross-fade
-      if (state.outputMode !== prev.outputMode) {
+      // Output mode change -> start cross-fade (skip if output is hidden)
+      if (state.outputMode !== prev.outputMode && !state.outputHidden) {
         const oldMode = currentMode;
         const newMode = state.outputMode;
         currentMode = newMode;
@@ -208,6 +208,24 @@ export default function SceneViewer() {
       // Mesh data update
       if (state.meshVertices !== prev.meshVertices && state.meshVertices && state.meshFaces) {
         meshManager.updateMesh(state.meshVertices, state.meshFaces, state.meshColors);
+      }
+    });
+
+    // --- Output hidden subscription (hide point cloud / voxels / mesh but keep scene) ---
+    let prevOutputHidden = useMetricsStore.getState().outputHidden;
+    const unsubOutputHidden = useMetricsStore.subscribe((state) => {
+      if (state.outputHidden !== prevOutputHidden) {
+        prevOutputHidden = state.outputHidden;
+        if (state.outputHidden) {
+          pointCloudManager.setVisible(false);
+          voxelManager.setVisible(false);
+          meshManager.setVisible(false);
+        } else {
+          // Restore visibility for the active output mode only
+          pointCloudManager.setVisible(state.outputMode === 'cloud');
+          voxelManager.setVisible(state.outputMode === 'voxel');
+          meshManager.setVisible(state.outputMode === 'mesh');
+        }
       }
     });
 
@@ -321,6 +339,7 @@ export default function SceneViewer() {
       unsub();
       unsubControl();
       unsubMetrics();
+      unsubOutputHidden();
       renderer.domElement.removeEventListener('click', handleClick);
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);

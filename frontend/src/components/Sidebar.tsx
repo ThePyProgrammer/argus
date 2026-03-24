@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useRobotStore, type RobotInfo } from '../stores/robotStore';
+import { useMetricsStore } from '../stores/metricsStore';
 import RobotCard from './RobotCard';
 import ControlPanel from './ControlPanel';
 
@@ -21,12 +22,9 @@ function useStableRobotList(): RobotInfo[] {
   return robots;
 }
 
-interface SidebarProps {
-  outputHidden?: boolean;
-  onToggleOutput?: () => void;
-}
-
-export default function Sidebar({ outputHidden, onToggleOutput }: SidebarProps) {
+export default function Sidebar() {
+  const outputHidden = useMetricsStore((s) => s.outputHidden);
+  const setOutputHidden = useMetricsStore((s) => s.setOutputHidden);
   const robots = useStableRobotList();
   const totalCoverage = useRobotStore((s) => s.totalCoverage);
   const mergeCount = useRobotStore((s) => s.mergeCount);
@@ -80,9 +78,8 @@ export default function Sidebar({ outputHidden, onToggleOutput }: SidebarProps) 
         >
           <span>Coverage: {totalCoverage.toFixed(1)}%</span>
           <span>Merges: {mergeCount}</span>
-          {onToggleOutput && (
-            <button
-              onClick={onToggleOutput}
+          <button
+              onClick={() => setOutputHidden(!outputHidden)}
               style={{
                 marginLeft: 'auto',
                 background: '#2a2a4a',
@@ -101,7 +98,6 @@ export default function Sidebar({ outputHidden, onToggleOutput }: SidebarProps) 
             >
               {outputHidden ? 'Show Output' : 'Hide Output'}
             </button>
-          )}
         </div>
       </div>
 

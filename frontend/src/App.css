@@ -48,18 +48,6 @@ body {
   grid-row: 3;
 }
 
-/* Output hidden mode -- sidebar fills full width */
-.app-container.output-hidden {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-
-.app-container.output-hidden .sidebar-area {
-  grid-column: 1;
-  grid-row: 1;
-  border-left: none;
-}
-
 /* Scrollbar styling for dark theme */
 ::-webkit-scrollbar {
   width: 6px;

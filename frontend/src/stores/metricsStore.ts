@@ -10,6 +10,8 @@ interface MetricsStoreState {
   viewMode: 'live' | 'baseline';
   /** Output rendering mode */
   outputMode: 'cloud' | 'voxel' | 'mesh';
+  /** Whether output (point cloud / voxel grid / mesh) is hidden in the 3D scene */
+  outputHidden: boolean;
   /** Per-robot metric history arrays (ring buffers from backend) */
   history: Record<string, MetricHistory>;
   /** Mesh data from server (for CTRL-07) */
@@ -27,6 +29,7 @@ interface MetricsStoreState {
   setBaseline: (baseline: Record<string, SlamMetrics> | null) => void;
   setViewMode: (mode: 'live' | 'baseline') => void;
   setOutputMode: (mode: 'cloud' | 'voxel' | 'mesh') => void;
+  setOutputHidden: (hidden: boolean) => void;
   updateHistory: (robotId: string, history: MetricHistory) => void;
   setMeshData: (
     vertices: number[][],
@@ -41,6 +44,7 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   baseline: null,
   viewMode: 'live',
   outputMode: 'cloud',
+  outputHidden: false,
   history: {},
   meshVertices: null,
   meshFaces: null,
@@ -62,6 +66,7 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   setBaseline: (baseline) => set({ baseline }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setOutputMode: (mode) => set({ outputMode: mode }),
+  setOutputHidden: (hidden) => set({ outputHidden: hidden }),
   updateHistory: (robotId, history) =>
     set((state) => ({
       history: { ...state.history, [robotId]: history },
