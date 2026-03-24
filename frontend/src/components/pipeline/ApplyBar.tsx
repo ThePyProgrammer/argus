@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePipelineStore } from '../../stores/pipelineStore';
+import { fetchSlamState } from '../../stores/slamStore';
 import { ConfirmModal } from '../ConfirmModal';
 import { RestartOverlay } from '../RestartOverlay';
 import { PresetSelector } from './PresetSelector';
@@ -42,7 +43,11 @@ export function ApplyBar() {
       })
       .then(() => {
         usePipelineStore.getState().markApplied();
-        usePipelineStore.getState().setIsApplying(false);
+        // Re-fetch sidebar SLAM/merge state after restart so it reflects the new pipeline
+        setTimeout(() => {
+          fetchSlamState();
+          usePipelineStore.getState().setIsApplying(false);
+        }, 1000);
       })
       .catch((err) => {
         setApplyError(err.message ?? 'Pipeline apply failed');
