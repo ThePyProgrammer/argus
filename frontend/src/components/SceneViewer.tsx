@@ -47,7 +47,8 @@ export default function SceneViewer() {
 
     // --- Scene ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d1a);
+    const isColoredInit = useControlStore.getState().sceneColored;
+    scene.background = new THREE.Color(isColoredInit ? 0xffffff : 0x0d0d1a);
 
     // --- Z-up to Y-up conversion ---
     // MuJoCo uses Z-up; Three.js uses Y-up. Rotate the world root
@@ -73,16 +74,19 @@ export default function SceneViewer() {
     directional.position.set(10, 20, 15);
     scene.add(directional);
 
-    // Adjust lighting when toggling colored/grey scene
+    // Adjust background + lighting when toggling colored/grey scene
     const unsubSceneColor = useControlStore.subscribe((state, prev) => {
       if (state.sceneColored !== prev.sceneColored) {
+        scene.background = new THREE.Color(state.sceneColored ? 0xffffff : 0x0d0d1a);
         ambient.intensity = state.sceneColored ? 1.0 : 0.4;
         directional.intensity = state.sceneColored ? 1.2 : 0.8;
+        grid.visible = !state.sceneColored;
       }
     });
 
-    // --- Grid helper ---
+    // --- Grid helper (hidden when colored scene active) ---
     const grid = new THREE.GridHelper(50, 50, 0x444466, 0x222244);
+    grid.visible = !isColoredInit;
     scene.add(grid);
 
     // --- OrbitControls ---
