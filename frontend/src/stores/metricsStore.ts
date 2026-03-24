@@ -43,8 +43,11 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   perRobot: {},
   baseline: null,
   viewMode: 'live',
-  outputMode: 'cloud',
-  outputHidden: false,
+  outputMode: (() => {
+    const stored = localStorage.getItem('c2-outputMode');
+    return stored === 'cloud' || stored === 'voxel' || stored === 'mesh' ? stored : 'cloud';
+  })(),
+  outputHidden: localStorage.getItem('c2-outputHidden') === 'true',
   history: {},
   meshVertices: null,
   meshFaces: null,
@@ -65,8 +68,14 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
 
   setBaseline: (baseline) => set({ baseline }),
   setViewMode: (mode) => set({ viewMode: mode }),
-  setOutputMode: (mode) => set({ outputMode: mode }),
-  setOutputHidden: (hidden) => set({ outputHidden: hidden }),
+  setOutputMode: (mode) => {
+    localStorage.setItem('c2-outputMode', mode);
+    set({ outputMode: mode });
+  },
+  setOutputHidden: (hidden) => {
+    localStorage.setItem('c2-outputHidden', String(hidden));
+    set({ outputHidden: hidden });
+  },
   updateHistory: (robotId, history) =>
     set((state) => ({
       history: { ...state.history, [robotId]: history },
