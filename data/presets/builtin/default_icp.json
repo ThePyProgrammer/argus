@@ -10,6 +10,7 @@
     {"source": "sensor_1", "sourceHandle": "image_out", "target": "slam_1", "targetHandle": "image_in"},
     {"source": "slam_1", "sourceHandle": "cloud_out", "target": "merger_1", "targetHandle": "cloud_in"},
     {"source": "slam_1", "sourceHandle": "pose_out", "target": "merger_1", "targetHandle": "pose_in"},
-    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"}
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "viz_1", "targetHandle": "pose_in"}
   ]
 }

@@ -16,6 +16,7 @@
     {"source": "slam_icp", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_a"},
     {"source": "slam_orb", "sourceHandle": "cloud_out", "target": "combiner_1", "targetHandle": "in_b"},
     {"source": "combiner_1", "sourceHandle": "out", "target": "merger_1", "targetHandle": "cloud_in"},
-    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"}
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"},
+    {"source": "slam_icp", "sourceHandle": "pose_out", "target": "viz_1", "targetHandle": "pose_in"}
   ]
 }

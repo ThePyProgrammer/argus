@@ -60,10 +60,14 @@ export function deserializeGraph(
   existingDefinitions: Record<string, NodeDefinition>,
 ): { nodes: PipelineNode[]; edges: PipelineEdge[] } {
   const nodes: PipelineNode[] = config.nodes.map((configNode) => {
-    // Find matching definition
+    // Find matching definition: exact type match first, then prefix match
+    // (e.g. "slam_icp" matches "slam_generic", "merger_icp_union" matches "merger_generic")
     const defKey = Object.keys(existingDefinitions).find(
       (key) => existingDefinitions[key].type === configNode.type,
-    );
+    ) ?? Object.keys(existingDefinitions).find((key) => {
+      const prefix = configNode.type.split('_')[0];
+      return existingDefinitions[key].type.startsWith(prefix + '_');
+    });
 
     const data = defKey
       ? buildNodeData(defKey)
@@ -78,6 +82,14 @@ export function deserializeGraph(
           status: 'idle' as const,
           nodeType: configNode.type,
         };
+
+    // Preserve the actual backend type from config (not the generic definition type)
+    data.nodeType = configNode.type;
+    // Use a readable label derived from the type if it was resolved via generic fallback
+    if (defKey && existingDefinitions[defKey].type !== configNode.type) {
+      const readable = configNode.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      data.label = readable;
+    }
 
     // Apply saved param values
     data.paramValues = { ...data.paramValues, ...configNode.params };

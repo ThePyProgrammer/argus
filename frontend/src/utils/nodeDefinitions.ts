@@ -41,7 +41,7 @@ export const NODE_DEFINITIONS: Record<string, NodeDefinition> = {
     category: 'sensor',
     inputs: [],
     outputs: [
-      { id: 'image_out', label: 'RGB-D', dataType: 'Image', required: false },
+      { id: 'image_out', label: 'RGB', dataType: 'Image', required: false },
       { id: 'depth_out', label: 'Depth', dataType: 'Image', required: false },
     ],
     defaultParams: {},

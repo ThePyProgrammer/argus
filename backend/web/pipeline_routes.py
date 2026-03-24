@@ -106,14 +106,27 @@ async def save_preset(req: PresetSaveRequest):
 
 @router.get("/presets/{name}")
 async def load_preset(name: str):
-    """Load a preset by name (searches builtin then user directories)."""
+    """Load a preset by name (matches filename or JSON 'name' field)."""
     for directory in [BUILTIN_DIR, USER_DIR]:
+        # Try exact filename match first
         fp = directory / f"{name}.json"
         if fp.exists():
             try:
                 return json.loads(fp.read_text())
             except (json.JSONDecodeError, OSError) as exc:
                 raise HTTPException(status_code=500, detail=f"Cannot read preset: {exc}")
+
+    # Fall back to matching the 'name' field inside JSON files
+    for directory in [BUILTIN_DIR, USER_DIR]:
+        if not directory.exists():
+            continue
+        for fp in directory.glob("*.json"):
+            try:
+                data = json.loads(fp.read_text())
+                if data.get("name") == name:
+                    return data
+            except (json.JSONDecodeError, OSError):
+                continue
 
     raise HTTPException(status_code=404, detail=f"Preset not found: {name}")
 

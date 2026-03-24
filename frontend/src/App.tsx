@@ -11,6 +11,9 @@ import { NodePalette } from './components/pipeline/NodePalette';
 import { NodeInspector } from './components/pipeline/NodeInspector';
 import { ApplyBar } from './components/pipeline/ApplyBar';
 import { usePipelineStore } from './stores/pipelineStore';
+import { deserializeGraph } from './utils/pipelineSerializer';
+import { NODE_DEFINITIONS } from './utils/nodeDefinitions';
+import type { PipelineNode, PipelineEdge } from './utils/pipelineTypes';
 
 interface RegistryNode {
   type: string;
@@ -39,7 +42,7 @@ export default function App() {
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [registryNodes, setRegistryNodes] = useState<RegistryNode[]>([]);
 
-  // Fetch node catalog when switching to pipeline view
+  // Fetch node catalog and load default preset when switching to pipeline view
   useEffect(() => {
     if (activeView === 'pipeline') {
       fetch('/api/pipeline/node-catalog')
@@ -57,6 +60,30 @@ export default function App() {
           setRegistryNodes(regNodes);
         })
         .catch(() => {});
+
+      // Load "Default ICP" preset if graph is empty (first open)
+      const store = usePipelineStore.getState();
+      if (store.nodes.length === 0) {
+        fetch('/api/pipeline/presets/default_icp')
+          .then((r) => {
+            if (!r.ok) throw new Error(`preset fetch failed: ${r.status}`);
+            return r.json();
+          })
+          .then((data) => {
+            if (data.nodes && data.edges) {
+              const { nodes, edges } = deserializeGraph(
+                { nodes: data.nodes, edges: data.edges },
+                NODE_DEFINITIONS,
+              );
+              usePipelineStore.getState().loadPresetGraph(
+                nodes as PipelineNode[],
+                edges as PipelineEdge[],
+                data.name ?? 'Default ICP',
+              );
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [activeView]);
 
