@@ -482,6 +482,13 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 if streaming_viz is not None:
                     streaming_viz.reset_cloud_tracking()
 
+                # Notify frontend that restart is complete
+                if streaming_viz is not None:
+                    streaming_viz._message_queue.append({
+                        "type": "slam_restart_complete",
+                        "payload": {},
+                    })
+
             logger.info("Simulation restarted.")
 
     sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)

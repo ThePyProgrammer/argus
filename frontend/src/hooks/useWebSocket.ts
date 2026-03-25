@@ -162,6 +162,7 @@ export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
         }
         case 'slam_restart_complete': {
           useSlamStore.getState().setRestarting(false);
+          usePipelineStore.getState().setIsApplying(false);
           fetchSlamState();
           break;
         }
