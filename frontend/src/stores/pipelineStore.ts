@@ -215,39 +215,3 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
     });
   },
 }));
-
-/** Fetch node catalog from backend. Returns array of node descriptors. */
-export async function fetchNodeCatalog(): Promise<
-  Array<{
-    type: string;
-    label: string;
-    category: string;
-    parameterSchema: Record<string, unknown> | null;
-    registryName?: string;
-  }>
-> {
-  try {
-    const res = await fetch('/api/pipeline/node-catalog');
-    if (res.ok) {
-      const data = await res.json();
-      return data.nodes || [];
-    }
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
-
-/** Fetch available presets from backend and populate store. */
-export async function fetchPresets(): Promise<void> {
-  const store = usePipelineStore.getState();
-  try {
-    const res = await fetch('/api/pipeline/presets');
-    if (res.ok) {
-      const data = await res.json();
-      store.setAvailablePresets(data.presets || []);
-    }
-  } catch {
-    /* ignore */
-  }
-}
