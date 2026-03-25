@@ -173,3 +173,16 @@ Plans:
 - [ ] 14-04-PLAN.md — NodePalette, NodeInspector, PresetSelector, ApplyBar
 - [ ] 14-05-PLAN.md — ViewToggle, App.tsx integration, WebSocket pipeline status, catalog fetch
 - [ ] 14-06-PLAN.md — Human verification of complete pipeline graph editor
+
+### Phase 15: Close v2.0 audit gaps: restart signal + crash fallback
+
+**Goal:** Close the two integration gaps found by milestone audit: (1) emit `slam_restart_complete` WebSocket message after restart so frontend spinners clear reliably, and (2) implement actual ICP fallback when a subprocess SLAM backend crashes.
+**Requirements**: ABST-05, CTRL-02, BACK-06
+**Depends on:** Phase 14
+**Success Criteria** (what must be TRUE):
+  1. After any restart (algorithm switch, merge strategy switch, pipeline apply), backend emits `slam_restart_complete` WS message and frontend clears spinner
+  2. `AlgorithmSection.tsx` isRestarting spinner clears via WS signal, not timeout
+  3. `ApplyBar.tsx` isApplying clears via WS signal, not 1-second setTimeout
+  4. When a subprocess SLAM backend crashes, the robot's SLAM instance is swapped to ICP and exploration continues
+  5. Dead code (`fetchNodeCatalog`, `fetchPresets`) removed from pipelineStore.ts
+**Plans:** TBD
