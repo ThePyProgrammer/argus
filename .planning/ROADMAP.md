@@ -185,8 +185,8 @@ Plans:
   3. `ApplyBar.tsx` isApplying clears via WS signal, not 1-second setTimeout
   4. When a subprocess SLAM backend crashes, the robot's SLAM instance is swapped to ICP and exploration continues
   5. Dead code (`fetchNodeCatalog`, `fetchPresets`) removed from pipelineStore.ts
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 15-01-PLAN.md — Emit slam_restart_complete WS signal, wire frontend handlers, remove dead code
+- [x] 15-01-PLAN.md — Emit slam_restart_complete WS signal, wire frontend handlers, remove dead code
 - [x] 15-02-PLAN.md — ICP fallback swap in ExplorationLoop on subprocess crash

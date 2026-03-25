@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: Ready to execute
-last_updated: "2026-03-25T07:24:50.661Z"
+status: Phase complete — ready for verification
+last_updated: "2026-03-25T07:25:53.597Z"
 last_activity: 2026-03-25
 progress:
   total_phases: 7
@@ -52,6 +52,7 @@ Plan: 2 of 2
 | Phase 14 P04 | 4min | 2 tasks | 4 files |
 | Phase 14 P05 | 4min | 2 tasks | 5 files |
 | Phase 15 P02 | 1min | 1 tasks | 2 files |
+| Phase 15 P01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,7 @@ Recent decisions affecting current work:
 - [14-05]: setNodeStatus/setEdgeThroughput update both status maps and node/edge data arrays
 - [14-05]: pipeline_status added to WSMessage type union for type-safe dispatch
 - [Phase 15-02]: ICP fallback swap placed inside same if-guard as crash_fallback WS emission
+- [Phase 15]: slam_restart_complete emitted inside _restart_lock block to guarantee all restart state committed before notification
 
 ### Roadmap Evolution
 

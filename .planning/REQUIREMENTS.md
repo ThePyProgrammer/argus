@@ -81,7 +81,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | ABST-02 | Phase 8 | Complete |
 | ABST-03 | Phase 8 | Complete |
 | ABST-04 | Phase 8 | Complete |
-| ABST-05 | Phase 8 | Pending |
+| ABST-05 | Phase 8 | Complete |
 | ABST-06 | Phase 8 | Complete |
 | BACK-01 | Phase 11 | Complete |
 | BACK-02 | Phase 11 | Complete |
