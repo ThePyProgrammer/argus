@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: unknown
-stopped_at: Completed 14-05-PLAN.md
-last_updated: "2026-03-23T15:49:13.000Z"
+status: Ready to execute
+last_updated: "2026-03-25T07:24:50.661Z"
+last_activity: 2026-03-25
 progress:
   total_phases: 7
   completed_phases: 6
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 14 — interactive-comfyui-esque-react-flow-pipeline-graph
+**Current focus:** Phase 15 — close-v2-0-audit-gaps
 
 ## Current Position
 
-Phase: 14 (interactive-comfyui-esque-react-flow-pipeline-graph) — EXECUTING
-Plan: 6 of 6
+Phase: 15 (close-v2-0-audit-gaps) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: 6 of 6
 | Phase 14 P03 | 4min | 2 tasks | 4 files |
 | Phase 14 P04 | 4min | 2 tasks | 4 files |
 | Phase 14 P05 | 4min | 2 tasks | 5 files |
+| Phase 15 P02 | 1min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,7 @@ Recent decisions affecting current work:
 - [14-05]: Node catalog fetched on activeView change to 'pipeline', not on mount
 - [14-05]: setNodeStatus/setEdgeThroughput update both status maps and node/edge data arrays
 - [14-05]: pipeline_status added to WSMessage type union for type-safe dispatch
+- [Phase 15-02]: ICP fallback swap placed inside same if-guard as crash_fallback WS emission
 
 ### Roadmap Evolution
 
@@ -175,5 +177,5 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-24 - Spawn robots facing opposite directions (260324-ksf)
+Last activity: 2026-03-25
 Resume file: None
