@@ -10,6 +10,7 @@ import { PipelineEditor } from './components/pipeline/PipelineEditor';
 import { NodePalette } from './components/pipeline/NodePalette';
 import { NodeInspector } from './components/pipeline/NodeInspector';
 import { ApplyBar } from './components/pipeline/ApplyBar';
+import { Minimap2D } from './components/Minimap2D';
 import { usePipelineStore } from './stores/pipelineStore';
 import { deserializeGraph } from './utils/pipelineSerializer';
 import { NODE_DEFINITIONS } from './utils/nodeDefinitions';
@@ -91,8 +92,9 @@ export default function App() {
     <div className="app-container">
       <div className="viewer-area" id="scene-container" style={{ position: 'relative' }}>
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />
-        <div style={{ width: '100%', height: '100%', display: activeView === '3d' ? 'block' : 'none' }}>
+        <div style={{ width: '100%', height: '100%', display: activeView === '3d' ? 'block' : 'none', position: 'relative' }}>
           <SceneViewer />
+          <Minimap2D />
         </div>
         <div style={{ width: '100%', height: '100%', display: activeView === 'pipeline' ? 'flex' : 'none', flexDirection: 'column' }}>
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
