@@ -134,12 +134,14 @@ class ExplorationLoop:
         octomap: "OctoMapBuilder",
         config: ExplorationConfig | None = None,
         streaming_viz: object | None = None,
+        intrinsics: object | None = None,
     ):
         self._bridge = bridge
         self._slam = slam
         self._octomap = octomap
         self._config = config or ExplorationConfig()
         self._streaming_viz = streaming_viz
+        self._intrinsics = intrinsics
 
         self._frontier_detector = FrontierDetector(
             resolution=self._config.voxel_resolution,
@@ -215,6 +217,18 @@ class ExplorationLoop:
                     "fallback_backend": "icp",
                 },
             })
+
+            # Actually swap to ICP backend so exploration continues
+            try:
+                from src.slam.registry import SLAMRegistry
+                import src.slam.backends  # noqa: F401
+                fallback_kwargs = {}
+                if self._intrinsics is not None:
+                    fallback_kwargs["intrinsics"] = self._intrinsics
+                self._slam = SLAMRegistry.create("icp", **fallback_kwargs)
+                logger.info("Swapped crashed %s to ICP fallback", backend_name)
+            except Exception as exc:
+                logger.error("Failed to create ICP fallback: %s", exc)
 
         pose = result.pose
         current_pos = pose[:3, 3].copy()

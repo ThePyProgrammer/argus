@@ -107,6 +107,7 @@ class RobotInstance:
         )
         exploration = ExplorationLoop(
             bridge=bridge, slam=slam, octomap=octomap, config=config,
+            intrinsics=intrinsics,
         )
 
         spawn_transform = np.eye(4, dtype=np.float64)
