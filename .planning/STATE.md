@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Generic SLAM API
-status: Milestone complete
-last_updated: "2026-03-25T07:26:48.423Z"
+status: v2.0 milestone complete
+last_updated: "2026-03-25T07:28:24.099Z"
 last_activity: 2026-03-25
 progress:
   total_phases: 7

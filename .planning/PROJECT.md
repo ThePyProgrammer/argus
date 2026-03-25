@@ -2,11 +2,11 @@
 
 ## What This Is
 
-A simulation-based system where N Unitree Go2 quadruped robots autonomously explore a MuJoCo environment, split the space between them via Voronoi partitioning, and produce a combined real-time 3D reconstruction map — all controlled from a browser-based Command & Control interface with Three.js visualization.
+A simulation-based system where N Unitree Go2 quadruped robots autonomously explore a MuJoCo environment, split the space between them via Voronoi partitioning, and produce a combined real-time 3D reconstruction map — all controlled from a browser-based Command & Control interface with Three.js visualization, pluggable SLAM backends, and a visual pipeline editor.
 
 ## Core Value
 
-Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
+Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time — with user-selectable SLAM algorithms, merge strategies, and live performance metrics.
 
 ## Requirements
 
@@ -19,16 +19,18 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - ✓ Proper quadruped locomotion (trot gait, position actuators) — v1.0
 - ✓ Browser-based C2 with WebSocket streaming, Three.js viewer — v1.0
 - ✓ N-robot scaling without frontend code changes — v1.0
+- ✓ Generic SLAM API abstraction layer with pluggable backends — v2.0
+- ✓ 4 real SLAM backends: ICP, ORB-SLAM3, OpenVINS, SVO Pro — v2.0
+- ✓ Frontend algorithm picker with pre-session selection — v2.0
+- ✓ Per-algorithm parameter tuning panel in C2 interface — v2.0
+- ✓ Live SLAM metrics comparison (ATE, RPE, ms/frame, tracking status) — v2.0
+- ✓ Output format toggle (point cloud, voxel grid, mesh visualization) — v2.0
+- ✓ Replace ICP-based map merging with pose-graph optimization — v2.0
+- ✓ Interactive pipeline graph editor (ComfyUI-style) — v2.0
 
 ### Active
 
-- [ ] Generic SLAM API abstraction layer with pluggable backends
-- [ ] 4 real SLAM backends: existing ICP, ORB-SLAM3, OpenVINS, SVO Pro
-- ✓ Frontend algorithm picker with pre-session selection — Phase 9
-- ✓ Per-algorithm parameter tuning panel in C2 interface — Phase 9
-- ✓ Live SLAM metrics comparison (ATE, RPE, ms/frame, tracking status) — Phase 13
-- ✓ Output format toggle (point cloud, voxel grid, mesh visualization) — Phase 13
-- ✓ Replace ICP-based map merging with pose-graph optimization — Phase 10
+(None — awaiting v3.0 milestone definition)
 
 ### Out of Scope
 
@@ -40,25 +42,15 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - Deep learning SLAM backends (DROID-SLAM, DPV-SLAM, SL-SLAM) — requires NVIDIA GPU, defer to v3.0
 - Neural representation SLAM backends (Photo-SLAM, SplaTAM) — requires GPU, defer to v3.0
 - LiDAR SLAM — cameras only, system exists to replace LiDAR
+- Hot-swap SLAM algorithm mid-session — pre-session selection sufficient
 
-## Current Milestone: v2.0 Generic SLAM API
+## Current State
 
-**Goal:** Architect a pluggable SLAM backend abstraction that supports traditional, VIO, and classical methods with frontend controls for algorithm selection, parameter tuning, and live metrics comparison.
+**Shipped:** v2.0 Generic SLAM API (2026-03-25)
 
-**Target features:**
-- Generic SLAM API with registry pattern for pluggable backends
-- 4 real backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
-- Replace ICP map merging with pose-graph optimization
-- Frontend algorithm picker, parameter tuning, live metrics, output format toggle
-- Pre-session algorithm selection with hot-swap as stretch goal
-
-## Context
-
-Shipped v1.0 with 7,609 LOC Python + 2,486 LOC TypeScript.
-Tech stack: MuJoCo, Open3D (ICP + VoxelGrid), FastAPI, React, Three.js, Zustand.
-Pivoted from SimWorld (UE5, needed NVIDIA GPU) to MuJoCo (CPU-only) early in development.
-Removed dimos dependency — replaced pLCM transport with in-process pub/sub.
-Conducted systematic SLAM literature review (.research/) covering 40+ methods — informs backend selection and merge strategy.
+**Codebase:** ~18,400 LOC (Python + TypeScript), 219 files
+**Tech stack:** MuJoCo, Open3D, GTSAM (optional), FastAPI, React 18, Three.js, React Flow, Zustand 5
+**Tests:** 122+ passing (pytest), TypeScript clean on all pipeline/SLAM code
 
 ## Constraints
 
@@ -78,8 +70,10 @@ Conducted systematic SLAM literature review (.research/) covering 40+ methods �
 | In-process transport over dimos pLCM | dimos has broken imports (TracebackType); single-process doesn't need IPC | ✓ Good — zero dependencies |
 | WebStreamingViz over Rerun | Browser-accessible, no desktop app needed | ✓ Good — replaced Phase 4 Rerun path |
 | Position actuators over torque | Go2 XML uses motor (torque); position servos needed for gait control | ✓ Good — reliable trot gait |
-
-| Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | — Pending |
+| Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | ✓ Good — 4 backends plugged in cleanly |
+| Subprocess isolation for C++ backends | ORB-SLAM3/OpenVINS/SVO Pro crash risk; subprocess + ZMQ keeps main process alive | ✓ Good — crash detection + ICP fallback |
+| Pose-graph optimization over ICP merge | ICP union naive for multi-robot; PGO produces globally consistent maps | ✓ Good — Open3D PGO + GTSAM iSAM2 |
+| React Flow for pipeline editor | Only mature React node-graph library; ComfyUI-style UX | ✓ Good — 10 presets, typed ports, live animation |
 
 ---
-*Last updated: 2026-03-23 after Phase 13 completion*
+*Last updated: 2026-03-25 after v2.0 milestone completion*

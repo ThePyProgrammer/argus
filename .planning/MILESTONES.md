@@ -1,5 +1,36 @@
 # Milestones
 
+## v2.0 Generic SLAM API (Shipped: 2026-03-25)
+
+**Phases completed:** 7 phases, 24 plans, 46 tasks
+
+**Key accomplishments:**
+
+- Runtime-checkable SLAMProtocol interface, decorator-based SLAMRegistry, and ICPBackend wrapping existing SLAMPipeline with zero behavioral regression
+- All 5 SLAM consumer files migrated from SLAMPipeline to SLAMProtocol/SLAMRegistry with zero behavioral regression across 190+ passing tests
+- Four REST endpoints for SLAM backend discovery, selection, active query, and parameter management wired into FastAPI server with restart integration
+- Zustand slamStore with REST fetch, Vite /api proxy, extended WS message types, debounce utility, CSS spin keyframes, and three leaf UI components (CapabilityBadge, ConfirmModal, RestartOverlay)
+- Custom dropdown for SLAM backend selection with capability badges, schema-driven parameter sliders/toggles with debounced WebSocket sends, and confirmation modal for algorithm switching with restart polling
+- WebSocket slam_param_update handler with schema validation and per-param ack, useWebSocket SLAM message dispatchers, SceneViewer restart overlay, verified end-to-end in browser
+- Pluggable merge strategy abstraction with MergeProtocol, MergeRegistry, and ICP Union baseline wrapping existing MapMerger
+- Open3D PGO and GTSAM iSAM2 merge strategies with ICP loop closure detection and spawn transform fallback on ICP failure
+- Four merge strategy REST endpoints and MergeProtocol-based dispatch in Coordinator with backward-compatible MapMerger fallback
+- ORB-SLAM3 backend wrapping orbslam3-python with dense depth clouds, sparse feature metrics, RGBD/monocular modes, and mocked CI tests
+- Textured MuJoCo walls for ORB feature extraction plus robot marker color changes based on SLAM tracking status (green=OK, red=LOST, yellow=INITIALIZING/RELOCALIZING)
+- IMUReading dataclass and MuJoCo bridge sub-step IMU collection at physics rate for visual-inertial SLAM backends
+- Generic SubprocessSLAMBridge with ZMQ PAIR IPC, msgpack+numpy multipart wire protocol, 5s hang detection, and IPC socket cleanup
+- DSO backend via SubprocessSLAMBridge with visual-only mode, C++ ZMQ harness, and full crash->toast notification pipeline
+- MetricsTracker with per-robot ATE/RPE/ms_per_frame ring buffers, coordinator wiring feeding SLAM data into tracker, extended stats WebSocket with slam_metrics/baseline/metric_history, and metricsStore Zustand store with useWebSocket dispatch
+- Collapsible MetricsPanel with live per-robot SLAM table, vs-baseline sparkline comparison, and output format toggle buttons in ControlPanel
+- Three.js VoxelManager (InstancedMesh) and MeshManager (BufferGeometry) with Open3D Poisson mesh reconstruction and 300ms cross-fade transitions between point cloud, voxel grid, and mesh rendering modes
+- Pipeline type system with 7 port data types, 11 node definitions across 7 categories, Kahn's algorithm graph validation, parameter-override-aware serializer, and Zustand pipelineStore with React Flow integration
+- PipelineBuilder with DAG validation, NodeCatalog aggregating registries, REST API for apply/catalog/presets, and 3 built-in pipeline preset configs
+- Custom React Flow canvas with typed pipeline nodes (colored headers, port handles by data type, inline params, status badges) and animated flowing-dot edges
+- 4 surrounding panel components for pipeline graph editor: categorized node palette with drag-to-add, full-parameter inspector with live-tunable indicators, preset load/save dropdown, and apply bar with validation status
+- ViewToggle switches hero area between 3D Viewer and full Pipeline Editor layout, with WebSocket pipeline status dispatch to pipelineStore
+
+---
+
 ## v1.0 — Multi-Robot 3D Reconstruction MVP
 
 **Shipped:** 2026-03-23
