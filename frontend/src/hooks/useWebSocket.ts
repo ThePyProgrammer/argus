@@ -17,10 +17,10 @@ import type {
 } from '../utils/messageTypes';
 
 /**
- * WebSocket hook that connects to the C2 backend and dispatches
+ * WebSocket hook that connects to the Argus backend and dispatches
  * incoming messages to the appropriate Zustand stores.
  */
-export function useWebSocket(url: string = 'ws://localhost:8000/ws'): void {
+export function useWebSocket(url: string = `ws://${window.location.host}/ws`): void {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

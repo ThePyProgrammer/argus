@@ -133,6 +133,12 @@ def parse_args() -> argparse.Namespace:
         default=2,
         help="Number of robots (default: 2)",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Web server port (default: 8000)",
+    )
     return parser.parse_args()
 
 
@@ -299,10 +305,10 @@ def run_multi_mode(args: argparse.Namespace) -> None:
 
 
 def run_web_mode(args: argparse.Namespace) -> None:
-    """Run the C2 web interface: FastAPI + MuJoCo simulation together.
+    """Run the Argus web interface: FastAPI + MuJoCo simulation together.
 
     Starts the multi-robot simulation in a background thread and serves
-    the React C2 frontend via FastAPI at http://localhost:8000.
+    the React frontend via FastAPI.
     """
 
     scene = args.scene
@@ -366,7 +372,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     coordinator.set_viz(streaming_viz)
     if args.static:
         coordinator.set_freeze_motion(True)
-    logger.info("MCP endpoint available at http://localhost:8000/mcp")
+    logger.info("MCP endpoint available at http://localhost:%d/mcp", args.port)
 
     # Build React frontend
     frontend_dir = Path(__file__).parent.parent / "frontend"
@@ -494,7 +500,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)
     sim_thread.start()
 
-    print("Starting C2 interface at http://localhost:8000")
+    print(f"Starting Argus at http://localhost:{args.port}")
     logger.info("Robots: %s", config.robot_ids)
     logger.info("Scene: %s", scene)
     for rid, pos in config.spawn_positions.items():
@@ -503,9 +509,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
     logger.info("Press Ctrl+C to stop")
 
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="info")
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Shutting down C2 interface...")
+        logger.info("Shutting down Argus...")
     finally:
         coordinator.request_stop()
         sim_thread.join(timeout=5.0)
