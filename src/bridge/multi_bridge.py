@@ -88,6 +88,9 @@ class MultiRobotBridge:
         """
         import mujoco
 
+        self._viewer_handle = None
+        self._step_count = 0
+
         # Generate combined XML
         if self._config.scene == "office":
             xml_str, assets = build_two_robot_office_scene(
