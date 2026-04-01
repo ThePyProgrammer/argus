@@ -286,7 +286,7 @@ export default function SceneViewer() {
             target: [local.x, local.y, 0],
           },
         });
-        console.log(`[C2] Sending ${placing} to (${local.x.toFixed(1)}, ${local.y.toFixed(1)})`);
+        console.log(`[Argus] Sending ${placing} to (${local.x.toFixed(1)}, ${local.y.toFixed(1)})`);
         useControlStore.getState().setPlacingRobot(null);
       }
     };

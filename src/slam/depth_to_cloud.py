@@ -2,7 +2,7 @@
 
 Uses Open3D's create_from_depth_image for correct intrinsics math,
 then applies configurable Y/Z sign flips and pose transforms.
-Switchable at runtime from the C2 frontend.
+Switchable at runtime from the Argus frontend.
 """
 
 import numpy as np

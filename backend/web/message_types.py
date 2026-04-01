@@ -2,7 +2,7 @@
 
 Defines the Pydantic message envelope, message type constants,
 Okabe-Ito color palette, camera frame binary encoding, and
-delta point cloud tracking for the C2 web interface.
+delta point cloud tracking for the Argus web interface.
 """
 
 

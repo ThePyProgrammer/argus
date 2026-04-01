@@ -1,4 +1,4 @@
-"""FastAPI application with WebSocket endpoint for C2 interface.
+"""FastAPI application with WebSocket endpoint for Argus interface.
 
 Provides /ws endpoint for real-time robot data streaming and
 command reception. Uses ConnectionManager for client tracking
@@ -21,7 +21,7 @@ from src.slam.registry import SLAMRegistry
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="C2 Interface")
+app = FastAPI(title="Argus")
 
 
 def create_app(

@@ -151,7 +151,7 @@ class Coordinator:
         # Enable with: coordinator._describer = SceneDescriber(...)
         self._describer = None
 
-        # Web control flags (set via _command_handler from C2 interface)
+        # Web control flags (set via _command_handler from Argus interface)
         self._should_stop: bool = False
         self._paused: bool = False
         self._freeze_motion: bool = False  # set True to keep robots stationary
@@ -279,7 +279,7 @@ class Coordinator:
         self._subscribers: list[pLCMTransport] = []
 
     def _command_handler(self, command: dict) -> None:
-        """Handle control commands from the C2 web interface.
+        """Handle control commands from the Argus web interface.
 
         Supports:
             {"action": "stop"} -- terminate exploration

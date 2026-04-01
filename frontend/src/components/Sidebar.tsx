@@ -60,7 +60,7 @@ export default function Sidebar() {
               letterSpacing: '0.5px',
             }}
           >
-            C2 Command
+            Argus
           </h2>
           <span style={{ fontSize: '12px', color: '#888' }}>
             {formatTime(elapsed)}

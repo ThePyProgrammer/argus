@@ -44,10 +44,10 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   baseline: null,
   viewMode: 'live',
   outputMode: (() => {
-    const stored = localStorage.getItem('c2-outputMode');
+    const stored = localStorage.getItem('argus-outputMode');
     return stored === 'cloud' || stored === 'voxel' || stored === 'mesh' ? stored : 'cloud';
   })(),
-  outputHidden: localStorage.getItem('c2-outputHidden') === 'true',
+  outputHidden: localStorage.getItem('argus-outputHidden') === 'true',
   history: {},
   meshVertices: null,
   meshFaces: null,
@@ -69,11 +69,11 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   setBaseline: (baseline) => set({ baseline }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setOutputMode: (mode) => {
-    localStorage.setItem('c2-outputMode', mode);
+    localStorage.setItem('argus-outputMode', mode);
     set({ outputMode: mode });
   },
   setOutputHidden: (hidden) => {
-    localStorage.setItem('c2-outputHidden', String(hidden));
+    localStorage.setItem('argus-outputHidden', String(hidden));
     set({ outputHidden: hidden });
   },
   updateHistory: (robotId, history) =>

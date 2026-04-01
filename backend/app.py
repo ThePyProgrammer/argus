@@ -1,4 +1,4 @@
-"""Backend entry point for the C2 web interface.
+"""Backend entry point for the Argus web interface.
 
 Run with:
     uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload

@@ -7,7 +7,7 @@ Provides tools that Claude Code can call to control robots:
 - send_command: Pause/resume/stop/set_speed
 - get_coverage: Current exploration coverage stats
 
-Runs as a FastAPI HTTP endpoint at /mcp alongside the C2 WebSocket.
+Runs as a FastAPI HTTP endpoint at /mcp alongside the Argus WebSocket.
 
 Protocol: JSON-RPC 2.0 (same as DimOS MCP server)
 """

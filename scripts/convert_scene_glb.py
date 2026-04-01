@@ -2,7 +2,7 @@
 """Convert OBJ scene files to a single GLB for Three.js rendering.
 
 Loads all OBJ files from the DimOS office scene directory and exports
-them as a single GLB file suitable for the C2 frontend 3D viewer.
+them as a single GLB file suitable for the Argus frontend 3D viewer.
 
 Input:  dimos/data/mujoco_sim/scene_office1/office_split/*.obj
 Output: frontend/public/scene.glb

@@ -14,3 +14,10 @@ dist/
 # ORB-SLAM3 vocabulary (too large for git, ~40MB)
 models/orbslam3/ORBvoc.txt
 models/orbslam3/ORBvoc.bin
+
+# Large binary assets
+references/
+frontend/public/scene_colored.glb
+
+# Generated files
+frontend/tsconfig.tsbuildinfo
