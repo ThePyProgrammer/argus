@@ -101,18 +101,58 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 ## Traceability
 
-Filled in by roadmapper. Each requirement must map to exactly one phase.
+Each requirement maps to exactly one phase. Filled by roadmapper 2026-04-13.
 
 | Requirement | Phase |
 |-------------|-------|
-| DET-API-01..07 | TBD |
-| DET-MODELS-01..08 | TBD |
-| DET-3D-01..07 | TBD |
-| DET-UI-01..06 | TBD |
-| DET-METRICS-01..05 | TBD |
-| DET-PIPELINE-01..05 | TBD |
-| DET-STRETCH-01..04 | TBD (stretch, last phase) |
+| DET-API-01 | Phase 1 (detector-api-foundation) |
+| DET-API-02 | Phase 1 (detector-api-foundation) |
+| DET-API-03 | Phase 1 (detector-api-foundation) |
+| DET-API-04 | Phase 2 (per-robot-worker-and-wire-plumbing) |
+| DET-API-05 | Phase 2 (per-robot-worker-and-wire-plumbing) |
+| DET-API-06 | Phase 1 (detector-api-foundation) |
+| DET-API-07 | Phase 1 (detector-api-foundation) |
+| DET-MODELS-01 | Phase 1 (detector-api-foundation) |
+| DET-MODELS-02 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-MODELS-03 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-MODELS-04 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-MODELS-05 | Phase 2 (per-robot-worker-and-wire-plumbing) |
+| DET-MODELS-06 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-MODELS-07 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-MODELS-08 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| DET-3D-01 | Phase 4 (real-3d-obb-pipeline) |
+| DET-3D-02 | Phase 4 (real-3d-obb-pipeline) |
+| DET-3D-03 | Phase 2 (per-robot-worker-and-wire-plumbing) |
+| DET-3D-04 | Phase 2 (per-robot-worker-and-wire-plumbing) |
+| DET-3D-05 | Phase 4 (real-3d-obb-pipeline) |
+| DET-3D-06 | Phase 4 (real-3d-obb-pipeline) |
+| DET-3D-07 | Phase 4 (real-3d-obb-pipeline) |
+| DET-UI-01 | Phase 3 (frontend-picker-and-ui) |
+| DET-UI-02 | Phase 3 (frontend-picker-and-ui) |
+| DET-UI-03 | Phase 3 (frontend-picker-and-ui) |
+| DET-UI-04 | Phase 3 (frontend-picker-and-ui) |
+| DET-UI-05 | Phase 3 (frontend-picker-and-ui) |
+| DET-UI-06 | Phase 3 (frontend-picker-and-ui) |
+| DET-METRICS-01 | Phase 6 (detection-metrics-and-mujoco-gt) |
+| DET-METRICS-02 | Phase 6 (detection-metrics-and-mujoco-gt) |
+| DET-METRICS-03 | Phase 6 (detection-metrics-and-mujoco-gt) |
+| DET-METRICS-04 | Phase 6 (detection-metrics-and-mujoco-gt) |
+| DET-METRICS-05 | Phase 6 (detection-metrics-and-mujoco-gt) |
+| DET-PIPELINE-01 | Phase 7 (pipeline-editor-perception-nodes) |
+| DET-PIPELINE-02 | Phase 7 (pipeline-editor-perception-nodes) |
+| DET-PIPELINE-03 | Phase 7 (pipeline-editor-perception-nodes) |
+| DET-PIPELINE-04 | Phase 7 (pipeline-editor-perception-nodes) |
+| DET-PIPELINE-05 | Phase 7 (pipeline-editor-perception-nodes) |
+| DET-STRETCH-01 | Phase 8 (stretch-tracker-fusion-semantic-map) |
+| DET-STRETCH-02 | Phase 8 (stretch-tracker-fusion-semantic-map) |
+| DET-STRETCH-03 | Phase 8 (stretch-tracker-fusion-semantic-map) |
+| DET-STRETCH-04 | Phase 8 (stretch-tracker-fusion-semantic-map) |
+
+**Coverage:** 42/42 requirements mapped ✓
+**Orphans:** none
+**Duplicates:** none
 
 ---
 
 *Defined: 2026-04-13 — pre-roadmap*
+*Traceability filled: 2026-04-13 — 8 phases, 100% coverage*
