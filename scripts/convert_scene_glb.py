@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Convert OBJ scene files to a single GLB for Three.js rendering.
 
-Loads all OBJ files from the DimOS office scene directory and exports
+Loads all OBJ files from the office scene directory and exports
 them as a single GLB file suitable for the Argus frontend 3D viewer.
 
-Input:  dimos/data/mujoco_sim/scene_office1/office_split/*.obj
+Input:  data/scenes/scene_office1/office_split/*.obj
 Output: frontend/public/scene.glb
 
 Methods (tried in order):
@@ -29,8 +29,8 @@ def find_default_input_dir() -> Path:
     """Locate the default OBJ input directory."""
     project_root = Path(__file__).parent.parent
     candidates = [
-        project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1" / "office_split",
-        project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1",
+        project_root / "data" / "scenes" / "scene_office1" / "office_split",
+        project_root / "data" / "scenes" / "scene_office1",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -339,7 +339,7 @@ def main():
         "--input-dir",
         type=Path,
         default=None,
-        help="Directory containing .obj files (default: dimos/data/mujoco_sim/scene_office1/office_split/)",
+        help="Directory containing .obj files (default: data/scenes/scene_office1/office_split/)",
     )
     parser.add_argument(
         "--output",
@@ -357,7 +357,7 @@ def main():
         "--xml",
         type=Path,
         default=None,
-        help="MuJoCo XML path (default: dimos/data/mujoco_sim/scene_office1.xml)",
+        help="MuJoCo XML path (default: data/scenes/scene_office1.xml)",
     )
     args = parser.parse_args()
 
@@ -371,8 +371,7 @@ def main():
 
     if not input_dir.exists():
         print(f"ERROR: Input directory does not exist: {input_dir}")
-        print("Ensure the DimOS scene data is available:")
-        print("  cd dimos && git lfs pull --include 'data/.lfs/mujoco_sim.tar.gz'")
+        print("Ensure the office scene data is available at data/scenes/scene_office1/.")
         sys.exit(1)
 
     # Try trimesh first (most portable), then gltfpack
@@ -391,7 +390,7 @@ def main():
     # Generate colored GLB if requested
     if args.colored:
         project_root = Path(__file__).parent.parent
-        xml_path = args.xml or (project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1.xml")
+        xml_path = args.xml or (project_root / "data" / "scenes" / "scene_office1.xml")
         colored_output = output.parent / "scene_colored.glb"
 
         if not xml_path.exists():

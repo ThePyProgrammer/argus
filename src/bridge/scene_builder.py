@@ -167,36 +167,20 @@ def build_two_robot_scene(
 
 
 def _find_dimos_scene_data() -> Path:
-    """Locate the DimOS mujoco_sim data directory.
-
-    Checks for extracted data at dimos/data/mujoco_sim/. If not found,
-    attempts to extract from the LFS archive.
+    """Locate the office scene data directory.
 
     Returns:
-        Path to the mujoco_sim directory containing scene XMLs and assets.
+        Path to the scenes directory containing scene XMLs and assets.
 
     Raises:
-        FileNotFoundError: If data cannot be found or extracted.
+        FileNotFoundError: If data cannot be found.
     """
-    # Relative to project root
     project_root = Path(__file__).parent.parent.parent
-    data_dir = project_root / "dimos" / "data" / "mujoco_sim"
+    data_dir = project_root / "data" / "scenes"
     if data_dir.exists():
         return data_dir
 
-    # Try extracting from LFS archive
-    archive = project_root / "dimos" / "data" / ".lfs" / "mujoco_sim.tar.gz"
-    if archive.exists():
-        import tarfile
-        with tarfile.open(str(archive), "r:gz") as tar:
-            tar.extractall(archive.parent.parent)
-        if data_dir.exists():
-            return data_dir
-
-    raise FileNotFoundError(
-        f"DimOS mujoco_sim data not found at {data_dir}. "
-        "Run: cd dimos && git lfs pull --include 'data/.lfs/mujoco_sim.tar.gz'"
-    )
+    raise FileNotFoundError(f"Office scene data not found at {data_dir}.")
 
 
 def build_two_robot_office_scene(

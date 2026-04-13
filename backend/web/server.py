@@ -76,7 +76,7 @@ def _mount_static_dirs() -> None:
     """Mount static file directories for frontend assets."""
     project_root = Path(__file__).parent.parent.parent
 
-    scene_dir = project_root / "dimos" / "data" / "mujoco_sim" / "scene_office1"
+    scene_dir = project_root / "data" / "scenes" / "scene_office1"
     if scene_dir.exists():
         try:
             app.mount("/scene-data", StaticFiles(directory=str(scene_dir)), name="scene_assets")
