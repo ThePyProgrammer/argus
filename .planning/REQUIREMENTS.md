@@ -16,7 +16,7 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 - [ ] **DET-API-03**: System exposes separate `Detection3DProtocol` + `Detection3DRegistry` for 3D lifters (PCA-OBB, median-depth, etc.), with `outputs_3d_natively` capability flag so end-to-end backends bypass the lifter
 - [ ] **DET-API-04**: Each robot runs its own `DetectorWorker` thread with a single-slot latest-frame queue (newest-wins backpressure); worker pool is keyed by robot_id
 - [ ] **DET-API-05**: Every detection result carries `capture_pose` + `capture_timestamp` from the submission time so downstream consumers do not re-associate stale poses
-- [ ] **DET-API-06**: Process-global thread-pool configuration (`torch`, `OMP`, `MKL`, `OPENBLAS`) is set in `src/_thread_config.py` before any torch import; no module-scope `torch.set_num_threads()` in individual files
+- [x] **DET-API-06**: Process-global thread-pool configuration (`torch`, `OMP`, `MKL`, `OPENBLAS`) is set in `src/_thread_config.py` before any torch import; no module-scope `torch.set_num_threads()` in individual files
 - [ ] **DET-API-07**: Every backend `__init__` calls `model.eval()` and wraps inference in `torch.inference_mode()`; enforced by a smoke test that caps RSS growth at 200 MB after 100 inferences
 
 ### DET-MODELS — Detection Backends

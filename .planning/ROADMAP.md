@@ -34,8 +34,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. No file outside `src/_thread_config.py` calls `torch.set_num_threads()` at module scope, and `main.py` imports `_thread_config` before any `torch` import.
   5. `Detection3DRegistry` exposes the placeholder `MedianDepthLifter` with `outputs_oriented=False` and an `outputs_3d_natively` capability flag is queryable on every detector.
 **Plans**: 5 plans
-- [ ] 01-01-PLAN.md — Thread config + main.py wiring + detector.py:25 removal + grep invariant test
-- [ ] 01-02-PLAN.md — src/perception/types.py + protocol.py (DetectorProtocol, Detection3DProtocol, TorchBackendMixin)
+- [x] 01-01-PLAN.md — Thread config + main.py wiring + detector.py:25 removal + grep invariant test
+- [x] 01-02-PLAN.md — src/perception/types.py + protocol.py (DetectorProtocol, Detection3DProtocol, TorchBackendMixin)
 - [ ] 01-03-PLAN.md — src/perception/registry.py (DetectorRegistry + Detection3DRegistry + decorators + D-05/D-06 enforcement)
 - [ ] 01-04-PLAN.md — MedianDepthLifter + lifters package + ObjectDetector._detect rewire (closes Pitfall P3)
 - [ ] 01-05-PLAN.md — YOLOv11Backend + backends package + main.py side-effect imports + D-12 regression test + RSS smoke test
@@ -143,7 +143,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. detector-api-foundation | 0/5 | Planned | - |
+| 1. detector-api-foundation | 2/5 | In Progress|  |
 | 2. per-robot-worker-and-wire-plumbing | 0/TBD | Not started | - |
 | 3. frontend-picker-and-ui | 0/TBD | Not started | - |
 | 4. real-3d-obb-pipeline | 0/TBD | Not started | - |
