@@ -4,6 +4,8 @@ import os as _os
 _os.environ["NNPACK_DISABLE"] = "1"
 _os.environ["TORCH_CPP_LOG_LEVEL"] = "ERROR"
 
+import src._thread_config  # noqa: F401 -- sets OMP/MKL/torch threads before any torch import (D-14)
+
 """Main entry point: MuJoCo bridge -> SLAM -> OctoMap -> Rerun visualization.
 
 Wires all Phase 1 modules into a single run loop:
