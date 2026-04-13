@@ -1,650 +1,867 @@
 # Architecture Patterns
 
-**Domain:** Generic SLAM API abstraction layer for multi-robot 3D reconstruction
-**Researched:** 2026-03-23
-**Confidence:** HIGH -- based on direct codebase analysis of 7,609 LOC Python + 2,486 LOC TypeScript and existing SLAM literature review (.research/)
+**Domain:** Pluggable object detection + 3D bounding box regression extending an existing multi-robot 3D reconstruction system
+**Researched:** 2026-04-13
+**Confidence:** HIGH — derived from direct read of the v2.0 shipped codebase (`src/slam/protocol.py`, `src/slam/registry.py`, `src/slam/backends/subprocess_bridge.py`, `src/slam/backends/orbslam3_backend.py`, `src/coordination/coordinator.py`, `src/perception/detector.py`, `src/perception/detection_3d.py`, `backend/web/slam_routes.py`, `backend/web/server.py`, `backend/web/streaming_viz.py`, `frontend/src/stores/slamStore.ts`, `frontend/src/stores/pipelineStore.ts`, `frontend/src/utils/pipelineTypes.ts`, `frontend/src/utils/nodeDefinitions.ts`, `frontend/src/utils/pipelineValidation.ts`, `frontend/src/components/DetectionBoxes.ts`, `frontend/src/components/pipeline/PipelineNode.tsx`) and the v2.0 research archive (`.planning/milestones/v2.0-research/ARCHITECTURE.md`).
 
 ## Recommended Architecture
 
-### Design Principle: Strategy Pattern with Registry
+### Design Principle: Mirror the SLAM v2.0 Strategy-Registry Pattern with a Two-Stage Perception Pipeline
 
-The SLAM API abstraction is a **Strategy pattern** with a runtime-selectable backend, mediated by a **Registry** that maps string keys to backend factory functions. The abstraction layer sits between `ExplorationLoop` (consumer) and the concrete SLAM implementation (provider), replacing the current hard-wired `SLAMPipeline` class.
+v3.0 introduces a clean split that the current `ObjectDetector` monolith conflates:
 
-### Current Data Flow (v1.0)
+1. **Detection2D stage** — takes an RGB frame (optionally RGBD), returns 2D detections (class, score, bbox) plus backend-specific auxiliaries (mask, features, text logits).
+2. **Detection3D stage** — takes 2D detections + depth + pose + optional `slam_cloud`, returns oriented 3D bounding boxes in world frame.
 
-```
-MuJoCoBridge.step()
-  -> SensorFrame (rgb, depth, ground_truth_pose, sim_time)
-    -> SLAMPipeline.process_frame(frame) -> 4x4 pose
-      -> OctoMapBuilder.insert_scan(last_frame_cloud, current_pos)
-        -> MapMerger.merge_from_voxels() [on rescan event]
-```
-
-Key observations from codebase:
-- `SLAMPipeline` is instantiated in `RobotInstance.create()` with only `intrinsics` arg
-- `ExplorationLoop.__init__()` takes `slam: "SLAMPipeline"` (string type hint, not protocol)
-- `Coordinator` accesses `robot.slam.slam_poses`, `robot.slam.last_frame_cloud`, `robot.slam.num_frames_processed`, `robot.slam.get_cloud_points()`, `robot.slam.get_cloud_colors()`
-- `RobotInstance.get_cloud_data()` delegates to `self.slam.get_cloud_points()` and `self.slam.get_cloud_colors()`
-- `ExplorationLoop._update_slam()` calls `self._slam.process_frame(frame)` and `self._slam.last_frame_cloud`
-
-### Proposed Data Flow (v2.0)
+Both stages are independently pluggable through their own Protocol + Registry pair, modelled exactly on `SLAMProtocol` / `SLAMRegistry`. This gives three axes of variation instead of one:
 
 ```
-MuJoCoBridge.step()
-  -> SensorFrame (rgb, depth, ground_truth_pose, sim_time)
-    -> SLAMBackend.process_frame(frame) -> SLAMResult(pose, cloud_points, cloud_colors, metrics)
-      -> OctoMapBuilder.insert_scan(result.cloud_points, current_pos)
-        -> PoseGraphMerger.add_pose(robot_id, result) [replaces MapMerger on rescan]
-          -> PoseGraphMerger.optimize() -> corrected poses + merged map
+DetectorRegistry (2D)  ×  Detection3DRegistry (3D lifter)  ×  [optional] TrackerRegistry (temporal)
+```
+
+A `YOLOv11 + MedianDepthLifter` pipe is behaviourally equivalent to v2.x today; a `BoxeR + PointCluster3DLifter` pipe produces real oriented 3D boxes; a `GroundingDINO + OmniBox3DLifter` pipe is open-vocabulary. No backend needs to own both stages.
+
+### Current Data Flow (v2.0 — what is)
+
+```
+Coordinator._send_viz_update (every 10 sim steps)
+  -> ObjectDetector.submit_frame(rid, rgb, depth, pose, slam_cloud=None)
+     (stores in _pending_frames dict; background thread)
+  -> ObjectDetector._detect (YOLO, single thread for ALL robots)
+     -> median-depth projection inline inside _detect()
+     -> writes to _results[rid]: list[Detection(bbox, center_3d, depth_m)]
+  -> Coordinator reads detector.get_detections(rid), serializes to dict
+  -> RobotVizData.detections (list[dict])
+  -> streaming_viz emits WS message {"type":"detections", "robot_id":rid,
+                                      "payload":{"detections":[{class, bbox, pos_3d, depth}]}}
+  -> frontend DetectionBoxManager reconstructs AABB from (pos_3d, bbox, depth)
+     using hardcoded 70° FOV and imgH=480 to back-compute worldW/worldH
+```
+
+Pain points this architecture must remove:
+- `ObjectDetector` is a class, not a Protocol — no pluggability
+- 2D→3D is hard-coded median-depth projection with duplicated math in Python (`detection_3d.py`) AND JS (`DetectionBoxes.ts`)
+- Frontend re-derives bbox size from pixel bbox + depth — implicit coupling to camera intrinsics the frontend should not know about
+- No per-robot backend selection, no parameter schema, no capability advertising, no crash isolation for heavy models
+- Detection path is invisible to the pipeline editor (which already has typed ports and SLAM/merger nodes)
+
+### Proposed Data Flow (v3.0)
+
+```
+MuJoCoBridge.step() -> SensorFrame(rgb, depth, sim_time, ground_truth_pose)
+  -> Coordinator.run() inner loop (existing, once per sim step):
+       For each robot rid:
+         DetectorWorker[rid].submit(SensorFrame, cam_pose, slam_cloud?)
+             (non-blocking; drops if queue full -- backpressure)
+       
+       DetectorWorker[rid]  -- one thread per robot, per Coordinator:
+         detector_2d.process_frame(frame) -> Detections2D
+         detection_3d.lift(detections_2d, frame, pose, slam_cloud)
+             -> Detections3D (oriented boxes, class, score, track_id?)
+         writes to latest_detections[rid] (lock-protected)
+  -> Coordinator._send_viz_update (every 10 sim steps):
+       reads latest_detections[rid]
+       packs into RobotVizData.detections_3d (NEW field) + legacy detections (2D)
+  -> WebStreamingViz emits:
+       {"type":"detections_3d", "robot_id":rid, "payload": Detections3DPayload}
+       (supersedes legacy "detections"; legacy kept during transition)
+  -> Frontend DetectionBoxManager consumes oriented boxes directly
+     (center, half_extents, quaternion -- no intrinsics recomputation)
+```
+
+Crash path (mirrors SLAM):
+```
+SubprocessDetectorBridge hangs (>5s) or subprocess dies
+  -> DetectorWorker catches None return from bridge.send_frame()
+  -> Falls back to registry default "yolo11n_median" for this robot
+  -> Coordinator emits WS {"type":"crash_fallback", ..., "subsystem":"detector"}
+  -> Frontend CrashToast surfaces "BoxeR crashed, falling back to YOLO11n"
 ```
 
 ## Component Boundaries
 
-### New Components
+### New Components (Python)
 
 | Component | File | Responsibility | Communicates With |
-|-----------|------|---------------|-------------------|
-| `SLAMProtocol` | `src/slam/protocol.py` | ABC defining the backend contract | All backends implement it |
-| `SLAMResult` | `src/slam/protocol.py` | Immutable dataclass returned by every backend | ExplorationLoop, Coordinator, OctoMapBuilder, viz |
-| `SLAMMetrics` | `src/slam/protocol.py` | Per-frame timing, fitness, inlier ratio | Stats streaming, frontend metrics panel |
-| `SLAMRegistry` | `src/slam/registry.py` | Maps string keys to backend factories; validates config | RobotInstance.create(), Coordinator, WebSocket handler |
-| `ICPBackend` | `src/slam/backends/icp_backend.py` | Wraps existing SLAMPipeline logic, implements SLAMProtocol | SLAMRegistry |
-| `ORBBackend` | `src/slam/backends/orb_backend.py` | ORB-SLAM3 wrapper via subprocess/pybind | SLAMRegistry |
-| `OpenVINSBackend` | `src/slam/backends/openvins_backend.py` | OpenVINS wrapper | SLAMRegistry |
-| `SVOBackend` | `src/slam/backends/svo_backend.py` | SVO Pro wrapper | SLAMRegistry |
-| `PoseGraphMerger` | `src/coordination/pose_graph_merger.py` | Replaces MapMerger; Open3D-based pose graph optimization | Coordinator |
+|-----------|------|----------------|-------------------|
+| `Detections2D` | `src/perception/protocol.py` | Immutable dataclass: N detections × {class_id, class_name, score, bbox xyxy, mask?, features?, instance_id?} | Detector backends (produce), Detection3D backends (consume) |
+| `OrientedBox3D` | `src/perception/protocol.py` | Immutable dataclass: center (3,), half_extents (3,), quaternion (4,), class_id, class_name, score, track_id?, source_2d_idx | Detection3D backends (produce), Coordinator, WS serialization |
+| `Detections3D` | `src/perception/protocol.py` | Immutable wrapper: list[OrientedBox3D] + per-frame metrics (inference_ms, lifter_ms, n_raw, n_filtered) | viz, MetricsPanel |
+| `DetectorInput` | `src/perception/protocol.py` | Enum-like capability: `RGB_ONLY`, `RGBD`, `RGB_STEREO`, `RGB_TEXT_PROMPT` | Registry (advertises on backends) |
+| `DetectorProtocol` | `src/perception/protocol.py` | `@runtime_checkable Protocol` mirroring `SLAMProtocol`. Methods: `process_frame(SensorFrame, text_prompt: str \| None) -> Detections2D`, `reset()`, `get_metrics()`. Class attrs: `CAPABILITIES`, `PARAMETER_SCHEMA`, `INPUT_TYPE: DetectorInput`, `CLASS_NAMES: list[str] \| None`. | DetectorRegistry, DetectorWorker |
+| `Detection3DProtocol` | `src/perception/protocol.py` | `@runtime_checkable Protocol`. Methods: `lift(Detections2D, SensorFrame, pose: (4,4), slam_cloud: (N,3) \| None, intrinsics) -> Detections3D`, `reset()`. Class attrs: `CAPABILITIES` (e.g. `requires_depth`, `requires_point_cloud`, `outputs_oriented`), `PARAMETER_SCHEMA`. | DetectorWorker |
+| `DetectorRegistry` | `src/perception/registry.py` | Exact clone of `SLAMRegistry`: `_backends: dict[str, {class_path, display}]`, `register`, `list_backends`, `create`, `get_default`. Default = `"yolo11n"`. | FastAPI routes, main.py discovery |
+| `Detection3DRegistry` | `src/perception/registry.py` | Same pattern, separate class. Default = `"median_depth"` (replicates current behaviour). | FastAPI routes |
+| `@detector` decorator | `src/perception/registry.py` | `@detector(name="boxer", display="BoxeR", input=DetectorInput.RGB_ONLY)` — mirror of `@slam_backend`. | Backend modules |
+| `@detection_3d` decorator | `src/perception/registry.py` | Same pattern for 3D lifters. | Backend modules |
+| `YOLOv11Backend` | `src/perception/backends/yolov11_backend.py` | In-process wrapper of `ObjectDetector._detect()` logic, conforming to `DetectorProtocol`. Optional: `torch.no_grad()`. INPUT_TYPE = `RGB_ONLY`. | Registry |
+| `BoxeRBackend` | `src/perception/backends/boxer_backend.py` | Composes `SubprocessDetectorBridge`, mirrors `OpenVINSBackend` pattern — out-of-process because transformer + torch weights risk crash / memory. INPUT_TYPE = `RGB_ONLY`. | SubprocessDetectorBridge |
+| `GroundingDINOBackend` | `src/perception/backends/grounding_dino_backend.py` | Composes `SubprocessDetectorBridge`. INPUT_TYPE = `RGB_TEXT_PROMPT` — backend advertises that it expects a text prompt param. | SubprocessDetectorBridge |
+| `SubprocessDetectorBridge` | `src/perception/subprocess_bridge.py` | **Separate file** (not `SLAM` bridge) but mirrors its structure exactly. Same ZMQ PAIR + msgpack + multipart protocol, same 5s `HANG_TIMEOUT_MS`, same crash detection + cleanup. Multipart: `[header, rgb_bytes, depth_bytes?, text_prompt_bytes?] -> [header, det_array_bytes]`. See "Subprocess Protocol" section. | BoxeR, GroundingDINO, any future heavy backend |
+| `MedianDepthLifter` | `src/perception/lifters/median_depth.py` | Wraps current `project_detections_to_3d` logic; returns **AABB** `OrientedBox3D` (identity quaternion). Advertises `outputs_oriented=False`. | Detection3DRegistry |
+| `PointClusterLifter` | `src/perception/lifters/point_cluster.py` | For each 2D bbox: carve depth pixels inside bbox → project to camera frame → transform to world → **PCA + RANSAC plane fit** → oriented box via PCA eigenvectors. Optional: use `slam_cloud` for better point support. Advertises `outputs_oriented=True`, `requires_depth=True`. | Detection3DRegistry |
+| `OmniBox3DLifter` | `src/perception/lifters/omnibox3d.py` | Learned RGBD → 3D box regressor (discovered by FEATURES research). Subprocess-gated (heavy torch model). Advertises `outputs_oriented=True`, `requires_depth=True`, `uses_learned_model=True`. | SubprocessDetectorBridge |
+| `DetectorWorker` | `src/perception/detector_worker.py` | **One per robot**. Owns a `DetectorProtocol` instance + `Detection3DProtocol` instance. Has a single-slot queue (`_pending`) and a thread that runs detect → lift. Writes to `_latest: Detections3D`. Implements `submit(frame, pose, slam_cloud)`, `get_latest()`, `apply_params(dict) -> dict`, `reset()`, `stop()`. | Coordinator |
+| `DetectorWorkerPool` | `src/perception/detector_worker.py` | `{rid -> DetectorWorker}`. Constructed by Coordinator at startup / restart based on app.state pending backend names. Supports *different backend per robot* (stretch) but defaults to same backend for all robots. | Coordinator |
+| `detector_routes.py` | `backend/web/detector_routes.py` | FastAPI router `/api/detectors/*` and `/api/detectors/lifter-*`. Exact clone of `slam_routes.py` shape. | server.py, SLAMRegistry patterns |
 
-### Modified Components
+### New Components (Frontend)
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| `DetectorBackend` type + `detectorStore` | `frontend/src/stores/detectorStore.ts` | Mirror of `slamStore.ts`. State: `backends`, `activeBackend`, `activeDisplay`, `activeParameters`, `stagedParams`, `isRestarting`, `crashMessage`, plus **`lifters`, `activeLifter`** (the 3D stage is displayed alongside but is its own registry). `fetchDetectorState()` fetches `/api/detectors/backends` + `/api/detectors/active` + `/api/detectors/lifters` + `/api/detectors/active-lifter`. |
+| `DetectorDropdown` | `frontend/src/components/DetectorDropdown.tsx` | Mirror of `AlgorithmDropdown`. Shows available detector backends; triggers `POST /api/detectors/select`. |
+| `LifterDropdown` | `frontend/src/components/LifterDropdown.tsx` | Same pattern for 3D lifter. Hidden when the active detector advertises `outputs_3d_natively = True` (e.g. OmniBox3D). |
+| `DetectorSection` | `frontend/src/components/DetectorSection.tsx` | Sidebar section bundling DetectorDropdown + LifterDropdown + ParameterPanel rewired to `detectorStore`. |
+| `DetectionMetricsCard` | `frontend/src/components/DetectionMetricsCard.tsx` | Live detection FPS, #detections, mean confidence per robot. Added to `MetricsPanel`. |
+| `DetectorNode`, `Detection3DNode`, `TrackerNode` definitions | `frontend/src/utils/nodeDefinitions.ts` | Three new `NodeDefinition` entries (see "Pipeline Editor Integration"). |
+
+### Modified Components (Python)
 
 | Component | File | What Changes | Why |
 |-----------|------|-------------|-----|
-| `RobotInstance` | `src/coordination/robot_instance.py` | `slam: SLAMPipeline` -> `slam: SLAMProtocol`; factory takes `algorithm` param | Backend-agnostic robot pipeline |
-| `ExplorationLoop` | `src/exploration/exploration_loop.py` | Type hint `SLAMPipeline` -> `SLAMProtocol`; use `SLAMResult` instead of direct property access | Decouples from ICP implementation |
-| `Coordinator` | `src/coordination/coordinator.py` | Use `PoseGraphMerger` instead of `MapMerger`; forward algorithm-change commands; include metrics in viz data | Pose-graph merging + algorithm control |
-| `WebStreamingViz` | `backend/web/streaming_viz.py` | Add `slam_metrics` message type; include algorithm name in stats | Frontend needs to display per-algorithm metrics |
-| `server.py` | `backend/web/server.py` | Handle `set_algorithm` WS message type; forward to Coordinator | Frontend algorithm picker communication path |
-| `main.py` | `src/main.py` | Use `SLAMRegistry` to resolve backend by name; pass to `RobotInstance.create()` | Entry point wiring |
-| `robotStore.ts` | `frontend/src/stores/robotStore.ts` | Add `algorithm`, `slamMetrics` fields to `RobotInfo` | Display current algorithm and metrics |
-| `controlStore.ts` | `frontend/src/stores/controlStore.ts` | Add `availableAlgorithms`, `activeAlgorithm`, `setAlgorithm` | Algorithm picker state |
-| `useWebSocket.ts` | `frontend/src/hooks/useWebSocket.ts` | Handle `slam_algorithms` and `slam_metrics` message types | Route new messages to stores |
-| `ControlPanel.tsx` | `frontend/src/components/ControlPanel.tsx` | Add algorithm picker dropdown (pre-session) | User-facing algorithm selection |
+| `src/perception/detector.py` | — | **Gut.** Keep only: the COCO `INDOOR_CLASSES` dict (moved to `yolov11_backend.py`). `ObjectDetector` class is replaced by `DetectorWorker` + `YOLOv11Backend`. The existing inline 2D→3D math moves into `MedianDepthLifter`. | Backwards-compat path: file becomes a shim that re-exports `Detection` (now `OrientedBox3D`) for one release cycle, then deletes. |
+| `src/perception/detection_3d.py` | — | Becomes `src/perception/lifters/median_depth.py`. The `project_detections_to_3d` function is repackaged as `MedianDepthLifter.lift()`. | Same logic, correct location. |
+| `Coordinator.__init__` | `src/coordination/coordinator.py` | Replace the `self._detector = ObjectDetector(...)` block (lines 139-148) with `self._worker_pool = DetectorWorkerPool.create_from_app_state(robots.keys(), app_state)`. | Per-robot isolation + registry-driven construction. |
+| `Coordinator._send_viz_update` | `src/coordination/coordinator.py` | Replace the `self._detector.submit_frame(...)` call (line 637-641) with `self._worker_pool.submit(rid, frame, pose, slam_cloud=cloud_pts if self._worker_pool.needs_slam_cloud(rid) else None)`. Replace the detections dict-building (line 646-654) with `self._worker_pool.get_latest(rid).to_payload()`. | Worker pool replaces inline threading. |
+| `Coordinator.reset_for_restart` | `src/coordination/coordinator.py` | Tear down old `DetectorWorkerPool`, construct a new one from `app.state.pending_detector_backend` + `pending_lifter` + `pending_detector_params`. | Mirrors how SLAM backend swap already works on restart. |
+| `RobotVizData` | `src/coordination/coordinator.py` | Add `detections_3d: Detections3D \| None` (keeps legacy `detections: list[dict]` for one release). | Typed payload. |
+| `streaming_viz.py` | `backend/web/streaming_viz.py` | New message emitter in `_update_robots`: if `data.get("detections_3d")`, emit `{"type":"detections_3d", "robot_id":rid, "payload": {...serialized OrientedBox3D list..., "metrics": {...}}}`. Keep existing "detections" emitter gated on a compat flag for one release. | New wire format for oriented boxes + per-frame metrics. |
+| `message_types.py` | `backend/web/message_types.py` | Add `DETECTIONS_3D = "detections_3d"` constant. | Consistency with existing constants. |
+| `server.py` | `backend/web/server.py` | Add `app.state.active_detector_backend = "yolo11n"`, `pending_detector_backend`, `pending_detector_params`, `active_lifter`, `pending_lifter`. Include `detector_routes` router. Add `detector_param_update` WS dispatch mirroring `slam_param_update` (lines 124-151). | State scaffolding + router. |
+| `main.py` (startup) | `src/main.py` | After `import src.slam.backends.*`, add `import src.perception.backends.yolov11_backend` (always), then `try-importlib` dance for `boxer_backend`, `grounding_dino_backend`, `omnibox3d_lifter`. Same graceful-degradation pattern the SLAM layer uses. | Registry self-registration. |
+| `useWebSocket.ts` | `frontend/src/hooks/useWebSocket.ts` | Add case for `detections_3d` → route to `robotStore.updateDetections3D(rid, payload)`. Handle `detector_param_ack`, `detector_restart_complete`. Handle `crash_fallback` with `subsystem:"detector"` → `detectorStore.setCrashMessage`. | Mirror of SLAM WS handling. |
+| `robotStore.ts` | `frontend/src/stores/robotStore.ts` | Add `detections3D: OrientedBox3D[]` per robot + `updateDetections3D` action. | New payload. |
+| `metricsStore.ts` | `frontend/src/stores/metricsStore.ts` | Add `detectionMetrics: {fps, count, meanConf}` per robot. | Metrics surface. |
+| `SceneViewer.tsx` + `DetectionBoxManager` | `frontend/src/components/DetectionBoxes.ts` + `SceneViewer.tsx` | `updateDetections` signature changes to accept `OrientedBox3D[]`: render wireframe + fill from `(center, half_extents, quaternion)` with `THREE.Quaternion` rotation. **Remove** FOV + pixel-bbox-to-world size derivation. | Real oriented boxes, no hidden intrinsic coupling. |
+| `Sidebar.tsx` | `frontend/src/components/Sidebar.tsx` | Add `<DetectorSection />`. | Picker surface. |
+| `MetricsPanel.tsx` | `frontend/src/components/MetricsPanel.tsx` | Add `<DetectionMetricsCard />` per robot. | Live FPS/#det/conf display. |
+| `nodeDefinitions.ts` | `frontend/src/utils/nodeDefinitions.ts` | Add `detector_generic`, `detection_3d_generic`, `tracker_generic`; add `'perception'` to `NodeCategory`; add `'Detections2D'`, `'Detections3D'` to `PortDataType`. | Pipeline editor support. |
+| `pipelineTypes.ts` | `frontend/src/utils/pipelineTypes.ts` | Extend `PortDataType` union with `'Detections2D' \| 'Detections3D'`; extend `NodeCategory` union with `'perception'`. | Type system. |
+| `PipelineNode.tsx` | `frontend/src/components/pipeline/PipelineNode.tsx` | Add `perception: '\u{1F441}'` (eye) to `CATEGORY_ICONS`. | Visual. |
+| `PORT_COLORS`, `PORT_SHAPES`, `CATEGORY_COLORS` | `frontend/src/utils/nodeDefinitions.ts` | Add colors for Detections2D (pink), Detections3D (magenta), and `perception` category header (purple-ish, distinct from filter). | Visual. |
 
 ### Unchanged Components
 
 | Component | Why Unchanged |
 |-----------|--------------|
-| `MuJoCoBridge` / `MultiRobotBridge` | Produces SensorFrames -- SLAM-agnostic |
-| `OctoMapBuilder` | Consumes (N,3) point arrays -- format unchanged |
-| `VoronoiPartitioner` | Uses poses from Coordinator -- source of pose is irrelevant |
-| `pLCMTransport` (InProcessTransport) | Message transport -- payload-agnostic |
-| `depth_to_cloud.py` | Only used by ICP backend internally |
-| `CoverageTracker`, `FrontierDetector`, `GoalSelector`, `PathPlanner` | Consume OctoMap voxels, not SLAM output directly |
+| `SLAMProtocol` / `SLAMRegistry` / all SLAM backends | Orthogonal subsystem. Perception consumes their `SLAMResult.points` via `slam_cloud`, nothing flows back. |
+| `SubprocessSLAMBridge` | Kept as-is; `SubprocessDetectorBridge` is a *separate class* that follows the same shape. Sharing the bridge would couple two subsystems sharing one ZMQ endpoint — bad blast radius. |
+| `MuJoCoBridge` / `MultiRobotBridge` / `SensorFrame` | SLAM-agnostic and detector-agnostic. |
+| `OctoMapBuilder`, `VoronoiPartitioner`, `PoseGraphMerger`, `MergeRegistry` | Do not consume detections. |
+| `pLCMTransport`, `RobotInstance.publisher`, `RobotMapMessage` | Detection is not currently published via pLCM (direct call from Coordinator). v3.0 keeps this. |
+| `pipeline_routes.py` | Stays; receives additional node types but keeps its structure. |
+| `CameraIntrinsics` | Used by lifters — but its shape is stable. |
 
-## SLAMProtocol Definition
-
-The protocol is the single most important design decision. It must capture the union of what all four backends can produce while remaining minimal.
+## DetectorProtocol Definition (Answer to Q1)
 
 ```python
-from abc import ABC, abstractmethod
+# src/perception/protocol.py
+
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Protocol, runtime_checkable
 import numpy as np
-from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
+
+from src.bridge.sensor_types import SensorFrame
+
+
+class DetectorInput(Enum):
+    RGB_ONLY = "rgb_only"
+    RGBD = "rgbd"
+    RGB_STEREO = "rgb_stereo"
+    RGB_TEXT_PROMPT = "rgb_text_prompt"  # open-vocabulary (GroundingDINO)
 
 
 @dataclass(frozen=True)
-class SLAMMetrics:
-    """Per-frame performance and quality metrics."""
-    processing_time_ms: float = 0.0
-    tracking_quality: float = 1.0     # 0.0=lost, 1.0=excellent
-    num_features: int = 0             # tracked features this frame
-    num_inliers: int = 0              # inliers after RANSAC/matching
-    memory_mb: float = 0.0            # current memory usage
+class Detection2D:
+    class_id: int
+    class_name: str
+    score: float
+    bbox_xyxy: tuple[float, float, float, float]
+    mask: np.ndarray | None = None           # (H, W) uint8, optional
+    features: np.ndarray | None = None       # backend-specific embedding, optional
+    instance_id: int | None = None           # set by tracker, not detector
 
 
 @dataclass(frozen=True)
-class SLAMResult:
-    """Immutable output from a single process_frame() call."""
-    pose: np.ndarray                   # (4,4) float64 estimated pose
-    cloud_points: np.ndarray           # (N,3) float64 points in world frame
-    cloud_colors: np.ndarray           # (N,3) float64 RGB [0,1] or empty
-    metrics: SLAMMetrics = field(default_factory=SLAMMetrics)
-    keyframe: bool = False             # True if backend considers this a keyframe
+class Detections2D:
+    items: list[Detection2D]
+    inference_ms: float
+    image_hw: tuple[int, int]                # so lifters know coord space
 
 
-@dataclass
-class SLAMConfig:
-    """Backend-specific configuration (base class)."""
-    voxel_size: float = 0.03
-    max_depth: float = 10.0
+@dataclass(frozen=True)
+class OrientedBox3D:
+    class_id: int
+    class_name: str
+    score: float
+    center: np.ndarray          # (3,) world frame
+    half_extents: np.ndarray    # (3,)  -- half-widths along local axes
+    quaternion: np.ndarray      # (4,)  xyzw, identity = axis-aligned
+    track_id: int | None = None
+    source_2d_idx: int | None = None   # index into originating Detections2D
+    # For debug / pipeline inspection:
+    probabilities: dict[str, float] | None = None  # top-k class distribution
 
 
-class SLAMProtocol(ABC):
-    """Abstract base class for all SLAM backends."""
+@dataclass(frozen=True)
+class Detections3D:
+    items: list[OrientedBox3D]
+    lifter_ms: float
+    detector_ms: float          # forwarded from Detections2D.inference_ms
+    n_raw: int                  # pre-filter
+    n_final: int                # post-filter
+    image_hw: tuple[int, int]
 
-    @abstractmethod
-    def initialize(self, intrinsics: CameraIntrinsics, config: SLAMConfig | None = None) -> None:
-        """Set up the backend with camera parameters."""
+
+@runtime_checkable
+class DetectorProtocol(Protocol):
+    """Produces 2D detections from a SensorFrame. Mirrors SLAMProtocol."""
+
+    CAPABILITIES: dict         # {"supports_masks": bool, "supports_features": bool,
+                               #  "open_vocabulary": bool, "runs_in_process": bool}
+    PARAMETER_SCHEMA: dict     # JSON-schema-ish; identical shape to SLAM
+    INPUT_TYPE: DetectorInput
+    CLASS_NAMES: list[str] | None   # None = open-vocab
+
+    def process_frame(
+        self,
+        frame: SensorFrame,
+        text_prompt: str | None = None,
+    ) -> Detections2D: ...
+
+    def reset(self) -> None: ...
+
+    def get_params(self) -> dict: ...
+
+    def apply_params(self, params: dict) -> dict:
+        """Returns per-key {status: "applied"|"requires_restart"|"unknown_parameter"}."""
         ...
 
-    @abstractmethod
-    def process_frame(self, frame: SensorFrame) -> SLAMResult:
-        """Process one RGB-D frame. Returns pose + cloud + metrics."""
+    def get_metrics(self) -> dict:
+        """Rolling averages over last N frames."""
         ...
 
-    @abstractmethod
-    def reset(self) -> None:
-        """Clear all accumulated state."""
-        ...
 
-    @abstractmethod
-    def get_global_cloud(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return (points, colors) of the accumulated global map."""
-        ...
+@runtime_checkable
+class Detection3DProtocol(Protocol):
+    """Lifts 2D detections to oriented 3D boxes."""
 
-    @property
-    @abstractmethod
-    def poses(self) -> list[np.ndarray]:
-        """All estimated poses so far."""
-        ...
+    CAPABILITIES: dict         # {"requires_depth": bool, "requires_point_cloud": bool,
+                               #  "outputs_oriented": bool, "uses_learned_model": bool}
+    PARAMETER_SCHEMA: dict
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Human-readable backend name (e.g. 'ICP', 'ORB-SLAM3')."""
-        ...
+    def lift(
+        self,
+        detections: Detections2D,
+        frame: SensorFrame,
+        pose_cam_to_world: np.ndarray,
+        slam_cloud: np.ndarray | None,
+    ) -> Detections3D: ...
 
-    @property
-    @abstractmethod
-    def num_frames_processed(self) -> int:
-        ...
+    def reset(self) -> None: ...
+    def get_params(self) -> dict: ...
+    def apply_params(self, params: dict) -> dict: ...
 ```
 
 **Design rationale:**
 
-1. **`SLAMResult` instead of properties.** The current `SLAMPipeline` exposes `slam_poses`, `last_frame_cloud`, `get_cloud_points()` as separate properties. This couples consumers to ICP's internal state. `SLAMResult` bundles everything a consumer needs from one frame into a single immutable object.
+1. **Two protocols, not one.** A unified `DetectorProtocol` that returns 3D boxes would force every 2D model (YOLO, BoxeR, GDINO) to embed 2D→3D logic. Splitting matches the scientific reality: 2D detection and 3D lifting are orthogonal research areas.
+2. **`process_frame` mirrors `SLAMProtocol.process_frame`** — same verb, same `SensorFrame` input. Drastically lowers cognitive cost for the v2.0 team.
+3. **No `submit_frame` in the protocol.** Queuing / threading is a concern of `DetectorWorker`, not the backend. Backends are stateful *inference engines*, not frame dispatchers. (This deliberately differs from today's `ObjectDetector.submit_frame` which conflates the two.)
+4. **`apply_params` returns per-key status.** Matches the `slam_param_ack` pattern — some params are live-tunable (confidence threshold), others need restart (model weights).
+5. **`probabilities` optional on `OrientedBox3D`.** BoxeR / GDINO give richer distributions than YOLO's top-1. Frontend can ignore or surface.
+6. **`text_prompt` is a method arg, not a constructor arg.** Lets an open-vocab backend change vocabulary between frames without reinit.
+7. **`runtime_checkable` Protocol, not ABC.** Matches `SLAMProtocol` exactly — enables duck-typed backends and per-method `isinstance` checks.
 
-2. **`cloud_points` in world frame.** The current ICP pipeline transforms points to world frame before returning (line 102 of slam_pipeline.py: `cloud.transform(self._current_pose)`). All backends must do the same -- consumers (OctoMapBuilder, viz) expect world-frame points.
+## DetectorRegistry Design (Answer to Q2)
 
-3. **`metrics` on every result.** Enables live comparison dashboard without polling. Each backend populates what it can; defaults are zero.
-
-4. **`keyframe` flag.** ORB-SLAM3 and SVO Pro have explicit keyframe concepts. The pose-graph merger needs keyframes for graph construction. For ICP, every Nth frame is synthetically marked as a keyframe.
-
-5. **`initialize()` separate from `__init__`.** Backends like ORB-SLAM3 need a subprocess or shared library loaded -- this may fail. Separating init from construction allows the registry to construct, then initialize only the selected backend.
-
-## SLAMRegistry Design
-
-```python
-_BACKEND_REGISTRY: dict[str, Callable[[], SLAMProtocol]] = {}
-
-def register_backend(name: str, factory: Callable[[], SLAMProtocol]) -> None:
-    _BACKEND_REGISTRY[name] = factory
-
-def get_backend(name: str) -> SLAMProtocol:
-    if name not in _BACKEND_REGISTRY:
-        raise KeyError(f"Unknown SLAM backend: {name}. Available: {list(_BACKEND_REGISTRY.keys())}")
-    return _BACKEND_REGISTRY[name]()
-
-def available_backends() -> list[str]:
-    return list(_BACKEND_REGISTRY.keys())
-```
-
-Each backend module self-registers on import:
+**Byte-for-byte clone of `SLAMRegistry`**, distinct class with its own `_backends` dict. Two separate registries (`DetectorRegistry` and `Detection3DRegistry`) live in the same file `src/perception/registry.py`, each with its own decorator. `class_path` strings for lazy import, `available: bool` + `reason: str` in list output, `_load_class` with try/except ImportError — all identical.
 
 ```python
-# src/slam/backends/icp_backend.py
-from src.slam.registry import register_backend
+# src/perception/registry.py
 
-class ICPBackend(SLAMProtocol):
+from src.perception.protocol import DetectorInput
+
+class DetectorRegistry:
+    _backends: dict[str, dict] = {}
+    _default: str = "yolo11n"
+
+    @classmethod
+    def register(
+        cls,
+        name: str,
+        display: str,
+        class_path: str,
+        input_type: DetectorInput,
+        install_hint: str | None = None,
+    ) -> None:
+        cls._backends[name] = {
+            "class_path": class_path,
+            "display": display,
+            "input_type": input_type.value,
+            "install_hint": install_hint,
+        }
+
+    # list_backends / create / get_default / _load_class: byte-identical to SLAMRegistry
+
+def detector(
+    name: str,
+    display: str,
+    input: DetectorInput,
+    install_hint: str | None = None,
+):
+    def decorator(klass):
+        class_path = f"{klass.__module__}.{klass.__qualname__}"
+        DetectorRegistry.register(name, display, class_path, input, install_hint)
+        return klass
+    return decorator
+
+
+class Detection3DRegistry:
+    _backends: dict[str, dict] = {}
+    _default: str = "median_depth"
+    # same shape as above
+
+def detection_3d(name, display, install_hint=None):
     ...
-
-register_backend("icp", ICPBackend)
 ```
 
-Backend discovery at startup (`main.py`):
+**`install_hint`** mirrors the SLAM pattern's `INSTALL_HINT` but is stored on the *registry entry*, not the class — so unavailable backends (for which the class never loaded) still surface their install hint in `list_backends()`:
 
 ```python
-import src.slam.backends.icp_backend  # always available
-
-for backend_module in ["orb_backend", "openvins_backend", "svo_backend"]:
-    try:
-        importlib.import_module(f"src.slam.backends.{backend_module}")
-        logger.info("Loaded SLAM backend: %s", backend_module)
-    except ImportError as e:
-        logger.info("SLAM backend %s not available: %s", backend_module, e)
-```
-
-## Frontend-Backend Communication for Algorithm Changes
-
-### Pre-Session Algorithm Selection (Primary)
-
-The algorithm is selected before the simulation starts or on restart. This avoids mid-run backend swapping complexity.
-
-**Flow:**
-
-```
-1. Client connects to /ws
-2. Server sends: {"type": "slam_algorithms", "payload": {"available": ["icp", "orb_slam3", "openvins", "svo_pro"], "active": "icp"}}
-3. User selects algorithm in ControlPanel dropdown
-4. Client sends: {"type": "set_algorithm", "algorithm": "orb_slam3"}
-5. Server validates algorithm name against registry
-6. Server stores selection on Coordinator._pending_algorithm
-7. On next restart (existing restart mechanism in main.py _run_simulation_loop), Coordinator uses new algorithm
-8. Server sends: {"type": "algorithm_ack", "payload": {"algorithm": "orb_slam3", "apply_on": "next_restart"}}
-```
-
-**Why pre-session, not hot-swap:** Each backend accumulates internal state (global map, pose chain, feature database). Swapping mid-run means the new backend starts with no history (pose chain breaks), the global cloud from the old backend is orphaned, and the OctoMap has mixed-quality data. Hot-swap as stretch goal would require: snapshot old backend state, reset OctoMap + merger, reinitialize new backend from ground-truth pose.
-
-### WebSocket Message Types (New)
-
-```typescript
-// Server -> Client (on connect, alongside existing robot_list)
-type SLAMAlgorithmsMessage = {
-  type: "slam_algorithms";
-  payload: {
-    available: string[];
-    active: string;
-    params: Record<string, ParamDef[]>;  // per-algorithm tunable params
-  };
-};
-
-// Server -> Client (piggybacks on existing 10-frame viz update cycle)
-type SLAMMetricsMessage = {
-  type: "slam_metrics";
-  robot_id: string;
-  payload: {
-    processing_time_ms: number;
-    tracking_quality: number;
-    num_features: number;
-    memory_mb: number;
-    algorithm: string;
-  };
-};
-
-// Client -> Server
-type SetAlgorithmMessage = {
-  type: "set_algorithm";
-  algorithm: string;
-};
-
-type SetAlgorithmParamsMessage = {
-  type: "set_algorithm_params";
-  algorithm: string;
-  params: Record<string, number | string | boolean>;
-};
-```
-
-### Server-Side Handling
-
-In `server.py._dispatch_ws_message()`, add alongside existing `set_cloud_config` handler:
-
-```python
-elif msg_type == "set_algorithm":
-    algorithm = data.get("algorithm", "icp")
-    if algorithm in available_backends():
-        # Coordinator stores this; applied on next restart
-        coordinator.set_pending_algorithm(algorithm)
-        await websocket.send_json({
-            "type": "algorithm_ack",
-            "payload": {"algorithm": algorithm, "apply_on": "next_restart"},
-        })
-```
-
-In `Coordinator`, the pending algorithm is consumed during the existing `reset_for_restart()` method, which is already called from `main.py._run_simulation_loop()` during restart:
-
-```python
-def reset_for_restart(self, bridge, robots):
-    # ... existing reset logic (lines 237-252 of coordinator.py) ...
-    # Apply pending algorithm to all robots
-    if self._pending_algorithm:
-        for rid, robot in robots.items():
-            backend = get_backend(self._pending_algorithm)
-            backend.initialize(intrinsics)
-            robot.slam = backend
-```
-
-## Pose-Graph Optimization Replacing ICP Merging
-
-### Current Merge Strategy (v1.0)
-
-`MapMerger.merge_from_voxels()` does union-OR voxel fusion: stacks all robots' occupied voxels, deduplicates by grid index (line 109 of map_merger.py: `np.round(combined / self._resolution).astype(np.int64)`). No geometric alignment -- relies on all robots using ground-truth-seeded ICP poses in a shared world frame.
-
-**Problem:** As the project's own research report documents: "ICP is wrong for sparse point clouds. Standard ICP struggles with the sparse outputs from feature-based SLAM." As drift accumulates without loop closure, two robots observing the same area will have misaligned overlapping regions that simple voxel union cannot correct.
-
-### Proposed Merge Strategy (v2.0)
-
-Replace `MapMerger` with `PoseGraphMerger` that:
-
-1. **Builds a pose graph** from all robots' keyframe poses (nodes) and odometry transforms (edges)
-2. **Detects inter-robot loop closures** when robots observe overlapping areas (FPFH descriptors for coarse matching, ICP for refinement)
-3. **Optimizes the graph** using Open3D's `GlobalOptimization` to produce globally consistent poses
-4. **Re-projects point clouds** using corrected poses, then voxel-deduplicates
-
-```python
-class PoseGraphMerger:
-    """Replaces MapMerger with Open3D pose graph optimization."""
-
-    def __init__(self, resolution: float = 0.1):
-        self._resolution = resolution
-        self._pose_graph = o3d.pipelines.registration.PoseGraph()
-        self._keyframes: list[KeyframeData] = []
-        self._last_merged_voxels: np.ndarray = np.empty((0, 3))
-
-    def add_keyframe(self, robot_id: str, result: SLAMResult,
-                     cloud_camera_frame: np.ndarray) -> None:
-        """Add a keyframe node + odometry edge to the pose graph."""
-        ...
-
-    def detect_loop_closures(self) -> int:
-        """Detect inter-robot loop closures via FPFH + ICP.
-        Returns number of new loop closure edges."""
-        ...
-
-    def optimize(self) -> None:
-        """Run Open3D GlobalOptimization (Levenberg-Marquardt)."""
-        o3d.pipelines.registration.global_optimization(
-            self._pose_graph,
-            o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
-            o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
-            option,
-        )
-
-    def get_merged_map(self) -> np.ndarray:
-        """Re-project all keyframe clouds using optimized poses, voxel-deduplicate."""
-        ...
-
-    @property
-    def last_merged_voxels(self) -> np.ndarray:
-        """API-compatible with MapMerger for viz pipeline."""
-        return self._last_merged_voxels
-```
-
-**Why Open3D's built-in PGO over external g2o:** The project already depends on Open3D. `open3d.pipelines.registration.GlobalOptimization` provides Levenberg-Marquardt pose graph optimization without adding a C++ dependency (g2o requires CMake build). If Open3D PGO proves insufficient for large graphs, `g2opy` is the fallback.
-
-### Integration with Coordinator
-
-The merge trigger point in `Coordinator.run()` (line 466 of coordinator.py) changes:
-
-```python
-# v1.0 (current):
-if any_rescan_triggered:
-    self._merge_occupancy_maps(robot_ids)
-
-# v2.0 (proposed):
-if any_rescan_triggered:
-    for rid in robot_ids:
-        robot = self._robots[rid]
-        result = robot.last_slam_result
-        if result and result.keyframe:
-            self._pose_graph_merger.add_keyframe(rid, result, ...)
-    closures = self._pose_graph_merger.detect_loop_closures()
-    if closures > 0:
-        self._pose_graph_merger.optimize()
-    self._pose_graph_merger.update_merged_map()
-```
-
-The `last_merged_voxels` property on `PoseGraphMerger` is API-compatible with `MapMerger`, so `_send_viz_update()` (line 617 of coordinator.py: `merged_voxels=self._merger.last_merged_voxels`) works unchanged.
-
-## Patterns to Follow
-
-### Pattern 1: Backend Wrapper with Subprocess Isolation
-
-ORB-SLAM3, OpenVINS, and SVO Pro are C++ codebases. Use subprocess communication for initial integration because:
-- No CMake/build system coupling with the Python project
-- Crash in C++ SLAM does not crash the Python process
-- Easier to develop and test independently
-- Each backend can be installed independently (nix, apt, or manual build)
-
-```python
-class ORBBackend(SLAMProtocol):
-    """ORB-SLAM3 backend via subprocess communication."""
-
-    def initialize(self, intrinsics, config=None):
-        self._write_config_yaml(intrinsics, config)
-        self._process = subprocess.Popen(
-            ["orb_slam3_rgbd", str(vocab_path), str(config_path)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        )
-
-    def process_frame(self, frame):
-        # Write depth + rgb to shared memory or named pipe
-        # Read pose (4x4) + sparse points from stdout
-        ...
-```
-
-**Upgrade path:** Replace subprocess with pybind11 wrapper once the interface is stable and performance needs to be optimized.
-
-### Pattern 2: Graceful Degradation on Missing Backends
-
-Not all backends will be installed on every machine. The system must work with only the ICP backend.
-
-```python
-# In main.py startup
-import src.slam.backends.icp_backend  # always available (pure Python + Open3D)
-
-for name in ["orb_backend", "openvins_backend", "svo_backend"]:
-    try:
-        importlib.import_module(f"src.slam.backends.{name}")
-    except ImportError as e:
-        logger.info("SLAM backend %s not available: %s", name, e)
-```
-
-The frontend algorithm picker only shows backends from `available_backends()`, so missing C++ backends do not cause UI errors.
-
-### Pattern 3: Consistent Coordinate Frames
-
-All backends MUST output poses and points in the **MuJoCo world frame** (Z-up, right-handed). The existing ICP backend seeds from `frame.ground_truth_pose` which is already in world frame (line 71 of slam_pipeline.py). External backends use their own coordinate conventions and need a transform in the wrapper:
-
-```python
-def _to_world_frame(self, slam_pose: np.ndarray) -> np.ndarray:
-    return self._world_from_slam @ slam_pose
-```
-
-### Pattern 4: SLAMResult Caching on RobotInstance
-
-Store the latest `SLAMResult` on the robot instance so Coordinator and viz can access metrics without re-querying the backend:
-
-```python
-# In ExplorationLoop._update_slam():
-result = self._slam.process_frame(frame)
-self._last_slam_result = result  # cached for external access
-
-# In RobotInstance:
-@property
-def last_slam_result(self) -> SLAMResult | None:
-    return self.exploration._last_slam_result
-```
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Leaking Backend State Through the Protocol
-
-**What:** Adding backend-specific properties to `SLAMProtocol` (e.g., `orb_features`, `vins_imu_state`).
-**Why bad:** Every consumer needs backend-aware code paths. Defeats the abstraction.
-**Instead:** Put everything in `SLAMResult.metrics` and `SLAMResult.cloud_points/cloud_colors`. Backend-specific debug info goes in logging.
-
-### Anti-Pattern 2: Hot-Swapping Without State Reset
-
-**What:** Changing algorithm mid-run and feeding frames to new backend without clearing accumulated state.
-**Why bad:** New backend has no pose history. First frame produces identity/ground-truth pose, creating a discontinuity. OctoMap has mixed-quality data.
-**Instead:** Algorithm changes take effect on restart. The existing `Coordinator.reset_for_restart()` already clears all state (line 237 of coordinator.py).
-
-### Anti-Pattern 3: Blocking the Simulation Loop with Heavy Backends
-
-**What:** Calling a slow backend's `process_frame()` synchronously in the coordinator loop.
-**Why bad:** ORB-SLAM3 can take 30-50ms per frame. The current loop runs as fast as possible (~200fps for ICP).
-**Instead:** For slow backends, consider async processing: queue frames, return last known pose immediately, update when result arrives. Start synchronous, measure, optimize if needed. The existing `step_delay` in MultiRobotConfig provides a natural throttle point.
-
-### Anti-Pattern 4: Dual Merge Paths
-
-**What:** Running both `MapMerger` (voxel union) and `PoseGraphMerger` simultaneously.
-**Why bad:** Confusing code, unclear which merged map is authoritative, double memory.
-**Instead:** `PoseGraphMerger` replaces `MapMerger`. For the ICP backend (no native keyframes), treat every Nth frame as a synthetic keyframe.
-
-## Integration Point Details (Exact Lines)
-
-### 1. RobotInstance.create() (line 86-119 of robot_instance.py)
-
-Current:
-```python
-slam = SLAMPipeline(intrinsics)
-```
-
-Proposed:
-```python
-slam = get_backend(algorithm)  # algorithm: str param, default "icp"
-slam.initialize(intrinsics, config)
-```
-
-The `algorithm` parameter flows from: CLI `--algorithm` arg -> `MultiRobotConfig` -> `RobotInstance.create()`. On restart, from `Coordinator._pending_algorithm`.
-
-### 2. ExplorationLoop._update_slam() (line 192-207 of exploration_loop.py)
-
-Current:
-```python
-pose = self._slam.process_frame(frame)
-current_pos = pose[:3, 3].copy()
-frame_cloud = self._slam.last_frame_cloud
-```
-
-Proposed:
-```python
-result = self._slam.process_frame(frame)
-pose = result.pose
-current_pos = pose[:3, 3].copy()
-frame_cloud = result.cloud_points
-self._last_slam_result = result  # cached for Coordinator
-```
-
-### 3. Coordinator._send_viz_update() (line 559-624 of coordinator.py)
-
-Add `slam_metrics` and `algorithm` to `RobotVizData`:
-```python
-robot_data[rid] = RobotVizData(
-    ...,
-    slam_metrics=robot.last_slam_result.metrics if robot.last_slam_result else None,
-    algorithm=robot.slam.name,
+@detector(
+    name="boxer",
+    display="BoxeR (transformer)",
+    input=DetectorInput.RGB_ONLY,
+    install_hint="pip install transformers torch && hf download facebook/BoxeR",
 )
+class BoxeRBackend: ...
 ```
 
-### 4. server.py websocket_endpoint (line 112-158 of server.py)
+`list_backends()` returns:
+```json
+{"name":"boxer","display":"BoxeR (transformer)","available":true,
+ "capabilities":{...}, "parameter_schema":{...}, "input_type":"rgb_only"}
+```
+or when unavailable:
+```json
+{"name":"boxer","available":false,
+ "reason":"Cannot load src.perception.backends.boxer_backend.BoxeRBackend",
+ "install_hint":"pip install transformers torch && hf download facebook/BoxeR",
+ "input_type":"rgb_only"}
+```
 
-On connect, send available algorithms alongside existing `robot_list` and `cloud_configs`:
+**Input requirement declaration:** Done three ways, each with a different role:
+- `input_type` at **register time** (registry metadata) — for UI filtering ("which backends can run on a monocular camera?")
+- `INPUT_TYPE` **class attribute** — programmatic check inside worker pool; redundant with registry but lets backends assert it at instantiation
+- `CAPABILITIES` dict — fine-grained optional flags (`supports_masks`, `open_vocabulary`) that don't fit the enum
+
+## Heavy-Backend Execution Model (Answer to Q3)
+
+**Decision: reuse the subprocess-bridge *concept* as `SubprocessDetectorBridge`, a separate class with the same structural contract.**
+
+Do NOT reuse the SLAM bridge instance. Two subsystems sharing one ZMQ endpoint would couple their failure domains: a SLAM hang would look like a detector hang, the 5s timeout would fire on the wrong subsystem, msgpack headers would need a discriminator field. Keep them sibling classes.
+
+### Why subprocess for transformers (BoxeR, GroundingDINO, OmniBox3D)
+
+1. **Crash isolation.** A torch OOM or CUDA stack trace inside BoxeR kills the subprocess, not the FastAPI event loop, not the sim. The existing `SubprocessSLAMBridge` crash detection (process `poll()`) + WS `crash_fallback` path is already proven — we mirror it.
+2. **Memory isolation.** torch + transformers keeps ~1–4 GB resident. Running in-process means every `reset_for_restart()` re-allocates that in the main process. Subprocess = reset = re-exec, clean slate.
+3. **Python version / dep conflicts.** Future backends may pin torch versions incompatible with Open3D's. Subprocess decouples.
+4. **CPU throttling.** The sim loop spins at ~200 FPS. A 150ms BoxeR forward pass cannot block it. Subprocess + PAIR socket with `zmq.DONTWAIT` on send side + backpressure drop on worker queue is the clean solution.
+
+### In-process alternative (YOLOv11)
+
+Lightweight models (YOLOv11n ~6 MB weights, ~30ms CPU) stay in-process under `torch.no_grad()` + `torch.set_num_threads(2)` (already how it works). The `DetectorWorker` thread model (below) handles it.
+
+### Subprocess Protocol
+
+Same shape as `SubprocessSLAMBridge.send_frame`:
+
+```
+Python side:
+  header = msgpack.packb({
+    "ts": frame.sim_time,
+    "rgb_shape": [H, W, 3], "rgb_dtype": "uint8",
+    "depth_shape": [H, W] | null, "depth_dtype": "float32" | null,
+    "text_prompt": "chair. person. backpack." | "",   # for GDINO-style
+    "params": {conf_thresh: 0.3, ...},                 # live-tunable params
+  })
+  send_multipart([header, rgb.tobytes(), depth.tobytes_or_empty(), prompt_bytes])
+
+C++/Python child side:
+  reply_header = msgpack.packb({
+    "ts": ..., "inference_ms": ...,
+    "n_det": N,
+    "classes": [N] int,
+    "scores":  [N] float32,
+    "bboxes":  [N,4] float32 (xyxy),
+    "class_names": ["chair", ...],  // for open-vocab
+  })
+  reply_parts = [reply_header, det_arrays_bytes, optional_masks_bytes]
+```
+
+Same 5s `HANG_TIMEOUT_MS`, same `zmq.Again` -> `_kill_process` -> fallback flow. The only protocol difference from SLAM: reply contains detections, not a pose.
+
+### Threading Model (Answer to Q7)
+
+**One `DetectorWorker` thread per robot**, not one shared thread. This differs from the current v2.x `ObjectDetector._run_loop` which is a single shared thread draining `_pending_frames` for ALL robots. Per-robot threads are necessary for v3.0 because:
+
+1. A slow backend on robot A must not block detections on robot B.
+2. Different robots can use different backends (stretch; see below).
+3. Backpressure should be per-robot queue (drop A's stale frame without dropping B's).
+
 ```python
-await websocket.send_json({
-    "type": "slam_algorithms",
-    "payload": {
-        "available": available_backends(),
-        "active": coordinator.current_algorithm,
-    },
-})
+class DetectorWorker:
+    def __init__(self, rid, detector_2d, lifter_3d, cam_intrinsics):
+        self._rid = rid
+        self._detector = detector_2d
+        self._lifter = lifter_3d
+        self._intrinsics = cam_intrinsics
+        self._pending: tuple | None = None  # single-slot queue = backpressure
+        self._latest: Detections3D | None = None
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def submit(self, frame, pose, slam_cloud):
+        # Drops older pending frame -- newest wins. Backpressure.
+        with self._lock:
+            self._pending = (frame, pose, slam_cloud)
+
+    def _loop(self):
+        while not self._stop.is_set():
+            with self._lock:
+                job, self._pending = self._pending, None
+            if job is None:
+                time.sleep(0.01)
+                continue
+            frame, pose, cloud = job
+            t0 = time.perf_counter()
+            dets_2d = self._detector.process_frame(frame)
+            t1 = time.perf_counter()
+            dets_3d = self._lifter.lift(dets_2d, frame, pose, cloud)
+            t2 = time.perf_counter()
+            # fold measured times into dets_3d.metrics
+            with self._lock:
+                self._latest = dets_3d
 ```
 
-### 5. useWebSocket.ts handleTextMessage (line 64-143 of useWebSocket.ts)
+**Backpressure discipline:** The Coordinator's sim loop runs at ~200 FPS. `_send_viz_update` runs every 10 sim steps, so submissions happen at ~20 Hz. A BoxeR backend at 5 FPS will see 4 out of 5 submissions dropped — this is correct. The frontend always sees the *latest* detection, no queue buildup, no "ghost" boxes from stale frames.
 
-Add cases for new message types:
+**Per-robot backends (stretch):** The pool reads `app.state.pending_detector_backend_per_robot: dict[rid, str]` with fallback to the global `pending_detector_backend`. MVP ships the global-only path.
+
+## 2D→3D Lifting: Where It Lives (Answer to Q4)
+
+**Decision: Separate pluggable `Detection3DProtocol` registry, not inside each detector.**
+
+Reasons a separate stage wins:
+
+1. **Orthogonality matrix.** Today's media-depth median lifter should work behind *any* 2D detector (YOLO, BoxeR, GDINO). If lifting lives inside a detector, we duplicate that logic N times. Separation gives us 1+M lifters and 1+N detectors composing into NxM pipelines for free.
+2. **Research momentum is split.** 2D detection SOTA (DETR-family, open-vocab) evolves separately from 3D lifting SOTA (depth-anything + geometry, OmniBox3D, BEV methods). Coupling them means every detector backend must track 3D research.
+3. **Pipeline editor clarity.** The editor already treats SLAM as a node and merger as a separate node; detection + lifting mirrors that.
+
+**Lifter taxonomy** (for FEATURES.md to expand):
+
+| Lifter | Method | Requires | Outputs oriented? | Latency |
+|--------|--------|----------|-------------------|---------|
+| `MedianDepthLifter` | median depth in bbox → unproject center, AABB size from bbox px × depth / focal | depth, intrinsics, pose | No | ~0.5 ms |
+| `PointClusterLifter` | carve depth points in bbox → PCA for axes → bbox extents from percentile along axes | depth, intrinsics, pose | **Yes** | ~5 ms |
+| `SlamCloudLifter` | find SLAM cloud points whose 2D projection lands in bbox → PCA | `slam_cloud`, pose, intrinsics | **Yes** | ~10 ms |
+| `OmniBox3DLifter` | learned RGBD → oriented box network | depth, intrinsics, RGB, subprocess | **Yes** | ~50 ms |
+
+**Edge case — detectors that output 3D natively.** Some future backends (e.g. CubeRCNN) produce 3D directly. Model this as:
+- Detector has `CAPABILITIES["outputs_3d_natively"] = True`
+- `DetectorWorker` checks this flag; if true, it calls a parallel `process_frame_3d()` method that returns `Detections3D` directly and bypasses the lifter
+- The frontend `LifterDropdown` hides when `activeDetector.outputs_3d_natively`
+
+This keeps the 2D+3D pipeline the default path while allowing end-to-end models without forcing the abstraction.
+
+**SLAM cloud feeding.** The existing `ObjectDetector.submit_frame` already accepts `slam_cloud`. v3.0 keeps that plumbing: Coordinator passes `cloud_pts` from `robot.get_cloud_data()` when the lifter's `CAPABILITIES["requires_point_cloud"]` is true. `DetectorWorkerPool.needs_slam_cloud(rid)` is the query helper.
+
+## FastAPI Routes + WebSocket Messages (Answer to Q5)
+
+### New REST Routes
+
+File: `backend/web/detector_routes.py` — exact clone of `slam_routes.py` with substituted names.
+
+```
+GET    /api/detectors/backends          -> {"backends": [...]}
+POST   /api/detectors/select            body: {"backend": "boxer", "params": {...}?}
+                                        triggers restart; stores pending on app.state
+GET    /api/detectors/active            -> {"backend":..., "display":..., "parameters": {...}}
+PATCH  /api/detectors/params            body: {"params": {...}}
+                                        per-key: applied | requires_restart | unknown_parameter
+
+GET    /api/detectors/lifters           -> {"lifters": [...]}
+POST   /api/detectors/lifter-select     body: {"lifter": "point_cluster"}
+GET    /api/detectors/active-lifter     -> {"lifter":..., "display":..., "parameters": {...}}
+PATCH  /api/detectors/lifter-params     body: {"params": {...}}
+```
+
+### New WebSocket Message Types
+
+Server → Client:
+- `{"type":"detections_3d", "robot_id": rid, "payload": {
+     items: [{class_id, class_name, score, center, half_extents, quaternion, track_id?, ...}],
+     metrics: {detector_ms, lifter_ms, n_raw, n_final}, image_hw
+  }}` — replaces legacy `"detections"`.
+- `{"type":"detector_param_ack", "payload":{"param":..., "status":"applied"|"requires_restart"|"unknown_parameter", "value":...}}`
+- `{"type":"detector_restart_complete", "payload":{"backend":..., "lifter":...}}`
+- `{"type":"crash_fallback", "payload":{"subsystem":"detector", "from":"boxer", "to":"yolo11n", "reason":"subprocess timeout"}}` — extends existing crash_fallback with a `subsystem` discriminator.
+
+Client → Server:
+- `{"type":"detector_param_update", "param":..., "value":...}` — live-tunable params (conf threshold, NMS IoU).
+
+All of the above structurally mirror the existing SLAM messages (`slam_param_update`, `slam_param_ack`, `slam_restart_complete`). The `crash_fallback` message already exists for SLAM — v3.0 promotes its schema to include a `subsystem` field so the frontend router can direct the toast.
+
+### WS dispatch in `server.py`
+
+Add one elif branch mirroring lines 124-151:
+```python
+elif msg_type == "detector_param_update":
+    # identical shape to slam_param_update, but reads active_detector_backend
+    ...
+```
+
+## Pipeline Editor Integration (Answer to Q6)
+
+### New port data types
+
+In `pipelineTypes.ts`, extend `PortDataType`:
 ```typescript
-case 'slam_algorithms': {
-    const payload = msg.payload as { available: string[]; active: string };
-    useControlStore.getState().setAlgorithms(payload.available, payload.active);
-    break;
-}
-case 'slam_metrics': {
-    const payload = msg.payload as SLAMMetricsPayload;
-    if (msg.robot_id) {
-        useRobotStore.getState().updateSLAMMetrics(msg.robot_id, payload);
-    }
-    break;
+export type PortDataType =
+  | 'Image' | 'PointCloud' | 'Pose' | 'IMU' | 'Scalar' | 'Boolean' | 'Config'
+  | 'Detections2D' | 'Detections3D';
+```
+
+In `nodeDefinitions.ts`:
+```typescript
+export const PORT_COLORS: Record<PortDataType, string> = {
+  ...
+  Detections2D: '#ec407a',   // pink
+  Detections3D: '#ab47bc',   // magenta
+};
+export const PORT_SHAPES: Record<PortDataType, string> = {
+  ...
+  Detections2D: 'hexagon',
+  Detections3D: 'hexagon',
+};
+```
+
+### New node category
+
+Extend `NodeCategory`:
+```typescript
+export type NodeCategory =
+  | 'sensor' | 'slam' | 'merger' | 'filter' | 'splitter'
+  | 'parameter' | 'output' | 'perception';   // NEW
+```
+
+Header color (purple, distinct from filter's #7b1fa2): `perception: '#6a1b9a'`. Icon: `\u{1F441}` (eye).
+
+### Three new node definitions
+
+```typescript
+detector_generic: {
+  type: 'detector_generic',
+  label: 'Object Detector',
+  category: 'perception',
+  inputs: [
+    { id: 'image_in', label: 'RGB', dataType: 'Image', required: true },
+    { id: 'text_in',  label: 'Prompt', dataType: 'Config', required: false },
+  ],
+  outputs: [
+    { id: 'dets_2d_out', label: 'Detections2D', dataType: 'Detections2D', required: false },
+  ],
+  defaultParams: {},
+  parameterSchema: null,   // populated from DetectorRegistry at runtime
+},
+
+detection_3d_generic: {
+  type: 'detection_3d_generic',
+  label: '3D Box Lifter',
+  category: 'perception',
+  inputs: [
+    { id: 'dets_in',  label: 'Detections2D', dataType: 'Detections2D', required: true },
+    { id: 'depth_in', label: 'Depth', dataType: 'Image', required: false },
+    { id: 'pose_in',  label: 'Pose', dataType: 'Pose', required: true },
+    { id: 'cloud_in', label: 'PointCloud', dataType: 'PointCloud', required: false },
+  ],
+  outputs: [
+    { id: 'dets_3d_out', label: 'Detections3D', dataType: 'Detections3D', required: false },
+  ],
+  defaultParams: {},
+  parameterSchema: null,   // populated from Detection3DRegistry at runtime
+},
+
+tracker_generic: {
+  type: 'tracker_generic',
+  label: 'Tracker',
+  category: 'perception',
+  inputs: [
+    { id: 'dets_in',  label: 'Detections3D', dataType: 'Detections3D', required: true },
+    { id: 'pose_in',  label: 'Pose', dataType: 'Pose', required: false },
+  ],
+  outputs: [
+    { id: 'tracks_out', label: 'Tracked', dataType: 'Detections3D', required: false },
+  ],
+  defaultParams: {},
+  parameterSchema: null,
+},
+```
+
+`tracker_generic` is defined now even though tracker backends ship in a later phase — defining it early locks the port shape and means the pipeline registry returns a stable schema.
+
+### Validation (Kahn's algorithm) — no changes needed
+
+`validateGraph` in `pipelineValidation.ts` is data-type agnostic: it walks `nodes` and `edges` regardless of `PortDataType`. Adding `Detections2D`/`Detections3D` ports does NOT require touching the validator. Cycle detection + required-port detection + missing-output detection all keep working.
+
+**What IS needed** — a per-edge type check: today's `onConnect` in `pipelineStore.ts` hardcodes `dataType: 'PointCloud' as const` (line 101). v3.0 upgrades it to read the source port's `dataType` and reject connections whose source/target types mismatch. This was always a pipeline editor bug; v3.0 fixes it cleanly. Add to `pipelineValidation.ts`:
+
+```typescript
+export function findTypeMismatches(nodes, edges): ValidationError[] {
+  // edge type must match sourcePort.dataType AND targetPort.dataType
 }
 ```
 
-## Build Order (Dependency-Aware)
+Call in `validateGraph`.
 
-### Phase 1: Protocol + Registry + ICP Backend Refactor
-**Creates:** `protocol.py`, `registry.py`, `backends/icp_backend.py`
-**Modifies:** `RobotInstance`, `ExplorationLoop` (type hints + SLAMResult usage)
-**Test:** All existing tests pass with ICP backend resolved via registry
-**Rationale:** Foundation. Everything depends on the protocol being right. The ICP backend is a pure refactor of existing `SLAMPipeline` -- no new functionality, no risk.
+### New preset
 
-### Phase 2: Frontend Algorithm Picker + WS Messages
-**Creates:** New WS message types, `AlgorithmPicker` component in ControlPanel
-**Modifies:** `server.py`, `useWebSocket.ts`, `controlStore.ts`, `ControlPanel.tsx`
-**Test:** Frontend shows algorithm dropdown, sends `set_algorithm`, receives ack. Only ICP available but plumbing works.
-**Rationale:** Establishes end-to-end communication path. Can test with only ICP.
+Add a built-in `perception_rgbd` preset to the pipeline editor:
+```
+RGBDSensor -> Detector -> Detection3DLifter -> VizOutput
+                   ^             ^
+                   Pose-----------
+                       (from SLAM)
+```
+This is the v3.0 shipped default pipeline, mirrors how `slam_icp_pipeline` is the v2.0 default.
 
-### Phase 3: Pose-Graph Merger
-**Creates:** `pose_graph_merger.py`
-**Modifies:** `Coordinator` (swap merger reference)
-**Test:** Two-robot run produces optimized merged map; compare quality vs v1.0 voxel union
-**Rationale:** Merge strategy is orthogonal to new backends. Doing it before adding backends means every backend benefits from day one.
+### Registry-driven schema
 
-### Phase 4: ORB-SLAM3 Backend
-**Creates:** `backends/orb_backend.py`, build script, config YAML templates
-**Modifies:** Nothing (self-registers via import)
-**Test:** Single robot ORB-SLAM3 run; compare ATE vs ICP baseline
-**Rationale:** Most mature C++ backend; best first candidate for subprocess wrapper pattern.
+The editor already supports `registryName` + `registrySchema` on node data (see `buildNodeData` in `nodeDefinitions.ts`). On node creation, the frontend fetches `/api/detectors/backends` and populates `parameterSchema` from the selected backend's `parameter_schema` — identical to how `slam_generic` pulls from `SLAMRegistry`.
 
-### Phase 5: OpenVINS + SVO Pro Backends
-**Creates:** `backends/openvins_backend.py`, `backends/svo_backend.py`
-**Test:** Each backend runs single-robot; metrics comparison across all backends
-**Rationale:** Same wrapper pattern as ORB-SLAM3. These two can be developed in parallel.
+### `pipeline_routes.py` extension
 
-### Phase 6: Live Metrics Dashboard + Comparison Panel
-**Creates:** `MetricsPanel.tsx`, metrics comparison view
-**Modifies:** `robotStore.ts`, `Sidebar.tsx`
-**Test:** Side-by-side metrics (processing time, tracking quality, features, memory) visible
-**Rationale:** Last because it needs real metrics data from multiple backends to be meaningful.
+The existing pipeline apply route receives a `PipelineConfig` containing nodes with `type: "detector_generic"`. The backend side needs to map node `type` + `registryName` to a concrete `DetectorWorkerPool` configuration. Extend `pipeline_routes.py` to:
+1. Recognize `detector_generic` / `detection_3d_generic` / `tracker_generic` node types.
+2. Resolve `registryName` via `DetectorRegistry.create(name=...)` / `Detection3DRegistry.create(...)`.
+3. Push configuration into `app.state.pending_detector_backend` + `pending_lifter` + `pending_detector_params` so the coordinator restart picks it up — same mechanism the SLAM picker uses.
+
+## Coordinator Orchestration Details (Answer to Q7)
+
+### Per-robot detection path (new)
+
+```python
+# src/coordination/coordinator.py  (changes in __init__ and _send_viz_update)
+
+class Coordinator:
+    def __init__(self, bridge, robots, config, partitioner=None, merger=None, viz=None,
+                 app_state=None):
+        ...
+        # v3.0: replaces lines 139-148 (YOLO ObjectDetector block)
+        self._worker_pool: DetectorWorkerPool | None = None
+        self._app_state = app_state
+        try:
+            self._worker_pool = DetectorWorkerPool.create(
+                robot_ids=list(robots.keys()),
+                detector_name=getattr(app_state, "active_detector_backend", None),
+                lifter_name=getattr(app_state, "active_lifter", None),
+                detector_params=getattr(app_state, "pending_detector_params", {}),
+                intrinsics=config.camera_intrinsics,
+            )
+            self._worker_pool.start()
+        except (ImportError, ValueError) as e:
+            logger.warning("Detector pool unavailable: %s", e)
+            self._worker_pool = None
+```
+
+In `_send_viz_update`:
+```python
+# Submit (non-blocking; drops old frame if pool busy)
+if self._worker_pool is not None:
+    needs_cloud = self._worker_pool.needs_slam_cloud(rid)
+    self._worker_pool.submit(
+        rid,
+        frames[rid],
+        pose,
+        slam_cloud=(cloud_pts if needs_cloud else None),
+    )
+    dets_3d = self._worker_pool.get_latest(rid)  # Detections3D | None
+else:
+    dets_3d = None
+
+robot_data[rid] = RobotVizData(..., detections_3d=dets_3d, ...)
+```
+
+### Backpressure summary
+
+- **Coordinator thread** (sim loop): never blocks. `submit` is lock+assign, O(1).
+- **DetectorWorker thread**: drains when ready. If it's slow, stale frames are overwritten, only the newest is processed.
+- **Crash path**: `DetectorWorker._loop` catches subprocess bridge returning None, calls `self._fallback_to_default()` which creates a YOLOv11Backend in-process and emits a `crash_fallback` event via a callback registered by `DetectorWorkerPool`.
+
+### Restart semantics (per-robot hot-swap NOT supported)
+
+Matches v2.0 SLAM: detector swap happens on restart via `reset_for_restart`. The pipeline editor's `ApplyBar` already triggers a restart for SLAM changes; detector changes reuse the same mechanism.
+
+## Build Order (Answer to Q8)
+
+Dependency-ordered phases respecting `DetectorProtocol/Registry → YOLO wrap → 3D strategy API → BoxeR subprocess → frontend → metrics → pipeline nodes`.
+
+### Phase 1: Protocol + Registry + YOLOv11 Refactor (foundation)
+**Creates:** `src/perception/protocol.py`, `src/perception/registry.py`, `src/perception/backends/yolov11_backend.py`, `src/perception/detector_worker.py`
+**Modifies:** `src/perception/detector.py` (shim/delete), `src/coordination/coordinator.py` (worker pool)
+**Test:** All existing 2D detection tests pass; `Coordinator` emits detections identical to v2.x with new plumbing.
+**Rationale:** Cannot add a second backend without the abstraction. YOLO wrap is a pure refactor — zero behavioural regression. Establishes worker-per-robot threading.
+
+### Phase 2: Detection3DProtocol + MedianDepthLifter + PointClusterLifter
+**Creates:** `src/perception/lifters/median_depth.py`, `src/perception/lifters/point_cluster.py`
+**Modifies:** Protocol / registry entries; `OrientedBox3D` payload shape in `streaming_viz.py`; wire `detections_3d` WS message.
+**Test:** `median_depth` lifter reproduces v2.x AABB positions to within ε. `point_cluster` lifter outputs oriented boxes with non-identity quaternions for non-axis-aligned objects.
+**Rationale:** Once 2D refactor is stable, orthogonal 3D stage unlocks. Two lifters prove the pluggability.
+
+### Phase 3: SubprocessDetectorBridge + BoxeR Backend
+**Creates:** `src/perception/subprocess_bridge.py`, `src/perception/backends/boxer_backend.py`, install/download scripts.
+**Modifies:** Graceful-degradation import dance in `main.py`.
+**Test:** BoxeR subprocess spawns, single-frame forward produces Detections2D; crash injection (kill subprocess) triggers fallback to YOLO + `crash_fallback` WS message.
+**Rationale:** First heavy backend using the v2.0-tested subprocess+ZMQ pattern. BoxeR before GroundingDINO because BoxeR is closed-vocab (simpler contract) and already mentioned in PROJECT.md as a specific v3.0 goal.
+
+### Phase 4: FastAPI `/api/detectors/*` Routes + Frontend Picker + Parameter Panel
+**Creates:** `backend/web/detector_routes.py`, `frontend/src/stores/detectorStore.ts`, `DetectorDropdown`, `LifterDropdown`, `DetectorSection`.
+**Modifies:** `server.py` (router + WS dispatch), `Sidebar.tsx`, `useWebSocket.ts`.
+**Test:** Frontend lists backends + lifters, selecting BoxeR triggers restart, live conf-threshold slider sends `detector_param_update`, UI shows `slam_param_ack`-style ACK.
+**Rationale:** End-to-end UX comes *after* backends work. Without real BoxeR, the picker would be single-item.
+
+### Phase 5: Frontend 3D OrientedBox Rendering + DetectionBoxManager Rewrite
+**Modifies:** `DetectionBoxes.ts` (consume quaternion + half_extents, drop intrinsic derivation), `SceneViewer.tsx`.
+**Test:** Chair detection renders as an oriented box aligned with its principal axis, not an AABB; rotating the robot around a chair keeps the box's orientation stable (world-frame, not view-frame).
+**Rationale:** Now that `point_cluster` and BoxeR produce oriented boxes end-to-end, the frontend must stop faking them. Critical visible win of v3.0.
+
+### Phase 6: Detection Metrics Pipeline (FPS, #det, conf histogram)
+**Creates:** `DetectionMetricsCard`.
+**Modifies:** `metricsStore.ts`, `MetricsPanel.tsx`, `MetricsTracker` (backend) to consume `Detections3D.metrics`.
+**Test:** MetricsPanel shows per-robot per-backend FPS and detection counts with baseline capture on restart (mirror SLAM metrics comparison).
+**Rationale:** Metrics need real data from two comparable backends (YOLO vs BoxeR) to be meaningful.
+
+### Phase 7: Pipeline Editor Nodes (DetectorNode, Detection3DNode, TrackerNode)
+**Modifies:** `pipelineTypes.ts`, `nodeDefinitions.ts`, `pipelineValidation.ts` (type-mismatch check), `pipeline_routes.py`.
+**Creates:** `perception_rgbd` preset.
+**Test:** User drags DetectorNode onto canvas, wires to existing SensorNode + SLAMNode, hits Apply, pipeline restarts with the selected detector wired from the editor.
+**Rationale:** Comes last because it exposes the full perception stack once everything below works. Also the highest risk of scope creep — locking port schemas after real runtime integration prevents rework.
+
+### (Optional Phase 8, discovered by research) GroundingDINO + Tracker
+**Creates:** `grounding_dino_backend.py`, `bytetrack_tracker.py`.
+**Modifies:** Text-prompt param wiring in `DetectorNode`.
+**Rationale:** Open-vocab + tracking are additive. Scope-locked after ecosystem research in FEATURES.md.
+
+## NEW vs MODIFIED Summary (Answer to Q9)
+
+### NEW — Python (12 files)
+```
+src/perception/protocol.py                          NEW
+src/perception/registry.py                          NEW
+src/perception/detector_worker.py                   NEW
+src/perception/subprocess_bridge.py                 NEW
+src/perception/backends/__init__.py                 NEW
+src/perception/backends/yolov11_backend.py          NEW
+src/perception/backends/boxer_backend.py            NEW
+src/perception/backends/grounding_dino_backend.py   NEW (Phase 8)
+src/perception/lifters/__init__.py                  NEW
+src/perception/lifters/median_depth.py              NEW
+src/perception/lifters/point_cluster.py             NEW
+src/perception/lifters/omnibox3d.py                 NEW (research-gated)
+backend/web/detector_routes.py                      NEW
+```
+
+### NEW — Frontend (4+ files)
+```
+frontend/src/stores/detectorStore.ts                NEW
+frontend/src/components/DetectorDropdown.tsx        NEW
+frontend/src/components/LifterDropdown.tsx          NEW
+frontend/src/components/DetectorSection.tsx         NEW
+frontend/src/components/DetectionMetricsCard.tsx    NEW
+```
+
+### MODIFIED — Python (6 files)
+```
+src/perception/detector.py               -> shim then deleted (DEPRECATED)
+src/perception/detection_3d.py           -> moved to lifters/median_depth.py (DEPRECATED)
+src/coordination/coordinator.py          -> DetectorWorkerPool instead of ObjectDetector (~30 lines diff)
+src/main.py                              -> importlib dance for detector backends (~10 lines)
+backend/web/server.py                    -> app.state scaffolding + detector_routes include + detector_param_update WS (~30 lines)
+backend/web/streaming_viz.py             -> detections_3d message emitter (~15 lines)
+backend/web/message_types.py             -> DETECTIONS_3D constant (1 line)
+backend/web/pipeline_routes.py           -> detector/lifter node type handlers (~30 lines, Phase 7)
+```
+
+### MODIFIED — Frontend (8 files)
+```
+frontend/src/hooks/useWebSocket.ts                       -> detections_3d case, detector_param_ack, detector_restart_complete, subsystem-aware crash_fallback
+frontend/src/stores/robotStore.ts                        -> detections3D field + updateDetections3D
+frontend/src/stores/metricsStore.ts                      -> detectionMetrics per robot
+frontend/src/components/DetectionBoxes.ts                -> consume OrientedBox3D[], drop FOV/intrinsic math
+frontend/src/components/SceneViewer.tsx                  -> pass OrientedBox3D[] to manager
+frontend/src/components/Sidebar.tsx                      -> <DetectorSection />
+frontend/src/components/MetricsPanel.tsx                 -> <DetectionMetricsCard />
+frontend/src/components/CrashToast.tsx                   -> subsystem-aware message ("Detector crashed..." vs "SLAM crashed...")
+frontend/src/utils/pipelineTypes.ts                      -> Detections2D | Detections3D in PortDataType, 'perception' in NodeCategory
+frontend/src/utils/nodeDefinitions.ts                    -> detector_generic, detection_3d_generic, tracker_generic + colors/shapes
+frontend/src/utils/pipelineValidation.ts                 -> findTypeMismatches for typed edges
+frontend/src/stores/pipelineStore.ts                     -> onConnect reads real port dataType (bugfix)
+frontend/src/components/pipeline/PipelineNode.tsx        -> perception icon
+```
 
 ## Scalability Considerations
 
-| Concern | 2 robots (current) | 4 robots | 8+ robots |
-|---------|-------------------|----------|-----------|
-| Backend memory | 2x backend memory (~200MB for ICP) | 4x -- may need lighter backends (SVO Pro) | Memory-constrained; must profile |
-| Pose graph size | ~100 nodes/run | ~200 nodes | Sliding window, prune old nodes |
-| Loop closure detection | O(N^2) pairwise keyframe comparison | Becomes bottleneck at ~500 keyframes | Use DBoW2 visual vocabulary for O(1) lookup |
-| Merge frequency | On rescan (~every 50 steps) | Same trigger, more data per merge | Incremental merge; avoid full re-merge |
-| WebSocket bandwidth | ~50KB/s cloud delta + metrics | ~100KB/s | Subsample or paginate cloud updates |
+| Concern | 2 robots (default) | 4 robots | 8+ robots |
+|---------|--------------------|----------|-----------|
+| Detector worker threads | 2 threads, ~60 MB each for YOLO | 4 threads, ~240 MB total | Move all but default backend to subprocess; CPU contention > memory |
+| Subprocess count (BoxeR) | 2 subprocesses × ~2 GB each = 4 GB RAM | 4 × 2 GB = 8 GB | Share one BoxeR subprocess with batched requests (per-robot queues on Python side, one ZMQ PAIR socket with round-robin) |
+| Detection FPS (BoxeR CPU) | ~3-5 FPS per robot | Same per-robot | Frames will drop more aggressively; no additional mechanism needed because backpressure is per-worker |
+| WS bandwidth (detections_3d) | ~5 KB × 10 Hz × 2 = 100 KB/s | 200 KB/s | Negligible vs cloud delta; no action |
+| Pipeline graph nodes | Small (4-6 nodes) | Same | Same (graph is per-pipeline, not per-robot) |
 
-## Directory Structure After v2.0
+**Shared-subprocess pattern for N>4:** Post-v3.0 optimization. Build a `BatchedDetectorBridge` that accepts `List[SensorFrame]` instead of single frame; each robot's worker multiplexes through one subprocess. Defer until 4+ robot profiling shows the need.
 
-```
-src/slam/
-  __init__.py
-  protocol.py          # SLAMProtocol, SLAMResult, SLAMMetrics, SLAMConfig
-  registry.py          # register_backend(), get_backend(), available_backends()
-  depth_to_cloud.py    # unchanged, used internally by ICP backend
-  octomap_builder.py   # unchanged
-  slam_pipeline.py     # DEPRECATED -- kept for reference, replaced by icp_backend
-  backends/
-    __init__.py
-    icp_backend.py     # wraps existing SLAMPipeline logic
-    orb_backend.py     # ORB-SLAM3 subprocess wrapper
-    openvins_backend.py
-    svo_backend.py
+## Anti-Patterns to Avoid
 
-src/coordination/
-  pose_graph_merger.py  # NEW -- replaces map_merger.py
-  map_merger.py         # DEPRECATED -- kept as fallback reference
-  ... existing files unchanged ...
+### Anti-Pattern 1: Sharing `SubprocessSLAMBridge` with detection traffic
+**What:** Reusing the SLAM bridge to avoid a second ZMQ endpoint.
+**Why bad:** Couples two independent failure domains; header needs a discriminator field; crash fallback ambiguous.
+**Instead:** `SubprocessDetectorBridge` is structurally identical but its own class with its own endpoint pattern (`ipc:///tmp/detector_bridge_<pid>_<id>`).
 
-backend/web/
-  server.py            # +set_algorithm handler, +slam_algorithms on connect
-  streaming_viz.py     # +slam_metrics message type
-  message_types.py     # +SLAM_ALGORITHMS, SLAM_METRICS constants
+### Anti-Pattern 2: Unified `DetectorProtocol` producing 3D boxes directly
+**What:** Fold 2D+3D into one protocol method `detect_3d(frame) -> Detections3D`.
+**Why bad:** Every new 2D backend re-implements median-depth or PCA; decouples us from open research on lifters.
+**Instead:** Two protocols; detectors expose an optional `outputs_3d_natively` capability for end-to-end models.
 
-frontend/src/
-  stores/
-    controlStore.ts    # +algorithms state
-    robotStore.ts      # +slamMetrics per robot
-  hooks/
-    useWebSocket.ts    # +slam_algorithms, slam_metrics handlers
-  components/
-    ControlPanel.tsx   # +AlgorithmPicker dropdown
-    MetricsPanel.tsx   # NEW -- live SLAM metrics comparison
-```
+### Anti-Pattern 3: One shared detector thread for all robots (status quo)
+**What:** Keep the current `ObjectDetector._run_loop` pattern.
+**Why bad:** Slow model on robot A blocks robot B; per-robot backpressure impossible; breaks per-robot backend selection.
+**Instead:** One `DetectorWorker` thread per robot, single-slot pending queue.
+
+### Anti-Pattern 4: Frontend re-deriving box size from pixel bbox + depth + FOV
+**What:** Keep current `DetectionBoxes.ts` logic (lines 81-90) that computes `worldW = bbox_px_w * depth / focal`.
+**Why bad:** Hardcoded 70° FOV, hardcoded imgH=480, breaks when intrinsics change, impossible to express true oriented boxes.
+**Instead:** Backend computes `(center, half_extents, quaternion)` server-side and ships world-frame geometry. Frontend renders verbatim.
+
+### Anti-Pattern 5: Hot-swap detector mid-run
+**What:** Change backend without restart so exploration doesn't pause.
+**Why bad:** Same issues as SLAM hot-swap (documented in v2.0 ARCHITECTURE.md): accumulated state, tracking continuity, detector-specific warmup frames.
+**Instead:** Apply on restart. The `/api/detectors/select` endpoint triggers restart via `app.state.command_callback({"action":"restart"})` — identical to SLAM.
+
+### Anti-Pattern 6: Pipeline editor with untyped edges ('PointCloud' as const)
+**What:** Keep `pipelineStore.ts` `onConnect` line 101 hardcoded to PointCloud.
+**Why bad:** Perception edges look "connected" but carry the wrong type label, downstream type checks become impossible.
+**Instead:** Phase 7 bugfix: read `sourcePort.dataType` from source node. Add `findTypeMismatches` validator.
 
 ## Sources
 
-- Direct codebase analysis: `src/slam/slam_pipeline.py` (157 lines), `src/coordination/coordinator.py` (625 lines), `src/coordination/robot_instance.py` (119 lines), `src/coordination/map_merger.py` (152 lines), `src/exploration/exploration_loop.py` (491 lines), `backend/web/server.py` (187 lines), `backend/web/streaming_viz.py` (372 lines), `frontend/src/stores/robotStore.ts` (219 lines), `frontend/src/hooks/useWebSocket.ts` (180 lines)
-- Project SLAM literature review: `.research/report.md` -- 40+ methods evaluated, HIGH confidence
-- ICP merge compatibility analysis: `.research/findings/axis-4-icp-merge-compatibility.md` -- HIGH confidence
-- Open3D pose graph optimization: `open3d.pipelines.registration.GlobalOptimization` (available in project's existing Open3D dependency)
+- Direct codebase analysis (v2.0 shipped): `src/slam/protocol.py` (80 LOC), `src/slam/registry.py` (128 LOC), `src/slam/backends/subprocess_bridge.py` (200 LOC), `src/slam/backends/orbslam3_backend.py` (368 LOC) — HIGH confidence on the patterns being mirrored.
+- Direct codebase analysis (current perception): `src/perception/detector.py` (241 LOC), `src/perception/detection_3d.py` (83 LOC), `src/coordination/coordinator.py` (737 LOC) — HIGH confidence on integration points.
+- Direct codebase analysis (web layer): `backend/web/slam_routes.py` (175 LOC), `backend/web/server.py` (228 LOC), `backend/web/streaming_viz.py` (391 LOC) — HIGH confidence.
+- Direct codebase analysis (frontend): `frontend/src/stores/slamStore.ts` (89 LOC), `frontend/src/stores/pipelineStore.ts` (218 LOC), `frontend/src/utils/pipelineTypes.ts` (73 LOC), `frontend/src/utils/nodeDefinitions.ts` (280 LOC), `frontend/src/utils/pipelineValidation.ts` (112 LOC), `frontend/src/components/DetectionBoxes.ts` (170 LOC), `frontend/src/components/pipeline/PipelineNode.tsx` (240 LOC) — HIGH confidence.
+- v2.0 research archive: `.planning/milestones/v2.0-research/ARCHITECTURE.md` — the decisional template this document mirrors; HIGH confidence that following its structure yields a compatible v3.0.
+- Existing `.planning/codebase/ARCHITECTURE.md` — broader DimOS context; MEDIUM relevance (DimOS layer is replaced by in-process transport per v1.0 decision).
