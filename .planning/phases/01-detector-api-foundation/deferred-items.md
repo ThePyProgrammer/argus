@@ -16,3 +16,19 @@ Out-of-scope discoveries logged by executor agents. Must be addressed before pha
 - **Scope:** Out of Plan 03 scope per executor deviation rules ("Only auto-fix issues DIRECTLY caused by the current task's changes").
 - **Proposed resolution:** Either (a) ensure Plan 05 (YOLOv11 backend) installs torch as part of its `uv sync` step so these tests pass end-to-end, or (b) guard the two test functions with `pytest.importorskip("torch")` so they skip gracefully when torch is not available. Phase 1 end-state requires YOLOv11 to be importable, so option (a) is the natural fix.
 - **Impact if left alone:** 2/18 perception-protocol tests fail under a torch-less env; does not block Plan 03, 04, or 05 code correctness (those plans either don't import torch at module scope or install torch themselves). Phase-level verification must confirm torch is available before declaring the phase complete.
+
+---
+
+## From 01-04 executor (MedianDepthLifter)
+
+### test_registry.py sys.modules-pollution failures (7 tests)
+
+- **File:** `tests/perception/test_registry.py`
+- **Tests failing when full suite runs:** `test_register_accepts_full_capabilities`, `test_list_backends_uses_available_probe`, `test_list_backends_tolerates_missing_available_classmethod`, `test_list_backends_handles_unloadable_class_path`, `test_probe_exception_marks_unavailable_without_crash`, `test_detector_backend_decorator_registers_at_class_definition`, `test_registries_are_independent`.
+- **Failure:** `ValueError: Detector 'only2d' CAPABILITIES['input_type'] must be DetectorInput, got DetectorInput (<DetectorInput.RGB_ONLY: 'rgb_only'>).` Same class name; two distinct class objects in memory.
+- **Cause:** `tests/perception/test_protocol_contracts.py::test_perception_types_import_does_not_load_heavy_deps` (and its sibling `..._protocol_import_..._heavy_deps`) delete `src.perception.types` entries from `sys.modules` and re-import. This creates a NEW `DetectorInput` Enum class. Tests already-loaded via `from src.perception.types import DetectorInput` at module top (e.g. `test_registry.py:14`) hold the OLD enum identity. When those tests register a backend, `registry._validate_capabilities` uses the NEW `DetectorInput` (from a fresh `src.perception.types`) for the `isinstance` check → returns False.
+- **Pre-existing:** YES — confirmed by removing `tests/perception/test_median_depth_lifter.py` (Plan 04's test file) and re-running the suite: same 9 failures (2 torch + 7 registry). Plan 04 did not introduce or aggravate this issue; it was latent at base commit `377d994`.
+- **In-isolation status:** All 16 tests in `test_registry.py` pass when run alone (`uv run pytest tests/perception/test_registry.py`). Plan 04's own 13 tests pass both in isolation and with the full suite, regardless of order.
+- **Scope:** Out of Plan 04 scope per executor deviation rules. The root cause is in `test_protocol_contracts.py`'s sys.modules manipulation, not in registry or lifter code.
+- **Proposed resolution:** (a) Fix the heavy-deps tests to use `importlib.reload()` in a try/finally that restores `sys.modules` state without invalidating `DetectorInput` identity — OR — (b) switch `_validate_capabilities`' `input_type` check from `isinstance(value, DetectorInput)` to a structural check (e.g. `type(value).__name__ == 'DetectorInput' and value.value in {"rgb_only", "rgbd", "rgb_text_prompt"}`). Option (a) is cleaner.
+- **Impact if left alone:** Perception test suite reports 9 failures when run as a whole. Plan 04 + Plan 05 code remains correct; Plan 05's YOLOv11 backend uses the registry via decorator at class definition time (single `DetectorInput` identity, no pollution path), so this doesn't block the phase.
