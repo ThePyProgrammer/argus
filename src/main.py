@@ -56,6 +56,8 @@ from src.metrics.ground_truth import GroundTruthCollector
 from src.slam.octomap_builder import OctoMapBuilder
 from src.slam.registry import SLAMRegistry
 import src.slam.backends  # noqa: F401 -- triggers backend registration
+import src.perception.backends  # noqa: F401 -- triggers perception backend registration
+import src.perception.lifters  # noqa: F401 -- triggers perception 3D-lifter registration
 from src.viz.multi_robot_viz import MultiRobotVisualizer
 from src.viz.rerun_viz import RerunVisualizer
 
