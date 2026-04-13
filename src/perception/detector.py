@@ -204,36 +204,17 @@ class ObjectDetector:
                     bbox=(x1, y1, x2, y2),
                 )
 
-                # Estimate 3D position using per-pixel ray from camera intrinsics
+                # 2D→3D projection delegated to MedianDepthLifter per CONTEXT.md D-13
+                # (closes Pitfall P3 — single source of median-depth projection math).
                 if depth is not None:
-                    cx_px, cy_px = (x1 + x2) // 2, (y1 + y2) // 2
-                    h_img, w_img = depth.shape
-                    cx_px = min(max(cx_px, 0), w_img - 1)
-                    cy_px = min(max(cy_px, 0), h_img - 1)
-
-                    # Median depth in bbox
-                    roi = depth[max(0,y1):min(h_img,y2), max(0,x1):min(w_img,x2)]
-                    valid_roi = roi[(roi > 0.1) & (roi < 15.0)]
-                    if len(valid_roi) > 0:
-                        d = float(np.median(valid_roi))
-
-                        # Unproject bbox center to camera-frame ray using intrinsics
-                        # Same math as Open3D create_from_depth_image:
-                        # OpenCV convention: X=right, Y=down, Z=forward
-                        import math as _math
-                        fov_rad = _math.radians(70.0)
-                        f = h_img / (2.0 * _math.tan(fov_rad / 2.0))
-                        cam_x = (cx_px - w_img / 2.0) * d / f
-                        cam_y = (cy_px - h_img / 2.0) * d / f
-
-                        # Apply same Y/Z flip as SLAM cloud (config 1: Y- Z-)
-                        cam_pt = np.array([cam_x, -cam_y, -d])
-
-                        # Transform to world: cam_mat @ cam_pt + cam_pos
-                        # pose is cam_xmat (no transpose) + cam_xpos
-                        world_pt = pose[:3, :3] @ cam_pt + pose[:3, 3]
+                    from src.perception.lifters.median_depth import (
+                        project_center_median_depth,
+                    )
+                    result = project_center_median_depth((x1, y1, x2, y2), depth, pose)
+                    if result is not None:
+                        world_pt, median_d = result
                         det.center_3d = world_pt
-                        det.depth_m = d
+                        det.depth_m = median_d
 
                 detections.append(det)
 
