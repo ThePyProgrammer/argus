@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Generic SLAM API
-status: v2.0 milestone complete
-last_updated: "2026-03-25T07:28:24.099Z"
-last_activity: 2026-03-25
+milestone: v3.0
+milestone_name: Pluggable Perception & 3D Object Detection
+status: Defining requirements
+last_updated: "2026-04-13T00:00:00.000Z"
+last_activity: 2026-04-13
 progress:
-  total_phases: 7
-  completed_phases: 6
-  total_plans: 24
-  completed_plans: 23
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-23)
+See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time.
-**Current focus:** Phase 15 — close-v2-0-audit-gaps
+**Current focus:** v3.0 — Pluggable Perception & 3D Object Detection (defining requirements)
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-13 — Milestone v3.0 started
 
 ## Performance Metrics
 
@@ -153,6 +155,7 @@ Recent decisions affecting current work:
 
 - 2026-03-23: v2.0 roadmap created — 6 phases (8-13), 23 requirements mapped
 - 2026-03-23: Phase 14 added: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
+- 2026-04-13: v3.0 milestone started — Pluggable Perception & 3D Object Detection, phase numbering reset to 1
 
 ### Pending Todos
 
@@ -179,5 +182,5 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-25
+Last activity: 2026-04-13
 Resume file: None

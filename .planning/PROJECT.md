@@ -30,7 +30,11 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 ### Active
 
-(None — awaiting v3.0 milestone definition)
+- ☐ Generic object-detection API with pluggable backends (v3.0)
+- ☐ facebook/BoxeR (HuggingFace) detector integrated alongside YOLO (v3.0)
+- ☐ Real 3D oriented bounding box regression (replace depth-median 2D→3D projection) (v3.0)
+- ☐ Frontend detector picker, parameter panel, live detection metrics (v3.0)
+- ☐ Pipeline-editor nodes for detector + 3D-projection stages (v3.0)
 
 ### Out of Scope
 
@@ -43,6 +47,22 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - Neural representation SLAM backends (Photo-SLAM, SplaTAM) — requires GPU, defer to v3.0
 - LiDAR SLAM — cameras only, system exists to replace LiDAR
 - Hot-swap SLAM algorithm mid-session — pre-session selection sufficient
+
+## Current Milestone: v3.0 Pluggable Perception & 3D Object Detection
+
+**Goal:** Extend the v2.0 pluggable-backend pattern to perception — decouple object detection from Ultralytics YOLO behind a generic detector API, add transformer-based backends (facebook/BoxeR and others surfaced by research), and upgrade the 3D bounding box pipeline from depth-median 2D→3D projection to real oriented 3D boxes.
+
+**Target features:**
+- Generic detector API + registry (mirror of SLAMProtocol / SLAMRegistry)
+- Existing YOLO detector refactored behind the new interface (zero behavioral regression)
+- facebook/BoxeR (HuggingFace) detector plugged in as a second backend
+- Real 3D oriented bounding box regression (replace depth-median center projection)
+- Frontend detector picker, per-algorithm parameter panel, restart overlay
+- Live detection metrics (FPS, #detections, confidence stats) in MetricsPanel
+- Pipeline-editor nodes for detector + 3D-projection stages
+- Additional backends discovered by deep research — scope locked after research completes
+
+**Key context:** CPU-only constraint (no NVIDIA GPU). Subprocess isolation + ZMQ transport reused from v2.0 for heavy models. Graceful fallback when backends missing.
 
 ## Current State
 
@@ -75,5 +95,22 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 | Pose-graph optimization over ICP merge | ICP union naive for multi-robot; PGO produces globally consistent maps | ✓ Good — Open3D PGO + GTSAM iSAM2 |
 | React Flow for pipeline editor | Only mature React node-graph library; ComfyUI-style UX | ✓ Good — 10 presets, typed ports, live animation |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-25 after v2.0 milestone completion*
+*Last updated: 2026-04-13 — v3.0 Pluggable Perception milestone started*
