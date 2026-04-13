@@ -22,7 +22,6 @@ try:
     import warnings
     warnings.filterwarnings("ignore", message=".*NNPACK.*")
     import torch
-    torch.set_num_threads(2)  # limit CPU usage for background detection
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
 except ImportError:
