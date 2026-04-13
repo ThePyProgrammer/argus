@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 5 plans
 - [x] 01-01-PLAN.md — Thread config + main.py wiring + detector.py:25 removal + grep invariant test
 - [x] 01-02-PLAN.md — src/perception/types.py + protocol.py (DetectorProtocol, Detection3DProtocol, TorchBackendMixin)
-- [ ] 01-03-PLAN.md — src/perception/registry.py (DetectorRegistry + Detection3DRegistry + decorators + D-05/D-06 enforcement)
+- [x] 01-03-PLAN.md — src/perception/registry.py (DetectorRegistry + Detection3DRegistry + decorators + D-05/D-06 enforcement)
 - [ ] 01-04-PLAN.md — MedianDepthLifter + lifters package + ObjectDetector._detect rewire (closes Pitfall P3)
 - [ ] 01-05-PLAN.md — YOLOv11Backend + backends package + main.py side-effect imports + D-12 regression test + RSS smoke test
 **Research flag**: standard
@@ -143,7 +143,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. detector-api-foundation | 2/5 | In Progress|  |
+| 1. detector-api-foundation | 3/5 | In Progress|  |
 | 2. per-robot-worker-and-wire-plumbing | 0/TBD | Not started | - |
 | 3. frontend-picker-and-ui | 0/TBD | Not started | - |
 | 4. real-3d-obb-pipeline | 0/TBD | Not started | - |
