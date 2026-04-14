@@ -165,7 +165,7 @@ export function ApplyBar() {
       )}
 
       {/* Restart overlay */}
-      {isApplying && <RestartOverlay algorithmName="pipeline configuration" />}
+      {isApplying && <RestartOverlay subsystem="slam" name="pipeline configuration" />}
     </div>
   );
 }

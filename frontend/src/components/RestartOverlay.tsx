@@ -1,4 +1,15 @@
-export function RestartOverlay({ algorithmName }: { algorithmName: string }) {
+interface RestartOverlayProps {
+  subsystem: 'slam' | 'detector' | 'lifter';
+  name: string;
+}
+
+const SUBSYSTEM_LABEL: Record<RestartOverlayProps['subsystem'], string> = {
+  slam: 'SLAM',
+  detector: 'detector',
+  lifter: 'lifter',
+};
+
+export function RestartOverlay({ subsystem, name }: RestartOverlayProps) {
   const overlayStyle: React.CSSProperties = {
     position: 'absolute',
     top: 0,
@@ -32,7 +43,7 @@ export function RestartOverlay({ algorithmName }: { algorithmName: string }) {
   return (
     <div style={overlayStyle}>
       <div style={spinnerStyle} />
-      <div style={textStyle}>Restarting with {algorithmName}...</div>
+      <div style={textStyle}>Restarting {SUBSYSTEM_LABEL[subsystem]} with {name}...</div>
     </div>
   );
 }
