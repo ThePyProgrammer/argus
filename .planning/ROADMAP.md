@@ -65,12 +65,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Camera feed panel renders a live 2D bbox overlay (class + confidence) per robot, synced to the same frame as the RGB image.
   5. `detectorStore` (Zustand) structure matches `slamStore` — flat state + setters + REST-fetched backend list + restart polling — verified by snapshot test diffing slice shape.
 **Plans**: 11 plans
-- [ ] 03-01-PLAN.md — Install Vitest + jsdom + vitest.config.ts + test scripts (Wave 0)
-- [ ] 03-02-PLAN.md — Extend CapabilityBadge to {label, value} + migrate 2 SLAM call sites (Wave 0)
-- [ ] 03-03-PLAN.md — Extend RestartOverlay to subsystem+name + migrate 3 call sites (Wave 0)
-- [ ] 03-04-PLAN.md — Clone slamStore → detectorStore with D-02 lifter shape (Wave 1)
-- [ ] 03-05-PLAN.md — 4 lifter REST routes + server.py state + test_lifter_routes.py (Wave 1)
-- [ ] 03-06-PLAN.md — main.py restart block + DetectorWorkerPool lifter_params kwarg (Wave 1)
+- [x] 03-01-PLAN.md — Install Vitest + jsdom + vitest.config.ts + test scripts (Wave 0)
+- [x] 03-02-PLAN.md — Extend CapabilityBadge to {label, value} + migrate 2 SLAM call sites (Wave 0)
+- [x] 03-03-PLAN.md — Extend RestartOverlay to subsystem+name + migrate 3 call sites (Wave 0)
+- [x] 03-04-PLAN.md — Clone slamStore → detectorStore with D-02 lifter shape (Wave 1)
+- [x] 03-05-PLAN.md — 4 lifter REST routes + server.py state + test_lifter_routes.py (Wave 1)
+- [x] 03-06-PLAN.md — main.py restart block + DetectorWorkerPool lifter_params kwarg (Wave 1)
 - [ ] 03-07-PLAN.md — DetectorDropdown + LifterDropdown clones (Wave 2)
 - [ ] 03-08-PLAN.md — DetectorParameterPanel + useWebSocket detector_restart_complete wiring (Wave 2)
 - [ ] 03-09-PLAN.md — CameraFeed per-class bbox color polish DET-UI-05 (Wave 2)
