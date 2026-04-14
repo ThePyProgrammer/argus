@@ -213,6 +213,9 @@ class ExplorationLoop:
             self._streaming_viz._message_queue.append({
                 "type": "crash_fallback",
                 "payload": {
+                    # Phase 2 (DET-MODELS-05): backward-compat default.
+                    # Phase 5 (DET-MODELS-06) adds a "detector" emission path.
+                    "subsystem": "slam",
                     "crashed_backend": backend_name,
                     "fallback_backend": "icp",
                 },
