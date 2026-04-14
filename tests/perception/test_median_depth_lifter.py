@@ -57,6 +57,50 @@ def test_lifter_registered_under_median_depth():
     assert "median_depth" in names, f"MedianDepthLifter not registered: {names}"
 
 
+def test_project_center_median_depth_takes_intrinsics_arg():
+    """Plan 04-03: intrinsics is now REQUIRED positional arg after pose."""
+    import pytest as _pytest
+
+    from src.bridge.sensor_types import CameraIntrinsics
+    from src.perception.lifters.median_depth import project_center_median_depth
+
+    depth = np.full((480, 640), 2.0, dtype=np.float32)
+    pose = np.eye(4)
+    intrinsics = CameraIntrinsics.from_fov(640, 480, 70.0)
+    out = project_center_median_depth((100, 100, 200, 200), depth, pose, intrinsics)
+    assert out is not None
+    world_pt, d = out
+    assert d == 2.0
+    assert world_pt.shape == (3,)
+    # TypeError when intrinsics is omitted
+    with _pytest.raises(TypeError):
+        project_center_median_depth((100, 100, 200, 200), depth, pose)  # type: ignore[call-arg]
+
+
+def test_lift_consumes_intrinsics_not_legacy_fov(lifter, synthetic_frame):
+    """Different intrinsics -> different world-frame centers. Confirms the
+    lift method consumes the intrinsics arg (rather than ignoring it as
+    Phase 1 did) per DET-3D-06."""
+    from src.bridge.sensor_types import CameraIntrinsics
+    from src.perception.types import Detection2D, Detections2D
+
+    frame, pose, _ = synthetic_frame
+    det = Detection2D(class_id=56, class_name="chair", score=0.9, bbox_xyxy=(100, 100, 300, 300))
+    dets_2d = Detections2D(items=[det], inference_ms=0.0, image_hw=(480, 640))
+
+    intr_70 = CameraIntrinsics.from_fov(640, 480, 70.0)
+    intr_50 = CameraIntrinsics.from_fov(640, 480, 50.0)
+
+    out_70 = lifter.lift(dets_2d, frame, pose, intr_70, None)
+    out_50 = lifter.lift(dets_2d, frame, pose, intr_50, None)
+
+    assert len(out_70.items) == 1 and len(out_50.items) == 1
+    c70 = out_70.items[0].center
+    c50 = out_50.items[0].center
+    # Off-center bbox -> x/y components differ when focal length changes.
+    assert not np.allclose(c70, c50), f"intrinsics not consumed: c70={c70}, c50={c50}"
+
+
 def test_lifter_satisfies_detection_3d_protocol(lifter):
     assert isinstance(lifter, Detection3DProtocol), (
         "MedianDepthLifter must satisfy @runtime_checkable Detection3DProtocol"
