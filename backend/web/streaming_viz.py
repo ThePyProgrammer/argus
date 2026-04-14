@@ -19,6 +19,7 @@ from src.metrics.metrics_tracker import MetricsTracker
 from backend.web.message_types import (
     CLOUD_DELTA,
     CLOUD_FULL,
+    DETECTIONS_3D,
     POSE_UPDATE,
     STATS,
     TRAJECTORY,
@@ -27,6 +28,7 @@ from backend.web.message_types import (
     encode_camera_frame,
     encode_depth_frame,
 )
+from src.perception.types import Detections3D  # noqa: F401  (type context for envelope)
 
 if TYPE_CHECKING:
     pass
@@ -334,13 +336,17 @@ class WebStreamingViz:
                     "payload": scene_desc,
                 })
 
-            # Object detections
-            detections = data.get("detections", [])
-            if detections:
+            # Object detections — Phase 2 D-18 cutover: emit detections_3d envelope only.
+            # Detections3D.to_wire() produces the D-09 + D-14 flat-float dict
+            # (items with bbox_xyxy/center/half_extents/quaternion, capture_pose,
+            # capture_timestamp, image_hw, metrics). No inline quaternion literal
+            # is constructed here, preserving Plan 02 D-10 grep invariant.
+            dets_3d = data.get("detections_3d")
+            if dets_3d is not None:
                 self._message_queue.append({
-                    "type": "detections",
+                    "type": DETECTIONS_3D,
                     "robot_id": rid,
-                    "payload": {"detections": detections},
+                    "payload": dets_3d.to_wire(),
                 })
 
             # Camera frames (binary) — RGB + depth
