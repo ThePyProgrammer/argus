@@ -32,13 +32,13 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 ### DET-3D — Real Oriented 3D Bounding Boxes
 
-- [ ] **DET-3D-01**: `PointClusterLifter` is the default 3D lifter — MAD-filtered depth frustum + DBSCAN cluster rejection + Open3D `compute_oriented_bounding_box(robust=True)`, yaw-only for indoor MVP, gravity-aligned
-- [ ] **DET-3D-02**: `MedianDepthLifter` is kept as a named legacy lifter with `outputs_oriented=False` (wraps existing `detection_3d.py` behavior) — for compatibility, not default
+- [x] **DET-3D-01**: `PointClusterLifter` is the default 3D lifter — MAD-filtered depth frustum + DBSCAN cluster rejection + Open3D `compute_oriented_bounding_box(robust=True)`, yaw-only for indoor MVP, gravity-aligned
+- [x] **DET-3D-02**: `MedianDepthLifter` is kept as a named legacy lifter with `outputs_oriented=False` (wraps existing `detection_3d.py` behavior) — for compatibility, not default
 - [x] **DET-3D-03**: Server emits canonical OBB wire format: `(center[3], half_extents[3], quaternion[4] in xyzw with qw>=0, class_id, class_name, score, track_id)` via `OrientedBox3D.to_wire()`; inline quaternion construction in backends is forbidden
 - [x] **DET-3D-04**: Round-trip test enforces `obb == OrientedBox3D.from_wire(obb.to_wire())` to ±1e-6 across all backends and lifters
-- [ ] **DET-3D-05**: Frontend `DetectionBoxManager` / `OBBManager` renders OBBs verbatim from wire format via `InstancedMesh`; client-side focal-length / FoV back-projection is deleted
-- [ ] **DET-3D-06**: Single projection path lives in `src/perception/geometry.py` — removes the hardcoded 70° FOV + duplicate projection paths that previously existed in `detector.py` and `detection_3d.py`
-- [ ] **DET-3D-07**: Lifter falls back to `MedianDepthLifter` when the depth frustum has fewer than 50 valid pixels, preserving behavior for degenerate cases
+- [x] **DET-3D-05**: Frontend `DetectionBoxManager` / `OBBManager` renders OBBs verbatim from wire format via `InstancedMesh`; client-side focal-length / FoV back-projection is deleted
+- [x] **DET-3D-06**: Single projection path lives in `src/perception/geometry.py` — removes the hardcoded 70° FOV + duplicate projection paths that previously existed in `detector.py` and `detection_3d.py`
+- [x] **DET-3D-07**: Lifter falls back to `MedianDepthLifter` when the depth frustum has fewer than 50 valid pixels, preserving behavior for degenerate cases
 
 ### DET-UI — Frontend Controls
 
