@@ -1,4 +1,4 @@
-"""Unit tests for MedianDepthLifter and ObjectDetector delegation.
+"""Unit tests for MedianDepthLifter (single source of 2D→3D projection math).
 
 Covers:
 - Registration under 'median_depth' (CONTEXT.md D-07 + Plan 04 Task 2).
@@ -6,8 +6,10 @@ Covers:
 - CAPABILITIES locked values (research Decision F — outputs_oriented=False).
 - Lift output shape: OrientedBox3D with identity quaternion, default half-extents.
 - slam_cloud argument is accepted (D-04) but ignored by this lifter.
-- ObjectDetector._detect delegates the 2D→3D step to project_center_median_depth
-  (CONTEXT.md D-13, Pitfall P3).
+- project_center_median_depth parity with the pre-refactor detector.py:221-236
+  output (CONTEXT.md D-13, Pitfall P3). Plan 02-12 D-19 deleted detector.py;
+  the Phase 1 test_detector_py_no_longer_has_inline_fov_math invariant was
+  removed with it (the file it asserted on no longer exists).
 """
 
 from __future__ import annotations
@@ -180,10 +182,12 @@ def test_get_metrics_reports_last_call(lifter, synthetic_frame):
 
 
 def test_project_center_median_depth_parity_on_identity_pose():
-    """Parity guard: project_center_median_depth MUST match the pre-refactor
-    detector.py:221-236 output. The Plan 05 regression test compares YOLO bboxes,
-    but coordinator.py:637-654 reads det.center_3d — that field comes from this
-    exact function after Task 3's rewire. If this math changes, downstream breaks.
+    """Parity guard: project_center_median_depth matches the pre-refactor
+    detector.py:221-236 output. Plan 02-12 D-19 deleted detector.py; this test
+    now validates the math in isolation as the permanent reference for the
+    frozen 70° FOV constant and the sign-flip-on-camera-y convention.
+    Downstream consumers (MedianDepthLifter.lift, coordinator's detector pool
+    path) rely on this exact math.
     """
     from src.perception.lifters.median_depth import project_center_median_depth
 
@@ -204,9 +208,8 @@ def test_project_center_median_depth_parity_on_identity_pose():
     assert np.allclose(world_pt, expected_world, atol=1e-6), (world_pt, expected_world)
 
 
-def test_detector_py_no_longer_has_inline_fov_math():
-    """Task 3 invariant: detector.py must delegate, not inline projection math."""
-    src = open("src/perception/detector.py").read()
-    assert "math.radians(70" not in src, "inline 70° FOV still present in detector.py"
-    assert "_math.radians(70" not in src, "inline 70° FOV still present in detector.py"
-    assert "project_center_median_depth" in src, "detector.py does not delegate to MedianDepthLifter"
+# test_detector_py_no_longer_has_inline_fov_math — REMOVED in Plan 02-12 D-19.
+# The test opened src/perception/detector.py and asserted it delegated to
+# MedianDepthLifter. Plan 02-12 deletes detector.py outright; the invariant
+# the test enforced ("detector.py must not inline FOV math") is now trivially
+# true because there is no detector.py at all.

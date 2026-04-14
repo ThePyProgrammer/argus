@@ -1,21 +1,21 @@
 """YOLOv11-nano detector backend — fresh DetectorProtocol implementation.
 
-Per CONTEXT.md D-11 and Pitfall P16: this is NOT a delegate to
-src.perception.detector.ObjectDetector._detect. It is a FRESH implementation
-against DetectorProtocol using TorchBackendMixin. Both paths coexist during
-Phase 1 (the old ObjectDetector stays wired into Coordinator; this backend
-is exercised only by Registry-driven callers and the D-12 regression test).
-Phase 2's DetectorWorkerPool rewire is what actually retires ObjectDetector.
+Per CONTEXT.md D-11 and Pitfall P16: this is a FRESH implementation against
+DetectorProtocol using TorchBackendMixin. In Phase 1 the legacy
+src.perception.detector.ObjectDetector and this backend coexisted; Phase 2
+Plan 02-12 D-19 deletes ObjectDetector and promotes this backend to the
+SOLE 2D detection implementation (consumed by DetectorWorkerPool per
+02-CONTEXT D-01..D-05).
 
-Parity contract (CONTEXT.md D-12): bbox + class_id + count output of
-this backend on a fixture frame MUST match ObjectDetector._detect on the
-same fixture frame bit-exactly (or ±2 pixels if NMS non-determinism creeps in
-on a CI runner, with documented reason).
+Parity contract: the INDOOR_CLASSES dict below and the detection pipeline
+carry forward the pre-refactor semantics verbatim. The Phase 1 D-12 bit-exact
+regression test was retired in Plan 02-12 (the reference implementation it
+compared against no longer exists); parity is now verified at the pool level
+by tests/integration/test_pool_end_to_end.py (W-01 fixture ≥1 detection).
 
 Pitfalls addressed:
   P1  — warmup(dummy_frame) runs one real inference; first_inference_ms logged separately
   P5  — TorchBackendMixin enforces model.eval() + torch.inference_mode()
-  P16 — ObjectDetector preserved; this is a parallel path, not a replacement
   P22 — INDOOR_CLASSES surfaced as a runtime class_filter parameter (schema-driven)
 """
 
@@ -52,31 +52,11 @@ INDOOR_CLASSES: dict[int, str] = {
 }
 
 
-# Runtime drift guard (CONTEXT.md — duplicated INDOOR_CLASSES must not drift
-# from src/perception/detector.py). Raises RuntimeError naming both module
-# paths if the two copies disagree. Deferred import to avoid circularity at
-# module-load time; the check runs the first time YOLOv11Backend is imported
-# AND src.perception.detector has also been imported.
-def _assert_indoor_classes_drift_guard() -> None:
-    """Raise RuntimeError if INDOOR_CLASSES here differs from detector.py's."""
-    try:
-        from src.perception.detector import ObjectDetector as _OD
-    except Exception:
-        # detector.py may not import in a torch-less env; skip guard in that case.
-        return
-    legacy = getattr(_OD, "INDOOR_CLASSES", None)
-    if legacy is None:
-        return
-    if dict(legacy) != dict(INDOOR_CLASSES):
-        raise RuntimeError(
-            "INDOOR_CLASSES drift detected between "
-            "src.perception.backends.yolov11_backend.INDOOR_CLASSES and "
-            "src.perception.detector.ObjectDetector.INDOOR_CLASSES. "
-            "These two dicts MUST stay bit-identical (see CONTEXT.md D-11 + D-12)."
-        )
-
-
-_assert_indoor_classes_drift_guard()
+# INDOOR_CLASSES drift guard REMOVED in Plan 02-12 D-19: the legacy
+# src/perception/detector.py (which this guard compared against) is deleted.
+# INDOOR_CLASSES above is now the single source of truth; nothing to drift
+# against. The dict carries forward the pre-refactor COCO class set verbatim
+# per CONTEXT.md D-11/D-12 parity requirement.
 
 
 @detector_backend(name="yolov11", display="YOLOv11-nano")
