@@ -492,6 +492,11 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 # Read pending detector selection from REST /select (Plan 02-08 surface).
                 pending_detector = getattr(app.state, "pending_detector_backend", None)
                 pending_det_params = getattr(app.state, "pending_detector_params", {}) or {}
+                # Phase 3 — D-10: read pending lifter selection from REST /lifter-select.
+                # MUST be read BEFORE DetectorWorkerPool(...) construction (Pitfall #6) so
+                # threading stale literals cannot silently drop a queued lifter switch.
+                pending_lifter = getattr(app.state, "pending_lifter", None)
+                pending_lifter_params = getattr(app.state, "pending_lifter_params", {}) or {}
                 # Pipeline config detector_name takes priority (mirrors SLAM pattern).
                 # PipelineConfig (Phase 2) does not yet carry detector_name; getattr
                 # keeps this forward-compatible for when the graph adds a detector node.
@@ -500,12 +505,17 @@ def run_web_mode(args: argparse.Namespace) -> None:
 
                 try:
                     # Side-effect imports force registry population before create()
-                    from src.perception.registry import DetectorRegistry  # noqa: F401
+                    from src.perception.registry import (  # noqa: F401
+                        Detection3DRegistry,
+                        DetectorRegistry,
+                    )
                     import src.perception.backends  # noqa: F401  — register yolov11 + family
                     import src.perception.lifters   # noqa: F401  — register median_depth
                     from src.perception.worker_pool import DetectorWorkerPool
 
                     backend_name = pending_detector or DetectorRegistry.get_default()
+                    # Phase 3 — D-10: resolve lifter_name with same fallback pattern as backend.
+                    lifter_name = pending_lifter or Detection3DRegistry.get_default()
                     # One CameraIntrinsics instance per robot (all share the same config today;
                     # Phase 8 stretch may diverge per-robot).
                     intrinsics_per_robot = {rid: intrinsics for rid in robots}
@@ -513,9 +523,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         robot_ids=list(robots.keys()),
                         backend_name=backend_name,
                         backend_params=pending_det_params,
-                        # Phase 2 lifter is always MedianDepthLifter; Phase 4 swaps to PointClusterLifter.
-                        lifter_name="median_depth",
+                        lifter_name=lifter_name,
                         intrinsics_per_robot=intrinsics_per_robot,
+                        lifter_params=pending_lifter_params,
                     )
 
                     # Synchronous warmup BEFORE emitting detector_restart_complete (D-03).
@@ -543,6 +553,11 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     app.state.pending_detector_backend = None
                     # pending_detector_params intentionally retained — coordinator may
                     # consume live-tunable values per-frame.
+                    # Phase 3 — D-10: lifter state update mirrors detector pattern.
+                    app.state.active_lifter = lifter_name
+                    app.state.pending_lifter = None
+                    # pending_lifter_params intentionally retained — same live-tunable
+                    # path as pending_detector_params (per-frame consumable).
                 except Exception as exc:
                     # T-02-24 mitigation: pool construction failure must not crash restart.
                     logger.exception("Detector pool rebuild failed: %s", exc)
@@ -559,10 +574,14 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         "payload": {},
                     })
                     # Emit detector_restart_complete AFTER warmup_all returns (D-03).
+                    # Phase 3 — D-09: payload carries both backend AND lifter; no
+                    # separate lifter_restart_complete event (Open Question #3 — single
+                    # event reused for the conjoined detector+lifter restart).
                     streaming_viz._message_queue.append({
                         "type": "detector_restart_complete",
                         "payload": {
                             "backend": getattr(app.state, "active_detector_backend", "yolov11"),
+                            "lifter": getattr(app.state, "active_lifter", "median_depth"),
                         },
                     })
 
