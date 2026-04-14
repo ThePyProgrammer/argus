@@ -396,7 +396,7 @@ export default function SceneViewer() {
           Click on the scene to send {placingRobot} to that position
         </div>
       )}
-      {isRestarting && <RestartOverlay algorithmName={activeDisplay} />}
+      {isRestarting && <RestartOverlay subsystem="slam" name={activeDisplay} />}
       {crashMessage && <CrashToast />}
     </div>
   );
