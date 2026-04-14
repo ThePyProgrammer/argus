@@ -64,7 +64,18 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Dragging a parameter slider in the detector panel sends a debounced `detector_param_update` WS message and the new value is visible in the next detection payload's metrics (e.g., confidence threshold cutoff).
   4. Camera feed panel renders a live 2D bbox overlay (class + confidence) per robot, synced to the same frame as the RGB image.
   5. `detectorStore` (Zustand) structure matches `slamStore` — flat state + setters + REST-fetched backend list + restart polling — verified by snapshot test diffing slice shape.
-**Plans**: TBD
+**Plans**: 11 plans
+- [ ] 03-01-PLAN.md — Install Vitest + jsdom + vitest.config.ts + test scripts (Wave 0)
+- [ ] 03-02-PLAN.md — Extend CapabilityBadge to {label, value} + migrate 2 SLAM call sites (Wave 0)
+- [ ] 03-03-PLAN.md — Extend RestartOverlay to subsystem+name + migrate 3 call sites (Wave 0)
+- [ ] 03-04-PLAN.md — Clone slamStore → detectorStore with D-02 lifter shape (Wave 1)
+- [ ] 03-05-PLAN.md — 4 lifter REST routes + server.py state + test_lifter_routes.py (Wave 1)
+- [ ] 03-06-PLAN.md — main.py restart block + DetectorWorkerPool lifter_params kwarg (Wave 1)
+- [ ] 03-07-PLAN.md — DetectorDropdown + LifterDropdown clones (Wave 2)
+- [ ] 03-08-PLAN.md — DetectorParameterPanel + useWebSocket detector_restart_complete wiring (Wave 2)
+- [ ] 03-09-PLAN.md — CameraFeed per-class bbox color polish DET-UI-05 (Wave 2)
+- [ ] 03-10-PLAN.md — DetectorSection parent + ControlPanel mount + stacked RestartOverlays (Wave 3)
+- [ ] 03-11-PLAN.md — Vitest detectorStore.shape.test.ts — DET-UI-06 structural equivalence (Wave 3)
 **Research flag**: standard
 **UI hint**: yes
 
@@ -145,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. detector-api-foundation | 5/5 | Complete   | 2026-04-13 |
 | 2. per-robot-worker-and-wire-plumbing | 12/12 | Complete   | 2026-04-14 |
-| 3. frontend-picker-and-ui | 0/TBD | Not started | - |
+| 3. frontend-picker-and-ui | 0/11 | Planning complete | - |
 | 4. real-3d-obb-pipeline | 0/TBD | Not started | - |
 | 5. second-backends-boxer-rtdetr-owlv2 | 0/TBD | Not started | - |
 | 6. detection-metrics-and-mujoco-gt | 0/TBD | Not started | - |

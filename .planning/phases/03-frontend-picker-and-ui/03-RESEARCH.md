@@ -861,19 +861,19 @@ No existing frontend test infrastructure exists. `find frontend -name "vitest*" 
 
 **Nothing in this log is load-bearing** — all six are low-to-medium risk items documented for planner / discuss-phase review.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `DetectorWorkerPool.__init__` accept `lifter_params`?**
+1. **Does `DetectorWorkerPool.__init__` accept `lifter_params`?** — RESOLVED: Plan 06 Task 1 extends `DetectorWorkerPool.__init__` with `lifter_params: dict | None = None` kwarg forwarded to `Detection3DRegistry.create`. 4 unit tests in `test_worker_pool_lifter_params.py`.
    - What we know: Constructor was added in Phase 2, supports `lifter_name` literal.
    - What's unclear: Whether `lifter_params` kwarg already exists or needs a 1-line signature extension.
    - Recommendation: Planner's T1-C task includes `Read src/perception/worker_pool.py` as first action; if `lifter_params` doesn't exist, extend the `__init__` signature as part of the same task.
 
-2. **Should Phase 3 ship a LifterParameterPanel or inline lifter params into DetectorParameterPanel?**
+2. **Should Phase 3 ship a LifterParameterPanel or inline lifter params into DetectorParameterPanel?** — RESOLVED: Deferred. `MedianDepthLifter` ships with sensible defaults. Phase 3 only wires `LifterDropdown` (selection, not param tuning). Revisit if Phase 4's `PointClusterLifter` needs runtime params.
    - What we know: D-07 says "LifterDropdown inline inside DetectorSection". Lifter params aren't explicitly called out by any D-xx.
    - What's unclear: Where do lifter params render — inline below LifterDropdown, or inside a mini LifterParameterPanel?
    - Recommendation: For Phase 3 ship only the lifter dropdown (no lifter param panel). `MedianDepthLifter` has only 2 live-tunable params (`depth_near_m`, `depth_far_m`) — reasonable defaults. Escalate if user disagrees during plan-check.
 
-3. **Does WS `detector_restart_complete` fire once for the detector restart, or will concurrent lifter+detector restarts yield two messages?**
+3. **Does WS `detector_restart_complete` fire once for the detector restart, or will concurrent lifter+detector restarts yield two messages?** — RESOLVED: Reuse `detector_restart_complete` with enriched payload `{backend, lifter}`. No separate `lifter_restart_complete` type. Plan 06 Task 2 emits the enriched payload from `main.py`.
    - What we know: `main.py:562-567` emits ONE `detector_restart_complete` at the end of the restart block; the lifter is rebuilt inside the same block.
    - What's unclear: If user switches ONLY lifter (not detector), does a WS event fire? Currently no — there's no `lifter_restart_complete` message type.
    - Recommendation: Phase 3 should add a `lifter_restart_complete` WS message emitted inside the same restart block, OR use the same `detector_restart_complete` for both (since lifter lives in the detector pool). Choose the simpler path — reuse `detector_restart_complete` with a richer payload `{backend, lifter}` per CONTEXT.md D-09's description "fires `detector_restart_complete` with `{backend, lifter}` payload after warmup". This is already in CONTEXT; planner should implement.
