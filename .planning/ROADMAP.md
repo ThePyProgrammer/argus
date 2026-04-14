@@ -90,8 +90,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. When a detection's bbox has <50 valid depth pixels, the lifter silently falls back to `MedianDepthLifter` and the resulting OBB has identity quaternion + `outputs_oriented=False` in the wire payload.
   5. Switching lifter from `MedianDepthLifter` → `PointClusterLifter` via the Lifter dropdown changes the rendered box orientation visibly on a rotated object, with no server restart required.
 **Plans**: 7 plans
-- [ ] 04-01-PLAN.md — pyproject.toml sklearn + scene_rotated_chair.xml fixture (Wave 0)
-- [ ] 04-02-PLAN.md — src/perception/geometry.py + test_geometry.py (Wave 0)
+- [x] 04-01-PLAN.md — pyproject.toml sklearn + scene_rotated_chair.xml fixture (Wave 0)
+- [x] 04-02-PLAN.md — src/perception/geometry.py + test_geometry.py (Wave 0)
 - [ ] 04-03-PLAN.md — median_depth migration: delete _LEGACY_FOV_DEG, consume intrinsics (Wave 1)
 - [ ] 04-04-PLAN.md — PointClusterLifter (PCA-OBB + DBSCAN + fallback) + unit tests (Wave 2)
 - [ ] 04-05-PLAN.md — DetectorWorkerPool.swap_lifter + /lifter-hotswap route + tests (Wave 3)
