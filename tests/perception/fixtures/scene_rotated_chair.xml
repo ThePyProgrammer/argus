@@ -1,0 +1,36 @@
+<mujoco model="scene_rotated_chair">
+  <compiler angle="radian" coordinate="local"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.6 0.6 0.6"/>
+  </visual>
+
+  <worldbody>
+    <!-- Floor plane -->
+    <geom name="floor" type="plane" size="5 5 0.1" rgba="0.8 0.8 0.8 1"/>
+
+    <!-- Robot-side camera: placed 2.0m in front of the chair looking at it.
+         fovy=70 MUST match CameraIntrinsics.from_fov default - SC#1 integration
+         test pipes this frame through runtime intrinsics. 480x640 matches the
+         CameraStrip resolution used by DetectorWorker._intrinsics. -->
+    <camera name="robot_cam" pos="0 -2.0 0.6" xyaxes="1 0 0 0 0 1" fovy="70"/>
+
+    <!-- Chair body parented at a KNOWN non-zero yaw (30 degrees about +Z).
+         Compound primitives approximate chair silhouette for YOLO recognition
+         per 04-RESEARCH Open Question 6 + A4. If A4 fails (YOLO confidence
+         < 0.25), fall back to mesh chair - Plan 07 documents that path. -->
+    <body name="chair" pos="0 0 0.45" euler="0 0 0.5236">
+      <!-- 0.5236 rad ~ 30 deg yaw ABOUT +Z -->
+      <!-- Seat: 0.5 x 0.5 x 0.06 slab at ~0.45m -->
+      <geom name="chair_seat" type="box" size="0.25 0.25 0.03" pos="0 0 0" rgba="0.55 0.35 0.20 1"/>
+      <!-- Backrest: thin upright slab behind seat -->
+      <geom name="chair_back" type="box" size="0.25 0.03 0.30" pos="0 0.22 0.33" rgba="0.55 0.35 0.20 1"/>
+      <!-- Four legs: 0.03 x 0.03 x 0.45 uprights at seat corners -->
+      <geom name="chair_leg_fl" type="box" size="0.03 0.03 0.22" pos="-0.20 -0.20 -0.25" rgba="0.45 0.25 0.15 1"/>
+      <geom name="chair_leg_fr" type="box" size="0.03 0.03 0.22" pos=" 0.20 -0.20 -0.25" rgba="0.45 0.25 0.15 1"/>
+      <geom name="chair_leg_bl" type="box" size="0.03 0.03 0.22" pos="-0.20  0.20 -0.25" rgba="0.45 0.25 0.15 1"/>
+      <geom name="chair_leg_br" type="box" size="0.03 0.03 0.22" pos=" 0.20  0.20 -0.25" rgba="0.45 0.25 0.15 1"/>
+    </body>
+  </worldbody>
+</mujoco>
