@@ -42,12 +42,12 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 ### DET-UI — Frontend Controls
 
-- [ ] **DET-UI-01**: Frontend exposes a Detector dropdown with capability badges (framework, license, CPU latency hint), mirroring the v2.0 SLAM picker
-- [ ] **DET-UI-02**: Frontend exposes a Lifter dropdown; hidden when the active detector has `outputs_3d_natively: true`
-- [ ] **DET-UI-03**: Parameter panel renders detector `PARAMETER_SCHEMA` as sliders/toggles with debounced `detector_param_update` WebSocket sends, mirroring SLAM param panel
-- [ ] **DET-UI-04**: Backend switch shows restart overlay until `detector_restart_complete` is received; UI does not report "ready" until `warmup()` completes
-- [ ] **DET-UI-05**: Camera feed panel renders 2D bbox overlay (class + confidence) per robot
-- [ ] **DET-UI-06**: `detectorStore` (Zustand) mirrors `slamStore` structure (flat state + setters, REST-fetched backend list, restart polling)
+- [x] **DET-UI-01**: Frontend exposes a Detector dropdown with capability badges (framework, license, CPU latency hint), mirroring the v2.0 SLAM picker
+- [x] **DET-UI-02**: Frontend exposes a Lifter dropdown; hidden when the active detector has `outputs_3d_natively: true`
+- [x] **DET-UI-03**: Parameter panel renders detector `PARAMETER_SCHEMA` as sliders/toggles with debounced `detector_param_update` WebSocket sends, mirroring SLAM param panel
+- [x] **DET-UI-04**: Backend switch shows restart overlay until `detector_restart_complete` is received; UI does not report "ready" until `warmup()` completes
+- [x] **DET-UI-05**: Camera feed panel renders 2D bbox overlay (class + confidence) per robot
+- [x] **DET-UI-06**: `detectorStore` (Zustand) mirrors `slamStore` structure (flat state + setters, REST-fetched backend list, restart polling)
 
 ### DET-METRICS — Honest Measurement
 
