@@ -76,23 +76,23 @@ export default function RobotCard({ robot }: RobotCardProps) {
         </div>
       )}
 
-      {/* YOLO detections */}
-      {robot.detections.length > 0 && (
+      {/* YOLO detections (Phase 2: detections_3d envelope) */}
+      {(robot.detections_3d?.items.length ?? 0) > 0 && (
         <div style={{
           marginTop: '4px', fontSize: '11px', color: '#aaa',
           display: 'flex', flexWrap: 'wrap', gap: '3px',
         }}>
-          {robot.detections.slice(0, 8).map((det, i) => (
+          {(robot.detections_3d?.items ?? []).slice(0, 8).map((det, i) => (
             <span key={i} style={{
               padding: '1px 5px', background: '#2a2a4a', borderRadius: '3px',
               fontSize: '10px',
             }}>
-              {det.class} {(det.confidence * 100).toFixed(0)}%
+              {det.class_name} {(det.score * 100).toFixed(0)}%
             </span>
           ))}
-          {robot.detections.length > 8 && (
+          {(robot.detections_3d?.items.length ?? 0) > 8 && (
             <span style={{ fontSize: '10px', color: '#666' }}>
-              +{robot.detections.length - 8} more
+              +{(robot.detections_3d?.items.length ?? 0) - 8} more
             </span>
           )}
         </div>

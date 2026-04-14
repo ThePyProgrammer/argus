@@ -149,11 +149,11 @@ export default function SceneViewer() {
             );
           }
         }
-        // 3D detection bounding boxes
-        if (!prev || prev.detections !== robot.detections) {
+        // 3D detection bounding boxes (Phase 2: detections_3d envelope)
+        if (!prev || prev.detections_3d !== robot.detections_3d) {
           detectionBoxManager.updateDetections(
             id,
-            robot.detections,
+            robot.detections_3d,
             robot.colorIndex,
           );
         }

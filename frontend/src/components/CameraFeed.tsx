@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRobotStore, type Detection } from '../stores/robotStore';
+import { useRobotStore, type Detection3DItem } from '../stores/robotStore';
 import { robotColor } from '../utils/palette';
 
 interface CameraFeedProps {
@@ -11,12 +11,12 @@ interface CameraFeedProps {
  * Hover to highlight and see a tooltip with details.
  */
 function DetectionOverlay({
-  detections,
+  items,
   color,
   imgWidth,
   imgHeight,
 }: {
-  detections: Detection[];
+  items: Detection3DItem[];
   color: string;
   imgWidth: number;
   imgHeight: number;
@@ -28,9 +28,10 @@ function DetectionOverlay({
       position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
       zIndex: 2,
     }}>
-      {detections.map((det, i) => {
-        if (!det.bbox || det.bbox.length < 4) return null;
-        const [x1, y1, x2, y2] = det.bbox;
+      {items.map((det, i) => {
+        // Graceful degradation: skip items without a 2D bbox (bbox_xyxy is optional per Plan 01).
+        if (!det.bbox_xyxy || det.bbox_xyxy.length < 4) return null;
+        const [x1, y1, x2, y2] = det.bbox_xyxy;
 
         // Convert pixel coords to percentages for responsive positioning
         const left = `${(x1 / imgWidth) * 100}%`;
@@ -78,7 +79,7 @@ function DetectionOverlay({
               borderRadius: '2px',
               transition: 'all 0.15s ease',
             }}>
-              {det.class} {(det.confidence * 100).toFixed(0)}%
+              {det.class_name} {(det.score * 100).toFixed(0)}%
             </div>
 
             {/* Tooltip on hover -- below box if room, above if not */}
@@ -101,11 +102,12 @@ function DetectionOverlay({
                 zIndex: 10,
                 pointerEvents: 'none',
               }}>
-                <div><strong style={{ color }}>{det.class}</strong></div>
-                <div>Confidence: {(det.confidence * 100).toFixed(1)}%</div>
-                <div>BBox: [{det.bbox.join(', ')}]</div>
-                {det.pos_3d && (
-                  <div>3D: [{det.pos_3d.map(v => v.toFixed(2)).join(', ')}]</div>
+                <div><strong style={{ color }}>{det.class_name}</strong></div>
+                <div>Score: {(det.score * 100).toFixed(1)}%</div>
+                <div>BBox: [{det.bbox_xyxy.map(v => v.toFixed(0)).join(', ')}]</div>
+                <div>3D: [{det.center.map(v => v.toFixed(2)).join(', ')}]</div>
+                {det.track_id !== undefined && (
+                  <div>Track: #{det.track_id}</div>
                 )}
               </div>
             )}
@@ -119,7 +121,9 @@ function DetectionOverlay({
 export default function CameraFeed({ robotId }: CameraFeedProps) {
   const cameraUrl = useRobotStore((s) => s.robots.get(robotId)?.cameraUrl);
   const depthUrl = useRobotStore((s) => s.robots.get(robotId)?.depthUrl);
-  const detections = useRobotStore((s) => s.robots.get(robotId)?.detections ?? []);
+  const detectionItems = useRobotStore(
+    (s) => s.robots.get(robotId)?.detections_3d?.items ?? [],
+  );
   const colorIndex = useRobotStore(
     (s) => s.robots.get(robotId)?.colorIndex ?? 0,
   );
@@ -188,7 +192,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
               <img src={cameraUrl} alt={`${robotId} rgb`} style={imgStyle} />
               {/* YOLO detection overlay (interactive) */}
               <DetectionOverlay
-                detections={detections}
+                items={detectionItems}
                 color={color}
                 imgWidth={640}
                 imgHeight={480}
