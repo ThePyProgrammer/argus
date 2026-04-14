@@ -11,15 +11,54 @@ import sys
 
 import pytest
 
-from src.perception.types import DetectorInput
-
-
 HEAVY_DEPS = ("torch", "ultralytics", "transformers", "onnxruntime")
+
+
+def _DetectorInput():
+    """Lazy-resolve DetectorInput from the current sys.modules snapshot.
+
+    W-02 fix (Plan 02-12): test_protocol_contracts.py does
+    ``del sys.modules["src.perception.types"]`` and re-imports, creating a
+    second enum class identity. If test_registry.py binds ``DetectorInput``
+    at module load time, later assertions that compare the module-bound
+    identity against the identity inside ``registry.py._DETECTOR_TYPED_KEYS``
+    can fail with the surreal "got DetectorInput, expected DetectorInput"
+    isinstance-mismatch (same-name / different-module-object classes).
+
+    This helper reads ``DetectorInput`` from the currently-cached
+    ``src.perception.types`` on every call, so the enum class identity
+    matches whatever ``registry.py`` captured on its most recent import.
+    test_protocol_contracts.py restores sys.modules to its pre-pollution
+    state after the P9-delta tests, so the cached types module stays
+    stable — this helper still guards against any future mutation we
+    haven't thought of yet.
+    """
+    from src.perception.types import DetectorInput as _DI
+
+    return _DI
 
 
 @pytest.fixture(autouse=True)
 def _clean_registries():
-    """Isolate tests -- clear both registries before and after each test."""
+    """Isolate tests -- clear both registries before and after each test.
+
+    W-02 fix (Plan 02-12): after teardown, pop sys.modules entries for the
+    backends + lifters packages so the next test's explicit import re-triggers
+    @detector_backend and @detection_3d decorator registration. Without this,
+    @detector_backend runs once at first module import; later _clear() wipes
+    the registry but sys.modules keeps the module cached, so re-importing is
+    a no-op and subsequent tests see an empty registry.
+
+    The DetectorInput enum-identity half of W-02 (Phase 1 VERIFICATION.md §W-02
+    root cause: test_protocol_contracts.py's ``del sys.modules[...]`` splitting
+    DetectorInput into two same-named / different-identity classes) is fixed
+    inside test_protocol_contracts.py itself — it now saves the original module
+    object and restores it via try/finally — rather than here. See _DetectorInput()
+    above for the defense-in-depth lazy-resolver that keeps _full_det_caps()
+    binding to the CURRENT types-module identity regardless of pollution.
+    """
+    import sys
+
     from src.perception.registry import DetectorRegistry, Detection3DRegistry
 
     DetectorRegistry._clear()
@@ -27,6 +66,26 @@ def _clean_registries():
     yield
     DetectorRegistry._clear()
     Detection3DRegistry._clear()
+    # W-02 fix: force re-execution of decorator-driven registration on next
+    # import. Only the ``backends`` + ``lifters`` packages are popped — NOT
+    # ``types`` / ``protocol`` / ``registry``, because popping those here
+    # would split the DetectorInput enum class identity against every module
+    # that has already imported it at class-definition time (FakeDetector in
+    # test_worker_pool.py, YOLOv11Backend in the real backend, ...). The
+    # enum-identity half of W-02 is fixed at the other end of the pollution
+    # chain: tests/perception/test_protocol_contracts.py's ``del
+    # sys.modules[...]`` pair restores the original module object via
+    # try/finally instead of leaving a freshly-constructed replacement
+    # behind. Together with the lazy ``_DetectorInput()`` resolver above,
+    # this keeps every ``isinstance(caps["input_type"], DetectorInput)``
+    # check comparing the SAME enum class across tests.
+    for mod in (
+        "src.perception.backends",
+        "src.perception.lifters",
+        "src.perception.backends.yolov11_backend",
+        "src.perception.lifters.median_depth",
+    ):
+        sys.modules.pop(mod, None)
 
 
 def _full_det_caps(**overrides):
@@ -35,7 +94,9 @@ def _full_det_caps(**overrides):
         "license": "AGPL-3.0",
         "cpu_latency_hint_ms": 120,
         "outputs_3d_natively": False,
-        "input_type": DetectorInput.RGB_ONLY,
+        # Lazy-resolve to bind to the CURRENT types-module enum identity —
+        # see _DetectorInput() docstring for the W-02 split-identity rationale.
+        "input_type": _DetectorInput().RGB_ONLY,
     }
     caps.update(overrides)
     return caps

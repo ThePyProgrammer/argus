@@ -23,35 +23,72 @@ HEAVY_DEPS = ("torch", "ultralytics", "transformers", "onnxruntime")
 
 
 def test_perception_types_import_does_not_load_heavy_deps() -> None:
-    """src.perception.types must be importable without torch/ultralytics/transformers."""
-    pre = set(sys.modules.keys())
+    """src.perception.types must be importable without torch/ultralytics/transformers.
+
+    W-02 fix (Plan 02-12): the delta-measuring approach used to ``del
+    sys.modules["src.perception.types"]`` and re-import without restoring.
+    That mutation created a second ``DetectorInput`` enum class identity
+    in sys.modules — any previously-imported module (registry, worker_pool,
+    ...) still held a reference to the FIRST class, so later
+    ``isinstance(value, DetectorInput)`` checks compared two same-named but
+    different-identity classes and failed. The fix: snapshot the original
+    module object, pop for the delta measurement, then restore it before
+    the test returns, leaving sys.modules bit-identical afterward.
+    """
+    pre_modules = dict(sys.modules)
+    pre = set(pre_modules.keys())
+    saved = {m: pre_modules[m] for m in pre if m.startswith("src.perception.types")}
     for mod in list(sys.modules):
         if mod.startswith("src.perception.types"):
             del sys.modules[mod]
-    import src.perception.types  # noqa: F401
-    post = set(sys.modules.keys())
-    delta = post - pre
-    for fw in HEAVY_DEPS:
-        assert fw not in delta or fw in pre, (
-            f"Importing src.perception.types pulled {fw} into sys.modules. "
-            f"Pitfall P9: types.py must have zero heavy-dep imports."
-        )
+    try:
+        import src.perception.types  # noqa: F401
+        post = set(sys.modules.keys())
+        delta = post - pre
+        for fw in HEAVY_DEPS:
+            assert fw not in delta or fw in pre, (
+                f"Importing src.perception.types pulled {fw} into sys.modules. "
+                f"Pitfall P9: types.py must have zero heavy-dep imports."
+            )
+    finally:
+        # W-02: restore the ORIGINAL module object so downstream modules
+        # (registry, worker_pool, ...) that captured references to it at
+        # their own import time keep matching identities.
+        for mod in list(sys.modules):
+            if mod.startswith("src.perception.types"):
+                del sys.modules[mod]
+        sys.modules.update(saved)
 
 
 def test_perception_protocol_import_does_not_load_heavy_deps() -> None:
-    """src.perception.protocol must be importable without torch/ultralytics/transformers."""
-    pre = set(sys.modules.keys())
+    """src.perception.protocol must be importable without torch/ultralytics/transformers.
+
+    W-02 fix (Plan 02-12): same restore-original-module pattern as
+    test_perception_types_import_does_not_load_heavy_deps above — see that
+    test's docstring for the full rationale. Without the restore the
+    protocol module identity splits, breaking @runtime_checkable protocol
+    isinstance() checks in downstream tests.
+    """
+    pre_modules = dict(sys.modules)
+    pre = set(pre_modules.keys())
+    saved = {m: pre_modules[m] for m in pre if m.startswith("src.perception.protocol")}
     for mod in list(sys.modules):
         if mod.startswith("src.perception.protocol"):
             del sys.modules[mod]
-    import src.perception.protocol  # noqa: F401
-    post = set(sys.modules.keys())
-    delta = post - pre
-    for fw in HEAVY_DEPS:
-        assert fw not in delta or fw in pre, (
-            f"Importing src.perception.protocol pulled {fw} into sys.modules. "
-            f"Pitfall P9: torch imports must be lazy inside TorchBackendMixin method bodies only."
-        )
+    try:
+        import src.perception.protocol  # noqa: F401
+        post = set(sys.modules.keys())
+        delta = post - pre
+        for fw in HEAVY_DEPS:
+            assert fw not in delta or fw in pre, (
+                f"Importing src.perception.protocol pulled {fw} into sys.modules. "
+                f"Pitfall P9: torch imports must be lazy inside TorchBackendMixin method bodies only."
+            )
+    finally:
+        for mod in list(sys.modules):
+            if mod.startswith("src.perception.protocol"):
+                del sys.modules[mod]
+        sys.modules.update(saved)
 
 
 def test_detector_input_enum() -> None:

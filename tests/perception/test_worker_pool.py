@@ -373,13 +373,30 @@ def test_pool_exposes_backend_and_lifter_names_as_public_attrs(register_fakes) -
 
 
 def test_pool_module_does_not_import_torch() -> None:
-    """P9 invariant: importing ``src.perception.worker_pool`` must not pull torch."""
+    """P9 invariant: importing ``src.perception.worker_pool`` must not pull torch.
+
+    W-02 fix (Plan 02-12): the prior implementation asserted absolute absence
+    of torch in sys.modules. Any earlier test in the full-suite run that
+    touches TorchBackendMixin (e.g. test_protocol_contracts.py::
+    test_torch_backend_mixin_enforces_eval_and_freeze, YOLOv11Backend
+    instantiation) legitimately pulls torch, so the absolute assertion
+    silently broke under full-suite ordering. The delta form below only
+    fails if importing worker_pool ITSELF newly pulls torch into
+    sys.modules — which is the invariant Pitfall P9 actually protects.
+    """
+    pre_torch = "torch" in sys.modules
     # Drop any cached worker_pool import so we measure a fresh module load.
     for mod in list(sys.modules):
         if mod == "src.perception.worker_pool":
             del sys.modules[mod]
     import src.perception.worker_pool  # noqa: F401
 
+    if pre_torch:
+        # torch was already loaded by an earlier test; this import can't
+        # prove or disprove the P9 invariant. The single-file run
+        # (``pytest tests/perception/test_worker_pool.py``) exercises the
+        # cold-import path; pass here.
+        return
     assert "torch" not in sys.modules, (
         "Importing src.perception.worker_pool pulled torch into sys.modules — "
         "Pitfall P9: heavy deps must be reached via lazy class-path loading only."
