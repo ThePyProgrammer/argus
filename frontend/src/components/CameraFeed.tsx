@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRobotStore, type Detection3DItem } from '../stores/robotStore';
-import { robotColor } from '../utils/palette';
+import { robotColor, OKABE_ITO_RGB } from '../utils/palette';
 
 interface CameraFeedProps {
   robotId: string;
@@ -12,7 +12,7 @@ interface CameraFeedProps {
  */
 function DetectionOverlay({
   items,
-  color,
+  color: _color,
   imgWidth,
   imgHeight,
 }: {
@@ -32,6 +32,13 @@ function DetectionOverlay({
         // Graceful degradation: skip items without a 2D bbox (bbox_xyxy is optional per Plan 01).
         if (!det.bbox_xyxy || det.bbox_xyxy.length < 4) return null;
         const [x1, y1, x2, y2] = det.bbox_xyxy;
+
+        // D-16 (DET-UI-05): per-class color via OKABE_ITO_RGB indexed by class_id modulo palette length.
+        // Guard against undefined/negative class_id (T-03-23); COCO indices are non-negative but defensive anyway.
+        const [cr, cg, cb] = OKABE_ITO_RGB[(det.class_id ?? 0) >= 0
+          ? (det.class_id ?? 0) % OKABE_ITO_RGB.length
+          : 0];
+        const classColor = `rgb(${cr}, ${cg}, ${cb})`;
 
         // Convert pixel coords to percentages for responsive positioning
         const left = `${(x1 / imgWidth) * 100}%`;
@@ -54,12 +61,12 @@ function DetectionOverlay({
             style={{
               position: 'absolute',
               left, top, width, height,
-              border: `2px solid ${isHovered ? '#fff' : color}`,
+              border: `2px solid ${isHovered ? '#fff' : classColor}`,
               borderRadius: '2px',
               background: isHovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
-              boxShadow: isHovered ? `0 0 8px ${color}` : 'none',
+              boxShadow: isHovered ? `0 0 8px ${classColor}` : 'none',
             }}
           >
             {/* Label badge -- above box if room, below if not */}
@@ -70,14 +77,15 @@ function DetectionOverlay({
                 ? { bottom: '100%', marginBottom: '2px' }
                 : { top: '100%', marginTop: '2px' }),
               padding: '1px 5px',
-              background: isHovered ? color : 'rgba(0,0,0,0.75)',
-              color: isHovered ? '#000' : color,
+              background: isHovered ? classColor : 'rgba(0,0,0,0.75)',
+              color: isHovered ? '#000' : classColor,
               fontSize: '10px',
               fontWeight: 700,
               fontFamily: 'monospace',
               whiteSpace: 'nowrap',
               borderRadius: '2px',
               transition: 'all 0.15s ease',
+              textShadow: isHovered ? 'none' : '0 1px 2px rgba(0,0,0,0.9)',
             }}>
               {det.class_name} {(det.score * 100).toFixed(0)}%
             </div>
@@ -93,7 +101,7 @@ function DetectionOverlay({
                   : { bottom: '100%', marginBottom: '4px' }),
                 padding: '6px 10px',
                 background: 'rgba(0,0,0,0.9)',
-                border: `1px solid ${color}`,
+                border: `1px solid ${classColor}`,
                 borderRadius: '4px',
                 fontSize: '11px',
                 fontFamily: 'monospace',
@@ -102,8 +110,8 @@ function DetectionOverlay({
                 zIndex: 10,
                 pointerEvents: 'none',
               }}>
-                <div><strong style={{ color }}>{det.class_name}</strong></div>
-                <div>Score: {(det.score * 100).toFixed(1)}%</div>
+                <div><strong style={{ color: classColor }}>{det.class_name}</strong></div>
+                <div>Score: {(det.score * 100).toFixed(2)}%</div>
                 <div>BBox: [{det.bbox_xyxy.map(v => v.toFixed(0)).join(', ')}]</div>
                 <div>3D: [{det.center.map(v => v.toFixed(2)).join(', ')}]</div>
                 {det.track_id !== undefined && (
