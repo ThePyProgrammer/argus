@@ -74,8 +74,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-07-PLAN.md — DetectorDropdown + LifterDropdown clones (Wave 2)
 - [x] 03-08-PLAN.md — DetectorParameterPanel + useWebSocket detector_restart_complete wiring (Wave 2)
 - [x] 03-09-PLAN.md — CameraFeed per-class bbox color polish DET-UI-05 (Wave 2)
-- [ ] 03-10-PLAN.md — DetectorSection parent + ControlPanel mount + stacked RestartOverlays (Wave 3)
-- [ ] 03-11-PLAN.md — Vitest detectorStore.shape.test.ts — DET-UI-06 structural equivalence (Wave 3)
+- [x] 03-10-PLAN.md — DetectorSection parent + ControlPanel mount + stacked RestartOverlays (Wave 3)
+- [x] 03-11-PLAN.md — Vitest detectorStore.shape.test.ts — DET-UI-06 structural equivalence (Wave 3)
 **Research flag**: standard
 **UI hint**: yes
 
