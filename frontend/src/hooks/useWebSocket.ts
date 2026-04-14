@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore, fetchSlamState } from '../stores/slamStore';
+import { useDetectorStore, fetchDetectorState } from '../stores/detectorStore';
 import { useMetricsStore } from '../stores/metricsStore';
 import { usePipelineStore } from '../stores/pipelineStore';
 import type {
@@ -139,8 +140,11 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
         }
         case 'detector_restart_complete': {
           const payload = msg.payload as DetectorRestartCompletePayload;
-          // Phase 2: log + future Phase 3 will drive detectorStore.setRestarting(false)
-          console.log(`[detector] restart complete: ${payload.backend}`);
+          useDetectorStore.getState().setRestarting(false);
+          // Refresh backend + lifter state so activeDisplay/activeLifterDisplay match
+          fetchDetectorState();
+          const lifter = (payload as DetectorRestartCompletePayload & { lifter?: string }).lifter;
+          console.log(`[detector] restart complete: ${payload.backend}${lifter ? ' / lifter=' + lifter : ''}`);
           break;
         }
         case 'detector_param_ack': {
