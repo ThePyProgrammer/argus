@@ -82,7 +82,10 @@ def test_legacy_parity_with_median_depth_intrinsics(intrinsics, identity_pose):
     from src.perception.lifters.median_depth import project_center_median_depth
     bbox = (100, 100, 200, 200)
     depth = np.full((480, 640), 2.5, dtype=np.float32)
-    legacy_out = project_center_median_depth(bbox, depth, identity_pose)
+    # Plan 04-03: project_center_median_depth now consumes intrinsics (no hardcoded FOV).
+    # Passing CameraIntrinsics.from_fov(640, 480, 70.0) preserves bit-parity with the
+    # pre-migration 70° default.
+    legacy_out = project_center_median_depth(bbox, depth, identity_pose, intrinsics)
     assert legacy_out is not None
     legacy_world, legacy_d = legacy_out
     # New path: unproject the same bbox-center pixel at the same depth.

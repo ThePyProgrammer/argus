@@ -14,21 +14,21 @@ orientation. `outputs_oriented=False` is the truth-in-advertising signal
 consumed by the Phase 4 frontend to hide the lifter dropdown when a
 3D-native detector is selected.
 
-Hardcoded 70° vertical FOV preserved for Phase 1 parity with the
-pre-refactor ObjectDetector._detect() math. Phase 4's
-src/perception/geometry.py will consume real CameraIntrinsics.
+Phase 4 migration complete: all pinhole math is delegated to
+src.perception.geometry.unproject_pixel_to_world using the intrinsics
+threaded through Detection3DProtocol.lift (no hardcoded FOV).
 """
 
 from __future__ import annotations
 
 import logging
-import math
 import time
 from typing import Any
 
 import numpy as np
 
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
+from src.perception.geometry import unproject_pixel_to_world
 from src.perception.registry import detection_3d
 from src.perception.types import (
     Detections2D,
@@ -38,29 +38,28 @@ from src.perception.types import (
 
 logger = logging.getLogger(__name__)
 
-# Phase 1 FOV constant (deg). Matches the pre-refactor detector.py:225 value.
-# Phase 4 replaces this with src/perception/geometry.py driven by real intrinsics.
-_LEGACY_FOV_DEG = 70.0
-
 
 def project_center_median_depth(
     bbox_xyxy: tuple[int, int, int, int],
     depth: np.ndarray,
     pose: np.ndarray,
+    intrinsics: CameraIntrinsics,
     depth_near_m: float = 0.1,
     depth_far_m: float = 15.0,
 ) -> tuple[np.ndarray, float] | None:
     """Return (world_point_3, median_depth_m) or None if no valid depth pixels.
 
-    Math preserved verbatim from src/perception/detector.py:221-236 (as it
-    existed before Phase 1) so ObjectDetector._detect() continues to produce
-    bit-identical Detection.center_3d values after Task 3 rewires it.
+    Plan 04-03 migration (DET-3D-06): all pinhole math now delegates to
+    `src.perception.geometry.unproject_pixel_to_world`, which consumes the
+    caller-supplied `intrinsics` instead of a hardcoded FOV constant. The
+    camera-frame sign flip (cam_pt = [cam_x, -cam_y, -d]) is preserved
+    inside `geometry.unproject_pixel_to_world` — bit-parity with the
+    pre-migration code is locked by
+    `tests/perception/test_geometry.py::test_legacy_parity_with_median_depth_intrinsics`.
 
     - Depth ROI = bbox, filtered to `depth_near_m < d < depth_far_m`.
     - Median of remaining pixels is the depth scalar.
-    - Unproject bbox CENTER pixel using 70° vertical FOV (hardcoded).
-    - Sign flip: cam_pt = [cam_x, -cam_y, -d] (OpenCV optical → world).
-    - World = pose[:3,:3] @ cam_pt + pose[:3,3].
+    - Bbox CENTER pixel is unprojected using `intrinsics` via geometry.py.
 
     This is the ONLY median-depth projection call site in the codebase
     after Phase 1. Do not duplicate this math elsewhere (Pitfall P3).
@@ -88,14 +87,9 @@ def project_center_median_depth(
     cx_px = min(max(cx_px, 0), w_img - 1)
     cy_px = min(max(cy_px, 0), h_img - 1)
 
-    fov_rad = math.radians(_LEGACY_FOV_DEG)
-    f = h_img / (2.0 * math.tan(fov_rad / 2.0))
-    cam_x = (cx_px - w_img / 2.0) * d / f
-    cam_y = (cy_px - h_img / 2.0) * d / f
-
-    # Sign flip matches "config 1: Y- Z-" from pre-refactor code
-    cam_pt = np.array([cam_x, -cam_y, -d], dtype=np.float64)
-    world_pt = pose[:3, :3] @ cam_pt + pose[:3, 3]
+    world_pt = unproject_pixel_to_world(
+        float(cx_px), float(cy_px), d, intrinsics, pose,
+    )
     return world_pt, d
 
 
@@ -179,9 +173,10 @@ class MedianDepthLifter:
     ) -> Detections3D:
         """Lift 2D detections to OrientedBox3D with identity quaternion.
 
-        `intrinsics` is received per D-04 but IGNORED in Phase 1 (hardcoded
-        70° FOV preserves ObjectDetector._detect parity — CONTEXT.md D-13).
-        `slam_cloud` is received per D-04 but IGNORED (Phase 4 consumes it).
+        `intrinsics` is consumed via src.perception.geometry.unproject_pixel_to_world
+        per Phase 4 DET-3D-06; the Phase 1 hardcoded 70° FOV has been deleted.
+        `slam_cloud` is received per D-04 but IGNORED (Phase 4 PointClusterLifter
+        consumes it).
         """
         t0 = time.perf_counter()
         items: list[OrientedBox3D] = []
@@ -211,6 +206,7 @@ class MedianDepthLifter:
                 det.bbox_xyxy,
                 depth,
                 pose,
+                intrinsics,
                 depth_near_m=self.depth_near_m,
                 depth_far_m=self.depth_far_m,
             )

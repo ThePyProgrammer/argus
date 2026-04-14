@@ -237,7 +237,8 @@ def test_project_center_median_depth_parity_on_identity_pose():
 
     depth = np.full((480, 640), 2.5, dtype=np.float32)
     pose = np.eye(4)
-    result = project_center_median_depth((100, 100, 200, 200), depth, pose)
+    intrinsics = CameraIntrinsics.from_fov(640, 480, 70.0)
+    result = project_center_median_depth((100, 100, 200, 200), depth, pose, intrinsics)
 
     assert result is not None
     world_pt, median_d = result
