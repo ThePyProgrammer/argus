@@ -107,14 +107,14 @@ def _handle_tool_call(name: str, arguments: dict) -> str:
 
     elif name == "get_detections":
         rid = arguments.get("robot_id", "robot_a")
-        if _coordinator.detector is not None:
-            dets = _coordinator.detector.get_detections(rid)
-            return json.dumps([
-                {"class": d.class_name, "confidence": round(d.confidence, 2),
-                 "bbox": list(d.bbox),
-                 "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None}
-                for d in dets
-            ])
+        # Phase 2 D-18 cutover: coordinator.detector now exposes the DetectorWorkerPool.
+        # ``latest(rid)`` returns a Detections3D envelope (or None); serialize via
+        # to_wire() so MCP clients see the Phase 2 3D schema directly.
+        pool = _coordinator.detector
+        if pool is not None:
+            envelope = pool.latest(rid)
+            if envelope is not None:
+                return json.dumps(envelope.to_wire())
         return json.dumps([])
 
     elif name == "get_scene_description":

@@ -34,8 +34,12 @@ from src.coordination.merge_protocol import MergeProtocol, RobotMapData
 from src.coordination.merge_registry import MergeRegistry
 from src.coordination.transport import pLCMTransport
 from src.metrics.drift_metrics import compute_drift_metrics
+from src.perception.types import Detections3D
+# DetectorWorkerPool is attached by main.py's restart block (see Plan 02-09) —
+# kept off module-scope imports to honor P9 (torch-free coordinator module).
 
 if TYPE_CHECKING:
+    from src.perception.worker_pool import DetectorWorkerPool
     from src.viz.multi_robot_viz import MultiRobotVisualizer
 
 
@@ -55,7 +59,7 @@ class RobotVizData:
     pose: np.ndarray
     trajectory: list[np.ndarray]
     coverage_pct: float
-    detections: list[dict]
+    detections_3d: Detections3D | None
     scene_description: dict | None
     tracking_status: str = "ok"
     body_yaw: float = 0.0
@@ -136,16 +140,11 @@ class Coordinator:
         self._merge_count = 0
         self._body_trajectories: dict[str, list[np.ndarray]] = {}
 
-        # Object detection (optional -- graceful if ultralytics not installed)
-        self._detector = None
-        try:
-            from src.perception.detector import ObjectDetector, YOLO_AVAILABLE
-            if YOLO_AVAILABLE:
-                self._detector = ObjectDetector(device="cpu", max_fps=0.5)
-                self._detector.start()
-                logger.info("YOLO object detector started (CPU, 0.5 FPS)")
-        except ImportError:
-            pass
+        # Detector pool is constructed by main.py's restart block (D-01, D-02):
+        # __init__ starts with None; main.py attaches via
+        # ``coordinator._detector_pool = ...`` after each reset_for_restart.
+        # Coordinator treats it as a black box — it never constructs the pool.
+        self._detector_pool: "DetectorWorkerPool | None" = None
 
         # Scene description disabled by default (heavy on CPU, requires libvips)
         # Enable with: coordinator._describer = SceneDescriber(...)
@@ -182,7 +181,14 @@ class Coordinator:
 
     @property
     def detector(self) -> Any:
-        return self._detector
+        """Return the detector pool (or None) as the single detection surface.
+
+        Phase 2 D-18 cutover: the legacy ``ObjectDetector`` is gone; the pool
+        exposes ``submit(rid, frame, pose, ...)`` and ``latest(rid) -> Detections3D | None``.
+        Callers must use the pool API, not the legacy ``get_detections``/
+        ``submit_frame`` methods from Phase 1.
+        """
+        return self._detector_pool
 
     @property
     def describer(self) -> Any:
@@ -256,7 +262,21 @@ class Coordinator:
         }
 
     def reset_for_restart(self, bridge: MultiRobotBridge, robots: dict[str, RobotInstance]) -> None:
-        """Reset coordinator state for a simulation restart."""
+        """Reset coordinator state for a simulation restart.
+
+        Detector-pool lifecycle (D-01, D-02): if a prior pool is attached, it is
+        shut down here so its worker threads stop cleanly before main.py attaches
+        a freshly constructed pool. Coordinator never constructs the pool itself.
+        """
+        # Shutdown any prior detector pool so old workers are joined before
+        # main.py attaches a new pool (Plan 02-09 contract).
+        if self._detector_pool is not None:
+            try:
+                self._detector_pool.shutdown()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("detector_pool.shutdown failed: %s", exc)
+            self._detector_pool = None
+
         self._bridge = bridge
         self._robots = robots
         self._should_stop = False
@@ -633,25 +653,16 @@ class Coordinator:
             pose = robot.get_pose()
             cloud_pts, cloud_rgb = robot.get_cloud_data()
 
-            # Submit frames for perception (background threads)
-            if self._detector is not None:
-                self._detector.submit_frame(
-                    rid, frames[rid].rgb, frames[rid].depth, pose,
-                    slam_cloud=None,
-                )
+            # Submit frames for perception (background threads).
+            # D-05: pool.submit receives the full SensorFrame (not rgb/depth split)
+            # and is a silent no-op for unknown rids. Newest-wins semantics inside
+            # the per-robot worker guarantee non-blocking hot-loop submit.
+            detections_3d: Detections3D | None = None
+            if self._detector_pool is not None:
+                self._detector_pool.submit(rid, frames[rid], pose, slam_cloud=None)
+                detections_3d = self._detector_pool.latest(rid)
             if self._describer is not None:
                 self._describer.submit_frame(rid, frames[rid].rgb)
-
-            # Collect detections
-            detections = []
-            if self._detector is not None:
-                detections = [
-                    {"class": d.class_name, "confidence": d.confidence,
-                     "bbox": list(d.bbox),
-                     "pos_3d": d.center_3d.tolist() if d.center_3d is not None else None,
-                     "depth": d.depth_m}
-                    for d in self._detector.get_detections(rid)
-                ]
 
             scene_desc = None
             if self._describer is not None:
@@ -675,7 +686,7 @@ class Coordinator:
                 pose=pose,
                 trajectory=robot.slam.get_poses(),
                 coverage_pct=robot.exploration.last_coverage,
-                detections=detections,
+                detections_3d=detections_3d,
                 scene_description=scene_desc,
                 tracking_status=getattr(robot.exploration, "last_tracking_status", "ok"),
                 body_yaw=body_yaw,
