@@ -49,6 +49,11 @@ interface DetectorStoreState {
   activeLifterParameters: Record<string, unknown>;
   stagedLifterParams: Record<string, unknown>;
 
+  // --- D-12 stacked overlay discriminator (Plan 10 extension) ---
+  // Tracks which subsystem the current restart is for so SceneViewer can
+  // render the correct RestartOverlay (detector vs lifter).
+  restartSubsystem: 'detector' | 'lifter' | null;
+
   // --- Detector setters (mirror slamStore) ---
   setBackends: (backends: DetectorBackend[]) => void;
   setActive: (name: string, display: string, parameters: Record<string, unknown>) => void;
@@ -66,6 +71,9 @@ interface DetectorStoreState {
   stageLifterParam: (key: string, value: unknown) => void;
   clearStagedLifterParams: () => void;
   updateActiveLifterParam: (key: string, value: unknown) => void;
+
+  // --- D-12 stacked overlay discriminator setter (Plan 10 extension) ---
+  setRestartSubsystem: (subsystem: 'detector' | 'lifter' | null) => void;
 }
 
 export const useDetectorStore = create<DetectorStoreState>((set) => ({
@@ -86,6 +94,9 @@ export const useDetectorStore = create<DetectorStoreState>((set) => ({
   activeLifterDisplay: 'Median Depth (legacy)',
   activeLifterParameters: {},
   stagedLifterParams: {},
+
+  // D-12 stacked overlay discriminator default
+  restartSubsystem: null,
 
   // Detector setters
   setBackends: (backends: DetectorBackend[]) => set({ backends }),
@@ -116,6 +127,9 @@ export const useDetectorStore = create<DetectorStoreState>((set) => ({
     set((s) => ({
       activeLifterParameters: { ...s.activeLifterParameters, [key]: value },
     })),
+
+  // D-12 stacked overlay discriminator setter (Plan 10 extension)
+  setRestartSubsystem: (subsystem) => set({ restartSubsystem: subsystem }),
 }));
 
 export async function fetchDetectorState(): Promise<void> {
