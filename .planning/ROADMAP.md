@@ -92,7 +92,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 7 plans
 - [x] 04-01-PLAN.md — pyproject.toml sklearn + scene_rotated_chair.xml fixture (Wave 0)
 - [x] 04-02-PLAN.md — src/perception/geometry.py + test_geometry.py (Wave 0)
-- [ ] 04-03-PLAN.md — median_depth migration: delete _LEGACY_FOV_DEG, consume intrinsics (Wave 1)
+- [x] 04-03-PLAN.md — median_depth migration: delete _LEGACY_FOV_DEG, consume intrinsics (Wave 1)
 - [ ] 04-04-PLAN.md — PointClusterLifter (PCA-OBB + DBSCAN + fallback) + unit tests (Wave 2)
 - [ ] 04-05-PLAN.md — DetectorWorkerPool.swap_lifter + /lifter-hotswap route + tests (Wave 3)
 - [ ] 04-06-PLAN.md — Frontend DetectorSection redirect to /lifter-hotswap (Wave 4)
