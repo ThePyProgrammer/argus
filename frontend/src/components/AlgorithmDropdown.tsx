@@ -134,7 +134,7 @@ export function AlgorithmDropdown({ onSelect }: { onSelect: (name: string) => vo
                   {capabilities.length > 0 && (
                     <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap' }}>
                       {capabilities.map((cap) => (
-                        <CapabilityBadge key={cap} name={cap} />
+                        <CapabilityBadge key={cap} label={cap} value={true} />
                       ))}
                     </div>
                   )}
