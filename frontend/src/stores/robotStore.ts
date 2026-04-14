@@ -1,12 +1,8 @@
 import { create } from 'zustand';
+import type { Detection3DEnvelope, Detection3DItem } from '../utils/messageTypes';
 
-export interface Detection {
-  class: string;
-  confidence: number;
-  bbox: number[];
-  pos_3d: number[] | null;
-  depth: number | null;
-}
+// Re-export so consumers can `import type { Detection3DEnvelope } from '../stores/robotStore'`
+export type { Detection3DEnvelope, Detection3DItem };
 
 export interface RobotInfo {
   id: string;
@@ -20,7 +16,7 @@ export interface RobotInfo {
   depthUrl: string | null;
   trajectory: number[][]; // list of [x,y,z]
   trajectoryAlphas: number[];
-  detections: Detection[];
+  detections_3d: Detection3DEnvelope | null;
   sceneDescription: string | null;
   sceneObjects: string[];
   trackingStatus: string; // "ok" | "lost" | "initializing" | "relocalizing"
@@ -63,7 +59,7 @@ export interface RobotStoreState {
     alphas: number[],
   ) => void;
   setColorMode: (mode: 'robot_tint' | 'true_rgb') => void;
-  updateDetections: (robotId: string, detections: Detection[]) => void;
+  updateDetections: (robotId: string, envelope: Detection3DEnvelope | null) => void;
   updateSceneDescription: (robotId: string, text: string, objects: string[]) => void;
 }
 
@@ -92,7 +88,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         depthUrl: existing?.depthUrl ?? null,
         trajectory: existing?.trajectory ?? [],
         trajectoryAlphas: existing?.trajectoryAlphas ?? [],
-        detections: existing?.detections ?? [],
+        detections_3d: existing?.detections_3d ?? null,
         sceneDescription: existing?.sceneDescription ?? null,
         sceneObjects: existing?.sceneObjects ?? [],
         trackingStatus: existing?.trackingStatus ?? 'ok',
@@ -208,12 +204,12 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
     set({ colorMode: mode });
   },
 
-  updateDetections: (robotId, detections) => {
+  updateDetections: (robotId, envelope) => {
     set((state) => {
       const robots = new Map(state.robots);
       const robot = robots.get(robotId);
       if (robot) {
-        robots.set(robotId, { ...robot, detections });
+        robots.set(robotId, { ...robot, detections_3d: envelope });
       }
       return { robots };
     });
