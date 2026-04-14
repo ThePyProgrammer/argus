@@ -14,8 +14,8 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 - [x] **DET-API-01**: System exposes `DetectorProtocol` runtime-checkable interface with `process_frame`, `reset`, `warmup`, `get_metrics`, `CAPABILITIES`, `PARAMETER_SCHEMA`
 - [x] **DET-API-02**: System exposes `DetectorRegistry` with `@detector_backend` decorator, lazy class-path loading, and availability reporting (`available: false` + install hint when deps missing)
 - [x] **DET-API-03**: System exposes separate `Detection3DProtocol` + `Detection3DRegistry` for 3D lifters (PCA-OBB, median-depth, etc.), with `outputs_3d_natively` capability flag so end-to-end backends bypass the lifter
-- [ ] **DET-API-04**: Each robot runs its own `DetectorWorker` thread with a single-slot latest-frame queue (newest-wins backpressure); worker pool is keyed by robot_id
-- [ ] **DET-API-05**: Every detection result carries `capture_pose` + `capture_timestamp` from the submission time so downstream consumers do not re-associate stale poses
+- [x] **DET-API-04**: Each robot runs its own `DetectorWorker` thread with a single-slot latest-frame queue (newest-wins backpressure); worker pool is keyed by robot_id
+- [x] **DET-API-05**: Every detection result carries `capture_pose` + `capture_timestamp` from the submission time so downstream consumers do not re-associate stale poses
 - [x] **DET-API-06**: Process-global thread-pool configuration (`torch`, `OMP`, `MKL`, `OPENBLAS`) is set in `src/_thread_config.py` before any torch import; no module-scope `torch.set_num_threads()` in individual files
 - [x] **DET-API-07**: Every backend `__init__` calls `model.eval()` and wraps inference in `torch.inference_mode()`; enforced by a smoke test that caps RSS growth at 200 MB after 100 inferences
 
@@ -25,7 +25,7 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 - [ ] **DET-MODELS-02**: RT-DETRv2-S backend (`PekingU/rtdetr_v2_r18vd`) ships as an in-process ONNX-accelerated real-time transformer detector, ≤250 ms/frame at 320px on CPU
 - [ ] **DET-MODELS-03**: facebook/BoxeR ships as a subprocess-isolated backend via `SubprocessDetectorBridge` (ZMQ PAIR + msgpack, 5 s watchdog, crash fallback); installs into its own worker venv and emits 3D OBBs natively
 - [ ] **DET-MODELS-04**: OWLv2 open-vocabulary backend (`google/owlv2-base-patch16-ensemble`) ships for zero-shot text-prompted detection; marked as on-demand (not a real-time backend)
-- [ ] **DET-MODELS-05**: User can select detector backend pre-session via REST (`POST /api/detectors/select`) which triggers restart — hot-swap mid-session is explicitly out of scope
+- [x] **DET-MODELS-05**: User can select detector backend pre-session via REST (`POST /api/detectors/select`) which triggers restart — hot-swap mid-session is explicitly out of scope
 - [ ] **DET-MODELS-06**: Backend crash in BoxeR subprocess emits `crash_fallback` WS message, falls back to YOLOv11, and shows a `CrashToast` in the frontend
 - [ ] **DET-MODELS-07**: Every checkpoint is pinned by `revision=` SHA; `make download-models` script pre-fetches all weights to `./models/` for offline / CI
 - [ ] **DET-MODELS-08**: LICENSES.md documents BoxeR CC-BY-NC-4.0 restriction
@@ -34,8 +34,8 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 - [ ] **DET-3D-01**: `PointClusterLifter` is the default 3D lifter — MAD-filtered depth frustum + DBSCAN cluster rejection + Open3D `compute_oriented_bounding_box(robust=True)`, yaw-only for indoor MVP, gravity-aligned
 - [ ] **DET-3D-02**: `MedianDepthLifter` is kept as a named legacy lifter with `outputs_oriented=False` (wraps existing `detection_3d.py` behavior) — for compatibility, not default
-- [ ] **DET-3D-03**: Server emits canonical OBB wire format: `(center[3], half_extents[3], quaternion[4] in xyzw with qw>=0, class_id, class_name, score, track_id)` via `OrientedBox3D.to_wire()`; inline quaternion construction in backends is forbidden
-- [ ] **DET-3D-04**: Round-trip test enforces `obb == OrientedBox3D.from_wire(obb.to_wire())` to ±1e-6 across all backends and lifters
+- [x] **DET-3D-03**: Server emits canonical OBB wire format: `(center[3], half_extents[3], quaternion[4] in xyzw with qw>=0, class_id, class_name, score, track_id)` via `OrientedBox3D.to_wire()`; inline quaternion construction in backends is forbidden
+- [x] **DET-3D-04**: Round-trip test enforces `obb == OrientedBox3D.from_wire(obb.to_wire())` to ±1e-6 across all backends and lifters
 - [ ] **DET-3D-05**: Frontend `DetectionBoxManager` / `OBBManager` renders OBBs verbatim from wire format via `InstancedMesh`; client-side focal-length / FoV back-projection is deleted
 - [ ] **DET-3D-06**: Single projection path lives in `src/perception/geometry.py` — removes the hardcoded 70° FOV + duplicate projection paths that previously existed in `detector.py` and `detection_3d.py`
 - [ ] **DET-3D-07**: Lifter falls back to `MedianDepthLifter` when the depth frustum has fewer than 50 valid pixels, preserving behavior for degenerate cases

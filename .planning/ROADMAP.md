@@ -13,7 +13,7 @@ v3.0 repeats the v2.0 pattern on a new domain: decouple object detection from Ul
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: detector-api-foundation** - Protocol + Registry + YOLO-behind-Protocol + thread config + eval-mode contract (completed 2026-04-13)
-- [ ] **Phase 2: per-robot-worker-and-wire-plumbing** - Per-robot DetectorWorker, REST/WS plumbing, canonical OBB wire format + round-trip test
+- [x] **Phase 2: per-robot-worker-and-wire-plumbing** - Per-robot DetectorWorker, REST/WS plumbing, canonical OBB wire format + round-trip test (completed 2026-04-14)
 - [ ] **Phase 3: frontend-picker-and-ui** - Detector dropdown, lifter dropdown, param panel, restart overlay, RGB bbox overlay
 - [ ] **Phase 4: real-3d-obb-pipeline** - PointClusterLifter (PCA-OBB), single geometry path, dumb-renderer frontend
 - [ ] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess, RT-DETRv2 in-process ONNX, OWLv2 open-vocab, pinned checkpoints
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. detector-api-foundation | 5/5 | Complete   | 2026-04-13 |
-| 2. per-robot-worker-and-wire-plumbing | 0/TBD | Not started | - |
+| 2. per-robot-worker-and-wire-plumbing | 12/12 | Complete   | 2026-04-14 |
 | 3. frontend-picker-and-ui | 0/TBD | Not started | - |
 | 4. real-3d-obb-pipeline | 0/TBD | Not started | - |
 | 5. second-backends-boxer-rtdetr-owlv2 | 0/TBD | Not started | - |
