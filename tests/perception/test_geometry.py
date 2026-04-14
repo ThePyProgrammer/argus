@@ -143,3 +143,60 @@ def test_geometry_module_uses_camera_intrinsics_type(intrinsics, identity_pose):
             intrinsics=(1.0, 2.0, 3.0, 4.0),  # tuple -- must fail
             pose=identity_pose,
         )
+
+
+def test_legacy_fov_deg_absent_post_migration():
+    """DET-3D-06 + D-06: after Plan 04-03, _LEGACY_FOV_DEG must NOT appear
+    in ANY file under src/perception/. Pitfall 9: we check the exact token,
+    not a substring, so unrelated '70' literals do not false-positive."""
+    perception_root = Path(__file__).resolve().parents[2] / "src" / "perception"
+    offenders: list[str] = []
+    for py in perception_root.rglob("*.py"):
+        txt = py.read_text()
+        if "_LEGACY_FOV_DEG" in txt:
+            offenders.append(str(py))
+    assert offenders == [], f"_LEGACY_FOV_DEG still present in: {offenders}"
+
+
+def test_no_math_tan_or_radians_in_perception_lifters():
+    """DET-3D-06: lifters delegate all pinhole math to geometry.py; no file
+    under src/perception/lifters/ may call math.tan(...) or math.radians(...)
+    in executable code."""
+    import re
+
+    lifters_root = Path(__file__).resolve().parents[2] / "src" / "perception" / "lifters"
+    pattern = re.compile(r"math\.(tan|radians)\s*\(")
+    offenders: list[str] = []
+    for py in lifters_root.rglob("*.py"):
+        # Skip lines starting with common comment/docstring delimiters.
+        for i, line in enumerate(py.read_text().split("\n"), start=1):
+            stripped = line.lstrip()
+            if stripped.startswith(("#", '"""', "'''", '"', "'")):
+                continue
+            if pattern.search(line):
+                offenders.append(f"{py}:{i}:{line.strip()}")
+    assert offenders == [], f"math.tan/math.radians in lifter code: {offenders}"
+
+
+def test_geometry_is_only_perception_module_with_executable_fov_math():
+    """DET-3D-06 single-entrypoint gate: across the whole src/perception/ package,
+    executable calls to math.tan() / math.radians() exist ONLY in geometry.py
+    (and in practice, the Pattern Template 2 implementation doesn't even use
+    them -- CameraIntrinsics.from_fov handles the derivation at capture time).
+    """
+    import re
+
+    perception_root = Path(__file__).resolve().parents[2] / "src" / "perception"
+    pattern = re.compile(r"math\.(tan|radians)\s*\(")
+    allowed = {"geometry.py"}
+    offenders: list[str] = []
+    for py in perception_root.rglob("*.py"):
+        for i, line in enumerate(py.read_text().split("\n"), start=1):
+            stripped = line.lstrip()
+            if stripped.startswith(("#", '"""', "'''", '"', "'")):
+                continue
+            if pattern.search(line) and py.name not in allowed:
+                offenders.append(f"{py}:{i}:{line.strip()}")
+    assert offenders == [], (
+        f"math.tan/math.radians outside geometry.py in perception pkg: {offenders}"
+    )
