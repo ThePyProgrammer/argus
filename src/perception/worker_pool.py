@@ -111,6 +111,7 @@ class DetectorWorkerPool:
         backend_params: dict | None,
         lifter_name: str,
         intrinsics_per_robot: dict[str, "CameraIntrinsics"],
+        lifter_params: dict | None = None,
     ) -> None:
         """Construct one ``DetectorWorker`` per rid with its own detector + lifter.
 
@@ -130,19 +131,28 @@ class DetectorWorkerPool:
                 rid's intrinsics — different robots may have different
                 cameras. KeyError if a rid in ``robot_ids`` is missing
                 from this dict (caller bug, fail loudly at construction).
+            lifter_params: kwargs forwarded to
+                ``Detection3DRegistry.create(lifter_name, **lifter_params)``.
+                ``None`` is treated as empty. Defensive copy mirrors
+                ``backend_params`` semantics so caller mutations cannot
+                leak into per-worker lifter instances. Plan 03-06 added
+                this kwarg to thread ``app.state.pending_lifter_params``
+                from the ``main.py`` restart block (D-10).
         """
         self.backend_name = backend_name
         self.lifter_name = lifter_name
         # Defensive copy: caller's dict mutations cannot retro-actively
         # change the kwargs that were forwarded to the registry.
         params = dict(backend_params or {})
+        lifter_kwargs = dict(lifter_params or {})
+        self._lifter_params = lifter_kwargs  # retained for repr/debug
         self._workers: dict[str, DetectorWorker] = {}
         for rid in robot_ids:
             # Per-robot instance separation — two separate create() calls
             # yield two independent backend instances. This is the invariant
             # tested by test_instance_separation_backend_mutations_do_not_leak.
             detector = DetectorRegistry.create(backend_name, **params)
-            lifter = Detection3DRegistry.create(lifter_name)
+            lifter = Detection3DRegistry.create(lifter_name, **lifter_kwargs)
             self._workers[rid] = DetectorWorker(
                 robot_id=rid,
                 detector=detector,
@@ -299,9 +309,18 @@ class DetectorWorkerPool:
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:  # pragma: no cover -- trivial formatting
+        # Plan 03-06: include lifter_params only when non-empty so the
+        # representation stays compact for the common Phase 2 path that
+        # omits the kwarg.
+        lp_part = (
+            f", lifter_params={self._lifter_params!r}"
+            if self._lifter_params
+            else ""
+        )
         return (
             f"DetectorWorkerPool(backend={self.backend_name!r}, "
-            f"lifter={self.lifter_name!r}, "
+            f"lifter={self.lifter_name!r}"
+            f"{lp_part}, "
             f"robots={list(self._workers.keys())!r})"
         )
 
