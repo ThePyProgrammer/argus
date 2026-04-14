@@ -36,8 +36,8 @@ const EXPECTED_EXTRAS = new Set<string>([
 ]);
 
 describe('detectorStore structural equivalence with slamStore (D-03)', () => {
-  const slamState = useSlamStore.getState() as Record<string, unknown>;
-  const detState = useDetectorStore.getState() as Record<string, unknown>;
+  const slamState = useSlamStore.getState() as unknown as Record<string, unknown>;
+  const detState = useDetectorStore.getState() as unknown as Record<string, unknown>;
   const slamKeys = new Set(Object.keys(slamState));
   const detKeys = new Set(Object.keys(detState));
 
