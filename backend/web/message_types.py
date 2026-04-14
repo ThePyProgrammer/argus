@@ -19,6 +19,12 @@ STATS = "stats"
 COMMAND = "command"
 TRAJECTORY = "trajectory"
 
+# ---- Detector message type literals (Phase 2 — DET-MODELS-05, DET-API-05, DET-3D-03) ----
+DETECTIONS_3D = "detections_3d"
+DETECTOR_RESTART_COMPLETE = "detector_restart_complete"
+DETECTOR_PARAM_ACK = "detector_param_ack"
+DETECTOR_PARAM_UPDATE = "detector_param_update"
+
 
 class WSMessage(BaseModel):
     """Envelope for all JSON WebSocket messages.
