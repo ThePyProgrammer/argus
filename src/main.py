@@ -41,7 +41,7 @@ from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.multi_robot_config import MultiRobotConfig
-from src.bridge.sensor_types import CameraIntrinsics
+from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.bridge.sim_bridge import MuJoCoBridge
 from src.control.random_walk import RandomWalkController
 from src.control.waypoint_runner import WaypointRunner
@@ -488,6 +488,66 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 app.state.pending_merge_strategy = None
                 app.state.pending_pipeline_config = None
 
+                # ---- Detector pool rebuild (Phase 2 — DET-MODELS-05 / D-02) ----
+                # Read pending detector selection from REST /select (Plan 02-08 surface).
+                pending_detector = getattr(app.state, "pending_detector_backend", None)
+                pending_det_params = getattr(app.state, "pending_detector_params", {}) or {}
+                # Pipeline config detector_name takes priority (mirrors SLAM pattern).
+                # PipelineConfig (Phase 2) does not yet carry detector_name; getattr
+                # keeps this forward-compatible for when the graph adds a detector node.
+                if pipeline_config is not None and getattr(pipeline_config, "detector_name", None) is not None:
+                    pending_detector = pipeline_config.detector_name
+
+                try:
+                    # Side-effect imports force registry population before create()
+                    from src.perception.registry import DetectorRegistry  # noqa: F401
+                    import src.perception.backends  # noqa: F401  — register yolov11 + family
+                    import src.perception.lifters   # noqa: F401  — register median_depth
+                    from src.perception.worker_pool import DetectorWorkerPool
+
+                    backend_name = pending_detector or DetectorRegistry.get_default()
+                    # One CameraIntrinsics instance per robot (all share the same config today;
+                    # Phase 8 stretch may diverge per-robot).
+                    intrinsics_per_robot = {rid: intrinsics for rid in robots}
+                    detector_pool = DetectorWorkerPool(
+                        robot_ids=list(robots.keys()),
+                        backend_name=backend_name,
+                        backend_params=pending_det_params,
+                        # Phase 2 lifter is always MedianDepthLifter; Phase 4 swaps to PointClusterLifter.
+                        lifter_name="median_depth",
+                        intrinsics_per_robot=intrinsics_per_robot,
+                    )
+
+                    # Synchronous warmup BEFORE emitting detector_restart_complete (D-03).
+                    # Pitfall 6: warmup frame resolution must match real inference resolution.
+                    dummy_frames: dict[str, SensorFrame] = {}
+                    for rid in robots:
+                        cached = None
+                        if hasattr(bridge, "get_last_frame"):
+                            try:
+                                cached = bridge.get_last_frame(rid)
+                            except Exception:
+                                cached = None
+                        if cached is None:
+                            cached = SensorFrame(
+                                rgb=np.zeros((480, 640, 3), dtype=np.uint8),
+                                depth=np.zeros((480, 640), dtype=np.float32),
+                                ground_truth_pose=np.eye(4),
+                                sim_time=0.0,
+                            )
+                        dummy_frames[rid] = cached
+                    detector_pool.warmup_all(dummy_frames)
+                    detector_pool.start()
+                    coordinator._detector_pool = detector_pool
+                    app.state.active_detector_backend = backend_name
+                    app.state.pending_detector_backend = None
+                    # pending_detector_params intentionally retained — coordinator may
+                    # consume live-tunable values per-frame.
+                except Exception as exc:
+                    # T-02-24 mitigation: pool construction failure must not crash restart.
+                    logger.exception("Detector pool rebuild failed: %s", exc)
+                    coordinator._detector_pool = None
+
                 # Reset streaming viz cloud tracking
                 if streaming_viz is not None:
                     streaming_viz.reset_cloud_tracking()
@@ -497,6 +557,13 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     streaming_viz._message_queue.append({
                         "type": "slam_restart_complete",
                         "payload": {},
+                    })
+                    # Emit detector_restart_complete AFTER warmup_all returns (D-03).
+                    streaming_viz._message_queue.append({
+                        "type": "detector_restart_complete",
+                        "payload": {
+                            "backend": getattr(app.state, "active_detector_backend", "yolov11"),
+                        },
                     })
 
             logger.info("Simulation restarted.")
