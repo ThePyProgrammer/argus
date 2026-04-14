@@ -83,33 +83,45 @@ def test_detections_2d_dataclass_contract() -> None:
 
 
 def test_oriented_box_3d_skeleton_contract() -> None:
+    """Phase 2 Plan 02-01 extends the OBB with bbox_xyxy (02-RESEARCH W-01 / Pitfall 8).
+
+    Field order is locked: the seven Phase 1 fields come first (unchanged order),
+    bbox_xyxy is appended as the LAST optional field so Phase 1 construction sites
+    (median_depth lifter, coordinator) keep working without kwargs churn.
+    """
     from src.perception.types import OrientedBox3D
 
     fields = [f.name for f in dataclasses.fields(OrientedBox3D)]
     assert fields == [
         "center", "half_extents", "quaternion",
-        "class_id", "class_name", "score", "track_id",
+        "class_id", "class_name", "score", "track_id", "bbox_xyxy",
     ], fields
 
 
-def test_no_to_wire_on_oriented_box_3d() -> None:
-    """Phase 2 ships to_wire / from_wire -- NOT Phase 1."""
+def test_oriented_box_3d_has_to_wire_and_from_wire() -> None:
+    """Phase 2 Plan 02-01 ships to_wire / from_wire per DET-3D-03 / DET-3D-04."""
     from src.perception.types import OrientedBox3D
 
-    assert not hasattr(OrientedBox3D, "to_wire"), (
-        "OrientedBox3D.to_wire is Phase 2 scope (DET-3D-03). Must not ship in Phase 1."
+    assert hasattr(OrientedBox3D, "to_wire"), (
+        "OrientedBox3D.to_wire is Phase 2 Plan 02-01 scope (DET-3D-03)."
     )
-    assert not hasattr(OrientedBox3D, "from_wire"), (
-        "OrientedBox3D.from_wire is Phase 2 scope (DET-3D-04). Must not ship in Phase 1."
+    assert hasattr(OrientedBox3D, "from_wire"), (
+        "OrientedBox3D.from_wire is Phase 2 Plan 02-01 scope (DET-3D-04)."
     )
 
 
 def test_detections_3d_dataclass_contract() -> None:
+    """Phase 2 Plan 02-01 adds envelope-level capture_pose + capture_timestamp (D-11, D-12).
+
+    Defaults exist ONLY to keep Phase 1 construction sites working during the Wave 2 cutover;
+    the Detections3D.to_wire() serializes capture_pose as a flat 16-float row-major list (D-14).
+    """
     from src.perception.types import Detections3D
 
     fields = [f.name for f in dataclasses.fields(Detections3D)]
     assert fields == [
         "items", "lifter_ms", "detector_ms", "n_raw", "n_final", "image_hw",
+        "capture_pose", "capture_timestamp",
     ], fields
 
 
