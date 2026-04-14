@@ -1,24 +1,57 @@
 """Deterministic generator for tests/fixtures/yolo_regression_scene_01.npz.
 
-Produces a committed NPZ fixture consumed by tests/perception/test_yolov11_regression.py
-to prove bit-exact parity between ObjectDetector._detect and YOLOv11Backend.process_frame
-(CONTEXT.md D-12).
+Produces a committed NPZ fixture consumed by
+tests/integration/test_pool_end_to_end.py to prove DetectorWorkerPool
+dataflow preserves detection parity with a direct YOLOv11Backend +
+MedianDepthLifter call (Plan 02-12 replacement for the retired D-12
+regression test; see Phase 1 01-VERIFICATION.md §W-01 for the parity
+rationale).
 
 Usage:
-    python tests/fixtures/generate_yolo_regression_fixture.py
+    uv run --active python tests/fixtures/generate_yolo_regression_fixture.py
 
-The script is idempotent — re-running produces a bit-identical NPZ. Commit the
-output NPZ to git alongside this script.
+The script is idempotent — re-running produces a bit-identical NPZ.
+The resulting NPZ is committed via git-lfs (``.gitattributes`` tracks
+``tests/fixtures/*.npz``).
 
-Two modes:
-  A (preferred) — render from the MuJoCo office scene (data/scenes/office*.xml).
-                  Uses MuJoCoBridge with a fixed seed + spawn position + step count.
-  B (fallback)  — synthetic gradient + painted rectangles. Used when Mode A fails
-                  (missing scene asset, MuJoCo init error, OS-level GL unavailable).
+W-01 FIX (Plan 02-12): the generator ASSERTS ``len(detections) >= 1``
+BEFORE writing the NPZ. The former Mode A (MuJoCo office-scene render)
+produced zero YOLO detections at 480x640 and the former Mode B
+(synthetic rectangles) likewise produced zero — a 0==0 parity tautology
+that passed the D-12 regression vacuously. Any future regression that
+makes the scene undetectable now fails LOUDLY at generation time.
 
-Either mode produces a valid D-12 fixture because the test compares the OUTPUT of
-two code paths on the SAME input — it does not require the fixture to contain
-ground-truth annotations.
+Mode selection (single mode, documented W-01 fix):
+
+  **Mode A' — ultralytics bus.jpg deterministically resized to 480x640.**
+
+  Rationale:
+  1. MuJoCo's go2 scene (models/unitree_go2/scene.xml via the default
+     MuJoCoEnvConfig) renders an empty office with the robot's front
+     camera pointed at mostly-untextured walls. YOLOv11 returns zero
+     detections at every tested resolution (320x240, 640x480, 1280x960)
+     with the confidence=0.5 threshold carried forward from the legacy
+     ObjectDetector — no COCO-class object is in view.
+  2. ``ultralytics/assets/bus.jpg`` ships with the ultralytics pip
+     package, is YOLO's de facto demo scene, and produces stable
+     detections (4 persons at conf > 0.6 post-resize). It is
+     deterministic across ultralytics versions (the file hash is locked
+     by the package release) and was COPIED into the repo as
+     ``tests/fixtures/yolo_regression_source_bus.jpg`` so generation
+     works even without ultralytics installed.
+  3. This satisfies the plan's "Mode A' synthetic scene with a chair
+     image overlay or a different scene choice" escape valve
+     (02-12-PLAN.md Task 4 step 2).
+
+  The resize uses cv2.INTER_AREA which is deterministic across OpenCV
+  versions for downscaling.
+
+NPZ schema (locked — consumed by test_pool_end_to_end.py):
+    rgb   : (480, 640, 3)  uint8
+    depth : (480, 640)     float32   (uniform 2.0 m — sufficient for
+                                      MedianDepthLifter.project_center
+                                      _median_depth on every bbox)
+    pose  : (4, 4)         float64   (identity — camera at world origin)
 """
 
 from __future__ import annotations
@@ -30,72 +63,84 @@ import numpy as np
 
 
 FIXTURE_PATH = Path(__file__).parent / "yolo_regression_scene_01.npz"
+SOURCE_IMAGE = Path(__file__).parent / "yolo_regression_source_bus.jpg"
 
 
-def _generate_mode_a() -> dict[str, np.ndarray] | None:
-    """Try to render from the real MuJoCo office scene.
+def _generate_frame() -> dict[str, np.ndarray]:
+    """Produce the deterministic (rgb, depth, pose, sim_time) payload.
 
-    Returns a dict of NPZ arrays on success, or None if Mode A is unavailable
-    (letting the caller fall through to Mode B).
+    See module docstring for Mode A' rationale.
     """
     try:
-        # Lazy imports — Mode B must not require MuJoCo.
-        from src.bridge.env_config import MuJoCoEnvConfig
-        from src.bridge.sim_bridge import MuJoCoBridge
-    except Exception as exc:
-        print(f"[fixture] Mode A unavailable (import error): {exc}", file=sys.stderr)
-        return None
+        import cv2
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "opencv-python-headless is required to regenerate the W-01 fixture. "
+            "Install the base deps: `uv pip install -e .`"
+        ) from exc
 
-    try:
-        config = MuJoCoEnvConfig()
-        bridge = MuJoCoBridge(config)
-        bridge.start()
-        frame = None
-        for _ in range(10):  # let the physics settle
-            frame = bridge.step()
-        bridge.stop()
-        if frame is None or frame.depth is None:
-            print("[fixture] Mode A produced None frame; falling back to Mode B", file=sys.stderr)
-            return None
-        if frame.rgb.shape != (480, 640, 3):
-            print(f"[fixture] Mode A frame.rgb wrong shape {frame.rgb.shape}; Mode B instead", file=sys.stderr)
-            return None
-        print("[fixture] mode=A (MuJoCo office scene)", file=sys.stderr)
-        return {
-            "rgb": frame.rgb.astype(np.uint8),
-            "depth": frame.depth.astype(np.float32),
-            "pose": frame.ground_truth_pose.astype(np.float64),
-            "sim_time": np.array(frame.sim_time, dtype=np.float64),
-        }
-    except Exception as exc:
-        print(f"[fixture] Mode A runtime error: {exc!r}; falling back to Mode B", file=sys.stderr)
-        return None
+    if not SOURCE_IMAGE.exists():  # pragma: no cover
+        raise RuntimeError(
+            f"Missing source image: {SOURCE_IMAGE}. This file ships in the repo "
+            f"(copied from ultralytics/assets/bus.jpg). Restore it from git."
+        )
 
+    img_bgr = cv2.imread(str(SOURCE_IMAGE))
+    if img_bgr is None:
+        raise RuntimeError(f"cv2.imread returned None for {SOURCE_IMAGE}")
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    rgb = cv2.resize(img_rgb, (640, 480), interpolation=cv2.INTER_AREA).astype(np.uint8)
 
-def _generate_mode_b() -> dict[str, np.ndarray]:
-    """Synthetic deterministic scene. Zero randomness — bit-identical on every run."""
-    H, W = 480, 640
-    ys, xs = np.mgrid[0:H, 0:W]
-    base = ((xs + ys) // 4 % 256).astype(np.uint8)
-    rgb = np.stack([base, base, base], axis=-1)
-    rgb[120:200, 150:230] = 100    # gray block
-    rgb[280:360, 300:380] = 180    # lighter gray
-    rgb[50:110, 500:600] = 200     # bright block
-    depth = np.full((H, W), 2.0, dtype=np.float32)
+    depth = np.full((480, 640), 2.0, dtype=np.float32)
     pose = np.eye(4, dtype=np.float64)
     sim_time = np.array(0.0, dtype=np.float64)
-    print("[fixture] mode=B (synthetic deterministic)", file=sys.stderr)
+
+    print("[fixture] mode=A' (ultralytics bus.jpg resized to 480x640 via INTER_AREA)",
+          file=sys.stderr)
     return {"rgb": rgb, "depth": depth, "pose": pose, "sim_time": sim_time}
 
 
+def _verify_yolo_detects_objects(rgb: np.ndarray, depth: np.ndarray) -> None:
+    """W-01 acceptance gate: the generated frame MUST produce >=1 YOLO detection.
+
+    Failing loudly here prevents the fixture from silently regressing to a
+    0==0 parity tautology (the exact bug W-01 records in Phase 1 VERIFICATION.md).
+    """
+    import src.perception.backends  # noqa: F401 — triggers @detector_backend
+    from src.bridge.sensor_types import SensorFrame
+    from src.perception.registry import DetectorRegistry
+
+    det = DetectorRegistry.create("yolov11")
+    frame = SensorFrame(
+        rgb=rgb, depth=depth, ground_truth_pose=np.eye(4), sim_time=0.0
+    )
+    d2d = det.process_frame(frame)
+    if len(d2d.items) < 1:
+        raise RuntimeError(
+            "W-01 violation: fixture produces 0 YOLO detections. "
+            "tests/integration/test_pool_end_to_end.py would be a 0==0 tautology. "
+            "Inspect the fixture image or drop the confidence threshold."
+        )
+    print(
+        f"[W-01] Fixture verification OK: {len(d2d.items)} YOLO detection(s) — "
+        + ", ".join(
+            f"{d.class_name}@{d.bbox_xyxy}(conf={d.score:.2f})"
+            for d in d2d.items
+        ),
+        file=sys.stderr,
+    )
+
+
 def main() -> None:
-    data = _generate_mode_a()
-    if data is None:
-        data = _generate_mode_b()
+    data = _generate_frame()
+    _verify_yolo_detects_objects(data["rgb"], data["depth"])
     FIXTURE_PATH.parent.mkdir(parents=True, exist_ok=True)
     np.savez(FIXTURE_PATH, **data)
-    print(f"[fixture] wrote {FIXTURE_PATH} "
-          f"(rgb={data['rgb'].shape} depth={data['depth'].shape})", file=sys.stderr)
+    print(
+        f"[fixture] wrote {FIXTURE_PATH} "
+        f"(rgb={data['rgb'].shape} depth={data['depth'].shape})",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
