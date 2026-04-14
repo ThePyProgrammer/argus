@@ -3,6 +3,7 @@ import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
 import { useMetricsStore } from '../stores/metricsStore';
 import AlgorithmSection from './AlgorithmSection';
+import DetectorSection from './DetectorSection';
 import SliderField from './SliderField';
 
 export default function ControlPanel() {
@@ -182,6 +183,8 @@ export default function ControlPanel() {
       </div>
 
       <AlgorithmSection />
+
+      <DetectorSection />
 
       {/* Restart section */}
       <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>

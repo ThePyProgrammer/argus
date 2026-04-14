@@ -11,6 +11,7 @@ import { CameraFrustumManager } from './CameraFrustum';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore } from '../stores/slamStore';
+import { useDetectorStore } from '../stores/detectorStore';
 import { useMetricsStore } from '../stores/metricsStore';
 import { RestartOverlay } from './RestartOverlay';
 import { CrashToast } from './CrashToast';
@@ -376,6 +377,12 @@ export default function SceneViewer() {
   const isRestarting = useSlamStore((s) => s.isRestarting);
   const activeDisplay = useSlamStore((s) => s.activeDisplay);
   const crashMessage = useSlamStore((s) => s.crashMessage);
+  // D-12 stacked RestartOverlay support: detector and lifter restarts share
+  // detectorStore.isRestarting; restartSubsystem discriminates which overlay renders.
+  const detectorRestarting = useDetectorStore((s) => s.isRestarting);
+  const detectorDisplay = useDetectorStore((s) => s.activeDisplay);
+  const lifterDisplay = useDetectorStore((s) => s.activeLifterDisplay);
+  const restartSubsystem = useDetectorStore((s) => s.restartSubsystem);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -397,6 +404,12 @@ export default function SceneViewer() {
         </div>
       )}
       {isRestarting && <RestartOverlay subsystem="slam" name={activeDisplay} />}
+      {detectorRestarting && restartSubsystem === 'detector' && (
+        <RestartOverlay subsystem="detector" name={detectorDisplay} />
+      )}
+      {detectorRestarting && restartSubsystem === 'lifter' && (
+        <RestartOverlay subsystem="lifter" name={lifterDisplay} />
+      )}
       {crashMessage && <CrashToast />}
     </div>
   );
