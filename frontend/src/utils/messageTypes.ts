@@ -11,7 +11,9 @@ export interface WSMessage {
     | 'trajectory'
     | 'cloud_configs'
     | 'cloud_config_ack'
-    | 'detections'
+    | 'detections_3d'              // D-18 cutover from legacy 'detections' (Phase 2)
+    | 'detector_restart_complete'  // new Phase 2
+    | 'detector_param_ack'         // new Phase 2
     | 'scene_description'
     | 'color_mode_ack'
     | 'slam_param_ack'
@@ -75,4 +77,50 @@ export interface StatsPayload {
 export interface TrajectoryPayload {
   positions: number[][];
   alphas: number[];
+}
+
+/**
+ * Single oriented 3D detection (D-09 wire shape, per Plan 01 OrientedBox3D.to_wire).
+ *
+ * Phase 2: MedianDepthLifter emits identity quaternion [0,0,0,1].
+ * Phase 4 (DET-3D-01): PointClusterLifter will emit real OBB orientation.
+ */
+export interface Detection3DItem {
+  center: [number, number, number];              // world-frame meters
+  half_extents: [number, number, number];        // local-axis meters
+  quaternion: [number, number, number, number];  // xyzw, qw >= 0 (D-06)
+  class_id: number;
+  class_name: string;
+  score: number;
+  track_id?: number;                              // omitted when null (D-07)
+  bbox_xyxy?: [number, number, number, number];   // optional 2D pixel bbox for CameraFeed (Plan 01)
+}
+
+/**
+ * Detections3D envelope payload (D-14 capture_pose + D-12 capture_timestamp).
+ * Matches Detections3D.to_wire() from Plan 01.
+ */
+export interface Detection3DEnvelope {
+  items: Detection3DItem[];
+  capture_pose: number[];           // flat 16-float row-major (THREE.Matrix4.fromArray)
+  capture_timestamp: number;        // sim time in seconds (D-12)
+  image_hw: [number, number];
+  metrics: {
+    detector_ms: number;
+    lifter_ms: number;
+    n_raw: number;
+    n_final: number;
+  };
+}
+
+/** Payload for 'detector_restart_complete' message. */
+export interface DetectorRestartCompletePayload {
+  backend: string;
+}
+
+/** Payload for 'detector_param_ack' message. */
+export interface DetectorParamAckPayload {
+  param: string;
+  status: 'applied' | 'requires_restart' | 'unknown_parameter';
+  value?: unknown;
 }
