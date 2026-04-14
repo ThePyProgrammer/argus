@@ -63,6 +63,11 @@ def create_app(
     app.state.pending_detector_backend = None
     app.state.pending_detector_params = {}
 
+    # Detection3D lifter selection state (Phase 3 — D-10)
+    app.state.active_lifter = "median_depth"
+    app.state.pending_lifter = None
+    app.state.pending_lifter_params = {}
+
     # Wire SLAM REST API routes
     from backend.web.slam_routes import router as slam_router
     app.include_router(slam_router)
