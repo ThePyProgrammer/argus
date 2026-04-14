@@ -32,6 +32,11 @@ class SelectRequest(BaseModel):
     params: dict | None = None
 
 
+class LifterSelectRequest(BaseModel):
+    lifter: str
+    params: dict | None = None
+
+
 class ParamPatch(BaseModel):
     params: dict
 
@@ -100,4 +105,101 @@ async def patch_params(patch: ParamPatch, request: Request):
             pending = getattr(request.app.state, "pending_detector_params", {})
             pending[key] = value
             request.app.state.pending_detector_params = pending
+    return {"results": results}
+
+
+# ---------------------------------------------------------------------------
+# Lifter (Detection3D) endpoints — Phase 3 D-10
+# ---------------------------------------------------------------------------
+#
+# Structural clone of the merge-strategy block in backend/web/slam_routes.py
+# (lines 107-175). Every handler MUST `import src.perception.lifters` at call
+# time to force @detection_3d side-effect registration (Pitfall #4 — without
+# this, a cold boot returns {lifters: []}).
+#
+# Threat model (mirror SLAM merge T-02-19..21; see 03-05-PLAN.md):
+#   T-03-11  POST /lifter-select validates req.lifter ∈ registry BEFORE write.
+#   T-03-12  PATCH /lifter-params per-key schema gate: unknown → no mutation.
+#   T-03-13  unknown_parameter oracle leaks schema (accepted; schema already
+#            published via GET /active-lifter).
+#   T-03-14  Missing side-effect import → empty registry (mitigated by the
+#            cold-boot test test_list_lifters_cold_boot_triggers_registry_population).
+
+
+@router.get("/lifters")
+async def list_lifters():
+    """List registered Detection3D lifters with capabilities + schemas (D-10)."""
+    import src.perception.lifters  # noqa: F401 — trigger @detection_3d registration
+    from src.perception.registry import Detection3DRegistry
+
+    return {"lifters": Detection3DRegistry.list_backends()}
+
+
+@router.post("/lifter-select")
+async def select_lifter(req: LifterSelectRequest, request: Request):
+    """Select a Detection3D lifter by name, triggering simulation restart (D-09)."""
+    import src.perception.lifters  # noqa: F401
+    from src.perception.registry import Detection3DRegistry
+
+    lifters = {l["name"]: l for l in Detection3DRegistry.list_backends()}
+    if req.lifter not in lifters:
+        raise HTTPException(status_code=404, detail=f"Unknown lifter: {req.lifter}")
+    if not lifters[req.lifter]["available"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lifter unavailable: {lifters[req.lifter].get('reason', 'unknown')}",
+        )
+    request.app.state.pending_lifter = req.lifter
+    if req.params:
+        request.app.state.pending_lifter_params = req.params
+    command_cb = getattr(request.app.state, "command_callback", None)
+    if command_cb:
+        command_cb({"action": "restart"})
+    return {"status": "restarting", "lifter": req.lifter}
+
+
+@router.get("/active-lifter")
+async def get_active_lifter(request: Request):
+    """Return the currently active Detection3D lifter name + config."""
+    import src.perception.lifters  # noqa: F401
+    from src.perception.registry import Detection3DRegistry
+
+    active = getattr(
+        request.app.state, "active_lifter", Detection3DRegistry.get_default()
+    )
+    lifters = {l["name"]: l for l in Detection3DRegistry.list_backends()}
+    info = lifters.get(active, {})
+    return {
+        "lifter": active,
+        "display": info.get("display", active),
+        "parameters": info.get("parameter_schema", {}),
+    }
+
+
+@router.patch("/lifter-params")
+async def patch_lifter_params(patch: ParamPatch, request: Request):
+    """Update lifter params — live_tunable applied, non-live queued for next restart."""
+    import src.perception.lifters  # noqa: F401
+    from src.perception.registry import Detection3DRegistry
+
+    active = getattr(
+        request.app.state, "active_lifter", Detection3DRegistry.get_default()
+    )
+    lifters = {l["name"]: l for l in Detection3DRegistry.list_backends()}
+    info = lifters.get(active, {})
+    schema_props = info.get("parameter_schema", {}).get("properties", {})
+    results: dict = {}
+    for key, value in patch.params.items():
+        if key not in schema_props:
+            results[key] = {"status": "unknown_parameter"}
+        elif schema_props[key].get("live_tunable", False):
+            results[key] = {"status": "applied", "value": value}
+            pending = getattr(request.app.state, "pending_lifter_params", {})
+            pending[key] = value
+            request.app.state.pending_lifter_params = pending
+        else:
+            results[key] = {"status": "requires_restart", "value": value}
+            pending = getattr(request.app.state, "pending_lifter_params", {})
+            pending[key] = value
+            request.app.state.pending_lifter_params = pending
     return {"results": results}
