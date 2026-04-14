@@ -95,7 +95,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-03-PLAN.md — median_depth migration: delete _LEGACY_FOV_DEG, consume intrinsics (Wave 1)
 - [x] 04-04-PLAN.md — PointClusterLifter (PCA-OBB + DBSCAN + fallback) + unit tests (Wave 2)
 - [x] 04-05-PLAN.md — DetectorWorkerPool.swap_lifter + /lifter-hotswap route + tests (Wave 3)
-- [ ] 04-06-PLAN.md — Frontend DetectorSection redirect to /lifter-hotswap (Wave 4)
+- [x] 04-06-PLAN.md — Frontend DetectorSection redirect to /lifter-hotswap (Wave 4)
 - [ ] 04-07-PLAN.md — MuJoCo SC#1 integration + SC#2/SC#3 grep invariants + VALIDATION notes (Wave 5)
 **Research flag**: standard
 **UI hint**: yes
