@@ -71,9 +71,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-04-PLAN.md — Clone slamStore → detectorStore with D-02 lifter shape (Wave 1)
 - [x] 03-05-PLAN.md — 4 lifter REST routes + server.py state + test_lifter_routes.py (Wave 1)
 - [x] 03-06-PLAN.md — main.py restart block + DetectorWorkerPool lifter_params kwarg (Wave 1)
-- [ ] 03-07-PLAN.md — DetectorDropdown + LifterDropdown clones (Wave 2)
-- [ ] 03-08-PLAN.md — DetectorParameterPanel + useWebSocket detector_restart_complete wiring (Wave 2)
-- [ ] 03-09-PLAN.md — CameraFeed per-class bbox color polish DET-UI-05 (Wave 2)
+- [x] 03-07-PLAN.md — DetectorDropdown + LifterDropdown clones (Wave 2)
+- [x] 03-08-PLAN.md — DetectorParameterPanel + useWebSocket detector_restart_complete wiring (Wave 2)
+- [x] 03-09-PLAN.md — CameraFeed per-class bbox color polish DET-UI-05 (Wave 2)
 - [ ] 03-10-PLAN.md — DetectorSection parent + ControlPanel mount + stacked RestartOverlays (Wave 3)
 - [ ] 03-11-PLAN.md — Vitest detectorStore.shape.test.ts — DET-UI-06 structural equivalence (Wave 3)
 **Research flag**: standard
