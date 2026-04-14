@@ -492,10 +492,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 # Read pending detector selection from REST /select (Plan 02-08 surface).
                 pending_detector = getattr(app.state, "pending_detector_backend", None)
                 pending_det_params = getattr(app.state, "pending_detector_params", {}) or {}
-                # Phase 3 — D-10: read pending lifter selection from REST /lifter-select.
-                # MUST be read BEFORE DetectorWorkerPool(...) construction (Pitfall #6) so
-                # threading stale literals cannot silently drop a queued lifter switch.
-                pending_lifter = getattr(app.state, "pending_lifter", None)
+                # Phase 4 D-09 (supersedes Phase 3 D-09): lifter no longer
+                # participates in the restart flow — swapping is handled
+                # atomically by POST /api/detectors/lifter-hotswap (see
+                # backend/web/detector_routes.py). The pool is reconstructed
+                # with the CURRENTLY active lifter so a restart (detector
+                # swap, spawn change, etc.) preserves the user's lifter pick.
+                # ``pending_lifter_params`` is retained for the initial-boot
+                # path and for live-tunable param threading (PATCH /lifter-params).
+                active_lifter_name = getattr(app.state, "active_lifter", None)
                 pending_lifter_params = getattr(app.state, "pending_lifter_params", {}) or {}
                 # Pipeline config detector_name takes priority (mirrors SLAM pattern).
                 # PipelineConfig (Phase 2) does not yet carry detector_name; getattr
@@ -514,8 +519,11 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     from src.perception.worker_pool import DetectorWorkerPool
 
                     backend_name = pending_detector or DetectorRegistry.get_default()
-                    # Phase 3 — D-10: resolve lifter_name with same fallback pattern as backend.
-                    lifter_name = pending_lifter or Detection3DRegistry.get_default()
+                    # Phase 4 D-09: lifter is no longer restart-driven. Prefer
+                    # the currently active lifter (set by /lifter-hotswap or
+                    # initial boot default); fall back to the registry default
+                    # on first boot when app.state.active_lifter is still None.
+                    lifter_name = active_lifter_name or Detection3DRegistry.get_default()
                     # One CameraIntrinsics instance per robot (all share the same config today;
                     # Phase 8 stretch may diverge per-robot).
                     intrinsics_per_robot = {rid: intrinsics for rid in robots}
@@ -549,19 +557,31 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     detector_pool.warmup_all(dummy_frames)
                     detector_pool.start()
                     coordinator._detector_pool = detector_pool
+                    # Plan 04-05 (Open Question #4): expose the pool via
+                    # app.state so POST /api/detectors/lifter-hotswap can
+                    # reach it via request.app.state.detector_pool.
+                    app.state.detector_pool = detector_pool
                     app.state.active_detector_backend = backend_name
                     app.state.pending_detector_backend = None
                     # pending_detector_params intentionally retained — coordinator may
                     # consume live-tunable values per-frame.
-                    # Phase 3 — D-10: lifter state update mirrors detector pattern.
+                    # Phase 4 D-09: lifter selection is hot-swap driven
+                    # (POST /api/detectors/lifter-hotswap). The restart block
+                    # only refreshes active_lifter from the value the pool was
+                    # built with so /active-lifter stays consistent across
+                    # a spawn/detector restart. No pending_lifter consumption —
+                    # that field is removed.
                     app.state.active_lifter = lifter_name
-                    app.state.pending_lifter = None
                     # pending_lifter_params intentionally retained — same live-tunable
                     # path as pending_detector_params (per-frame consumable).
                 except Exception as exc:
                     # T-02-24 mitigation: pool construction failure must not crash restart.
                     logger.exception("Detector pool rebuild failed: %s", exc)
                     coordinator._detector_pool = None
+                    # Plan 04-05 (T-04-23 mitigation): keep app.state in sync
+                    # with coordinator — /lifter-hotswap returns 503 while the
+                    # pool is absent.
+                    app.state.detector_pool = None
 
                 # Reset streaming viz cloud tracking
                 if streaming_viz is not None:

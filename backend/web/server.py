@@ -63,10 +63,17 @@ def create_app(
     app.state.pending_detector_backend = None
     app.state.pending_detector_params = {}
 
-    # Detection3D lifter selection state (Phase 3 — D-10)
+    # Detection3D lifter selection state.
+    # Phase 4 D-09 supersedes Phase 3 D-09: lifter swap is now HOT-SWAP via
+    # POST /api/detectors/lifter-hotswap (no restart). There is no
+    # `pending_lifter` field — selection is atomic. `pending_lifter_params`
+    # is retained for PATCH /lifter-params live-tunable threading (mirrors
+    # the detector-param pattern; consumed per-frame).
     app.state.active_lifter = "median_depth"
-    app.state.pending_lifter = None
     app.state.pending_lifter_params = {}
+    # Plan 04-05: pool reference is populated by main.py's restart block
+    # and read by /lifter-hotswap. None means "pool not yet built" → 503.
+    app.state.detector_pool = None
 
     # Wire SLAM REST API routes
     from backend.web.slam_routes import router as slam_router

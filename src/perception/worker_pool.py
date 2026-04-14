@@ -56,6 +56,7 @@ Threat register references:
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -146,6 +147,10 @@ class DetectorWorkerPool:
         params = dict(backend_params or {})
         lifter_kwargs = dict(lifter_params or {})
         self._lifter_params = lifter_kwargs  # retained for repr/debug
+        # Plan 04-05 (D-10): serialize concurrent hot-swappers. Held only
+        # during the per-worker ref rebind loop (≪1ms); registry.create runs
+        # OUTSIDE the lock so failing swaps don't block queued swappers.
+        self._swap_lock = threading.Lock()
         self._workers: dict[str, DetectorWorker] = {}
         for rid in robot_ids:
             # Per-robot instance separation — two separate create() calls
@@ -225,6 +230,53 @@ class DetectorWorkerPool:
         """
         for w in self._workers.values():
             w.reset()
+
+    def swap_lifter(
+        self,
+        new_lifter_name: str,
+        new_lifter_params: dict | None = None,
+    ) -> None:
+        """Hot-swap the lifter on every worker atomically (D-09 / D-10).
+
+        Per Phase 4 D-10 (supersedes Phase 3 D-09):
+          - Construct a FRESH lifter per worker via
+            ``Detection3DRegistry.create(...)`` (per-worker-instance
+            separation preserved — mirrors ``__init__``).
+          - Hold ``self._swap_lock`` during the ref rebind loop (≪1ms;
+            non-blocking for ``submit``/``latest`` which run on per-worker
+            locks).
+          - Workers reading ``self._lifter`` in ``_loop`` see either the
+            old or the new ref — never torn. Python attribute-write
+            atomicity under the GIL is the load-bearing primitive here
+            (04-RESEARCH.md Pattern Template 3 + Pitfall 6).
+
+        Does NOT call ``warmup()`` — lifters are stateless geometry in the
+        Phase 4 contract. A ``ValueError`` from
+        ``Detection3DRegistry.create`` (unknown name, missing dep) propagates
+        BEFORE any worker is mutated — no partial swap, fail loudly.
+
+        Pitfall 6 note: an in-flight ``lift`` call completes on the OLD
+        lifter (Python captured the method-bound ref at dispatch time). The
+        NEXT ``submit`` uses the new lifter. This is the documented behavior
+        of an atomic ref swap — not a bug (threat register T-04-22).
+        """
+        # Force @detection_3d registration (matches the pattern at the route
+        # handler boundaries — never rely on a pre-populated registry in a
+        # public entry point).
+        import src.perception.lifters  # noqa: F401
+
+        lifter_kwargs = dict(new_lifter_params or {})
+        # Construct per-worker lifters BEFORE touching any worker. If create
+        # raises (unknown name, missing dep), no worker is mutated.
+        new_lifters = {
+            rid: Detection3DRegistry.create(new_lifter_name, **lifter_kwargs)
+            for rid in self._workers
+        }
+        with self._swap_lock:
+            for rid, w in self._workers.items():
+                w._lifter = new_lifters[rid]  # atomic attribute write under GIL
+            self.lifter_name = new_lifter_name
+            self._lifter_params = lifter_kwargs
 
     def shutdown(self) -> None:
         """Signal every worker to stop and join its thread (bounded 2 s each).
