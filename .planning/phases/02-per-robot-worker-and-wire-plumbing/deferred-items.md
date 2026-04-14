@@ -7,3 +7,11 @@ from sys.modules and re-imports it, invalidating `DetectorInput` class identity 
 tests that imported `DetectorInput` at module scope. Pre-existing on base commit 1a804fe.
 
 Each file runs green in isolation (18/18 and 16/16). Out of scope for Plan 02-01.
+
+## Deferred: pre-existing ExplorationConfig.stuck_threshold_steps test drift
+
+`tests/exploration/test_coverage_tracker.py::TestExplorationConfig::test_default_values`
+asserts `stuck_threshold_steps == 100` but the live default is `30`. Default was tuned
+without updating the test. Unrelated to Plan 02-09's restart-block + crash_fallback
+discriminator scope. Pre-existing on base commit 439e273.
+
