@@ -166,7 +166,7 @@ export default function AlgorithmSection() {
           {activeCapabilities.length > 0 && (
             <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap' }}>
               {activeCapabilities.map((cap) => (
-                <CapabilityBadge key={cap} name={cap} />
+                <CapabilityBadge key={cap} label={cap} value={true} />
               ))}
             </div>
           )}
