@@ -2,9 +2,14 @@
 
 Mirrors test_detector_routes.py pattern:
   GET   /api/detectors/lifters        — list (incl. side-effect-triggered registry pop)
-  POST  /api/detectors/lifter-select  — pending_lifter write + restart command (D-09)
   GET   /api/detectors/active-lifter  — active lifter metadata
   PATCH /api/detectors/lifter-params  — live_tunable / requires_restart / unknown
+
+Phase 4 D-09 (supersedes Phase 3 D-09): `POST /lifter-select` is REMOVED;
+replaced by `POST /lifter-hotswap` (atomic ref swap, no restart). Route-level
+tests for the hot-swap endpoint live in ``test_lifter_hotswap.py`` — this
+file retains the list / active / params surface plus a regression lock that
+asserts `/lifter-select` is no longer registered.
 
 All tests run torch-free — they register module-level FakeLifter / UnavailableLifter
 and never instantiate the real MedianDepthLifter (except cold-boot test which
@@ -230,43 +235,23 @@ def test_list_lifters_cold_boot_triggers_registry_population():
 
 
 # ---------------------------------------------------------------------------
-# POST /api/detectors/lifter-select
+# POST /api/detectors/lifter-select — REMOVED in Phase 4 D-09
 # ---------------------------------------------------------------------------
+#
+# The Phase 3 restart-driven route is gone. The contract for the replacement
+# `POST /lifter-hotswap` lives in tests/perception/test_lifter_hotswap.py.
+# The single test below is the regression lock for the supersession.
 
 
-def test_lifter_select_sets_pending_lifter(app_client):
-    client, cb, app = app_client
-    r = client.post("/api/detectors/lifter-select", json={"lifter": "fake_lifter"})
-    assert r.status_code == 200, r.text
-    assert r.json() == {"status": "restarting", "lifter": "fake_lifter"}
-    assert app.state.pending_lifter == "fake_lifter"
-    cb.assert_called_with({"action": "restart"})
-
-
-def test_lifter_select_unknown_returns_404(app_client):
-    client, _cb, _app = app_client
-    r = client.post("/api/detectors/lifter-select", json={"lifter": "nonexistent"})
-    assert r.status_code == 404
-    assert "nonexistent" in r.json()["detail"]
-
-
-def test_lifter_select_unavailable_returns_400(app_client):
+def test_lifter_select_route_removed(app_client):
+    """Phase 4 D-09: /lifter-select must return 404/405 (no handler registered)."""
     client, _cb, _app = app_client
     r = client.post(
-        "/api/detectors/lifter-select", json={"lifter": "unavailable_lifter"}
+        "/api/detectors/lifter-select", json={"lifter": "fake_lifter"}
     )
-    assert r.status_code == 400
-    assert "unavailable" in r.json()["detail"].lower()
-
-
-def test_lifter_select_with_params_stashes(app_client):
-    client, _cb, app = app_client
-    r = client.post(
-        "/api/detectors/lifter-select",
-        json={"lifter": "fake_lifter", "params": {"depth_near_m": 0.3}},
+    assert r.status_code in (404, 405), (
+        f"/lifter-select should be removed, got {r.status_code}"
     )
-    assert r.status_code == 200
-    assert app.state.pending_lifter_params == {"depth_near_m": 0.3}
 
 
 # ---------------------------------------------------------------------------

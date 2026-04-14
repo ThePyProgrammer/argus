@@ -109,16 +109,29 @@ async def patch_params(patch: ParamPatch, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Lifter (Detection3D) endpoints — Phase 3 D-10
+# Lifter (Detection3D) endpoints — Phase 4 D-09 (supersedes Phase 3 D-09)
 # ---------------------------------------------------------------------------
 #
-# Structural clone of the merge-strategy block in backend/web/slam_routes.py
-# (lines 107-175). Every handler MUST `import src.perception.lifters` at call
-# time to force @detection_3d side-effect registration (Pitfall #4 — without
-# this, a cold boot returns {lifters: []}).
+# Structural clone of the merge-strategy block in backend/web/slam_routes.py.
+# Every handler MUST `import src.perception.lifters` at call time to force
+# @detection_3d side-effect registration (Pitfall #4 — without this, a cold
+# boot returns {lifters: []}).
 #
-# Threat model (mirror SLAM merge T-02-19..21; see 03-05-PLAN.md):
-#   T-03-11  POST /lifter-select validates req.lifter ∈ registry BEFORE write.
+# Phase 4 supersession: the previous `POST /lifter-select` handler that
+# stashed `pending_lifter` and triggered a full simulation restart is GONE.
+# Lifters are stateless geometry; switching one is an atomic
+# `DetectorWorkerPool.swap_lifter(...)` call under a pool-level lock
+# (≪1ms). The new handler is `POST /lifter-hotswap`.
+#
+# Threat model (Phase 4 04-05-PLAN.md <threat_model>):
+#   T-04-18  POST /lifter-hotswap validates req.lifter ∈ registry BEFORE any
+#            state mutation (404). Mirrors Phase 2 T-02-19.
+#   T-04-19  Unavailable lifter (dep missing) → 400 with vendor reason.
+#   T-04-20  Concurrent swap race — serialized by pool._swap_lock;
+#            registry.create runs OUTSIDE the lock.
+#   T-04-21  Pool not yet initialized → 503.
+#   T-04-22  In-flight lift() sees torn state — accepted (GIL atomicity,
+#            Pitfall 6).
 #   T-03-12  PATCH /lifter-params per-key schema gate: unknown → no mutation.
 #   T-03-13  unknown_parameter oracle leaks schema (accepted; schema already
 #            published via GET /active-lifter).
@@ -135,10 +148,28 @@ async def list_lifters():
     return {"lifters": Detection3DRegistry.list_backends()}
 
 
-@router.post("/lifter-select")
-async def select_lifter(req: LifterSelectRequest, request: Request):
-    """Select a Detection3D lifter by name, triggering simulation restart (D-09)."""
-    import src.perception.lifters  # noqa: F401
+@router.post("/lifter-hotswap")
+async def lifter_hotswap(req: LifterSelectRequest, request: Request):
+    """Atomic lifter ref swap — no restart, no warmup (Phase 4 D-09, D-10).
+
+    Supersedes Phase 3 `/lifter-select`. Lifters are stateless geometry;
+    swapping is a sub-millisecond pool-locked attribute rebind per D-10.
+
+    Flow:
+      1. Validate req.lifter against Detection3DRegistry → 404 / 400 on
+         unknown / unavailable (T-04-18, T-04-19 — fail BEFORE mutation).
+      2. Reach the pool via ``request.app.state.detector_pool``. If None
+         (pool not yet constructed — happens during initial boot before the
+         first restart block runs), return 503 (T-04-21).
+      3. Call ``pool.swap_lifter(req.lifter, req.params or {})`` — this is
+         the atomic hook; it builds fresh lifter instances per worker and
+         rebinds under the pool's ``_swap_lock``.
+      4. Update ``app.state.active_lifter`` so ``GET /active-lifter`` and
+         the next restart block see the new pick (restart preserves
+         hot-swapped lifter via main.py's active_lifter read).
+      5. Return ``{"status": "swapped", "lifter": req.lifter}``.
+    """
+    import src.perception.lifters  # noqa: F401 — force @detection_3d registration
     from src.perception.registry import Detection3DRegistry
 
     lifters = {l["name"]: l for l in Detection3DRegistry.list_backends()}
@@ -149,13 +180,20 @@ async def select_lifter(req: LifterSelectRequest, request: Request):
             status_code=400,
             detail=f"Lifter unavailable: {lifters[req.lifter].get('reason', 'unknown')}",
         )
-    request.app.state.pending_lifter = req.lifter
-    if req.params:
-        request.app.state.pending_lifter_params = req.params
-    command_cb = getattr(request.app.state, "command_callback", None)
-    if command_cb:
-        command_cb({"action": "restart"})
-    return {"status": "restarting", "lifter": req.lifter}
+
+    pool = getattr(request.app.state, "detector_pool", None)
+    if pool is None:
+        raise HTTPException(status_code=503, detail="Detector pool not initialized")
+
+    params = dict(req.params or {})
+    pool.swap_lifter(req.lifter, params)
+
+    # Keep app.state in sync so GET /active-lifter reflects the new lifter
+    # and the next restart block preserves the hot-swapped pick.
+    request.app.state.active_lifter = req.lifter
+    if params:
+        request.app.state.pending_lifter_params = params
+    return {"status": "swapped", "lifter": req.lifter}
 
 
 @router.get("/active-lifter")
