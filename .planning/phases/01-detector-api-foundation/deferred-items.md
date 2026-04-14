@@ -28,3 +28,18 @@ Out-of-scope discoveries logged by executor agents. Must be addressed before pha
 - **Scope:** Out of Plan 04 scope per executor deviation rules. The root cause is in `test_protocol_contracts.py`'s sys.modules manipulation, not in registry or lifter code.
 - **Proposed resolution:** (a) Fix the heavy-deps tests to use `importlib.reload()` in a try/finally that restores `sys.modules` state without invalidating `DetectorInput` identity — OR — (b) switch `_validate_capabilities`' `input_type` check from `isinstance(value, DetectorInput)` to a structural check (e.g. `type(value).__name__ == 'DetectorInput' and value.value in {"rgb_only", "rgbd", "rgb_text_prompt"}`). Option (a) is cleaner.
 - **Impact if left alone:** Perception test suite reports 9 failures when run as a whole. Plan 04 + Plan 05 code remains correct; Plan 05's YOLOv11 backend uses the registry via decorator at class definition time (single `DetectorInput` identity, no pollution path), so this doesn't block the phase.
+
+---
+
+## Phase 1 verifier warnings (2026-04-13) — accepted as Phase 2 scope
+
+### W-01: Zero-detection regression fixture
+- Mode B synthetic fixture (YOLO returns 0 detections) was used because MuJoCo scene renders at 320×240 vs plan-spec 480×640.
+- D-12 bit-exact parity test currently validates `0 == 0` — passes SC#2 mechanically but weak regression-detection value.
+- **Phase 2 action:** When DetectorWorkerPool rewires the coordinator, regenerate the fixture from a live scene render with actual detections (or adjust the fixture spec to match the current render resolution). Folded into Phase 2 scope.
+
+### W-02: Full-suite sys.modules pollution
+- `tests/perception/test_protocol_contracts.py:28` does `del sys.modules[...]` creating two `DetectorInput` Enum identities.
+- `tests/perception/test_registry.py` autouse `_clean_registries` fixture wipes `_backends` without re-triggering side-effect imports → 8 false-failures when running the combined suite.
+- Each suite passes in isolation; runtime registry path is correct.
+- **Phase 2 action:** Fix `_clean_registries` fixture to re-trigger `import src.perception.backends` and `import src.perception.lifters` after clearing `_backends`. Small test-hygiene task; slotted into Phase 2 test-touch plan.

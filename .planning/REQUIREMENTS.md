@@ -11,17 +11,17 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 ### DET-API — Pluggable Detector Abstraction
 
-- [ ] **DET-API-01**: System exposes `DetectorProtocol` runtime-checkable interface with `process_frame`, `reset`, `warmup`, `get_metrics`, `CAPABILITIES`, `PARAMETER_SCHEMA`
+- [x] **DET-API-01**: System exposes `DetectorProtocol` runtime-checkable interface with `process_frame`, `reset`, `warmup`, `get_metrics`, `CAPABILITIES`, `PARAMETER_SCHEMA`
 - [x] **DET-API-02**: System exposes `DetectorRegistry` with `@detector_backend` decorator, lazy class-path loading, and availability reporting (`available: false` + install hint when deps missing)
 - [x] **DET-API-03**: System exposes separate `Detection3DProtocol` + `Detection3DRegistry` for 3D lifters (PCA-OBB, median-depth, etc.), with `outputs_3d_natively` capability flag so end-to-end backends bypass the lifter
 - [ ] **DET-API-04**: Each robot runs its own `DetectorWorker` thread with a single-slot latest-frame queue (newest-wins backpressure); worker pool is keyed by robot_id
 - [ ] **DET-API-05**: Every detection result carries `capture_pose` + `capture_timestamp` from the submission time so downstream consumers do not re-associate stale poses
 - [x] **DET-API-06**: Process-global thread-pool configuration (`torch`, `OMP`, `MKL`, `OPENBLAS`) is set in `src/_thread_config.py` before any torch import; no module-scope `torch.set_num_threads()` in individual files
-- [ ] **DET-API-07**: Every backend `__init__` calls `model.eval()` and wraps inference in `torch.inference_mode()`; enforced by a smoke test that caps RSS growth at 200 MB after 100 inferences
+- [x] **DET-API-07**: Every backend `__init__` calls `model.eval()` and wraps inference in `torch.inference_mode()`; enforced by a smoke test that caps RSS growth at 200 MB after 100 inferences
 
 ### DET-MODELS — Detection Backends
 
-- [ ] **DET-MODELS-01**: Existing Ultralytics YOLOv11-nano detector is refactored behind `DetectorProtocol` as `YOLOv11Backend` with zero behavioral regression (verified by fixture-frame regression test)
+- [x] **DET-MODELS-01**: Existing Ultralytics YOLOv11-nano detector is refactored behind `DetectorProtocol` as `YOLOv11Backend` with zero behavioral regression (verified by fixture-frame regression test)
 - [ ] **DET-MODELS-02**: RT-DETRv2-S backend (`PekingU/rtdetr_v2_r18vd`) ships as an in-process ONNX-accelerated real-time transformer detector, ≤250 ms/frame at 320px on CPU
 - [ ] **DET-MODELS-03**: facebook/BoxeR ships as a subprocess-isolated backend via `SubprocessDetectorBridge` (ZMQ PAIR + msgpack, 5 s watchdog, crash fallback); installs into its own worker venv and emits 3D OBBs natively
 - [ ] **DET-MODELS-04**: OWLv2 open-vocabulary backend (`google/owlv2-base-patch16-ensemble`) ships for zero-shot text-prompted detection; marked as on-demand (not a real-time backend)
