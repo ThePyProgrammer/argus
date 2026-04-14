@@ -14,6 +14,9 @@ import type {
   TrajectoryPayload,
   SlamMetrics,
   MetricHistory,
+  Detection3DEnvelope,
+  DetectorRestartCompletePayload,
+  DetectorParamAckPayload,
 } from '../utils/messageTypes';
 
 /**
@@ -126,11 +129,23 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
           }
           break;
         }
-        case 'detections': {
-          const payload = msg.payload as { detections: Array<{class: string; confidence: number; bbox: number[]; pos_3d: number[] | null}> };
+        case 'detections_3d': {
+          // Phase 2 D-18 cutover: envelope (Detection3DEnvelope) replaces legacy detections array
+          const payload = msg.payload as Detection3DEnvelope;
           if (msg.robot_id) {
-            store.updateDetections(msg.robot_id, payload.detections);
+            store.updateDetections(msg.robot_id, payload);
           }
+          break;
+        }
+        case 'detector_restart_complete': {
+          const payload = msg.payload as DetectorRestartCompletePayload;
+          // Phase 2: log + future Phase 3 will drive detectorStore.setRestarting(false)
+          console.log(`[detector] restart complete: ${payload.backend}`);
+          break;
+        }
+        case 'detector_param_ack': {
+          const payload = msg.payload as DetectorParamAckPayload;
+          console.log(`[detector] param ${payload.param}: ${payload.status}`);
           break;
         }
         case 'scene_description': {
@@ -167,12 +182,20 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
           break;
         }
         case 'crash_fallback': {
-          const payload = msg.payload as { crashed_backend: string; fallback_backend: string };
-          const slamState = useSlamStore.getState();
-          slamState.setCrashMessage(
-            `Backend ${payload.crashed_backend} crashed, fell back to ICP`
-          );
-          slamState.setActive('icp', 'ICP Odometry', {});
+          const payload = msg.payload as { subsystem?: string; crashed_backend: string; fallback_backend: string };
+          const subsystem = payload.subsystem ?? 'slam'; // backward-compat default
+          if (subsystem === 'slam') {
+            const slamState = useSlamStore.getState();
+            slamState.setCrashMessage(
+              `Backend ${payload.crashed_backend} crashed, fell back to ICP`
+            );
+            slamState.setActive('icp', 'ICP Odometry', {});
+          } else {
+            // Phase 5 DET-MODELS-06 will handle subsystem === 'detector' here.
+            console.log(
+              `[crash_fallback] subsystem=${subsystem}: ${payload.crashed_backend} -> ${payload.fallback_backend}`
+            );
+          }
           break;
         }
         case 'pipeline_status': {
