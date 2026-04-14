@@ -11,9 +11,12 @@ import { useDetectorStore, fetchDetectorState } from '../stores/detectorStore';
 const ACTIVE_BADGE_KEYS = ['framework', 'license', 'cpu_latency_hint_ms'] as const;
 
 // ---------------------------------------------------------------------------
-// Polling fallbacks (mirror pollForRestart in AlgorithmSection.tsx:9-29).
-// Fires when the WS path drops detector_restart_complete / lifter_restart_complete
+// Polling fallback for the DETECTOR path (mirror pollForRestart in
+// AlgorithmSection.tsx:9-29). Fires when the WS drops detector_restart_complete
 // or the connection flaps. 500ms × 20 attempts = 10s bound (D-15 precedent).
+//
+// The LIFTER path does NOT poll — per Phase 4 D-09 it uses /lifter-hotswap
+// which is synchronous and returns 200 immediately. No restart, no overlay.
 // ---------------------------------------------------------------------------
 
 async function pollForDetectorRestart(expectedBackend: string) {
@@ -37,32 +40,6 @@ async function pollForDetectorRestart(expectedBackend: string) {
   }
   useDetectorStore.getState().setError(
     'Detector restart timed out. Try again or refresh the page.',
-  );
-  useDetectorStore.getState().setRestarting(false);
-  useDetectorStore.getState().setRestartSubsystem(null);
-}
-
-async function pollForLifterRestart(expectedLifter: string) {
-  const maxAttempts = 20;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-    try {
-      const res = await fetch('/api/detectors/active-lifter');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.lifter === expectedLifter) {
-          await fetchDetectorState();
-          useDetectorStore.getState().setRestarting(false);
-          useDetectorStore.getState().setRestartSubsystem(null);
-          return;
-        }
-      }
-    } catch {
-      /* continue polling */
-    }
-  }
-  useDetectorStore.getState().setError(
-    'Lifter restart timed out. Try again or refresh the page.',
   );
   useDetectorStore.getState().setRestarting(false);
   useDetectorStore.getState().setRestartSubsystem(null);
@@ -182,15 +159,13 @@ export default function DetectorSection() {
     );
     const pickedDisplay = picked?.display ?? pendingLifter;
 
-    useDetectorStore.getState().setRestarting(true);
-    useDetectorStore.getState().setRestartSubsystem('lifter');
-
+    // D-09 hot-swap path — NO restart, NO overlay, NO polling.
     const params = useDetectorStore.getState().stagedLifterParams;
     const body: Record<string, unknown> = { lifter: pendingLifter };
     if (Object.keys(params).length > 0) body.params = params;
 
     try {
-      const res = await fetch('/api/detectors/lifter-select', {
+      const res = await fetch('/api/detectors/lifter-hotswap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -201,23 +176,22 @@ export default function DetectorSection() {
 
       if (!res.ok) {
         useDetectorStore.getState().setError(
-          `Failed to switch lifter to ${pickedDisplay}. The previous lifter is still active.`,
+          `Failed to swap lifter to ${pickedDisplay}. The previous lifter is still active.`,
         );
-        useDetectorStore.getState().setRestarting(false);
-        useDetectorStore.getState().setRestartSubsystem(null);
         return;
       }
 
+      // Clear staged params AFTER successful POST.
       useDetectorStore.getState().clearStagedLifterParams();
-      pollForLifterRestart(pendingLifter);
+      // Refresh active-lifter display (the hot-swap route already updated
+      // app.state.active_lifter; GET /active-lifter reflects the new state).
+      fetchDetectorState();
     } catch {
       setShowLifterModal(false);
       setSwitching(false);
       useDetectorStore.getState().setError(
-        `Failed to switch lifter to ${pickedDisplay}. The previous lifter is still active.`,
+        `Failed to swap lifter to ${pickedDisplay}. The previous lifter is still active.`,
       );
-      useDetectorStore.getState().setRestarting(false);
-      useDetectorStore.getState().setRestartSubsystem(null);
     }
 
     setPendingLifter(null);
@@ -341,7 +315,7 @@ export default function DetectorSection() {
       {showLifterModal && (
         <ConfirmModal
           heading="Switch Lifter"
-          body={`Switch lifter to ${pendingLifterDisplay}? This will restart the current session.`}
+          body={`Switch lifter to ${pendingLifterDisplay}? This is an instant swap (no restart).`}
           confirmLabel="Switch Lifter"
           cancelLabel="Keep Current"
           confirmDisabled={switching}
