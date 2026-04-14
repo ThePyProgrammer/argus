@@ -65,105 +65,122 @@ def _clean_registries():
     Detection3DRegistry._clear()
 
 
+class FakeDetector:
+    """Fake DetectorProtocol backend: fast, introspectable, torch-free.
+
+    Registered by the ``register_fakes`` fixture via ``DetectorRegistry.register``
+    with a ``class_path`` of ``f"{__name__}.FakeDetector"``. Defined at module
+    scope (NOT inside the fixture) so ``registry._load_class`` can re-import
+    it from the dotted path at ``create()`` time.
+
+    Per-instance state (``threshold``, ``warmup_count``) is what the instance-
+    separation test asserts never crosses between workers.
+    """
+
+    CAPABILITIES = {
+        "framework": "fake",
+        "license": "MIT",
+        "cpu_latency_hint_ms": 10,
+        "outputs_3d_natively": False,
+        "input_type": DetectorInput.RGB_ONLY,
+    }
+    PARAMETER_SCHEMA: dict = {}
+
+    def __init__(self, **kwargs):
+        self.threshold = 0.5  # mutable per-instance state (separation test)
+        self.warmup_count = 0
+        self.init_kwargs = dict(kwargs)
+
+    def process_frame(self, f: SensorFrame) -> Detections2D:
+        return Detections2D(items=[], inference_ms=1.0, image_hw=(480, 640))
+
+    def reset(self) -> None:
+        return None
+
+    def warmup(self, f: SensorFrame) -> None:
+        self.warmup_count += 1
+
+    def get_metrics(self) -> dict:
+        return {}
+
+    def apply_params(self, p: dict) -> dict:
+        return {}
+
+    @classmethod
+    def available(cls) -> tuple[bool, str | None]:
+        return True, None
+
+
+class FakeLifter:
+    """Fake Detection3DProtocol backend: returns an empty Detections3D envelope."""
+
+    CAPABILITIES = {
+        "requires_depth": False,
+        "requires_point_cloud": False,
+        "outputs_oriented": False,
+        "license": "MIT",
+    }
+    PARAMETER_SCHEMA: dict = {}
+
+    def __init__(self, **kwargs):
+        self.init_kwargs = dict(kwargs)
+
+    def lift(
+        self,
+        d2d: Detections2D,
+        f: SensorFrame,
+        pose: np.ndarray,
+        intr: CameraIntrinsics,
+        cloud: np.ndarray | None,
+    ) -> Detections3D:
+        return Detections3D(
+            items=[],
+            lifter_ms=0.0,
+            detector_ms=d2d.inference_ms,
+            n_raw=0,
+            n_final=0,
+            image_hw=d2d.image_hw,
+            capture_pose=np.eye(4),
+            capture_timestamp=0.0,
+        )
+
+    def reset(self) -> None:
+        return None
+
+    def get_metrics(self) -> dict:
+        return {}
+
+    def apply_params(self, p: dict) -> dict:
+        return {}
+
+    @classmethod
+    def available(cls) -> tuple[bool, str | None]:
+        return True, None
+
+
 @pytest.fixture
 def register_fakes():
-    """Register a fast fake detector + lifter via the registry decorator API.
+    """Register the module-scope FakeDetector + FakeLifter in both registries.
 
-    The pool calls ``DetectorRegistry.create(backend_name, **params)`` and
-    ``Detection3DRegistry.create(lifter_name)`` at construction; for those
-    create() calls to succeed, the classes must be reachable via their
-    dotted class_path. We stash the classes on THIS test module so
-    ``src.perception.registry._load_class`` can import them back.
+    The ``_clean_registries`` autouse fixture wipes the registries before +
+    after each test, so we re-register each run. We call ``register()`` with
+    an explicit ``class_path`` (not the decorator) so the stored path resolves
+    back to this test module via ``importlib``.
     """
-    from src.perception.registry import detector_backend, detection_3d
+    from src.perception.registry import DetectorRegistry, Detection3DRegistry
 
-    @detector_backend(name="fake_yolo", display="Fake YOLO")
-    class FakeDetector:
-        CAPABILITIES = {
-            "framework": "fake",
-            "license": "MIT",
-            "cpu_latency_hint_ms": 10,
-            "outputs_3d_natively": False,
-            "input_type": DetectorInput.RGB_ONLY,
-        }
-        PARAMETER_SCHEMA: dict = {}
-
-        def __init__(self, **kwargs):
-            self.threshold = 0.5  # mutable per-instance state (separation test)
-            self.warmup_count = 0
-            self.init_kwargs = dict(kwargs)
-
-        def process_frame(self, f: SensorFrame) -> Detections2D:
-            return Detections2D(items=[], inference_ms=1.0, image_hw=(480, 640))
-
-        def reset(self) -> None:
-            return None
-
-        def warmup(self, f: SensorFrame) -> None:
-            self.warmup_count += 1
-
-        def get_metrics(self) -> dict:
-            return {}
-
-        def apply_params(self, p: dict) -> dict:
-            return {}
-
-        @classmethod
-        def available(cls) -> tuple[bool, str | None]:
-            return True, None
-
-    @detection_3d(name="fake_lifter", display="Fake Lifter")
-    class FakeLifter:
-        CAPABILITIES = {
-            "requires_depth": False,
-            "requires_point_cloud": False,
-            "outputs_oriented": False,
-            "license": "MIT",
-        }
-        PARAMETER_SCHEMA: dict = {}
-
-        def __init__(self, **kwargs):
-            self.init_kwargs = dict(kwargs)
-
-        def lift(
-            self,
-            d2d: Detections2D,
-            f: SensorFrame,
-            pose: np.ndarray,
-            intr: CameraIntrinsics,
-            cloud: np.ndarray | None,
-        ) -> Detections3D:
-            return Detections3D(
-                items=[],
-                lifter_ms=0.0,
-                detector_ms=d2d.inference_ms,
-                n_raw=0,
-                n_final=0,
-                image_hw=d2d.image_hw,
-                capture_pose=np.eye(4),
-                capture_timestamp=0.0,
-            )
-
-        def reset(self) -> None:
-            return None
-
-        def get_metrics(self) -> dict:
-            return {}
-
-        def apply_params(self, p: dict) -> dict:
-            return {}
-
-        @classmethod
-        def available(cls) -> tuple[bool, str | None]:
-            return True, None
-
-    # Make classes resolvable via ``{module}.{qualname}`` — the registry stores
-    # the class_path at register() time; create() re-imports the module and
-    # looks up the attribute. For module-local classes, the module itself must
-    # expose them as attributes.
-    this_module = sys.modules[__name__]
-    this_module.FakeDetector = FakeDetector  # type: ignore[attr-defined]
-    this_module.FakeLifter = FakeLifter  # type: ignore[attr-defined]
+    DetectorRegistry.register(
+        name="fake_yolo",
+        display="Fake YOLO",
+        class_path=f"{__name__}.FakeDetector",
+        klass=FakeDetector,
+    )
+    Detection3DRegistry.register(
+        name="fake_lifter",
+        display="Fake Lifter",
+        class_path=f"{__name__}.FakeLifter",
+        klass=FakeLifter,
+    )
     yield
 
 

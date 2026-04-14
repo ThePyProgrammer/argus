@@ -1,0 +1,312 @@
+"""DetectorWorkerPool: Coordinator-owned keyed dispatch across per-robot workers.
+
+Plan 02-04 deliverable (DET-API-04 + DET-MODELS-05).
+
+Design (per 02-CONTEXT.md D-03 / D-05 and 02-RESEARCH.md Pattern 4):
+
+- The pool wraps one ``DetectorWorker`` per ``robot_id``, each with ITS OWN
+  ``DetectorProtocol`` + ``Detection3DProtocol`` instance (constructed via
+  ``DetectorRegistry.create()`` / ``Detection3DRegistry.create()``). Per-robot
+  instance separation — not a shared singleton — is what enables Phase 8's
+  stretch DET-STRETCH-04 per-robot param tuning: mutating one worker's
+  detector state never leaks into another.
+
+- ``submit(rid, frame, pose, slam_cloud)`` is the single submission entry
+  point for the Coordinator (D-05). Unknown ``rid`` -> defensive no-op so a
+  stale-rid race during restart cannot crash the pool (T-02-08 mitigation).
+
+- ``warmup_all(dummy_frames)`` is SYNCHRONOUS: every ``worker.warmup`` call
+  completes on the caller's thread before ``warmup_all`` returns. Wave 4's
+  ``main.py`` restart block chains this before emitting
+  ``detector_restart_complete`` (D-03) so the UI restart overlay dismisses
+  only after first inference is real — no oneDNN cold-start stall on the
+  next real frame.
+
+- ``inspect_worker_queues()`` returns a stable per-rid snapshot consumed by
+  Phase 6's MetricsPanel: ``{rid: {queue_depth, drops_since_session_start,
+  last_submit_sim_time}}``.
+
+Construction sequence Wave 4's ``main.py`` must follow::
+
+    pool = DetectorWorkerPool(
+        robot_ids=[...],
+        backend_name="yolov11",
+        backend_params={...},
+        lifter_name="median_depth",
+        intrinsics_per_robot={...},
+    )
+    pool.warmup_all({rid: first_frame_per_rid})   # D-03 gate
+    pool.start()                                   # spawn daemon threads
+    # ... pool.submit(rid, frame, pose, cloud) from here on ...
+    # at shutdown: pool.shutdown()
+
+Module-scope invariants (Pitfall P9):
+- No ``torch`` / ``ultralytics`` / ``transformers`` imports here. The only
+  heavy-adjacent imports are ``registry`` + ``worker``, both torch-free.
+- ``SensorFrame`` / ``CameraIntrinsics`` / ``Detections3D`` live behind
+  ``TYPE_CHECKING`` so this module's import graph stays minimal.
+
+Threat register references:
+- T-02-08 (DoS via unknown rid) — mitigated by defensive no-op in submit/latest.
+- T-02-09 (Tampering via backend_name) — transferred to Registry.create, which
+  validates against the registered set. Plan 08's REST ``/select`` validates
+  BEFORE writing to ``app.state``.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from src.perception.registry import Detection3DRegistry, DetectorRegistry
+from src.perception.worker import DetectorWorker
+
+if TYPE_CHECKING:  # pragma: no cover -- P9: TYPE_CHECKING only, no runtime import
+    from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
+    from src.perception.types import Detections3D
+
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class DetectorWorkerPool:
+    """Keyed dispatch over per-robot ``DetectorWorker`` instances.
+
+    Public API (thread-safe — each call delegates to a single worker whose
+    internal state is guarded by its own lock):
+
+      - ``start()``                       -- spawn every worker's daemon thread
+      - ``submit(rid, frame, pose, cloud)`` -- dispatch to worker; unknown rid
+                                             is a silent no-op (D-05)
+      - ``latest(rid) -> Detections3D | None`` -- most recent result, or None
+                                             for unknown rid
+      - ``warmup_all(dummy_frames)``      -- synchronous per-worker warmup
+                                             (D-03 restart gate)
+      - ``inspect_worker_queues()``       -- per-rid snapshot for Phase 6
+      - ``reset_all()``                   -- reset every worker's backend state
+                                             and drop queued/latest frames
+      - ``shutdown()``                    -- stop + join every worker thread
+      - ``robot_ids``                     -- property; list of managed rids
+
+    Construction contract:
+      ``__init__`` constructs workers but does NOT call ``start()``. Callers
+      typically chain::
+
+          pool = DetectorWorkerPool(...)
+          pool.warmup_all({...})   # D-03 gate — synchronous
+          pool.start()             # threads spawn AFTER warmup
+
+      This ordering matters because ``warmup`` runs on the CALLER's thread
+      (delegating to ``detector.warmup`` synchronously), which is the whole
+      point of the D-03 gate: the next ``submit`` call can race a worker
+      thread on already-warmed state.
+    """
+
+    def __init__(
+        self,
+        robot_ids: list[str],
+        backend_name: str,
+        backend_params: dict | None,
+        lifter_name: str,
+        intrinsics_per_robot: dict[str, "CameraIntrinsics"],
+    ) -> None:
+        """Construct one ``DetectorWorker`` per rid with its own detector + lifter.
+
+        Args:
+            robot_ids: Non-empty list of robot identifiers. Duplicates are
+                silently deduplicated by dict construction (last wins).
+            backend_name: Name registered in ``DetectorRegistry``. Upstream
+                callers (Phase 8 REST ``/select``) MUST validate against the
+                registered set before reaching the pool — T-02-09 transfer.
+            backend_params: kwargs forwarded to ``DetectorRegistry.create``.
+                ``None`` is treated as empty. Copied defensively so mutations
+                by the caller after construction do not leak into later
+                worker instantiations (irrelevant here because all workers
+                are created in this call, but defensive anyway).
+            lifter_name: Name registered in ``Detection3DRegistry``.
+            intrinsics_per_robot: Dict keyed by rid. Each worker gets its
+                rid's intrinsics — different robots may have different
+                cameras. KeyError if a rid in ``robot_ids`` is missing
+                from this dict (caller bug, fail loudly at construction).
+        """
+        self.backend_name = backend_name
+        self.lifter_name = lifter_name
+        # Defensive copy: caller's dict mutations cannot retro-actively
+        # change the kwargs that were forwarded to the registry.
+        params = dict(backend_params or {})
+        self._workers: dict[str, DetectorWorker] = {}
+        for rid in robot_ids:
+            # Per-robot instance separation — two separate create() calls
+            # yield two independent backend instances. This is the invariant
+            # tested by test_instance_separation_backend_mutations_do_not_leak.
+            detector = DetectorRegistry.create(backend_name, **params)
+            lifter = Detection3DRegistry.create(lifter_name)
+            self._workers[rid] = DetectorWorker(
+                robot_id=rid,
+                detector=detector,
+                lifter=lifter,
+                intrinsics=intrinsics_per_robot[rid],
+            )
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Spawn each worker's daemon thread. Call AFTER ``warmup_all``."""
+        for w in self._workers.values():
+            w.start()
+
+    def warmup_all(self, dummy_frames: dict[str, "SensorFrame"]) -> None:
+        """Synchronously warm every worker's detector before threads are live.
+
+        Per D-03 (restart protocol), Wave 4's ``main.py`` restart block awaits
+        this call before emitting ``detector_restart_complete`` so the UI
+        restart overlay dismisses only after first inference is real — no
+        oneDNN cold-start stall on the next real frame.
+
+        Iteration is SEQUENTIAL (not thread-pooled) because all workers share
+        the oneDNN / BLAS thread pool; running warmups in parallel would
+        contend the same CPU cores and defeat the point. Sequential keeps
+        timing predictable.
+
+        If a rid is missing from ``dummy_frames``, log a WARNING and skip
+        that worker. Wave 4's restart path may only have captured a first
+        real frame for a subset of robots at the moment of restart; hanging
+        the whole restart until every robot has a frame would be worse than
+        shipping a cold-start stall for the late ones.
+
+        If a worker's ``warmup`` raises, log a WARNING and continue — the
+        other robots must still come online. The restart completion event
+        still fires; the bad backend reports its failure via ``get_metrics``
+        in Phase 6.
+        """
+        for rid, w in self._workers.items():
+            frame = dummy_frames.get(rid)
+            if frame is None:
+                _LOGGER.warning(
+                    "warmup_all: no dummy frame for robot %s; skipping warmup "
+                    "(cold-start stall possible on first real frame).",
+                    rid,
+                )
+                continue
+            try:
+                w.warmup(frame)
+            except Exception as exc:
+                _LOGGER.warning(
+                    "warmup_all: worker %s raised during warmup: %s "
+                    "(continuing — backend will show the error via get_metrics).",
+                    rid,
+                    exc,
+                )
+
+    def reset_all(self) -> None:
+        """Reset every worker's backend state and drop queued/latest frames.
+
+        Used on detector swap (Phase 8 REST ``/select``): the new backend
+        instance is NOT installed here — Wave 4 constructs a fresh pool
+        behind ``app.state.detector_pool`` — but any residual state in a
+        still-live pool (e.g., during a soft reset) is cleared.
+
+        Does NOT reset per-worker session-lifetime drop counters; the
+        MetricsPanel (Phase 6) wants cumulative drops across restarts.
+        """
+        for w in self._workers.values():
+            w.reset()
+
+    def shutdown(self) -> None:
+        """Signal every worker to stop and join its thread (bounded 2 s each).
+
+        Safe to call even if ``start()`` was never invoked — each worker's
+        ``shutdown`` is a no-op when the thread is ``None``.
+        """
+        for w in self._workers.values():
+            w.shutdown()
+
+    # ------------------------------------------------------------------
+    # Dispatch
+    # ------------------------------------------------------------------
+
+    def submit(
+        self,
+        rid: str,
+        frame: "SensorFrame",
+        pose: np.ndarray,
+        slam_cloud: np.ndarray | None = None,
+    ) -> None:
+        """Dispatch a frame to the worker owning ``rid`` (newest-wins on that worker).
+
+        Unknown ``rid`` is a SILENT NO-OP (D-05 / T-02-08): Coordinator may
+        race a stale rid past a robot teardown, and propagating KeyError
+        would crash the detection dataflow for every other robot.
+        """
+        w = self._workers.get(rid)
+        if w is None:
+            return
+        w.submit(frame, pose, slam_cloud)
+
+    def latest(self, rid: str) -> "Detections3D | None":
+        """Most recent Detections3D for ``rid``, or ``None`` (also for unknown rid)."""
+        w = self._workers.get(rid)
+        return w.latest() if w is not None else None
+
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
+
+    def inspect_worker_queues(self) -> dict[str, dict]:
+        """Per-rid snapshot for Phase 6 MetricsPanel.
+
+        Returns::
+
+            {rid: {
+                "queue_depth": 0 | 1,
+                "drops_since_session_start": int,
+                "last_submit_sim_time": float,
+            }, ...}
+
+        Each worker's ``inspect()`` takes its own lock, so the per-rid
+        entries are individually consistent. Cross-rid snapshots are NOT
+        atomic — adjacent entries may differ by a submit that landed
+        between calls. Phase 6 treats metrics as monotonic counters so
+        this is fine.
+        """
+        return {rid: w.inspect() for rid, w in self._workers.items()}
+
+    # ------------------------------------------------------------------
+    # Accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def robot_ids(self) -> list[str]:
+        """List of managed robot ids (order matches construction)."""
+        return list(self._workers.keys())
+
+    def get_worker(self, rid: str) -> DetectorWorker | None:
+        """Escape hatch for tests + Phase 6 probes. None if rid unknown."""
+        return self._workers.get(rid)
+
+    def __len__(self) -> int:
+        return len(self._workers)
+
+    def __contains__(self, rid: object) -> bool:
+        return rid in self._workers
+
+    # ------------------------------------------------------------------
+    # Repr (debug-friendly)
+    # ------------------------------------------------------------------
+
+    def __repr__(self) -> str:  # pragma: no cover -- trivial formatting
+        return (
+            f"DetectorWorkerPool(backend={self.backend_name!r}, "
+            f"lifter={self.lifter_name!r}, "
+            f"robots={list(self._workers.keys())!r})"
+        )
+
+
+# Lightweight sanity: ``Any`` imported above is reserved for a future
+# typed-params escape hatch; silence unused-import lint without moving the
+# import off module-scope (keeps TYPE_CHECKING footprint visible).
+_ = Any
