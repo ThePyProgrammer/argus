@@ -58,6 +58,11 @@ def create_app(
     app.state.pending_slam_backend = None
     app.state.pending_slam_params = {}
 
+    # Detector backend selection state (Phase 2 — DET-MODELS-05)
+    app.state.active_detector_backend = "yolov11"
+    app.state.pending_detector_backend = None
+    app.state.pending_detector_params = {}
+
     # Wire SLAM REST API routes
     from backend.web.slam_routes import router as slam_router
     app.include_router(slam_router)
@@ -65,6 +70,10 @@ def create_app(
     # Wire pipeline configuration routes
     from backend.web.pipeline_routes import router as pipeline_router
     app.include_router(pipeline_router)
+
+    # Wire detector REST API routes (Phase 2 — DET-MODELS-05)
+    from backend.web.detector_routes import router as detector_router
+    app.include_router(detector_router)
 
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)
@@ -147,6 +156,39 @@ async def _dispatch_ws_message(data: dict, websocket: WebSocket) -> None:
         else:
             await websocket.send_json({
                 "type": "slam_param_ack",
+                "payload": {"param": param, "status": "requires_restart"},
+            })
+    elif msg_type == "detector_param_update":
+        # Phase 2 — DET-MODELS-05. Mirrors slam_param_update branch.
+        # Threat model T-02-20: param validated against schema_props BEFORE
+        # any app.state mutation. Unknown params → ack with "unknown_parameter"
+        # and no state change.
+        from src.perception.registry import DetectorRegistry
+
+        param = data.get("param")
+        value = data.get("value")
+        active = getattr(state, "active_detector_backend", DetectorRegistry.get_default())
+        backends = {b["name"]: b for b in DetectorRegistry.list_backends()}
+        info = backends.get(active, {})
+        schema_props = info.get("parameter_schema", {}).get("properties", {})
+
+        if param not in schema_props:
+            await websocket.send_json({
+                "type": "detector_param_ack",
+                "payload": {"param": param, "status": "unknown_parameter"},
+            })
+        elif schema_props[param].get("live_tunable", False):
+            pending = getattr(state, "pending_detector_params", {})
+            pending[param] = value
+            state.pending_detector_params = pending
+            logger.info("Live detector param update: %s = %s", param, value)
+            await websocket.send_json({
+                "type": "detector_param_ack",
+                "payload": {"param": param, "status": "applied", "value": value},
+            })
+        else:
+            await websocket.send_json({
+                "type": "detector_param_ack",
                 "payload": {"param": param, "status": "requires_restart"},
             })
 
