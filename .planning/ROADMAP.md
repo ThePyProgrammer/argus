@@ -89,7 +89,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Grepping the codebase for `70` (the hardcoded FOV) and `CLOUD_CONFIGS` returns no hits in perception modules; `src/perception/geometry.py::unproject_pixel_to_world` is the single projection entrypoint.
   4. When a detection's bbox has <50 valid depth pixels, the lifter silently falls back to `MedianDepthLifter` and the resulting OBB has identity quaternion + `outputs_oriented=False` in the wire payload.
   5. Switching lifter from `MedianDepthLifter` → `PointClusterLifter` via the Lifter dropdown changes the rendered box orientation visibly on a rotated object, with no server restart required.
-**Plans**: TBD
+**Plans**: 7 plans
+- [ ] 04-01-PLAN.md — pyproject.toml sklearn + scene_rotated_chair.xml fixture (Wave 0)
+- [ ] 04-02-PLAN.md — src/perception/geometry.py + test_geometry.py (Wave 0)
+- [ ] 04-03-PLAN.md — median_depth migration: delete _LEGACY_FOV_DEG, consume intrinsics (Wave 1)
+- [ ] 04-04-PLAN.md — PointClusterLifter (PCA-OBB + DBSCAN + fallback) + unit tests (Wave 2)
+- [ ] 04-05-PLAN.md — DetectorWorkerPool.swap_lifter + /lifter-hotswap route + tests (Wave 3)
+- [ ] 04-06-PLAN.md — Frontend DetectorSection redirect to /lifter-hotswap (Wave 4)
+- [ ] 04-07-PLAN.md — MuJoCo SC#1 integration + SC#2/SC#3 grep invariants + VALIDATION notes (Wave 5)
 **Research flag**: standard
 **UI hint**: yes
 
@@ -157,7 +164,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. detector-api-foundation | 5/5 | Complete   | 2026-04-13 |
 | 2. per-robot-worker-and-wire-plumbing | 12/12 | Complete   | 2026-04-14 |
 | 3. frontend-picker-and-ui | 0/11 | Planning complete | - |
-| 4. real-3d-obb-pipeline | 0/TBD | Not started | - |
+| 4. real-3d-obb-pipeline | 0/7 | Planning complete | - |
 | 5. second-backends-boxer-rtdetr-owlv2 | 0/TBD | Not started | - |
 | 6. detection-metrics-and-mujoco-gt | 0/TBD | Not started | - |
 | 7. pipeline-editor-perception-nodes | 0/TBD | Not started | - |
