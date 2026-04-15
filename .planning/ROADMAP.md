@@ -170,10 +170,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 07-06-PLAN.md — PortDataType/NodeCategory union extension + findPortTypeMismatches (D-07, D-09)
 - [x] 07-07-PLAN.md — nodeDefinitions.ts 3 perception node defs + color maps + NodePalette ordering (D-03..D-07)
 - [x] 07-08-PLAN.md — pipelineStore.ts:101 + pipelineSerializer.ts:112 dataType fix + ApplyBar hot-apply toast (D-08, UI-SPEC)
-- [ ] 07-09-PLAN.md — apply_pipeline diff-then-dispatch + hot-apply integration test (D-10)
-- [ ] 07-10-PLAN.md — data/presets/builtin/perception_rgbd.json + contract test (D-15, D-16)
-- [ ] 07-11-PLAN.md — main.py lifter hook + last_applied_pipeline_config lifecycle + on_backend_crash hook (D-12)
-- [ ] 07-12-PLAN.md — NodeInspector backend-dropdown hot-swap UI (D-02; Phase 7 revision iter 1)
+- [x] 07-09-PLAN.md — apply_pipeline diff-then-dispatch + hot-apply integration test (D-10)
+- [x] 07-10-PLAN.md — data/presets/builtin/perception_rgbd.json + contract test (D-15, D-16)
+- [x] 07-11-PLAN.md — main.py lifter hook + last_applied_pipeline_config lifecycle + on_backend_crash hook (D-12)
+- [x] 07-12-PLAN.md — NodeInspector backend-dropdown hot-swap UI (D-02; Phase 7 revision iter 1)
 **Research flag**: standard
 **UI hint**: yes
 
