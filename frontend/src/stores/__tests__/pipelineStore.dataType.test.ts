@@ -1,53 +1,111 @@
 /**
- * Plan 07-08 target — DET-PIPELINE-03 SC#2 regression lockdown.
- *
- * `pipelineStore.ts:101` currently hardcodes `dataType: 'PointCloud'` on every
- * edge created via `onConnect`. This test verifies the fix: the edge's
- * `data.dataType` comes from the source node's output port's dataType.
- *
- * Also locks down the parallel bug in `pipelineSerializer.ts:112` — every edge
- * deserialized from a preset JSON must carry the correct dataType.
- *
- * Literal reproducer from CONTEXT.md §specifics:
- *   sensor_rgbd.image_out (Image) → slam_generic.image_in (Image)
- *   expects edge.data.dataType === 'Image' (NOT 'PointCloud').
+ * Plan 07-08 — DET-PIPELINE-03 SC#2 dataType regression lockdown.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { usePipelineStore } from '../../stores/pipelineStore';
+import { deserializeGraph } from '../../utils/pipelineSerializer';
+import { NODE_DEFINITIONS } from '../../utils/nodeDefinitions';
 
-describe.skip('pipelineStore.onConnect — dataType inference (Plan 07-08)', () => {
+function resetStore(): void {
+  usePipelineStore.setState({
+    nodes: [],
+    edges: [],
+    selectedNodeId: null,
+    activePreset: null,
+    availablePresets: [],
+    isDirty: false,
+    validationErrors: [],
+    isValid: true,
+    isApplying: false,
+    nodeStatuses: {},
+    edgeThroughputs: {},
+    lastAppliedConfig: null,
+  });
+}
+
+describe('pipelineStore.onConnect dataType resolution (Plan 07-08)', () => {
+  beforeEach(() => resetStore());
+
   it('resolves edge dataType from source handle (Image → Image case)', () => {
-    // TODO Plan 07-08: set up store with sensor_rgbd + slam_generic nodes,
-    // call onConnect({ source: 'sensor_1', sourceHandle: 'image_out',
-    //   target: 'slam_1', targetHandle: 'image_in' }),
-    // assert state.edges[0].data.dataType === 'Image'.
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('sensor_rgbd', { x: 0, y: 0 });
+    s.addNode('slam_generic', { x: 100, y: 0 }, 'icp');
+    const nodes = usePipelineStore.getState().nodes;
+    usePipelineStore.getState().onConnect({
+      source: nodes[0].id,
+      sourceHandle: 'image_out',
+      target: nodes[1].id,
+      targetHandle: 'image_in',
+    });
+    const edges = usePipelineStore.getState().edges;
+    expect(edges).toHaveLength(1);
+    expect(edges[0].data?.dataType).toBe('Image');
   });
 
   it('resolves edge dataType for PointCloud → PointCloud case (regression)', () => {
-    // TODO Plan 07-08: slam_generic.cloud_out (PointCloud) → merger_generic.cloud_in;
-    // assert edge.data.dataType === 'PointCloud'.
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('slam_generic', { x: 0, y: 0 }, 'icp');
+    s.addNode('merger_generic', { x: 100, y: 0 }, 'icp_union');
+    const nodes = usePipelineStore.getState().nodes;
+    usePipelineStore.getState().onConnect({
+      source: nodes[0].id,
+      sourceHandle: 'cloud_out',
+      target: nodes[1].id,
+      targetHandle: 'cloud_in',
+    });
+    const edges = usePipelineStore.getState().edges;
+    expect(edges[0].data?.dataType).toBe('PointCloud');
   });
 
   it('resolves edge dataType for new Detections2D → Detections2D case', () => {
-    // TODO Plan 07-08: detector_generic.detections_2d_out → detection3d_generic.detections_2d_in;
-    // assert edge.data.dataType === 'Detections2D'.
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('detector_generic', { x: 0, y: 0 }, 'yolov11');
+    s.addNode('detection3d_generic', { x: 100, y: 0 }, 'point_cluster');
+    const nodes = usePipelineStore.getState().nodes;
+    usePipelineStore.getState().onConnect({
+      source: nodes[0].id,
+      sourceHandle: 'detections_2d_out',
+      target: nodes[1].id,
+      targetHandle: 'detections_2d_in',
+    });
+    const edges = usePipelineStore.getState().edges;
+    expect(edges[0].data?.dataType).toBe('Detections2D');
   });
 
   it('falls back to PointCloud defensively when source port cannot be resolved', () => {
-    // TODO Plan 07-08: supply connection with unknown sourceHandle;
-    // assert edge.data.dataType === 'PointCloud' (defensive fallback).
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('sensor_rgbd', { x: 0, y: 0 });
+    s.addNode('slam_generic', { x: 100, y: 0 }, 'icp');
+    const nodes = usePipelineStore.getState().nodes;
+    usePipelineStore.getState().onConnect({
+      source: nodes[0].id,
+      sourceHandle: 'nonexistent_handle',
+      target: nodes[1].id,
+      targetHandle: 'image_in',
+    });
+    const edges = usePipelineStore.getState().edges;
+    expect(edges[0].data?.dataType).toBe('PointCloud');
   });
 });
 
-describe.skip('pipelineSerializer.deserializeGraph — edge dataType (Plan 07-08)', () => {
+describe('pipelineSerializer.deserializeGraph edge dataType (Plan 07-08)', () => {
   it('resolves edge dataType from source handle on deserialize', () => {
-    // TODO Plan 07-08: build a PipelineConfig with one edge from
-    // detector_generic.detections_2d_out → detection3d_generic.detections_2d_in;
-    // call deserializeGraph; assert edges[0].data.dataType === 'Detections2D'
-    // (NOT 'PointCloud' — today's bug at pipelineSerializer.ts:112).
-    expect(false).toBe(true);
+    const config = {
+      nodes: [
+        { id: 'det_1', type: 'detector_yolov11', params: {}, position: { x: 0, y: 0 } },
+        { id: 'd3d_1', type: 'detection3d_point_cluster', params: {}, position: { x: 100, y: 0 } },
+      ],
+      edges: [
+        {
+          source: 'det_1',
+          sourceHandle: 'detections_2d_out',
+          target: 'd3d_1',
+          targetHandle: 'detections_2d_in',
+        },
+      ],
+    };
+    const { edges } = deserializeGraph(config, NODE_DEFINITIONS);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].data?.dataType).toBe('Detections2D');
   });
 });
