@@ -110,7 +110,19 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Killing the BoxeR subprocess manually (`kill -9 <pid>`) triggers a `crash_fallback` WS message within 5 s, the active detector auto-switches to YOLOv11, and a `CrashToast` appears in the frontend.
   4. `make download-models` pre-fetches every checkpoint to `./models/` and each backend loads with `revision=<sha>` pinned; running with network disabled after pre-fetch still boots all backends.
   5. `LICENSES.md` contains the BoxeR CC-BY-NC-4.0 entry with upstream attribution link, and the BoxeR backend advertises `license: "CC-BY-NC-4.0"` via its capability dict (rendered by Phase 3's existing capability badge path).
-**Plans**: TBD
+**Plans**: 12 plans
+- [ ] 05-01-PLAN.md — pyproject.toml (ort + optimum + pytest markers) + .gitignore subprocess_venvs (Wave 0)
+- [ ] 05-02-PLAN.md — LICENSES.md + models/.gitkeep + models/README.md (Wave 0)
+- [ ] 05-03-PLAN.md — Makefile + scripts/download_models.py skeleton (Wave 0)
+- [ ] 05-04-PLAN.md — 7 pytest test-file skip-stubs scaffolds (Wave 0)
+- [ ] 05-05-PLAN.md — subprocess_bridge typed exceptions + handshake + drain thread; registry.set_available; _thread_config.get_default_budget (Wave 1)
+- [ ] 05-06-PLAN.md — scripts/boxer_worker.py + scripts/setup_boxer_subprocess.sh (Wave 1)
+- [ ] 05-07-PLAN.md — src/perception/backends/rtdetrv2_backend.py + tests (Wave 2)
+- [ ] 05-08-PLAN.md — src/perception/backends/boxer_backend.py composer + tests + LICENSES tests (Wave 3)
+- [ ] 05-09-PLAN.md — DetectorWorkerPool.on_backend_crash + DetectorWorker typed-except wiring + crash_fallback unit tests (Wave 4)
+- [ ] 05-10-PLAN.md — main.py streaming_viz wiring + useWebSocket.ts detector crash_fallback branch (Wave 5)
+- [ ] 05-11-PLAN.md — download_models.py real snapshot+optimum+sha256+rollback + 4 network integration tests (Wave 4)
+- [ ] 05-12-PLAN.md — SC#3 kill-9 + SC#4 offline-boot integration tests (slow_boxer-marked) (Wave 5)
 **Research flag**: needed (verify `facebook/boxer` repo structure, current checkpoint names, and Python 3.12 compatibility via Context7 at phase-planning time — do not trust April 2026 memory for 2022 CVPR code)
 
 ### Phase 6: detection-metrics-and-mujoco-gt
