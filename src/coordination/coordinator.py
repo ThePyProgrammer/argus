@@ -208,6 +208,64 @@ class Coordinator:
 
     def set_viz(self, viz: "MultiRobotVisualizer | None") -> None:
         self._viz = viz
+        # Phase 6 BLOCKER 2: best-effort early attach. If the bridge is not
+        # yet started (common in run_web_mode: set_viz is called BEFORE
+        # coordinator.run() invokes bridge.start()), ``mj_model`` / ``mj_data``
+        # are None and this no-ops — run() will call the helper again after
+        # bridge.start() so the extractor attaches on the first tick.
+        self._attach_gt_extractor_if_possible()
+
+    def _attach_gt_extractor_if_possible(self) -> None:
+        """Attach the MuJoCo GT extractor on the streaming viz, if wired.
+
+        Phase 6 BLOCKER 2 fix (revision 2026-04-15). Graceful no-op if:
+          - no viz attached, or
+          - viz lacks ``attach_gt_extractor`` (pre-Phase-6 visualizers), or
+          - bridge has no ``mj_model`` / ``mj_data`` accessors yet (pre-start
+            or older MultiBridge without the public properties), or
+          - the YAML file does not exist in this checkout.
+
+        ``attach_gt_extractor`` itself swallows ValueError / FileNotFoundError /
+        OSError internally (Plan 08 WebStreamingViz) so a bad mapping file
+        leaves ``gt_extractor`` as None without crashing coordinator boot —
+        the UI GT panel renders N/A while live detection metrics continue.
+
+        Called from two sites:
+          - :meth:`set_viz` (early, optimistic — may be pre-bridge.start())
+          - :meth:`run` (after ``self._bridge.start()``, guaranteed usable)
+        Second call is idempotent when the first succeeded — Plan 08's
+        ``attach_gt_extractor`` just reconstructs the extractor, and both
+        calls resolve against the same live ``mj_data`` handle.
+        """
+        viz = self._viz
+        if viz is None or not hasattr(viz, "attach_gt_extractor"):
+            return
+        # Already attached — skip the reconstruction work.
+        if getattr(viz, "gt_extractor", None) is not None:
+            return
+        from pathlib import Path as _GTPath
+        gt_yaml = _GTPath("data/scenes/scene_office1_gt.yaml")
+        if not gt_yaml.exists():
+            return
+        if not (hasattr(self._bridge, "mj_model") and hasattr(self._bridge, "mj_data")):
+            return
+        mj_model = self._bridge.mj_model
+        mj_data = self._bridge.mj_data
+        if mj_model is None or mj_data is None:
+            return
+
+        viz.attach_gt_extractor(gt_yaml, mj_model, mj_data)
+        if getattr(viz, "gt_extractor", None) is not None:
+            logger.info(
+                "GT extractor attached: %s (classes=%s)",
+                gt_yaml,
+                viz.gt_extractor.all_classes(),
+            )
+        else:
+            logger.warning(
+                "GT extractor attach attempted but extractor is None; "
+                "GT metrics will render N/A (see attach_gt_extractor logs).",
+            )
 
     def set_freeze_motion(self, freeze: bool) -> None:
         self._freeze_motion = freeze
@@ -429,6 +487,10 @@ class Coordinator:
             robot.publisher.start()
 
         frames = self._bridge.start()
+        # Phase 6 BLOCKER 2: bridge is now started → mj_model / mj_data are
+        # populated. Retry the GT-extractor attach (no-op if already attached
+        # or if the scene YAML is absent).
+        self._attach_gt_extractor_if_possible()
         robot_ids = tuple(self._robots.keys())
         terminated_reason = "stopped"
 
@@ -731,6 +793,57 @@ class Coordinator:
                         )
                     except Exception:
                         pass  # drift computation can fail with insufficient data
+
+        # ──────────────────────────────────────────────────────────────────
+        # Phase 6 (DET-METRICS-01 / DET-METRICS-02): detection-metrics pump.
+        # Runs once per robot per tick. Guarded by hasattr so pre-Phase-6 viz
+        # objects no-op silently. sim_now uses sim clock per Pitfall 4.
+        # ──────────────────────────────────────────────────────────────────
+        if hasattr(self._viz, "detection_metrics_tracker") and self._detector_pool is not None:
+            det_tracker = self._viz.detection_metrics_tracker
+            det_export = self._viz.detection_export
+            gt_extractor = self._viz.gt_extractor
+            sim_now = float(frames[robot_ids[0]].sim_time)
+
+            workers_map = self._detector_pool.workers_by_robot()
+            for rid in robot_ids:
+                worker = workers_map.get(rid)
+                if worker is None:
+                    continue
+                latest = worker.latest()
+                inspect = worker.inspect()
+                backend_metrics = worker.detector.get_metrics()
+
+                det_tracker.record_frame(
+                    robot_id=rid,
+                    sim_now=sim_now,
+                    latest=latest,
+                    inspect=inspect,
+                    backend_metrics=backend_metrics,
+                )
+
+                if latest is not None:
+                    items = getattr(latest, "items", None) or getattr(latest, "boxes", [])
+                    for obb in items:
+                        det_export.append(
+                            obb,
+                            robot_id=rid,
+                            backend_id=backend_metrics.get("backend_id", "unknown"),
+                            capture_timestamp=float(latest.capture_timestamp),
+                        )
+                        if gt_extractor is not None:
+                            cls = getattr(obb, "class_name", "")
+                            center = np.asarray(obb.center, dtype=np.float64).reshape(3)
+                            # Consume match result via tracker.record_gt_match (Plan 04
+                            # surface; SC#2 end-to-end delivery). match_detection returns
+                            # (gid, err) where err is None if no match within gate_m.
+                            _gid, err = gt_extractor.match_detection(cls, center, gate_m=1.0)
+                            det_tracker.record_gt_match(
+                                robot_id=rid,
+                                class_name=cls,
+                                center_err_m=err,
+                                matched=(err is not None),
+                            )
 
         voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
         frontier_cells = self._gather_frontier_cells(robot_ids)

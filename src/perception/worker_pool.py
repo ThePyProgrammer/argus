@@ -527,6 +527,18 @@ class DetectorWorkerPool:
         """Escape hatch for tests + Phase 6 probes. None if rid unknown."""
         return self._workers.get(rid)
 
+    def workers_by_robot(self) -> dict[str, DetectorWorker]:
+        """Public accessor for the internal robot-to-worker map (Phase 6).
+
+        Returns a SHALLOW COPY of the ``{rid: worker}`` mapping so external
+        callers (coordinator detection-metrics pump) cannot accidentally
+        mutate the pool's worker registry. Worker instances themselves are
+        not copied — the coordinator must call ``worker.latest()`` /
+        ``worker.inspect()`` / ``worker.detector.get_metrics()`` on the live
+        worker objects to see fresh per-tick state.
+        """
+        return dict(self._workers)
+
     def __len__(self) -> int:
         return len(self._workers)
 
