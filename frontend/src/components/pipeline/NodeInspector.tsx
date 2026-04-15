@@ -18,6 +18,8 @@ const debouncedSendPipelineParam = debounce((nodeId: unknown, key: unknown, valu
 export function NodeInspector() {
   const selectedNodeId = usePipelineStore((s) => s.selectedNodeId);
   const nodes = usePipelineStore((s) => s.nodes);
+  // Phase 7 D-02 — backend hot-swap dropdown reads catalog from the store.
+  const availableRegistryNodes = usePipelineStore((s) => s.availableRegistryNodes);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -87,6 +89,50 @@ export function NodeInspector() {
           Backend: {registryName}
         </div>
       )}
+
+      {/* Phase 7 D-02 — backend hot-swap dropdown for perception nodes */}
+      {selectedNode.data.nodeType &&
+        ['detector_generic', 'detection3d_generic', 'tracker_generic'].includes(
+          selectedNode.data.nodeType,
+        ) && (
+          <select
+            aria-label="Backend"
+            value={registryName ?? ''}
+            onChange={(e) => {
+              if (!selectedNodeId) return;
+              usePipelineStore
+                .getState()
+                .updateNodeParam(selectedNodeId, 'backend', e.target.value);
+            }}
+            style={{
+              width: '100%',
+              marginTop: 4,
+              marginLeft: 16,
+              padding: '4px 8px',
+              background: '#0a0a14',
+              color: '#e0e0e0',
+              border: '1px solid #2a2a4a',
+              borderRadius: 3,
+              fontSize: 11,
+              fontWeight: 600,
+              boxSizing: 'border-box',
+            }}
+          >
+            {(() => {
+              const baseKind = selectedNode.data.nodeType.replace(/_generic$/, '');
+              return availableRegistryNodes
+                .filter(
+                  (rn) =>
+                    rn.category === 'perception' && rn.type.startsWith(`${baseKind}_`),
+                )
+                .map((rn) => (
+                  <option key={rn.type} value={rn.registryName}>
+                    {rn.label}
+                  </option>
+                ));
+            })()}
+          </select>
+        )}
 
       {/* Separator */}
       <div style={{ borderTop: '1px solid #2a2a4a', margin: '16px 0' }} />
