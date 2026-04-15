@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: per-robot-worker-and-wire-plumbing** - Per-robot DetectorWorker, REST/WS plumbing, canonical OBB wire format + round-trip test (completed 2026-04-14)
 - [ ] **Phase 3: frontend-picker-and-ui** - Detector dropdown, lifter dropdown, param panel, restart overlay, RGB bbox overlay
 - [ ] **Phase 4: real-3d-obb-pipeline** - PointClusterLifter (PCA-OBB), single geometry path, dumb-renderer frontend
-- [ ] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess (3D-native), RT-DETRv2 in-process ONNX, pinned checkpoints, crash fallback (OWLv2 dropped 2026-04-15 — see Phase 5 CONTEXT D-10)
+- [x] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess (3D-native), RT-DETRv2 in-process ONNX, pinned checkpoints, crash fallback (OWLv2 dropped 2026-04-15 — see Phase 5 CONTEXT D-10) (completed 2026-04-15)
 - [ ] **Phase 6: detection-metrics-and-mujoco-gt** - MetricsPanel populated, MuJoCo GT extractor, center_error_m, JSONL export, RSS smoke test
 - [ ] **Phase 7: pipeline-editor-perception-nodes** - DetectorNode, Detection3DNode, TrackerNode, per-edge type validation, perception_rgbd preset
 - [ ] **Phase 8: stretch-tracker-fusion-semantic-map** - ByteTrack, multi-robot fusion, SemanticMap TTL layer, heterogeneous per-robot backends (time-gated)
@@ -111,18 +111,18 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `make download-models` pre-fetches every checkpoint to `./models/` and each backend loads with `revision=<sha>` pinned; running with network disabled after pre-fetch still boots all backends.
   5. `LICENSES.md` contains the BoxeR CC-BY-NC-4.0 entry with upstream attribution link, and the BoxeR backend advertises `license: "CC-BY-NC-4.0"` via its capability dict (rendered by Phase 3's existing capability badge path).
 **Plans**: 12 plans
-- [ ] 05-01-PLAN.md — pyproject.toml (ort + optimum + pytest markers) + .gitignore subprocess_venvs (Wave 0)
-- [ ] 05-02-PLAN.md — LICENSES.md + models/.gitkeep + models/README.md (Wave 0)
-- [ ] 05-03-PLAN.md — Makefile + scripts/download_models.py skeleton (Wave 0)
-- [ ] 05-04-PLAN.md — 7 pytest test-file skip-stubs scaffolds (Wave 0)
-- [ ] 05-05-PLAN.md — subprocess_bridge typed exceptions + handshake + drain thread; registry.set_available; _thread_config.get_default_budget (Wave 1)
-- [ ] 05-06-PLAN.md — scripts/boxer_worker.py + scripts/setup_boxer_subprocess.sh (Wave 1)
-- [ ] 05-07-PLAN.md — src/perception/backends/rtdetrv2_backend.py + tests (Wave 2)
-- [ ] 05-08-PLAN.md — src/perception/backends/boxer_backend.py composer + tests + LICENSES tests (Wave 3)
-- [ ] 05-09-PLAN.md — DetectorWorkerPool.on_backend_crash + DetectorWorker typed-except wiring + crash_fallback unit tests (Wave 4)
-- [ ] 05-10-PLAN.md — main.py streaming_viz wiring + useWebSocket.ts detector crash_fallback branch (Wave 5)
-- [ ] 05-11-PLAN.md — download_models.py real snapshot+optimum+sha256+rollback + 4 network integration tests (Wave 4)
-- [ ] 05-12-PLAN.md — SC#3 kill-9 + SC#4 offline-boot integration tests (slow_boxer-marked) (Wave 5)
+- [x] 05-01-PLAN.md — pyproject.toml (ort + optimum + pytest markers) + .gitignore subprocess_venvs (Wave 0)
+- [x] 05-02-PLAN.md — LICENSES.md + models/.gitkeep + models/README.md (Wave 0)
+- [x] 05-03-PLAN.md — Makefile + scripts/download_models.py skeleton (Wave 0)
+- [x] 05-04-PLAN.md — 7 pytest test-file skip-stubs scaffolds (Wave 0)
+- [x] 05-05-PLAN.md — subprocess_bridge typed exceptions + handshake + drain thread; registry.set_available; _thread_config.get_default_budget (Wave 1)
+- [x] 05-06-PLAN.md — scripts/boxer_worker.py + scripts/setup_boxer_subprocess.sh (Wave 1)
+- [x] 05-07-PLAN.md — src/perception/backends/rtdetrv2_backend.py + tests (Wave 2)
+- [x] 05-08-PLAN.md — src/perception/backends/boxer_backend.py composer + tests + LICENSES tests (Wave 3)
+- [x] 05-09-PLAN.md — DetectorWorkerPool.on_backend_crash + DetectorWorker typed-except wiring + crash_fallback unit tests (Wave 4)
+- [x] 05-10-PLAN.md — main.py streaming_viz wiring + useWebSocket.ts detector crash_fallback branch (Wave 5)
+- [x] 05-11-PLAN.md — download_models.py real snapshot+optimum+sha256+rollback + 4 network integration tests (Wave 4)
+- [x] 05-12-PLAN.md — SC#3 kill-9 + SC#4 offline-boot integration tests (slow_boxer-marked) (Wave 5)
 **Research flag**: needed (verify `facebook/boxer` repo structure, current checkpoint names, and Python 3.12 compatibility via Context7 at phase-planning time — do not trust April 2026 memory for 2022 CVPR code)
 
 ### Phase 6: detection-metrics-and-mujoco-gt
@@ -176,7 +176,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. per-robot-worker-and-wire-plumbing | 12/12 | Complete   | 2026-04-14 |
 | 3. frontend-picker-and-ui | 0/11 | Planning complete | - |
 | 4. real-3d-obb-pipeline | 0/7 | Planning complete | - |
-| 5. second-backends-boxer-rtdetr-owlv2 | 0/TBD | Not started | - |
+| 5. second-backends-boxer-rtdetr-owlv2 | 12/12 | Complete   | 2026-04-15 |
 | 6. detection-metrics-and-mujoco-gt | 0/TBD | Not started | - |
 | 7. pipeline-editor-perception-nodes | 0/TBD | Not started | - |
 | 8. stretch-tracker-fusion-semantic-map | 0/TBD | Not started | - |
