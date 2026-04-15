@@ -28,6 +28,7 @@ const CATEGORY_ORDER: NodeCategory[] = [
   'sensor',
   'slam',
   'merger',
+  'perception',  // Phase 7 DET-PIPELINE-01 (UI-SPEC Palette Layout Ordering)
   'filter',
   'splitter',
   'parameter',
@@ -38,6 +39,7 @@ const CATEGORY_LABELS: Record<NodeCategory, string> = {
   sensor: 'Sensors',
   slam: 'SLAM Backends',
   merger: 'Mergers',
+  perception: 'Perception',  // Phase 7 DET-PIPELINE-01
   filter: 'Filters',
   splitter: 'Splitters / Combiners',
   parameter: 'Parameters',
