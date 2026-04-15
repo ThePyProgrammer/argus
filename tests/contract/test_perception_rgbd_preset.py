@@ -31,6 +31,14 @@ def _populate_registries():
         "icp_union", "ICP Union",
         "src.coordination.merge_strategies.icp_union.ICPUnionStrategy",
     )
+    # Force re-import of registry-populating packages so @decorators re-run
+    # after any prior test's _clear. Python caches modules by default — a
+    # second `import` is a no-op, so we drop cached entries first.
+    import sys
+    for _prefix in ("src.perception.backends", "src.perception.lifters", "src.tracking.trackers"):
+        for _key in list(sys.modules):
+            if _key == _prefix or _key.startswith(_prefix + "."):
+                del sys.modules[_key]
     import src.perception.backends  # noqa: F401
     import src.perception.lifters   # noqa: F401
     import src.tracking.trackers    # noqa: F401

@@ -143,8 +143,13 @@ def _clean_and_register_fakes():
         klass=FakeLifter,
     )
     yield
-    DetectorRegistry._clear()
-    Detection3DRegistry._clear()
+    # Do NOT clear registries on teardown — trailing tests (e.g. the
+    # pipeline-apply-hot integration suite and the perception_rgbd preset
+    # contract) rely on real backends being registered, and Python's import
+    # cache prevents their side-effect imports from re-triggering the
+    # @detector_backend / @detection_3d decorators after a clear. The
+    # registry state is overwritten on setup of the next test that uses
+    # this fixture, so session-global accumulation is not a concern.
 
 
 def _make_pool(robot_ids: list[str]):
