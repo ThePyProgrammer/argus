@@ -24,3 +24,9 @@ frontend/tsconfig.tsbuildinfo
 
 # Phase 5 (D-01): BoxeR subprocess venv — owns its own torch/DINOv3/BoxerNet stack
 subprocess_venvs/
+
+# Phase 5 (D-11): detector checkpoints fetched by `make download-models`.
+# RT-DETRv2 ~78 MB ONNX + HF PyTorch snapshot; BoxeR ~1.2 GB of .ckpt/.pth/.pt.
+# Pin via module-level SHA constants + sha256 manifest; never commit artifacts.
+models/rtdetrv2/
+models/boxer/
