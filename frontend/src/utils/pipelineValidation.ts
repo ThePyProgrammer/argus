@@ -84,8 +84,45 @@ export function findMissingOutput(nodes: PipelineNode[]): ValidationError | null
 }
 
 /**
+ * Find edges whose source output and target input have different PortDataTypes.
+ * Emits a ValidationError per mismatched edge with the CONTEXT D-09 literal message format.
+ */
+export function findPortTypeMismatches(
+  nodes: PipelineNode[],
+  edges: PipelineEdge[],
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const nodeById = new Map<string, PipelineNode>();
+  for (const n of nodes) nodeById.set(n.id, n);
+
+  for (const edge of edges) {
+    const src = nodeById.get(edge.source);
+    const tgt = nodeById.get(edge.target);
+    if (!src || !tgt) continue; // defensive
+
+    const srcPort = src.data.outputs.find((p) => p.id === edge.sourceHandle);
+    const tgtPort = tgt.data.inputs.find((p) => p.id === edge.targetHandle);
+    if (!srcPort || !tgtPort) continue; // handle not resolved
+
+    if (srcPort.dataType !== tgtPort.dataType) {
+      errors.push({
+        nodeId: edge.target,
+        message:
+          `Edge from ${src.data.label}.${srcPort.label} (${srcPort.dataType}) ` +
+          `to ${tgt.data.label}.${tgtPort.label} (${tgtPort.dataType}) ` +
+          `has mismatched types`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Run all graph validations. Returns combined array of errors.
- * Order: cycles first, then unconnected ports, then missing output.
+ * Order (CONTEXT D-09): cycles → type mismatches → unconnected ports → missing output.
+ * Type errors come before unconnected errors because they are more actionable
+ * (user sees the specific mismatched edge, not a generic "required input missing").
  */
 export function validateGraph(nodes: PipelineNode[], edges: PipelineEdge[]): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -97,6 +134,9 @@ export function validateGraph(nodes: PipelineNode[], edges: PipelineEdge[]): Val
       message: `Pipeline contains a cycle through nodes: ${cycleLabels.join(', ')}`,
     });
   }
+
+  // Phase 7 D-09: type mismatches before structural errors.
+  errors.push(...findPortTypeMismatches(nodes, edges));
 
   // Check for unconnected required ports
   errors.push(...findUnconnectedPorts(nodes, edges));
