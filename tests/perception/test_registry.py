@@ -331,3 +331,92 @@ def test_create_unknown_name_raises_valueerror():
 
     with pytest.raises(ValueError, match="Unknown detector backend"):
         DetectorRegistry.create("nonexistent")
+
+
+# ---------------------------------------------------------------------------
+# Plan 05-05: DetectorRegistry.set_available (D-04 — session-scoped override).
+# ---------------------------------------------------------------------------
+
+
+def test_set_available_overrides_probe_result():
+    """D-04: set_available(False, reason) wins over klass.available() result."""
+    from src.perception.registry import DetectorRegistry
+
+    class Probed:
+        CAPABILITIES = _full_det_caps()
+        PARAMETER_SCHEMA = {}
+
+        @classmethod
+        def available(cls):  # probe would say True
+            return True, None
+
+    sys.modules[__name__].Probed_SetAvail = Probed  # type: ignore[attr-defined]
+    DetectorRegistry.register(
+        "probed_set", "Probed_Set", f"{__name__}.Probed_SetAvail", Probed
+    )
+
+    # Before override — probe says available.
+    before = DetectorRegistry.list_backends()
+    assert before[0]["available"] is True
+
+    # Override to False with a reason (the D-04 use case).
+    DetectorRegistry.set_available(
+        "probed_set", False, reason="Crashed this session"
+    )
+    entries = {e["name"]: e for e in DetectorRegistry.list_backends()}
+    assert entries["probed_set"]["available"] is False
+    assert entries["probed_set"]["reason"] == "Crashed this session"
+
+
+def test_set_available_raises_on_unknown_backend():
+    from src.perception.registry import DetectorRegistry
+
+    with pytest.raises(ValueError, match="Unknown detector backend"):
+        DetectorRegistry.set_available("nonexistent-backend-xyz", False)
+
+
+def test_set_available_can_restore_availability():
+    """Flipping False then True back should return the backend to healthy."""
+    from src.perception.registry import DetectorRegistry
+
+    class Probed:
+        CAPABILITIES = _full_det_caps()
+        PARAMETER_SCHEMA = {}
+
+        @classmethod
+        def available(cls):
+            return True, None
+
+    sys.modules[__name__].Probed_Restore = Probed  # type: ignore[attr-defined]
+    DetectorRegistry.register(
+        "probed_restore", "Probed_Restore", f"{__name__}.Probed_Restore", Probed
+    )
+
+    DetectorRegistry.set_available("probed_restore", False, reason="temp")
+    DetectorRegistry.set_available("probed_restore", True, reason=None)
+    entries = {e["name"]: e for e in DetectorRegistry.list_backends()}
+    assert entries["probed_restore"]["available"] is True
+
+
+def test_set_available_with_none_reason_uses_default_message():
+    """reason=None on a False override surfaces a default explanatory string."""
+    from src.perception.registry import DetectorRegistry
+
+    class Probed:
+        CAPABILITIES = _full_det_caps()
+        PARAMETER_SCHEMA = {}
+
+        @classmethod
+        def available(cls):
+            return True, None
+
+    sys.modules[__name__].Probed_Default = Probed  # type: ignore[attr-defined]
+    DetectorRegistry.register(
+        "probed_default", "Probed_Default", f"{__name__}.Probed_Default", Probed
+    )
+
+    DetectorRegistry.set_available("probed_default", False, reason=None)
+    entries = {e["name"]: e for e in DetectorRegistry.list_backends()}
+    assert entries["probed_default"]["available"] is False
+    # Default message kicks in when reason is None.
+    assert "set_available" in entries["probed_default"]["reason"]

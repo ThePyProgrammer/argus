@@ -63,3 +63,24 @@ def test_thread_config_module_actually_calls_set_num_threads() -> None:
     assert "torch.set_num_interop_threads" in text, (
         "src/_thread_config.py must also call torch.set_num_interop_threads(1)."
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 05-05: get_default_budget() public getter (D-07 — ORT consumers).
+# ---------------------------------------------------------------------------
+
+
+def test_get_default_budget_returns_int() -> None:
+    """D-07: ORT backends read the process-global thread budget via this getter.
+
+    Phase 1 D-04 invariant: ALL thread budget config flows through _thread_config.
+    Plan 05-07's RT-DETRv2 backend sets
+    ``sess_options.intra_op_num_threads = get_default_budget()`` — the backend
+    MUST NOT hardcode a thread count.
+    """
+    from src._thread_config import _DEFAULT_BUDGET, get_default_budget
+
+    result = get_default_budget()
+    assert isinstance(result, int)
+    assert result == _DEFAULT_BUDGET
+    assert result >= 1
