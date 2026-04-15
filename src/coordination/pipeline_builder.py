@@ -27,6 +27,14 @@ class PipelineConfig:
     merger_params: dict = field(default_factory=dict)
     filter_chain: list[dict] = field(default_factory=list)
 
+    # Phase 7 DET-PIPELINE-05 (CONTEXT D-12 + RESEARCH Pattern Template 7)
+    detector_name: str = "yolov11"
+    detector_params: dict = field(default_factory=dict)
+    lifter_name: str = "point_cluster"
+    lifter_params: dict = field(default_factory=dict)
+    tracker_name: str = "none"
+    tracker_params: dict = field(default_factory=dict)
+
 
 # ---------------------------------------------------------------------------
 # Static node definitions
@@ -168,6 +176,10 @@ _STATIC_NODES: list[dict] = [
 _REQUIRED_INPUTS: dict[str, list[str]] = {
     "slam_": ["image_in"],
     "merger_": ["cloud_in"],
+    # Phase 7 additions (CONTEXT D-03 / D-04 / D-05)
+    "detector_": ["image_in"],
+    "detection3d_": ["detections_2d_in", "depth_in"],
+    "tracker_": ["detections_3d_in"],
 }
 
 
@@ -218,6 +230,70 @@ class NodeCatalog:
                 "parameterSchema": strategy.get("parameter_schema", {}),
                 "defaultParams": {},
                 "registryName": strategy["name"],
+            })
+
+        # ---- Phase 7 DET-PIPELINE-01: perception catalog entries ----
+        # Side-effect imports force registry population in case this handler
+        # was imported before any detector/lifter/tracker module.
+        import src.perception.backends  # noqa: F401
+        import src.perception.lifters  # noqa: F401
+        import src.tracking.trackers  # noqa: F401
+        from src.perception.registry import Detection3DRegistry, DetectorRegistry
+        from src.tracking.registry import TrackerRegistry
+
+        for backend in DetectorRegistry.list_backends():
+            catalog.append({
+                "type": f"detector_{backend['name']}",
+                "label": f"Detector: {backend['display']}",
+                "category": "perception",
+                "inputs": [
+                    {"id": "image_in", "label": "Image", "dataType": "Image", "required": True},
+                    {"id": "depth_in", "label": "Depth", "dataType": "Image", "required": False},
+                ],
+                "outputs": [
+                    {"id": "detections_2d_out", "label": "Detections 2D", "dataType": "Detections2D"},
+                    {"id": "detections_3d_out", "label": "Detections 3D", "dataType": "Detections3D"},
+                ],
+                "parameterSchema": backend.get("parameter_schema", {}),
+                "capabilities": backend.get("capabilities", {}),
+                "defaultParams": {},
+                "registryName": backend["name"],
+            })
+
+        for lifter in Detection3DRegistry.list_backends():
+            catalog.append({
+                "type": f"detection3d_{lifter['name']}",
+                "label": f"3D Lifter: {lifter['display']}",
+                "category": "perception",
+                "inputs": [
+                    {"id": "detections_2d_in", "label": "Detections 2D", "dataType": "Detections2D", "required": True},
+                    {"id": "depth_in", "label": "Depth", "dataType": "Image", "required": True},
+                    {"id": "pose_in", "label": "Pose", "dataType": "Pose", "required": False},
+                ],
+                "outputs": [
+                    {"id": "detections_3d_out", "label": "Detections 3D", "dataType": "Detections3D"},
+                ],
+                "parameterSchema": lifter.get("parameter_schema", {}),
+                "capabilities": lifter.get("capabilities", {}),
+                "defaultParams": {},
+                "registryName": lifter["name"],
+            })
+
+        for t in TrackerRegistry.list_backends():
+            catalog.append({
+                "type": f"tracker_{t['name']}",
+                "label": f"Tracker: {t['display']}",
+                "category": "perception",
+                "inputs": [
+                    {"id": "detections_3d_in", "label": "Detections 3D", "dataType": "Detections3D", "required": True},
+                ],
+                "outputs": [
+                    {"id": "tracks_out", "label": "Tracks", "dataType": "Tracks"},
+                ],
+                "parameterSchema": t.get("parameter_schema", {}),
+                "capabilities": t.get("capabilities", {}),
+                "defaultParams": {},
+                "registryName": t["name"],
             })
 
         return catalog
@@ -286,6 +362,45 @@ class PipelineBuilder:
                     )
                 continue
 
+            # Phase 7: perception prefixes. NOTE: `detector_` check does not
+            # conflict with `detection3d_` because Python startswith is strict
+            # (`"detection3d_..."` does not start with `"detector_"`).
+            if ntype.startswith("detector_"):
+                registry_name = ntype[len("detector_"):]
+                import src.perception.backends  # noqa: F401
+                from src.perception.registry import DetectorRegistry
+                available = [b["name"] for b in DetectorRegistry.list_backends()]
+                if registry_name not in available:
+                    raise ValueError(
+                        f"Unknown detector backend: {registry_name}. "
+                        f"Available: {available}"
+                    )
+                continue
+
+            if ntype.startswith("detection3d_"):
+                registry_name = ntype[len("detection3d_"):]
+                import src.perception.lifters  # noqa: F401
+                from src.perception.registry import Detection3DRegistry
+                available = [b["name"] for b in Detection3DRegistry.list_backends()]
+                if registry_name not in available:
+                    raise ValueError(
+                        f"Unknown 3D lifter: {registry_name}. "
+                        f"Available: {available}"
+                    )
+                continue
+
+            if ntype.startswith("tracker_"):
+                registry_name = ntype[len("tracker_"):]
+                import src.tracking.trackers  # noqa: F401
+                from src.tracking.registry import TrackerRegistry
+                available = [b["name"] for b in TrackerRegistry.list_backends()]
+                if registry_name not in available:
+                    raise ValueError(
+                        f"Unknown tracker: {registry_name}. "
+                        f"Available: {available}"
+                    )
+                continue
+
             raise ValueError(
                 f"Unknown node type: {ntype}"
             )
@@ -296,6 +411,19 @@ class PipelineBuilder:
                 slam_node = node
             elif node["type"].startswith("merger_"):
                 merger_node = node
+
+        # Phase 7: find perception nodes (detector / 3D lifter / tracker).
+        detector_node = None
+        detection3d_node = None
+        tracker_node = None
+        for node in nodes:
+            ntype = node["type"]
+            if ntype.startswith("detector_"):
+                detector_node = node
+            elif ntype.startswith("detection3d_"):
+                detection3d_node = node
+            elif ntype.startswith("tracker_"):
+                tracker_node = node
 
         # 3. Validate required connections
         self._validate_required_connections(nodes, edges)
@@ -316,6 +444,25 @@ class PipelineBuilder:
             merger_name = merger_node["type"][len("merger_"):]
             merger_params = dict(merger_node.get("params", {}))
 
+        # Phase 7: extract perception config with registry defaults.
+        detector_name = "yolov11"
+        detector_params: dict[str, Any] = {}
+        if detector_node is not None:
+            detector_name = detector_node["type"][len("detector_"):]
+            detector_params = dict(detector_node.get("params", {}))
+
+        lifter_name = "point_cluster"
+        lifter_params: dict[str, Any] = {}
+        if detection3d_node is not None:
+            lifter_name = detection3d_node["type"][len("detection3d_"):]
+            lifter_params = dict(detection3d_node.get("params", {}))
+
+        tracker_name = "none"
+        tracker_params: dict[str, Any] = {}
+        if tracker_node is not None:
+            tracker_name = tracker_node["type"][len("tracker_"):]
+            tracker_params = dict(tracker_node.get("params", {}))
+
         # 6. Build filter chain in topological order
         filter_chain = []
         for node_id in topo_order:
@@ -332,6 +479,12 @@ class PipelineBuilder:
             merger_name=merger_name,
             merger_params=merger_params,
             filter_chain=filter_chain,
+            detector_name=detector_name,
+            detector_params=detector_params,
+            lifter_name=lifter_name,
+            lifter_params=lifter_params,
+            tracker_name=tracker_name,
+            tracker_params=tracker_params,
         )
 
     def _topological_sort(
