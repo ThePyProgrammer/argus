@@ -1089,22 +1089,22 @@ def swap_lifter(self, new_lifter_name: str, new_lifter_params: dict | None = Non
 
 **If this table grows during planning:** Each `[ASSUMED]` claim needs confirmation before the plan locks. Currently 6 low-risk assumptions, all verifiable via codebase inspection at plan-write time.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `detector_swap_complete` be a new WS type or reuse `detector_restart_complete`?**
-   - What we know: CONTEXT §Claude's Discretion item #6 leaves this open with slight preference for new type.
-   - What's unclear: Frontend consumers — `useWebSocket.ts:155` has a single `detector_restart_complete` branch. Adding a discriminator (`reason: "hot_swap"`) vs a new case is stylistic.
-   - Recommendation: New type `detector_swap_complete` — cleaner consumer logic, easier to add distinct UI affordance (success toast vs restart overlay). Cost is one extra case in the switch — negligible.
+   - RESOLVED: New type `detector_swap_complete`. Implemented in Plan 07-05 `DetectorWorkerPool.swap_backend` — emits `{"type": "detector_swap_complete", "payload": {"new_backend": ..., "reason": "hot_swap"}}` via `_streaming_viz._message_queue`. Consumer branch in the frontend store handles the new WS message. Rationale: cleaner consumer logic, distinct UI affordance (success toast vs restart overlay); negligible cost of one extra switch case.
+   - What we knew: CONTEXT §Claude's Discretion item #6 left this open with slight preference for new type.
+   - Evidence of resolution: Plan 07-05 action block explicitly specifies the new envelope shape.
 
 2. **Should `PipelineBuilder.build` treat "no detector node" as "use last applied" or "use default"?**
-   - What we know: Existing SLAM/merger logic at `pipeline_builder.py:307-311` treats missing nodes as "use default" (`"icp"` / `"icp_union"`).
-   - What's unclear: If the user presets a SLAM-only graph (no perception nodes), the diff will say "detector changed from current to yolov11 default" and attempt hot-swap.
-   - Recommendation: Match existing semantics (missing → default). Document in a test that "SLAM-only preset triggers diff to default detector_name". If UX is bad in practice, Phase 8 can revisit — not a regression, since Phase 6 and earlier never had pipeline-driven detector changes.
+   - RESOLVED: Use default (match existing SLAM/merger semantics). Implemented in Plan 07-04 `PipelineBuilder.build` perception extension — missing `detector_generic` node → `detector_name = DetectorRegistry.get_default()` (yolov11); missing `detection3d_generic` → `lifter_name = Detection3DRegistry.get_default()` (point_cluster); missing `tracker_generic` → `tracker_name = "none"`. Test `test_missing_perception_nodes_fall_back_to_defaults` in `tests/coordination/test_pipeline_builder_perception.py` locks the fallback behavior.
+   - What we knew: Existing SLAM/merger logic at `pipeline_builder.py:307-311` treats missing nodes as "use default".
+   - Evidence of resolution: Plan 07-04 acceptance criteria name the fallback test and require it to assert exact default names.
 
 3. **Does `NoneTracker` need to be idempotent across frames (same detection → same track_id)?**
-   - What we know: CONTEXT D-13 says session-lifetime monotonic counter; `produces_stable_ids: false`.
-   - What's unclear: If the same chair is detected across frames, does each detection get a new track_id? Yes, per the counter semantics. That's why `produces_stable_ids: false`.
-   - Recommendation: Document in NoneTracker docstring: "Each frame's detections receive fresh incrementing IDs; IDs are NOT stable across frames. For stable IDs, use `tracker_bytetrack` (Phase 8)."
+   - RESOLVED: No — fresh incrementing IDs per detection per frame; `produces_stable_ids: False` advertised in capabilities. Implemented in Plan 07-03 `src/tracking/trackers/none.py::NoneTracker` with session-lifetime monotonic counter. Docstring explicitly states: "Each frame's detections receive fresh incrementing IDs; IDs are NOT stable across frames. For stable IDs, use `tracker_bytetrack` (Phase 8)."
+   - What we knew: CONTEXT D-13 says session-lifetime monotonic counter; `produces_stable_ids: false`.
+   - Evidence of resolution: Plan 07-03 action block quotes the exact docstring text and capability dict.
 
 ## Validation Architecture
 
