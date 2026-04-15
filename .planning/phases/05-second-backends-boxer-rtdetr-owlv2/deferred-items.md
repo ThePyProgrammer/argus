@@ -141,3 +141,15 @@ uv run pytest tests/perception/test_boxer_backend.py tests/test_licenses_md.py t
 `uv sync --extra perception --extra web --extra dev` or reorganize the
 `perception` extras into auto-pulled dev deps.
 
+
+---
+
+## Plan 05-12: pre-existing failure in tests/integration/test_multi_mode.py
+
+**Discovered:** Plan 05-12 verification sweep of `uv run pytest tests/integration/ -x --timeout=120`.
+
+**Issue:** `tests/integration/test_multi_mode.py::test_viz_update_interval` fails with an `AttributeError` (see failure output).
+
+**Scope:** Pre-existing — last touch was commit `6882bbe feat(08-02): migrate coordinator, main.py, and tests to SLAMProtocol`. Unrelated to Plan 05-12's two new/activated tests (test_boxer_crash_fallback.py, test_offline_boot.py), which are the ONLY files this plan modifies.
+
+**Resolution path:** Not in Phase 5 scope. Belongs to whoever owns the Phase 8 SLAMProtocol migration. File a standalone ticket or sweep in the next Phase 8 polish plan.
