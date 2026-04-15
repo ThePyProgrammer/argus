@@ -135,7 +135,20 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The string `mAP` does not appear anywhere in the rendered UI; attempting to enable it requires a `--labeled-eval-set` flag pointing at a committed annotation file.
   4. `GET /api/detections/export` streams JSONL for the current session containing full OBB + class + confidence + capture_timestamp for every detection emitted, and the output parses losslessly round-trip through `OrientedBox3D.from_wire`.
   5. Running the memory smoke test against each backend (YOLOv11, RT-DETRv2, OWLv2, BoxeR) caps RSS growth at ≤200 MB over 100 inferences; regression causes CI failure.
-**Plans**: TBD
+**Plans**: 13 plans
+- [ ] 06-01-PLAN.md — pyproject.toml PyYAML declaration (Wave 0)
+- [ ] 06-02-PLAN.md — 9 pytest test-file skip-stubs + tests/contract/ package (Wave 0)
+- [ ] 06-03-PLAN.md — frontend metricsStore vitest detection-shape skip-stub (Wave 0)
+- [ ] 06-04-PLAN.md — DetectionMetricsTracker + 5 unit tests (Wave 1)
+- [ ] 06-05-PLAN.md — MuJoCoGTExtractor (data.geom_xpos per F1) + 5 unit tests + fixture mapping YAML (Wave 1)
+- [ ] 06-06-PLAN.md — DetectionExportWriter (tempfile + UUID4 + lock) + 6 unit tests (Wave 1)
+- [ ] 06-07-PLAN.md — data/scenes/scene_office1_gt.yaml committed mapping (Wave 1)
+- [ ] 06-08-PLAN.md — WebStreamingViz detection composition + mAP payload guard + runtime-guard tests (Wave 2)
+- [ ] 06-09-PLAN.md — GET /api/detections/export route + 3 integration tests (Wave 2)
+- [ ] 06-10-PLAN.md — Coordinator pump (F2 line 644) + DetectorWorker.detector property (F3) + --labeled-eval-set CLI (Wave 3)
+- [ ] 06-11-PLAN.md — Frontend DetectionMetrics types + store slices + MetricsPanel 7-row subsection + vitest shape (Wave 4)
+- [ ] 06-12-PLAN.md — tests/contract/test_no_map_in_ui.py grep invariant (Wave 5)
+- [ ] 06-13-PLAN.md — tests/integration/test_rss_smoke_backends.py parametrized over yolov11/rtdetrv2/boxer (Wave 5)
 **Research flag**: light (30-min MuJoCo scene XML class-labeled geom inventory at phase-planning time)
 
 ### Phase 7: pipeline-editor-perception-nodes
@@ -177,6 +190,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. frontend-picker-and-ui | 0/11 | Planning complete | - |
 | 4. real-3d-obb-pipeline | 0/7 | Planning complete | - |
 | 5. second-backends-boxer-rtdetr-owlv2 | 12/12 | Complete   | 2026-04-15 |
-| 6. detection-metrics-and-mujoco-gt | 0/TBD | Not started | - |
+| 6. detection-metrics-and-mujoco-gt | 0/13 | Planning complete | - |
 | 7. pipeline-editor-perception-nodes | 0/TBD | Not started | - |
 | 8. stretch-tracker-fusion-semantic-map | 0/TBD | Not started | - |
