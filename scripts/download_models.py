@@ -117,17 +117,44 @@ def download_rtdetrv2() -> None:
             local_dir_use_symlinks=False,
         )
 
-        # Step 4: optimum ONNX export (static input shape 320x320 per D-08).
-        from optimum.exporters.onnx import main_export  # noqa: PLC0415
-        print(f"[download_rtdetrv2] optimum main_export -> {onnx_path}")
-        main_export(
-            model_name_or_path=str(pt_dir),
-            output=target,
-            task="object-detection",
-            input_shapes={"pixel_values": [1, 3, 320, 320]},
-            monolith=True,
-            no_post_process=True,
-        )
+        # Step 4: ONNX export via torch.onnx.export (static 1x3x320x320 per D-08).
+        #
+        # Why not optimum: optimum 2.x split its exporters into the `optimum-onnx`
+        # package, which hard-pins `transformers<5` (incompatible with this
+        # project's `transformers>=5.3.0` requirement). Direct torch.onnx.export
+        # works with any transformers version and has no extra deps — the model
+        # is already a plain `torch.nn.Module` after `from_pretrained`.
+        import torch  # noqa: PLC0415
+        from transformers import AutoModelForObjectDetection  # noqa: PLC0415
+
+        print(f"[download_rtdetrv2] torch.onnx.export -> {onnx_path}")
+        model = AutoModelForObjectDetection.from_pretrained(str(pt_dir))
+        model.eval()
+
+        class _ExportWrapper(torch.nn.Module):
+            """Convert HF ModelOutput dict → tuple so ONNX emits named outputs."""
+            def __init__(self, m: torch.nn.Module) -> None:
+                super().__init__()
+                self.m = m
+
+            def forward(self, pixel_values: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+                out = self.m(pixel_values=pixel_values)
+                return out.logits, out.pred_boxes
+
+        wrapped = _ExportWrapper(model)
+        dummy = torch.zeros(1, 3, 320, 320, dtype=torch.float32)
+
+        with torch.inference_mode():
+            torch.onnx.export(
+                wrapped,
+                dummy,
+                str(onnx_path),
+                input_names=["pixel_values"],
+                output_names=["logits", "pred_boxes"],
+                opset_version=17,
+                do_constant_folding=True,
+                dynamo=False,  # legacy TorchScript path — avoids onnxscript dep
+            )
 
         # Step 5: sha256 verify (or record on first run).
         if not onnx_path.exists():
