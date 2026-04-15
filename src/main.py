@@ -34,7 +34,9 @@ from pathlib import Path
 
 import numpy as np
 import rerun as rr
-import uvicorn
+# Phase 6 DET-METRICS-03: uvicorn is imported lazily inside ``run_web_mode``
+# so ``src.main`` can be imported (and ``--labeled-eval-set`` can raise its
+# NotImplementedError) in environments that lack the web-server deps.
 
 from backend.web.server import create_app
 from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active_config
@@ -142,6 +144,15 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=8000,
         help="Web server port (default: 8000)",
+    )
+    parser.add_argument(
+        "--labeled-eval-set",
+        dest="labeled_eval_set",
+        default=None,
+        metavar="PATH",
+        help="(RESERVED -- future milestone) Path to a committed labeled "
+             "evaluation set. Passing this flag currently raises "
+             "NotImplementedError per DET-METRICS-03 / CONTEXT D-10.",
     )
     return parser.parse_args()
 
@@ -314,6 +325,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
     Starts the multi-robot simulation in a background thread and serves
     the React frontend via FastAPI.
     """
+    # Phase 6 DET-METRICS-03: lazy-imported so ``src.main`` stays importable
+    # (and ``--labeled-eval-set`` can raise its NotImplementedError) in
+    # environments that lack uvicorn.
+    import uvicorn
 
     scene = args.scene
     n_robots = args.num_robots
@@ -639,6 +654,14 @@ def run_web_mode(args: argparse.Namespace) -> None:
 def main() -> None:
     """Run the single-robot SLAM loop."""
     args = parse_args()
+
+    # DET-METRICS-03 / CONTEXT D-10: --labeled-eval-set is reserved for a
+    # future milestone. Raising BEFORE any heavy init (coordinator / bridge /
+    # scene loading) keeps the subprocess CLI test fast and deterministic.
+    if getattr(args, "labeled_eval_set", None) is not None:
+        raise NotImplementedError(
+            "Labeled eval set ingestion arrives in a future milestone"
+        )
 
     if args.control == "web":
         run_web_mode(args)

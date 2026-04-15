@@ -732,6 +732,57 @@ class Coordinator:
                     except Exception:
                         pass  # drift computation can fail with insufficient data
 
+        # ──────────────────────────────────────────────────────────────────
+        # Phase 6 (DET-METRICS-01 / DET-METRICS-02): detection-metrics pump.
+        # Runs once per robot per tick. Guarded by hasattr so pre-Phase-6 viz
+        # objects no-op silently. sim_now uses sim clock per Pitfall 4.
+        # ──────────────────────────────────────────────────────────────────
+        if hasattr(self._viz, "detection_metrics_tracker") and self._detector_pool is not None:
+            det_tracker = self._viz.detection_metrics_tracker
+            det_export = self._viz.detection_export
+            gt_extractor = self._viz.gt_extractor
+            sim_now = float(frames[robot_ids[0]].sim_time)
+
+            workers_map = self._detector_pool.workers_by_robot()
+            for rid in robot_ids:
+                worker = workers_map.get(rid)
+                if worker is None:
+                    continue
+                latest = worker.latest()
+                inspect = worker.inspect()
+                backend_metrics = worker.detector.get_metrics()
+
+                det_tracker.record_frame(
+                    robot_id=rid,
+                    sim_now=sim_now,
+                    latest=latest,
+                    inspect=inspect,
+                    backend_metrics=backend_metrics,
+                )
+
+                if latest is not None:
+                    items = getattr(latest, "items", None) or getattr(latest, "boxes", [])
+                    for obb in items:
+                        det_export.append(
+                            obb,
+                            robot_id=rid,
+                            backend_id=backend_metrics.get("backend_id", "unknown"),
+                            capture_timestamp=float(latest.capture_timestamp),
+                        )
+                        if gt_extractor is not None:
+                            cls = getattr(obb, "class_name", "")
+                            center = np.asarray(obb.center, dtype=np.float64).reshape(3)
+                            # Consume match result via tracker.record_gt_match (Plan 04
+                            # surface; SC#2 end-to-end delivery). match_detection returns
+                            # (gid, err) where err is None if no match within gate_m.
+                            _gid, err = gt_extractor.match_detection(cls, center, gate_m=1.0)
+                            det_tracker.record_gt_match(
+                                robot_id=rid,
+                                class_name=cls,
+                                center_err_m=err,
+                                matched=(err is not None),
+                            )
+
         voronoi_mid, voronoi_dir = self._get_voronoi_geometry()
         frontier_cells = self._gather_frontier_cells(robot_ids)
         total_cov = sum(d.coverage_pct for d in robot_data.values()) / len(robot_data)
