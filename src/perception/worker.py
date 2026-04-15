@@ -35,10 +35,11 @@ import logging
 import threading
 import time
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from src.perception.subprocess_bridge import BridgeHangError, SubprocessDiedError
 from src.perception.types import Detections3D
 
 if TYPE_CHECKING:  # pragma: no cover -- P9: TYPE_CHECKING only, no runtime import
@@ -109,11 +110,18 @@ class DetectorWorker:
         detector: "DetectorProtocol",
         lifter: "Detection3DProtocol",
         intrinsics: "CameraIntrinsics",
+        pool_ref: Any = None,
     ) -> None:
         self._rid = robot_id
         self._detector = detector
         self._lifter = lifter
         self._intrinsics = intrinsics
+        # Plan 05-09 (D-03): reverse ref used by ``_loop`` to call
+        # ``pool.on_backend_crash`` when the bridge raises a typed crash
+        # exception. ``None`` (the default) makes unit-test construction of
+        # a bare worker trivial — in that mode a bridge crash just logs and
+        # continues.
+        self._pool_ref: Any = pool_ref
         self._pending: tuple | None = None
         self._latest: Detections3D | None = None
         self._drops: int = 0
@@ -256,6 +264,41 @@ class DetectorWorker:
             frame, pose, slam_cloud, sim_time = job
             try:
                 dets_2d = self._detector.process_frame(frame)
+            except (BridgeHangError, SubprocessDiedError) as exc:
+                # Plan 05-09 / D-03: subprocess-backend crash is a distinct,
+                # recoverable failure mode. Escalate to the pool so it can
+                # emit the crash_fallback WS envelope and atomically swap to
+                # the YOLOv11 fallback across every worker. Skip this frame;
+                # the next submit() picks up the (now-swapped) detector.
+                backend_name = type(self._detector).__name__
+                _LOGGER.error(
+                    "DetectorWorker %s: detector %s raised %s: %s",
+                    self._rid,
+                    backend_name,
+                    type(exc).__name__,
+                    exc,
+                )
+                if self._pool_ref is not None:
+                    try:
+                        self._pool_ref.on_backend_crash(
+                            crashed_backend=self._backend_registry_name(),
+                            reason=f"{type(exc).__name__}: {exc}",
+                        )
+                    except Exception:  # noqa: BLE001 — must not kill the worker thread
+                        _LOGGER.exception(
+                            "DetectorWorker %s: pool.on_backend_crash propagation failed",
+                            self._rid,
+                        )
+                continue
+            except Exception as exc:
+                # Defensive: the worker thread must never silently die. Log the
+                # exception (including traceback via logger.exception) and loop
+                # back -- the next submit() will enqueue a fresh frame.
+                _LOGGER.exception(
+                    "DetectorWorker %s: inference failed: %s", self._rid, exc
+                )
+                continue
+            try:
                 dets_3d = self._lifter.lift(
                     dets_2d,
                     frame,
@@ -269,12 +312,38 @@ class DetectorWorker:
                 # backends that happen to populate their own values.
                 dets_3d = _attach_capture(dets_3d, pose, sim_time)
             except Exception as exc:
-                # Defensive: the worker thread must never silently die. Log the
-                # exception (including traceback via logger.exception) and loop
-                # back -- the next submit() will enqueue a fresh frame.
                 _LOGGER.exception(
-                    "DetectorWorker %s: inference failed: %s", self._rid, exc
+                    "DetectorWorker %s: lift failed: %s", self._rid, exc
                 )
                 continue
             with self._lock:
                 self._latest = dets_3d
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _backend_registry_name(self) -> str:
+        """Reverse-lookup the registry name (e.g., ``'boxer'``) of the active detector.
+
+        :class:`DetectorRegistry` stores each backend's dotted ``class_path``;
+        this helper matches the live detector's class_path against that map
+        so :meth:`on_backend_crash` can call
+        ``DetectorRegistry.set_available(name, False, reason)`` with the right
+        registered name. Falls back to a best-effort lowercased class name
+        (stripped of ``"Backend"`` suffix) if no match is found — a best-effort
+        diagnostic label suffices because the registry-level lockout is
+        already logged in the caller.
+        """
+        from src.perception.registry import DetectorRegistry
+
+        target_path = (
+            f"{type(self._detector).__module__}."
+            f"{type(self._detector).__qualname__}"
+        )
+        for name, info in DetectorRegistry._backends.items():  # noqa: SLF001
+            if info.get("class_path") == target_path:
+                return name
+        return (
+            type(self._detector).__name__.lower().replace("backend", "")
+        )

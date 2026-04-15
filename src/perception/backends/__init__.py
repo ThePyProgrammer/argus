@@ -13,6 +13,8 @@ main.py imports this module via:
 """
 
 from src.perception.backends import yolov11_backend  # noqa: F401 -- registers 'yolov11'
+from . import rtdetrv2_backend  # noqa: F401 -- Phase 5 DET-MODELS-02 registration
+from . import boxer_backend  # noqa: F401 -- Phase 5 DET-MODELS-03 registration
 
 # Phase 5 additions land here as try/except-guarded imports, mirroring
 # src.slam.backends' orbslam3 / openvins / svopro pattern. Not yet shipped.

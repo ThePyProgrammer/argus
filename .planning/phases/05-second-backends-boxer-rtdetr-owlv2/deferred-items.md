@@ -74,3 +74,70 @@ extras is a Phase 6+ concern.
 2. Consider splitting the top-level `tests/` into extra-gated subpackages with
    `pytest_plugins`-based skips when the extra is absent.
 
+---
+
+## Plan 05-07: `tests/perception/test_point_cluster_lifter.py::test_point_cluster_lifter_registered` test-ordering flake
+
+**Discovered:** 2026-04-15 during 05-07 execution while running the plan's
+`<verification>` block `uv run pytest tests/ -x --timeout=120 -m "not slow_boxer and not network"`.
+
+**Issue:** `test_point_cluster_lifter_registered` fails when run in the full
+`tests/perception/` sweep but passes in isolation:
+
+```
+uv run pytest tests/perception/test_point_cluster_lifter.py::test_point_cluster_lifter_registered  # PASSES
+uv run pytest tests/perception/ -x                                                                   # FAILS this test
+```
+
+**Scope decision:** Not auto-fixed per the executor's SCOPE BOUNDARY rule —
+verified present on the pre-05-07 base (`2854c68`) using
+`git checkout 2854c68 -- . && uv run pytest tests/perception/`. The failure
+predates RT-DETRv2 backend work and is unrelated to the 05-07 artifacts
+(rtdetrv2_backend.py, test_rtdetrv2_backend.py, fixtures/*.npz). Root cause
+appears to be a test-ordering side effect where another test module leaves
+`Detection3DRegistry` in a state that fails the `point_cluster_lifter`
+registration assertion — likely `registry._clear()` called by a fixture that
+doesn't re-register lifters. Fix belongs in a test-infra cleanup plan
+(conftest autouse registry-restore fixture), not in a backend-landing plan.
+
+**Required action (future):**
+1. Add an autouse fixture in `tests/perception/conftest.py` that snapshots
+   `DetectorRegistry._backends` + `Detection3DRegistry._backends` dicts before
+   each test and restores them after, OR re-runs the side-effect-import at
+   session start.
+2. Consider making registry `_clear()` reset to a baseline snapshot instead of
+   empty dict.
+
+---
+
+## Plan 05-08: `onnxruntime` missing in default dev env blocks most rtdetrv2 tests
+
+**Discovered:** 2026-04-15 during 05-08 execution while running the phase-wide
+`uv run pytest tests/ -m "not slow_boxer and not network"` regression command.
+
+**Issue:** On a default `uv sync` install, `onnxruntime` is not present
+(it lives in the `perception` extra). Running
+`uv run pytest tests/perception/test_rtdetrv2_backend.py` fails 4 tests at the
+`_install_fake_session` helper that tries `import onnxruntime as ort`. Affected
+tests (not caused by Plan 05-08):
+
+- `test_construct_no_onnx_file_raises`
+- `test_construct_with_onnx_file_succeeds`
+- `test_warmup_runs_one_inference`
+- `test_thread_budget_inherits_from_thread_config`
+
+**Scope decision:** Not auto-fixed per executor's SCOPE BOUNDARY rule. The
+failures are pre-existing (pre-05-08 base commit `19b1c2c`) and caused by the
+default-install profile not pulling the `perception` extra — same root cause as
+the `fastapi`/`torch` items above. Plan 05-08 adds zero new lines to
+`test_rtdetrv2_backend.py`. In-scope tests pass cleanly:
+
+```
+uv run pytest tests/perception/test_boxer_backend.py tests/test_licenses_md.py tests/perception/test_registry.py -x --timeout=60
+# 31 passed, 1 skipped
+```
+
+**Required action (future):** Same as Plan 05-05 item — document
+`uv sync --extra perception --extra web --extra dev` or reorganize the
+`perception` extras into auto-pulled dev deps.
+
