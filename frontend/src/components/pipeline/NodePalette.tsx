@@ -1,14 +1,6 @@
 import { useState } from 'react';
-import type { NodeCategory } from '../../utils/pipelineTypes';
+import type { NodeCategory, RegistryNode } from '../../utils/pipelineTypes';
 import { NODE_DEFINITIONS, CATEGORY_COLORS } from '../../utils/nodeDefinitions';
-
-interface RegistryNode {
-  type: string;
-  label: string;
-  category: NodeCategory;
-  parameterSchema: Record<string, unknown> | null;
-  registryName: string;
-}
 
 interface NodePaletteProps {
   collapsed: boolean;

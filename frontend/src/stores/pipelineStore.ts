@@ -9,6 +9,7 @@ import type {
   ValidationError,
   PipelineConfig,
   PortDataType,
+  RegistryNode,
 } from '../utils/pipelineTypes';
 import { buildNodeData, NODE_DEFINITIONS } from '../utils/nodeDefinitions';
 import { validateGraph } from '../utils/pipelineValidation';
@@ -37,6 +38,9 @@ interface PipelineStoreState {
   // Last applied config for reset
   lastAppliedConfig: PipelineConfig | null;
 
+  // Phase 7 D-02 — registry catalog entries (lifted from App.tsx local state)
+  availableRegistryNodes: RegistryNode[];
+
   // React Flow callbacks
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
@@ -59,6 +63,7 @@ interface PipelineStoreState {
   setEdgeThroughput: (edgeId: string, fps: number) => void;
   setIsApplying: (applying: boolean) => void;
   setAvailablePresets: (presets: PresetInfo[]) => void;
+  setAvailableRegistryNodes: (nodes: RegistryNode[]) => void;
   loadPresetGraph: (nodes: PipelineNode[], edges: PipelineEdge[], presetName: string) => void;
   resetToLastApplied: () => void;
 }
@@ -77,6 +82,7 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
   nodeStatuses: {},
   edgeThroughputs: {},
   lastAppliedConfig: null,
+  availableRegistryNodes: [],
 
   // React Flow callbacks
   onNodesChange: (changes) => {
@@ -142,20 +148,73 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
   },
 
   updateNodeParam: (nodeId, key, value) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === nodeId
-          ? {
+    set((state) => {
+      // Phase 7 D-02 hot-swap: changing 'backend' on a perception node mutates
+      // registryName + replaces parameterSchema + resets paramValues to the new
+      // schema's defaults. For all other keys, fall through to the legacy
+      // paramValues[key] = value path.
+      if (key === 'backend') {
+        const newRegistryName = String(value);
+        return {
+          nodes: state.nodes.map((node) => {
+            if (node.id !== nodeId) return node;
+            // Resolve base node-kind: 'detector_generic' -> 'detector', etc.
+            const nodeType = node.data.nodeType ?? '';
+            const baseKind = nodeType.replace(/_generic$/, '');
+            const expectedRegistryType = `${baseKind}_${newRegistryName}`;
+            const match = state.availableRegistryNodes.find(
+              (rn) => rn.type === expectedRegistryType,
+            );
+            if (!match) {
+              // Defensive fallback: catalog not populated; legacy paramValues write.
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  paramValues: { ...node.data.paramValues, [key]: value },
+                },
+              };
+            }
+            // Reset paramValues to the new schema's defaults.
+            const newDefaults: Record<string, unknown> = {};
+            const props = (match.parameterSchema?.properties ?? {}) as Record<
+              string,
+              Record<string, unknown>
+            >;
+            for (const [pkey, prop] of Object.entries(props)) {
+              if ('default' in prop) newDefaults[pkey] = prop.default;
+            }
+            return {
               ...node,
               data: {
                 ...node.data,
-                paramValues: { ...node.data.paramValues, [key]: value },
+                registryName: newRegistryName,
+                parameterSchema: match.parameterSchema
+                  ? { ...match.parameterSchema }
+                  : null,
+                paramValues: newDefaults,
               },
-            }
-          : node,
-      ),
-      isDirty: true,
-    }));
+            };
+          }),
+          isDirty: true,
+        };
+      }
+      // Default path (unchanged from pre-revision).
+      return {
+        nodes: state.nodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  paramValues: { ...node.data.paramValues, [key]: value },
+                },
+              }
+            : node,
+        ),
+        isDirty: true,
+      };
+    });
   },
 
   validate: () => {
@@ -202,6 +261,8 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
   setIsApplying: (applying) => set({ isApplying: applying }),
 
   setAvailablePresets: (presets) => set({ availablePresets: presets }),
+
+  setAvailableRegistryNodes: (nodes) => set({ availableRegistryNodes: nodes }),
 
   loadPresetGraph: (nodes, edges, presetName) => {
     set({

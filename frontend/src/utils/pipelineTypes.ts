@@ -90,3 +90,13 @@ export interface NodeDefinition {
   defaultParams: Record<string, unknown>;
   parameterSchema: Record<string, unknown> | null;
 }
+
+// Phase 7 revision iter 1 — lifted from App.tsx local interface so
+// pipelineStore + NodeInspector + NodePalette can all share the type.
+export interface RegistryNode {
+  type: string;            // catalog entry key, e.g. 'detector_yolov11'
+  label: string;           // display name from NodeCatalog.get_catalog()
+  category: NodeCategory;
+  parameterSchema: Record<string, unknown> | null;
+  registryName: string;    // backend registry key, e.g. 'yolov11'
+}

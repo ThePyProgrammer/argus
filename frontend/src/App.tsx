@@ -14,15 +14,7 @@ import { Minimap2D } from './components/Minimap2D';
 import { usePipelineStore } from './stores/pipelineStore';
 import { deserializeGraph } from './utils/pipelineSerializer';
 import { NODE_DEFINITIONS } from './utils/nodeDefinitions';
-import type { PipelineNode, PipelineEdge } from './utils/pipelineTypes';
-
-interface RegistryNode {
-  type: string;
-  label: string;
-  category: 'sensor' | 'slam' | 'merger' | 'filter' | 'splitter' | 'parameter' | 'output';
-  parameterSchema: Record<string, unknown> | null;
-  registryName: string;
-}
+import type { PipelineNode, PipelineEdge, RegistryNode } from './utils/pipelineTypes';
 
 function InspectorWrapper() {
   const selectedNodeId = usePipelineStore((s) => s.selectedNodeId);
@@ -59,6 +51,8 @@ export default function App() {
               registryName: n.registryName as string,
             }));
           setRegistryNodes(regNodes);
+          // Phase 7 D-02: also populate pipelineStore for NodeInspector backend dropdown.
+          usePipelineStore.getState().setAvailableRegistryNodes(regNodes);
         })
         .catch(() => {});
 
