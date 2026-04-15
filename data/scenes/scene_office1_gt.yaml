@@ -1,0 +1,24 @@
+# COCO class name -> list of MuJoCo body names representing instances of that class.
+# Body names verified live via mj_name2id against scene_office1.xml.
+# Coordinates below are FYI (data.geom_xpos values from mj_forward(model, data)
+# at construction; updated per-step by MuJoCo).
+#
+# CRITICAL: extractor reads data.geom_xpos[first_geom_of_body], NOT data.xpos
+# (RESEARCH F1) — all bodies in this scene have body-origin at world (0,0,0).
+
+chair:
+  - body_BezierCurve_009_SwivlChair                         # geom_xpos ~ (0.68, -2.44, 0.51)
+  - body_BezierCurve_009_SwivlChair_BLACK                   # geom_xpos ~ (0.71, 0.07, 0.72)
+  - body_Chocofur_free_12_plastic_cycles_013_BrownChair     # geom_xpos ~ (-0.36, 7.99, 0.47)
+
+dining_table:
+  - body_Plane_029_meetingTable                             # geom_xpos ~ (-0.35, 7.99, 0.55)
+  - body_Cube_013_BigWhiteTable                             # geom_xpos ~ (1.30, 0.89, 0.59)
+  - body_Cube_007_woodenDesk                                # geom_xpos ~ (-0.06, -6.13, 0.45)
+  - body_Cube_017_SmallWhiteTable_low_001                   # geom_xpos ~ (1.87, -1.51, 0.50)
+
+# Optional / lower-confidence COCO mappings (deferred until SC#2 green for chair):
+# - "tv" maps to body_Plane_037_Desktop (geom_xpos ~ (0.59, -1.91, 0.94)) only if
+#   COCO class id 62 ("tv") is desired; YOLOv11 may also fire class 63 ("laptop").
+# - "couch", "potted plant", "book", "vase", "cup", "bottle" — none present in
+#   this scene (verified by full geom inventory).
