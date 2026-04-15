@@ -8,14 +8,18 @@ pose, trajectory, camera frames, and stats.
 
 import logging
 import time
-from typing import TYPE_CHECKING
+import uuid
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 from backend.web.connection_manager import ConnectionManager
+from src.metrics.detection_export import DetectionExportWriter
+from src.metrics.detection_metrics_tracker import DetectionMetricsTracker
 from src.metrics.metrics_tracker import MetricsTracker
+from src.metrics.mujoco_gt import MuJoCoGTExtractor
 from backend.web.message_types import (
     CLOUD_DELTA,
     CLOUD_FULL,
@@ -32,6 +36,39 @@ from src.perception.types import Detections3D  # noqa: F401  (type context for e
 
 if TYPE_CHECKING:
     pass
+
+
+# Phase 6 DET-METRICS-03 runtime guard (CONTEXT D-10 belt-and-suspenders).
+# Forbidden mAP-family keys — MUST NOT appear in any stats payload emitted
+# to the UI. Grep test (Plan 12) covers source; this guard covers runtime
+# payload serialization.
+_FORBIDDEN_METRIC_KEYS = frozenset({
+    "mAP",
+    "map_50",
+    "map_75",
+    "mean_average_precision",
+})
+
+
+def _assert_no_map_keys(obj: Any, path: str = "$") -> None:
+    """Recursively verify no forbidden mAP-family keys anywhere in a payload.
+
+    DET-METRICS-03 runtime guard (CONTEXT D-10 belt-and-suspenders). Walks
+    nested dicts and lists so any forbidden key at any depth — including
+    inside ``detection_gt_metrics[rid][class_name]`` — triggers the
+    AssertionError before the payload is enqueued for WebSocket broadcast.
+    """
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in _FORBIDDEN_METRIC_KEYS:
+                raise AssertionError(
+                    f"Forbidden mAP-family key '{k}' in stats payload at "
+                    f"{path}.{k} (DET-METRICS-03 runtime guard)"
+                )
+            _assert_no_map_keys(v, f"{path}.{k}")
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj):
+            _assert_no_map_keys(item, f"{path}[{i}]")
 
 
 class WebStreamingViz:
@@ -60,14 +97,79 @@ class WebStreamingViz:
         self._message_queue: list[dict | bytes] = []
         self._metrics_tracker = MetricsTracker(history_size=60)
 
+        # Phase 6 (DET-METRICS-01/03/04): detection-metrics composition.
+        # Parallel to `_metrics_tracker` (CONTEXT D-01 — zero shared fields).
+        self._detection_metrics_tracker = DetectionMetricsTracker(history_size=60)
+        self._session_id: str = uuid.uuid4().hex
+        self._detection_export = DetectionExportWriter(self._session_id)
+        # GT extractor is optional (attached post-construction by the
+        # coordinator boot once mj_model + mj_data exist; graceful None
+        # if the YAML is missing or bodies don't resolve — RESEARCH F7).
+        self._gt_extractor: MuJoCoGTExtractor | None = None
+
     def reset_cloud_tracking(self) -> None:
-        """Clear cached voxel state to force a full cloud resend."""
+        """Clear cached voxel state to force a full cloud resend.
+
+        Phase 6 D-12: also rotates the detection-export writer to a fresh
+        session id. Detection-tracker history is NOT cleared (matches the
+        SLAM tracker baseline-preservation pattern — see CONTEXT D-12 and
+        RESEARCH Anti-Patterns).
+        """
         self._last_voxel_set = set()
+
+        # Phase 6 D-12: rotate export writer session; preserve tracker history.
+        new_session_id = uuid.uuid4().hex
+        self._detection_export.rotate(new_session_id)
+        self._session_id = new_session_id
 
     @property
     def metrics_tracker(self) -> MetricsTracker:
         """Public access to the metrics tracker for coordinator wiring."""
         return self._metrics_tracker
+
+    @property
+    def detection_metrics_tracker(self) -> DetectionMetricsTracker:
+        """Public access to the detection-metrics tracker (Plan 10 coordinator)."""
+        return self._detection_metrics_tracker
+
+    @property
+    def detection_export(self) -> DetectionExportWriter:
+        """Public access to the JSONL export writer (Plan 09 REST handler)."""
+        return self._detection_export
+
+    @property
+    def gt_extractor(self) -> MuJoCoGTExtractor | None:
+        """Public access to the optional MuJoCo GT extractor (Plan 10)."""
+        return self._gt_extractor
+
+    def current_session_id(self) -> str:
+        """Current export-session UUID4 hex (Plan 09 REST handler uses this)."""
+        return self._session_id
+
+    def attach_gt_extractor(
+        self,
+        mapping_yaml_path,
+        mj_model,
+        mj_data,
+    ) -> None:
+        """Try to construct MuJoCoGTExtractor; on failure log + set None.
+
+        Graceful degradation per RESEARCH F7 / T-6-08: a bad mapping YAML
+        or missing body MUST NOT crash coordinator boot. On failure the
+        UI's GT panel renders N/A while live detection metrics continue
+        to flow (SC#2 still partially satisfied).
+        """
+        try:
+            self._gt_extractor = MuJoCoGTExtractor(
+                mapping_yaml_path, mj_model, mj_data,
+            )
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            self._gt_extractor = None
+            logging.getLogger(__name__).warning(
+                "MuJoCoGTExtractor construction failed (%s); "
+                "GT metrics will show N/A",
+                exc,
+            )
 
     def reset_metrics(self) -> None:
         """Reset per-robot metrics (preserves baseline for comparison)."""
@@ -381,16 +483,31 @@ class WebStreamingViz:
             }
         # Build SLAM metrics from tracker
         metrics_payload = self._metrics_tracker.get_stats_payload()
+        # Phase 6 SC#2 (revision 2026-04-15): additive detection payload.
+        # Forwards ALL THREE tracker keys (detection_metrics +
+        # detection_history + detection_gt_metrics) into the WS payload
+        # alongside the existing SLAM keys. Do not drop any key here;
+        # frontend (Plan 11) expects the full set.
+        detection_payload = self._detection_metrics_tracker.get_stats_payload()
+
+        payload = {
+            "total_coverage": total_coverage,
+            "merge_count": merge_count,
+            "elapsed": elapsed,
+            "robots": robots,
+            "slam_metrics": metrics_payload["slam_metrics"],
+            "baseline": metrics_payload["baseline"],
+            "metric_history": metrics_payload["metric_history"],
+            "detection_metrics": detection_payload["detection_metrics"],
+            "detection_history": detection_payload["detection_history"],
+            "detection_gt_metrics": detection_payload["detection_gt_metrics"],
+        }
+        # DET-METRICS-03 / T-6-01 runtime guard — recursive walk rejects
+        # mAP-family keys at any nesting depth including inside the new
+        # detection_gt_metrics[rid][class_name] dicts.
+        _assert_no_map_keys(payload)
 
         self._message_queue.append({
             "type": STATS,
-            "payload": {
-                "total_coverage": total_coverage,
-                "merge_count": merge_count,
-                "elapsed": elapsed,
-                "robots": robots,
-                "slam_metrics": metrics_payload["slam_metrics"],
-                "baseline": metrics_payload["baseline"],
-                "metric_history": metrics_payload["metric_history"],
-            },
+            "payload": payload,
         })
