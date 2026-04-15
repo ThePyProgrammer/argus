@@ -53,13 +53,29 @@ echo "[setup_boxer] Cloning $BOXER_REPO_URL into $BOXER_REPO_DIR"
 git clone "$BOXER_REPO_URL" "$BOXER_REPO_DIR"
 git -C "$BOXER_REPO_DIR" checkout "$BOXER_SHA"
 
-# ---- Step 3: Install BoxeR + its deps via uv ----
-# BoxeR ships a pyproject.toml (verified) so editable install suffices.
+# ---- Step 3: Install BoxeR's runtime deps via uv ----
+# Upstream BoxeR is a research repo — its pyproject.toml only carries ruff
+# config, there's no [build-system] / [project] / setup.py. Pip-installing
+# the repo fails (setuptools auto-discovery confused by flat-layout top-level
+# packages: boxernet/owl/loaders). Per upstream README, the "run Boxer"
+# install recipe is an explicit pip-install of the 5 core deps; the repo is
+# then on PYTHONPATH (done at worker-launch time, not here).
+#
 # EGL_PLATFORM=surfaceless mitigates BoxeR's moderngl headless import path
-# (Open Risk #2 per 05-RESEARCH.md).
-echo "[setup_boxer] Installing BoxeR (editable) via uv pip"
+# (Open Risk #2 per 05-RESEARCH.md). moderngl is NOT in the core deps —
+# only needed for the interactive view_*.py scripts, which our worker
+# doesn't use. Skipped here.
+echo "[setup_boxer] Installing BoxeR runtime deps via uv pip (per upstream README)"
 export EGL_PLATFORM="surfaceless"
-uv pip install -e "$BOXER_REPO_DIR"
+uv pip install 'torch>=2.0' numpy opencv-python tqdm dill
+
+# ---- Step 3b: Drop a .pth file so the venv's Python picks up BoxeR's repo ----
+# Without this, `import boxernet`, `import owl`, `import loaders` fail from the
+# worker script. The venv's site-packages dir path is portable across CPython
+# minor versions (we pin 3.12 above).
+SITE_PACKAGES="$VENV_DIR/lib/python3.12/site-packages"
+echo "$BOXER_REPO_DIR" > "$SITE_PACKAGES/boxer_repo.pth"
+echo "[setup_boxer] Dropped .pth file: $SITE_PACKAGES/boxer_repo.pth -> $BOXER_REPO_DIR"
 
 # ---- Step 4: Fetch checkpoints into models/boxer/<SHA>/ (D-11 layout) ----
 echo "[setup_boxer] Fetching checkpoints into $MODELS_DIR"

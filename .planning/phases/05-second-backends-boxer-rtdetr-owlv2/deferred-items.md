@@ -153,3 +153,24 @@ uv run pytest tests/perception/test_boxer_backend.py tests/test_licenses_md.py t
 **Scope:** Pre-existing — last touch was commit `6882bbe feat(08-02): migrate coordinator, main.py, and tests to SLAMProtocol`. Unrelated to Plan 05-12's two new/activated tests (test_boxer_crash_fallback.py, test_offline_boot.py), which are the ONLY files this plan modifies.
 
 **Resolution path:** Not in Phase 5 scope. Belongs to whoever owns the Phase 8 SLAMProtocol migration. File a standalone ticket or sweep in the next Phase 8 polish plan.
+
+## BoxeR worker API mismatch (follow-up, non-blocking)
+
+**Flagged:** 2026-04-15 during runtime QA (`make download-models`)
+**Origin:** Plan 05-06 (scripts/boxer_worker.py)
+
+RESEARCH.md assumed BoxeR exposes `from boxer.model import load_boxer_pipeline`. Actual upstream API at pinned SHA `df474128…`:
+- No `boxer` top-level module — actual modules are `boxernet`, `owl`, `loaders`, `utils`
+- No `load_boxer_pipeline` factory — entry points are CLI scripts (`run_boxer.py`, `view_*.py`)
+- BoxeR is not a pip-installable package (flat-layout, no build-system in pyproject.toml)
+
+**Current state:** `scripts/setup_boxer_subprocess.sh` installs the 5 core runtime deps per upstream README and drops a `.pth` file so `import boxernet/owl/loaders/utils` works. Checkpoints land in `models/boxer/<SHA>/`. `.ready` marker touched on success. BoxeR imports verified.
+
+**Worker behavior on select:** `scripts/boxer_worker.py::_load_pipeline` will try `import boxer` (fails — wrong module name) and returns None. Worker emits a diagnostic reply with `n_det=0` and exits with code 2. Bridge reports `SubprocessDiedError` → pool's `on_backend_crash` fires → `crash_fallback` WS → UI auto-switches to YOLOv11. **This actually exercises SC#3 (crash fallback within 5 s) end-to-end** — just not with a real BoxeR inference.
+
+**Real integration (deferred follow-up phase):**
+- Build the `boxer_worker.py` inference path from `boxernet`/`owl`/`loaders` imports directly (no `boxer.model` — instead instantiate `BoxerNet` + `OWLv2` + the loader pipeline manually per `run_boxer.py`'s structure)
+- Map BoxerNet's 3D OBB output (`boxer_3dbbs.csv` schema per RESEARCH) to the D-02 msgpack `boxes_3d` field
+- This is research-code wrangling, not GSD-planner scope — belongs in a standalone phase or backlog item
+
+**Severity:** non-blocking. The BoxeR selection pathway degrades gracefully through the exact crash-fallback chain Phase 5 D-03 was designed to exercise.
