@@ -8,6 +8,7 @@ import type {
   PresetInfo,
   ValidationError,
   PipelineConfig,
+  PortDataType,
 } from '../utils/pipelineTypes';
 import { buildNodeData, NODE_DEFINITIONS } from '../utils/nodeDefinitions';
 import { validateGraph } from '../utils/pipelineValidation';
@@ -93,17 +94,26 @@ export const usePipelineStore = create<PipelineStoreState>((set, get) => ({
   },
 
   onConnect: (connection) => {
-    set((state) => ({
-      edges: addEdge(
-        {
-          ...connection,
-          type: 'animated',
-          data: { fps: 0, dataType: 'PointCloud' as const },
-        },
-        state.edges,
-      ) as PipelineEdge[],
-      isDirty: true,
-    }));
+    set((state) => {
+      // Phase 7 DET-PIPELINE-03 D-08 — resolve edge dataType from source output port
+      // (fixes former hardcoded 'PointCloud' bug).
+      const sourceNode = state.nodes.find((n) => n.id === connection.source);
+      const sourcePort = sourceNode?.data.outputs.find(
+        (p) => p.id === connection.sourceHandle,
+      );
+      const dataType: PortDataType = sourcePort?.dataType ?? 'PointCloud';
+      return {
+        edges: addEdge(
+          {
+            ...connection,
+            type: 'animated',
+            data: { fps: 0, dataType },
+          },
+          state.edges,
+        ) as PipelineEdge[],
+        isDirty: true,
+      };
+    });
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),

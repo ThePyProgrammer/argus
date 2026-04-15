@@ -1,4 +1,4 @@
-import type { PipelineNode, PipelineEdge, PipelineConfig, NodeDefinition } from './pipelineTypes';
+import type { PipelineNode, PipelineEdge, PipelineConfig, NodeDefinition, PortDataType } from './pipelineTypes';
 import { buildNodeData } from './nodeDefinitions';
 
 /**
@@ -102,15 +102,24 @@ export function deserializeGraph(
     };
   });
 
-  const edges: PipelineEdge[] = config.edges.map((configEdge, index) => ({
-    id: `e-${configEdge.source}-${configEdge.target}-${index}`,
-    source: configEdge.source,
-    sourceHandle: configEdge.sourceHandle,
-    target: configEdge.target,
-    targetHandle: configEdge.targetHandle,
-    type: 'animated',
-    data: { fps: 0, dataType: 'PointCloud' as const },
-  }));
+  const edges: PipelineEdge[] = config.edges.map((configEdge, index) => {
+    // Phase 7 DET-PIPELINE-03 D-08 — resolve edge dataType from source node's output port.
+    // Fixes former hardcoded `dataType: 'PointCloud'` at line 112.
+    const sourceNode = nodes.find((n) => n.id === configEdge.source);
+    const sourcePort = sourceNode?.data.outputs.find(
+      (p) => p.id === configEdge.sourceHandle,
+    );
+    const dataType: PortDataType = sourcePort?.dataType ?? 'PointCloud';
+    return {
+      id: `e-${configEdge.source}-${configEdge.target}-${index}`,
+      source: configEdge.source,
+      sourceHandle: configEdge.sourceHandle,
+      target: configEdge.target,
+      targetHandle: configEdge.targetHandle,
+      type: 'animated',
+      data: { fps: 0, dataType },
+    };
+  });
 
   return { nodes, edges };
 }
