@@ -78,7 +78,7 @@ User's global CLAUDE.md primarily references blueprint/turing tooling (ADRs + ML
 
 ---
 
-# Decision Implementation Notes
+## Decision Implementation Notes
 
 > One subsection per locked decision. **Decisions are locked — only HOW is in scope.**
 
@@ -491,7 +491,7 @@ EXPECTED_SHA256 = {
 
 ---
 
-# RT-DETRv2 Technical Reference
+## RT-DETRv2 Technical Reference
 
 | Property | Value | Source |
 |----------|-------|--------|
@@ -532,7 +532,7 @@ Training-data estimate: 70–120 ms/frame at 320×320 on a modern x86_64 (i7/i9 
 
 ---
 
-# BoxeR Subprocess Technical Reference
+## BoxeR Subprocess Technical Reference
 
 | Property | Value | Source |
 |----------|-------|--------|
@@ -634,7 +634,7 @@ if __name__ == "__main__":
 
 ---
 
-# Msgpack Schema Extension (D-02) Reference
+## Msgpack Schema Extension (D-02) Reference
 
 See **D-02 implementation notes** above for the full schema dump. Migration-safety summary:
 
@@ -649,7 +649,7 @@ See **D-02 implementation notes** above for the full schema dump. Migration-safe
 
 ---
 
-# Crash Fallback Pattern Mirror (D-03)
+## Crash Fallback Pattern Mirror (D-03)
 
 **Source pattern (verified in-tree):**
 File: `src/exploration/exploration_loop.py` lines 207–234.
@@ -736,7 +736,7 @@ except (BridgeHangError, SubprocessDiedError) as exc:
 
 ---
 
-# Models Directory + Pinning Layout (D-11, D-12)
+## Models Directory + Pinning Layout (D-11, D-12)
 
 See **D-11** and **D-12** sections above for full tree + constants.
 
@@ -757,7 +757,7 @@ BOXER_MODEL_DIR: Path = Path("models") / "boxer" / BOXER_SHA
 
 ---
 
-# Makefile + download_models.py Contract (D-13)
+## Makefile + download_models.py Contract (D-13)
 
 **Makefile (already shown in D-13 section above).** Three targets, `download-models` aggregates.
 
@@ -852,7 +852,7 @@ if __name__ == "__main__":
 
 ---
 
-# LICENSES.md Schema (D-14)
+## LICENSES.md Schema (D-14)
 
 **File:** `LICENSES.md` (new, repo root). Format: GitHub-flavored markdown table.
 
@@ -902,7 +902,7 @@ facebook/BoxeR is CC-BY-NC-4.0. argus surfaces this in the UI:
 
 ---
 
-# Validation Architecture
+## Validation Architecture
 
 > Required header per nyquist_validation flag (`workflow.nyquist_validation: true` in `.planning/config.json`).
 
@@ -958,7 +958,7 @@ facebook/BoxeR is CC-BY-NC-4.0. argus surfaces this in the UI:
 
 ---
 
-# Security Domain
+## Security Domain
 
 > Included per `security_enforcement` default (no explicit `false` in config).
 
@@ -992,7 +992,7 @@ facebook/BoxeR is CC-BY-NC-4.0. argus surfaces this in the UI:
 
 ---
 
-# Wave Structure Recommendation
+## Wave Structure Recommendation
 
 **Goal:** Maximum parallelism. Independent files in same wave; sequential waves where state/file depends.
 
@@ -1034,7 +1034,7 @@ Parallel:
 
 ---
 
-# Plan Count Estimate
+## Plan Count Estimate
 
 **~12 plans (Plans A–Q with some renumbering).** Concretely:
 - Wave 0: 6 plans (A–F)
@@ -1047,7 +1047,7 @@ Parallel:
 
 ---
 
-# Open Risks / Unknowns
+## Open Risks / Unknowns
 
 1. **BoxeR pipeline import path uncertainty.** The exact `from boxer.X import Y` line in `boxer_worker.py` cannot be determined without inspecting BoxeR's actual code at SHA `df474128...`. **Mitigation:** Wave 0 Plan F should INCLUDE a 30-min spike: `git clone --depth 1 https://github.com/facebookresearch/boxer && git checkout df474128 && python -c "import boxer; help(boxer)"` to find the public surface. If `load_boxer_pipeline` doesn't exist as imagined, fall back to invoking `run_boxer.py` as a CLI subprocess from inside the worker (slower per-frame because of CLI startup, but functionally equivalent — the bridge sees the same wire).
 
@@ -1069,7 +1069,7 @@ Parallel:
 
 ---
 
-# Assumptions Log
+## Assumptions Log
 
 > Claims tagged `[ASSUMED]` that need user/Wave 0 confirmation before becoming locked decisions.
 
@@ -1088,7 +1088,7 @@ Parallel:
 
 ---
 
-# Sources
+## Sources
 
 ### Primary (HIGH confidence)
 - `src/perception/protocol.py`, `src/perception/registry.py`, `src/perception/types.py`, `src/perception/subprocess_bridge.py`, `src/perception/worker_pool.py`, `src/perception/backends/yolov11_backend.py`, `src/_thread_config.py`, `scripts/echo_detector_worker.py`, `src/exploration/exploration_loop.py`, `frontend/src/hooks/useWebSocket.ts`, `pyproject.toml` — direct read 2026-04-15
@@ -1113,7 +1113,7 @@ Parallel:
 
 ---
 
-# Metadata
+## Metadata
 
 **Confidence breakdown:**
 - Locked decisions (D-01..D-14): HIGH — no re-derivation needed, only HOW
