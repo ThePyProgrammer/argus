@@ -25,7 +25,10 @@ def _repopulate_registry():
     import src.tracking.trackers.none as _none
     importlib.reload(_none)
     yield
-    TrackerRegistry._clear()
+    # Do NOT _clear on teardown — trailing tests (e.g. tests/coordination/
+    # test_pipeline_builder_perception.py) rely on the registry being populated,
+    # and Python's import cache prevents their `import src.tracking.trackers`
+    # from re-triggering the @tracker decorator after a clear.
 
 
 def _make_envelope(n_boxes: int = 3) -> Detections3D:
