@@ -9,6 +9,10 @@ export const PORT_COLORS: Record<PortDataType, string> = {
   Scalar: '#ef5350',
   Boolean: '#78909c',
   Config: '#ffee58',
+  // Phase 7 DET-PIPELINE-02 (CONTEXT D-07)
+  Detections2D: '#ff8a65',  // coral
+  Detections3D: '#ec407a',  // pink
+  Tracks: '#26a69a',        // teal
 };
 
 // Port socket shapes per data type (from UI-SPEC)
@@ -20,6 +24,10 @@ export const PORT_SHAPES: Record<PortDataType, string> = {
   Scalar: 'diamond',
   Boolean: 'diamond',
   Config: 'square',
+  // Phase 7 — streaming envelopes = circle (UI-SPEC Color rationale)
+  Detections2D: 'circle',
+  Detections3D: 'circle',
+  Tracks: 'circle',
 };
 
 // Node header colors per category (from UI-SPEC)
@@ -31,6 +39,8 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   splitter: '#00838f',
   parameter: '#6d4c41',
   output: '#c62828',
+  // Phase 7 DET-PIPELINE-01 (CONTEXT D-07)
+  perception: '#ad1457',  // magenta
 };
 
 // Static node type definitions
@@ -234,6 +244,53 @@ export const NODE_DEFINITIONS: Record<string, NodeDefinition> = {
     },
   },
 
+  // ---- Phase 7 DET-PIPELINE-01 perception nodes ----
+  detector_generic: {
+    type: 'detector_generic',
+    label: 'Detector',
+    category: 'perception',
+    inputs: [
+      { id: 'image_in', label: 'Image', dataType: 'Image', required: true },
+      { id: 'depth_in', label: 'Depth', dataType: 'Image', required: false },
+    ],
+    outputs: [
+      { id: 'detections_2d_out', label: 'Detections 2D', dataType: 'Detections2D', required: false },
+      { id: 'detections_3d_out', label: 'Detections 3D', dataType: 'Detections3D', required: false },
+    ],
+    defaultParams: {},
+    parameterSchema: null,
+  },
+
+  detection3d_generic: {
+    type: 'detection3d_generic',
+    label: '3D Lifter',
+    category: 'perception',
+    inputs: [
+      { id: 'detections_2d_in', label: 'Detections 2D', dataType: 'Detections2D', required: true },
+      { id: 'depth_in', label: 'Depth', dataType: 'Image', required: true },
+      { id: 'pose_in', label: 'Pose', dataType: 'Pose', required: false },
+    ],
+    outputs: [
+      { id: 'detections_3d_out', label: 'Detections 3D', dataType: 'Detections3D', required: false },
+    ],
+    defaultParams: {},
+    parameterSchema: null,
+  },
+
+  tracker_generic: {
+    type: 'tracker_generic',
+    label: 'Tracker',
+    category: 'perception',
+    inputs: [
+      { id: 'detections_3d_in', label: 'Detections 3D', dataType: 'Detections3D', required: true },
+    ],
+    outputs: [
+      { id: 'tracks_out', label: 'Tracks', dataType: 'Tracks', required: false },
+    ],
+    defaultParams: {},
+    parameterSchema: null,
+  },
+
   viz_output: {
     type: 'viz_output',
     label: 'Visualization Output',
@@ -241,6 +298,8 @@ export const NODE_DEFINITIONS: Record<string, NodeDefinition> = {
     inputs: [
       { id: 'cloud_in', label: 'PointCloud', dataType: 'PointCloud', required: true },
       { id: 'pose_in', label: 'Pose', dataType: 'Pose', required: false },
+      // Phase 7 DET-PIPELINE-01 D-06
+      { id: 'tracks_in', label: 'Tracks', dataType: 'Tracks', required: false },
     ],
     outputs: [],
     defaultParams: {},
