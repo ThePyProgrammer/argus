@@ -1,7 +1,18 @@
 import type { Node, Edge } from '@xyflow/react';
 
 // Port data types (per CONTEXT.md locked decision: typed ports with visual hints)
-export type PortDataType = 'Image' | 'PointCloud' | 'Pose' | 'IMU' | 'Scalar' | 'Boolean' | 'Config';
+// Port data types (CONTEXT.md Phase 7 D-07 adds Detections2D/Detections3D/Tracks)
+export type PortDataType =
+  | 'Image'
+  | 'PointCloud'
+  | 'Pose'
+  | 'IMU'
+  | 'Scalar'
+  | 'Boolean'
+  | 'Config'
+  | 'Detections2D'  // Phase 7 DET-PIPELINE-02 (coral #ff8a65)
+  | 'Detections3D'  // Phase 7 DET-PIPELINE-02 (pink #ec407a)
+  | 'Tracks';       // Phase 7 DET-PIPELINE-02 (teal #26a69a)
 
 // Port definition for node inputs/outputs
 export interface PortDef {
@@ -12,7 +23,16 @@ export interface PortDef {
 }
 
 // Node categories (per CONTEXT.md: 4 categories, expanded to 7 for granularity)
-export type NodeCategory = 'sensor' | 'slam' | 'merger' | 'filter' | 'splitter' | 'parameter' | 'output';
+// Node categories (CONTEXT.md Phase 7 D-07 adds perception)
+export type NodeCategory =
+  | 'sensor'
+  | 'slam'
+  | 'merger'
+  | 'filter'
+  | 'splitter'
+  | 'parameter'
+  | 'output'
+  | 'perception';  // Phase 7 DET-PIPELINE-01 (magenta #ad1457)
 
 // Custom node data shape
 // Uses type (not interface) so it satisfies Record<string, unknown> constraint for React Flow
