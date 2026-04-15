@@ -162,8 +162,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Changing the `backend` param on a `DetectorNode` from `yolov11` to `rtdetrv2` and applying the pipeline swaps the per-robot `DetectorWorker` backend without a full coordinator restart (verified by watching PID stability in logs).
   5. `pipeline_routes.py` maps `detector_generic` node definitions to `DetectorWorkerPool` entries so node params flow through to worker construction kwargs.
 **Plans**: 12 plans
-- [ ] 07-01-PLAN.md — Wave 0 Python pytest skip-stubs (7 test files)
-- [ ] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (6 test files; +NodeInspector.backendDropdown iter 1)
+- [x] 07-01-PLAN.md — Wave 0 Python pytest skip-stubs (7 test files)
+- [x] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (6 test files; +NodeInspector.backendDropdown iter 1)
 - [ ] 07-03-PLAN.md — src/tracking/ package: TrackerProtocol + TrackerRegistry + NoneTracker (D-13)
 - [ ] 07-04-PLAN.md — PipelineConfig + NodeCatalog + PipelineBuilder.build extension for perception
 - [ ] 07-05-PLAN.md — DetectorWorkerPool.swap_backend (D-11) + 5 atomicity tests
