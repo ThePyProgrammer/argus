@@ -1,0 +1,8 @@
+# COCO class name -> list of MuJoCo body names. Fixture for test_mujoco_gt.py.
+# Matches tests/perception/fixtures/scene_rotated_chair.xml (Phase 4 heritage).
+# Chair body in the fixture XML is named `chair` (verified via grep '<body.*name='
+# tests/perception/fixtures/scene_rotated_chair.xml) — NOT `chair_body` as some
+# Phase 4 prose suggests. Value is a list so the mapping format matches
+# CONTEXT D-08 (one COCO class -> N MuJoCo bodies).
+chair:
+  - chair
