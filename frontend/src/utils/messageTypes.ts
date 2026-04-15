@@ -124,3 +124,34 @@ export interface DetectorParamAckPayload {
   status: 'applied' | 'requires_restart' | 'unknown_parameter';
   value?: unknown;
 }
+
+/** Per-robot detection metrics from DetectionMetricsTracker.get_stats_payload.
+ *  Phase 6 DET-METRICS-01. Mirrors src/metrics/detection_metrics_tracker.py. */
+export interface DetectionMetrics {
+  inference_ms_p50: number;
+  inference_ms_p95: number;
+  detections_per_frame: number;
+  mean_confidence: number;
+  freshness_s: number;
+  queue_depth: number;
+  jitter_m: number;
+}
+
+/** Per-robot detection metric history arrays (ring-buffer snapshots). */
+export interface DetectionMetricHistory {
+  inference_ms: number[];
+  det_per_frame: number[];
+  confidence: number[];
+  freshness: number[];
+  jitter: number[];
+}
+
+/** SC#2 — per-class GT match aggregates. Mirrors backend `detection_gt_metrics[rid][class_name]`.
+ *  revision 2026-04-15. */
+export interface DetectionGtClass {
+  /** Mean center-error over last 60 matched frames (meters). `null` until first match. */
+  center_error_m: number | null;
+  /** matched_count / frames_observed in [0, 1]. */
+  per_class_recall: number;
+}
+export type DetectionGtMetrics = Record<string, DetectionGtClass>;
