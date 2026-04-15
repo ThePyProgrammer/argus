@@ -161,9 +161,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Loading the `perception_rgbd` built-in preset wires MuJoCoBridge → DetectorNode(YOLOv11) → Detection3DNode(PointCluster) → visualization and, on Apply, produces live OBBs in the 3D viewer end-to-end.
   4. Changing the `backend` param on a `DetectorNode` from `yolov11` to `rtdetrv2` and applying the pipeline swaps the per-robot `DetectorWorker` backend without a full coordinator restart (verified by watching PID stability in logs).
   5. `pipeline_routes.py` maps `detector_generic` node definitions to `DetectorWorkerPool` entries so node params flow through to worker construction kwargs.
-**Plans**: 11 plans
+**Plans**: 12 plans
 - [ ] 07-01-PLAN.md — Wave 0 Python pytest skip-stubs (7 test files)
-- [ ] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (5 test files)
+- [ ] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (6 test files; +NodeInspector.backendDropdown iter 1)
 - [ ] 07-03-PLAN.md — src/tracking/ package: TrackerProtocol + TrackerRegistry + NoneTracker (D-13)
 - [ ] 07-04-PLAN.md — PipelineConfig + NodeCatalog + PipelineBuilder.build extension for perception
 - [ ] 07-05-PLAN.md — DetectorWorkerPool.swap_backend (D-11) + 5 atomicity tests
@@ -173,6 +173,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] 07-09-PLAN.md — apply_pipeline diff-then-dispatch + hot-apply integration test (D-10)
 - [ ] 07-10-PLAN.md — data/presets/builtin/perception_rgbd.json + contract test (D-15, D-16)
 - [ ] 07-11-PLAN.md — main.py lifter hook + last_applied_pipeline_config lifecycle + on_backend_crash hook (D-12)
+- [ ] 07-12-PLAN.md — NodeInspector backend-dropdown hot-swap UI (D-02; Phase 7 revision iter 1)
 **Research flag**: standard
 **UI hint**: yes
 
