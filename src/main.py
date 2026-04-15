@@ -517,11 +517,19 @@ def run_web_mode(args: argparse.Namespace) -> None:
                 # path and for live-tunable param threading (PATCH /lifter-params).
                 active_lifter_name = getattr(app.state, "active_lifter", None)
                 pending_lifter_params = getattr(app.state, "pending_lifter_params", {}) or {}
-                # Pipeline config detector_name takes priority (mirrors SLAM pattern).
-                # PipelineConfig (Phase 2) does not yet carry detector_name; getattr
-                # keeps this forward-compatible for when the graph adds a detector node.
-                if pipeline_config is not None and getattr(pipeline_config, "detector_name", None) is not None:
-                    pending_detector = pipeline_config.detector_name
+                # Phase 7 DET-PIPELINE-05 D-12: pipeline_config takes priority
+                # for detector AND lifter (name + params). Mirrors the SLAM /
+                # merger pattern above. PipelineConfig fields use getattr for
+                # forward-compat with pre-Phase-7 configs that may be in flight.
+                if pipeline_config is not None:
+                    if getattr(pipeline_config, "detector_name", None) is not None:
+                        pending_detector = pipeline_config.detector_name
+                    if getattr(pipeline_config, "detector_params", None):
+                        pending_det_params = dict(pipeline_config.detector_params)
+                    if getattr(pipeline_config, "lifter_name", None) is not None:
+                        active_lifter_name = pipeline_config.lifter_name
+                    if getattr(pipeline_config, "lifter_params", None):
+                        pending_lifter_params = dict(pipeline_config.lifter_params)
 
                 try:
                     # Side-effect imports force registry population before create()
@@ -575,6 +583,11 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     # can append crash_fallback messages to the WS queue.
                     if streaming_viz is not None:
                         detector_pool.set_streaming_viz(streaming_viz)
+                    # Phase 7 DET-PIPELINE-05 D-12 — wire app.state so
+                    # pool.on_backend_crash can update
+                    # last_applied_pipeline_config.detector_name after a
+                    # crash fallback (Pitfall 3 stale-baseline mitigation).
+                    detector_pool.set_app_state(app.state)
                     coordinator._detector_pool = detector_pool
                     # Plan 04-05 (Open Question #4): expose the pool via
                     # app.state so POST /api/detectors/lifter-hotswap can
@@ -624,6 +637,19 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         },
                     })
 
+                # Phase 7 DET-PIPELINE-05 D-12: record the fully-applied
+                # config as the hot-apply diff baseline. If this restart was
+                # pipeline-driven, capture pipeline_config verbatim; otherwise
+                # (spawn-change restart, etc.) leave last_applied untouched so
+                # any prior hot-apply state is preserved.
+                if pipeline_config is not None:
+                    try:
+                        app.state.last_applied_pipeline_config = pipeline_config
+                    except Exception:  # noqa: BLE001 — diff baseline is best-effort
+                        logger.exception(
+                            "Failed to update last_applied_pipeline_config"
+                        )
+
             logger.info("Simulation restarted.")
 
     sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)
@@ -636,6 +662,26 @@ def run_web_mode(args: argparse.Namespace) -> None:
         logger.info("  %s: (%.2f, %.2f, %.2f)", rid, pos[0], pos[1], pos[2])
     logger.info("Max steps: %d", max_steps)
     logger.info("Press Ctrl+C to stop")
+
+    # Phase 7 DET-PIPELINE-05 D-12: seed hot-apply diff baseline with the
+    # initial coordinator configuration so the first /api/pipeline/apply
+    # can diff against a real PipelineConfig instead of None (otherwise
+    # last_applied is None → always restart, and SC#4 hot-swap never
+    # fires). last_applied_topology_digest is seeded None so the first
+    # apply's topology write establishes the baseline for subsequent
+    # diffs.
+    try:
+        from src.coordination.pipeline_builder import PipelineConfig as _InitialPipelineConfig
+        app.state.last_applied_pipeline_config = _InitialPipelineConfig(
+            backend_name=getattr(app.state, "active_slam_backend", "icp") or "icp",
+            merger_name=getattr(app.state, "active_merge_strategy", "icp_union") or "icp_union",
+            detector_name=getattr(app.state, "active_detector_backend", "yolov11") or "yolov11",
+            lifter_name=getattr(app.state, "active_lifter", "point_cluster") or "point_cluster",
+            tracker_name="none",
+        )
+        app.state.last_applied_topology_digest = None  # first apply sets it
+    except Exception:  # noqa: BLE001 — best-effort seed; failure falls back to always-restart
+        logger.exception("Failed to seed initial last_applied_pipeline_config")
 
     try:
         uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="info")

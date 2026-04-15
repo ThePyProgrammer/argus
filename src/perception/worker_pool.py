@@ -167,6 +167,13 @@ class DetectorWorkerPool:
         # emit the crash_fallback WS message. See set_streaming_viz for the
         # post-construction wiring path main.py uses.
         self._streaming_viz: Any = streaming_viz
+        # Plan 07-11 (DET-PIPELINE-05 D-12): optional ref to FastAPI app.state
+        # so on_backend_crash can update last_applied_pipeline_config.detector_name
+        # after a crash fallback (Pitfall 3 — stale baseline mis-diffs the next
+        # hot-apply). Wired post-construction via :meth:`set_app_state` from
+        # main.py's restart block. ``None`` keeps unit-test construction trivial;
+        # the crash handler degrades to a no-op when unset.
+        self._app_state: Any = None
         # Plan 04-05 (D-10): serialize concurrent hot-swappers. Held only
         # during the per-worker ref rebind loop (≪1ms); registry.create runs
         # OUTSIDE the lock so failing swaps don't block queued swappers.
@@ -199,6 +206,18 @@ class DetectorWorkerPool:
         ``None`` clears it (and the crash handler degrades to log-only).
         """
         self._streaming_viz = streaming_viz
+
+    def set_app_state(self, app_state: Any) -> None:
+        """Attach a reference to FastAPI ``app.state`` for crash-fallback lifecycle updates.
+
+        Plan 07-11 (DET-PIPELINE-05 D-12 Pitfall 3). Called post-construction
+        from ``main.py``'s restart block so :meth:`on_backend_crash` can update
+        ``app.state.last_applied_pipeline_config.detector_name`` after a
+        fallback swap — otherwise the hot-apply diff on the next user apply
+        sees a stale baseline and mis-diffs a "switch back to crashed backend"
+        as "no change". Idempotent; ``None`` clears the ref.
+        """
+        self._app_state = app_state
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -531,6 +550,28 @@ class DetectorWorkerPool:
                 fallback,
                 len(self._workers),
             )
+            # Plan 07-11 (DET-PIPELINE-05 D-12 Pitfall 3): update the hot-apply
+            # diff baseline so a subsequent user apply that switches back to
+            # the crashed backend is not mis-diffed as "no change" against a
+            # stale last_applied.detector_name. The app_state ref is wired
+            # post-construction by main.py via :meth:`set_app_state`; when it
+            # is None (unit-test or pre-wire path), this is a no-op.
+            try:
+                from dataclasses import replace
+                app_state = self._app_state
+                last = (
+                    getattr(app_state, "last_applied_pipeline_config", None)
+                    if app_state is not None
+                    else None
+                )
+                if last is not None:
+                    app_state.last_applied_pipeline_config = replace(
+                        last, detector_name=fallback
+                    )
+            except Exception:  # noqa: BLE001 — diff baseline is a best-effort hint
+                _LOGGER.exception(
+                    "on_backend_crash: failed to update last_applied_pipeline_config"
+                )
         except Exception:  # noqa: BLE001 — fallback construction is second-order
             _LOGGER.exception(
                 "on_backend_crash: fallback construction failed for %s",
