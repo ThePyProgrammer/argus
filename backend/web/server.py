@@ -85,7 +85,10 @@ def create_app(
 
     # Wire detector REST API routes (Phase 2 — DET-MODELS-05)
     from backend.web.detector_routes import router as detector_router
+    from backend.web.detector_routes import export_router as detections_export_router
     app.include_router(detector_router)
+    # Phase 6 — DET-METRICS-04: /api/detections/export JSONL stream
+    app.include_router(detections_export_router)
 
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)

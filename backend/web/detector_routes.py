@@ -20,11 +20,17 @@ Threat model (mirror SLAM — see 02-08-PLAN.md <threat_model>):
 """
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.perception.registry import DetectorRegistry
 
 router = APIRouter(prefix="/api/detectors", tags=["detectors"])
+
+# Phase 6 DET-METRICS-04: dedicated router for /api/detections/* — separate
+# prefix from the detector-registry router so the export endpoint lives under
+# /api/detections/export per CONTEXT D-13, not /api/detectors/...
+export_router = APIRouter(prefix="/api/detections", tags=["detections"])
 
 
 class SelectRequest(BaseModel):
@@ -241,3 +247,53 @@ async def patch_lifter_params(patch: ParamPatch, request: Request):
             pending[key] = value
             request.app.state.pending_lifter_params = pending
     return {"results": results}
+
+
+# ---------------------------------------------------------------------------
+# Detections export endpoint (Phase 6 — DET-METRICS-04)
+# ---------------------------------------------------------------------------
+#
+# Streams the current session's detections.jsonl file produced by
+# WebStreamingViz.detection_export (DetectionExportWriter). Per CONTEXT D-13:
+# snapshot-at-request-time semantics (not `tail -f`), 65536-byte chunks,
+# media_type application/x-ndjson. Session ID is server-side (UUID4,
+# generated at WebStreamingViz construction; rotated on reset_cloud_tracking).
+# The endpoint accepts no path parameter — no traversal risk (T-6-02).
+#
+# Mounted on a dedicated `export_router` with prefix /api/detections so the
+# endpoint lives at /api/detections/export (not /api/detectors/...).
+
+@export_router.get("/export")
+async def export_detections(request: Request):
+    """Stream the current session's detections.jsonl (DET-METRICS-04).
+
+    Snapshot-at-request-time semantics (CONTEXT D-13): not tail -f.
+    Session ID is server-side (UUID4, generated at WebStreamingViz
+    construction or rotated on reset_cloud_tracking). Endpoint accepts
+    no path parameter — no traversal risk (T-6-02).
+    """
+    streaming_viz = request.app.state.streaming_viz
+    path = streaming_viz.detection_export.file_path
+    session = streaming_viz.current_session_id()
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No detections recorded yet for the current session",
+        )
+
+    def generate():
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={
+            "Content-Disposition": f'attachment; filename="detections-{session}.jsonl"',
+        },
+    )
