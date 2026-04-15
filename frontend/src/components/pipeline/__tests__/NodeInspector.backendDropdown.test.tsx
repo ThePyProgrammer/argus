@@ -1,80 +1,146 @@
 /**
- * Plan 07-12 target — D-02 NodeInspector backend-dropdown hot-swap UI flow.
+ * Plan 07-12 — D-02 NodeInspector backend-dropdown hot-swap UI lockdown.
  *
- * D-02 (CONTEXT.md): "Users change the active backend by editing the node’s
- * `backend` param in the Inspector (a dropdown sourced from DetectorRegistry.list())
- * — NOT by deleting and replacing the node. registryName on the node data is
- * mutable; updateNodeParam on key 'backend' updates data.registryName + the
- * parameterSchema (refetched from /api/pipeline/node-catalog)."
- *
- * SC#4 end-to-end is exercisable from the Inspector — not just integration tests.
- *
- * Locked behaviors this stub will assert in Plan 07-12:
- *   1. NodeInspector renders a backend <select> dropdown when nodeType starts with
- *      `detector_`, `detection3d_`, or `tracker_`.
- *   2. Dropdown options come from pipelineStore.availableRegistryNodes filtered by
- *      category === 'perception' AND base node-kind matching the selected node’s
- *      nodeType prefix (detector_* shows only detector_* registry entries, etc.).
- *   3. Changing the dropdown calls updateNodeParam(nodeId, 'backend', newRegistryName).
- *   4. After updateNodeParam fires with key === 'backend', the selected node’s
- *      data.registryName mutates AND parameterSchema is refetched from
- *      /api/pipeline/node-catalog (parameterSchema replaced + paramValues reset to
- *      the new backend’s defaultParams).
- *   5. The non-perception case (sensor / slam / merger / filter / output): NO
- *      backend dropdown is rendered (regression guard — we don’t want a
- *      dropdown on non-hot-swappable nodes).
+ * Promoted from the Plan 07-02 skip-stub. Tests render NodeInspector against
+ * a primed pipelineStore (selected node + availableRegistryNodes) and assert
+ * the dropdown render conditions, options filtering, and store-mutation
+ * side-effects (registryName + parameterSchema + paramValues).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { usePipelineStore } from '../../../stores/pipelineStore';
+import { NodeInspector } from '../NodeInspector';
+import type { RegistryNode } from '../../../utils/pipelineTypes';
 
-describe.skip('NodeInspector backend dropdown — D-02 hot-swap (Plan 07-12)', () => {
+const REGISTRY_FIXTURE: RegistryNode[] = [
+  {
+    type: 'detector_yolov11',
+    label: 'Detector: YOLOv11',
+    category: 'perception',
+    registryName: 'yolov11',
+    parameterSchema: { properties: { conf_thresh: { type: 'number', default: 0.25 } } },
+  },
+  {
+    type: 'detector_rtdetrv2',
+    label: 'Detector: RT-DETRv2',
+    category: 'perception',
+    registryName: 'rtdetrv2',
+    parameterSchema: { properties: { conf_thresh: { type: 'number', default: 0.4 } } },
+  },
+  {
+    type: 'detection3d_point_cluster',
+    label: '3D Lifter: PointCluster',
+    category: 'perception',
+    registryName: 'point_cluster',
+    parameterSchema: { properties: {} },
+  },
+  {
+    type: 'tracker_none',
+    label: 'Tracker: Passthrough (no tracking)',
+    category: 'perception',
+    registryName: 'none',
+    parameterSchema: null,
+  },
+];
+
+function resetStore(): void {
+  usePipelineStore.setState({
+    nodes: [],
+    edges: [],
+    selectedNodeId: null,
+    activePreset: null,
+    availablePresets: [],
+    isDirty: false,
+    validationErrors: [],
+    isValid: true,
+    isApplying: false,
+    nodeStatuses: {},
+    edgeThroughputs: {},
+    lastAppliedConfig: null,
+    availableRegistryNodes: [],
+  });
+}
+
+function seedDetectorNode(): string {
+  const s = usePipelineStore.getState();
+  s.addNode('detector_generic', { x: 0, y: 0 }, 'yolov11');
+  const node = usePipelineStore.getState().nodes[0];
+  usePipelineStore.getState().selectNode(node.id);
+  usePipelineStore.getState().setAvailableRegistryNodes(REGISTRY_FIXTURE);
+  return node.id;
+}
+
+describe('NodeInspector backend dropdown — D-02 hot-swap (Plan 07-12)', () => {
+  beforeEach(() => resetStore());
+
   it('renders a <select> dropdown for detector_generic nodes', () => {
-    // TODO Plan 07-12: render NodeInspector with a selected detector_generic node
-    // (registryName: "yolov11"); query the dropdown by role 'combobox' or
-    // accessible name "Backend"; assert it exists.
-    expect(false).toBe(true);
+    seedDetectorNode();
+    render(<NodeInspector />);
+    expect(screen.getByLabelText('Backend')).toBeTruthy();
   });
 
   it('renders a <select> dropdown for detection3d_generic nodes', () => {
-    // TODO Plan 07-12: same as above, registryName: "point_cluster".
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('detection3d_generic', { x: 0, y: 0 }, 'point_cluster');
+    const node = usePipelineStore.getState().nodes[0];
+    usePipelineStore.getState().selectNode(node.id);
+    usePipelineStore.getState().setAvailableRegistryNodes(REGISTRY_FIXTURE);
+    render(<NodeInspector />);
+    expect(screen.getByLabelText('Backend')).toBeTruthy();
   });
 
   it('renders a <select> dropdown for tracker_generic nodes', () => {
-    // TODO Plan 07-12: same as above, registryName: "none".
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('tracker_generic', { x: 0, y: 0 }, 'none');
+    const node = usePipelineStore.getState().nodes[0];
+    usePipelineStore.getState().selectNode(node.id);
+    usePipelineStore.getState().setAvailableRegistryNodes(REGISTRY_FIXTURE);
+    render(<NodeInspector />);
+    expect(screen.getByLabelText('Backend')).toBeTruthy();
   });
 
   it('does NOT render a backend dropdown for non-perception nodes', () => {
-    // TODO Plan 07-12: render NodeInspector with a slam_generic node;
-    // assert no combobox / no "Backend" select rendered (only the static
-    // "Backend: {registryName}" label from the existing inspector).
-    expect(false).toBe(true);
+    const s = usePipelineStore.getState();
+    s.addNode('slam_generic', { x: 0, y: 0 }, 'icp');
+    const node = usePipelineStore.getState().nodes[0];
+    usePipelineStore.getState().selectNode(node.id);
+    usePipelineStore.getState().setAvailableRegistryNodes(REGISTRY_FIXTURE);
+    render(<NodeInspector />);
+    expect(screen.queryByLabelText('Backend')).toBeNull();
   });
 
-  it('options are sourced from pipelineStore.availableRegistryNodes filtered by node-kind prefix', () => {
-    // TODO Plan 07-12: seed pipelineStore.setAvailableRegistryNodes([
-    //   {type:'detector_yolov11', registryName:'yolov11', category:'perception', ...},
-    //   {type:'detector_rtdetrv2', registryName:'rtdetrv2', category:'perception', ...},
-    //   {type:'detection3d_point_cluster', registryName:'point_cluster', category:'perception', ...},
-    //   {type:'tracker_none', registryName:'none', category:'perception', ...},
-    // ]); render Inspector with a detector_generic node; assert the dropdown has
-    // exactly 2 options (yolov11, rtdetrv2) — NOT detection3d_* or tracker_*.
-    expect(false).toBe(true);
+  it('options are sourced from availableRegistryNodes filtered by node-kind prefix', () => {
+    seedDetectorNode();
+    render(<NodeInspector />);
+    const select = screen.getByLabelText('Backend') as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    // Only detector_* registry entries should appear — NOT detection3d_* or tracker_*.
+    expect(optionValues).toEqual(expect.arrayContaining(['yolov11', 'rtdetrv2']));
+    expect(optionValues).not.toContain('point_cluster');
+    expect(optionValues).not.toContain('none');
   });
 
   it('changing the dropdown calls updateNodeParam(nodeId, "backend", newRegistryName)', () => {
-    // TODO Plan 07-12: spy on usePipelineStore.getState().updateNodeParam;
-    // simulate user selecting a new option; assert spy called with
-    // (selectedNodeId, 'backend', 'rtdetrv2').
-    expect(false).toBe(true);
+    const nodeId = seedDetectorNode();
+    const spy = vi.spyOn(usePipelineStore.getState(), 'updateNodeParam');
+    render(<NodeInspector />);
+    const select = screen.getByLabelText('Backend') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'rtdetrv2' } });
+    expect(spy).toHaveBeenCalledWith(nodeId, 'backend', 'rtdetrv2');
+    spy.mockRestore();
   });
 
-  it('after backend change, data.registryName updates AND parameterSchema is refetched', () => {
-    // TODO Plan 07-12: mock global.fetch for /api/pipeline/node-catalog returning
-    // a parameterSchema for rtdetrv2; trigger dropdown change; await microtasks;
-    // assert state.nodes[idx].data.registryName === 'rtdetrv2' AND
-    // .parameterSchema deep-equals the catalog response for that backend AND
-    // .paramValues has been reset to the new backend’s defaults.
-    expect(false).toBe(true);
+  it('after backend change: data.registryName updates AND parameterSchema is replaced AND paramValues reset', () => {
+    const nodeId = seedDetectorNode();
+    render(<NodeInspector />);
+    const select = screen.getByLabelText('Backend') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'rtdetrv2' } });
+    const updated = usePipelineStore.getState().nodes.find((n) => n.id === nodeId)!;
+    expect(updated.data.registryName).toBe('rtdetrv2');
+    expect(updated.data.parameterSchema).toEqual({
+      properties: { conf_thresh: { type: 'number', default: 0.4 } },
+    });
+    // paramValues reset to the new schema's defaults (extracted from properties[k].default).
+    expect(updated.data.paramValues).toEqual({ conf_thresh: 0.4 });
   });
 });
