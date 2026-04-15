@@ -62,11 +62,17 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from src.perception.registry import Detection3DRegistry, DetectorRegistry
+from src.perception.subprocess_bridge import BridgeHangError, SubprocessDiedError
 from src.perception.worker import DetectorWorker
 
 if TYPE_CHECKING:  # pragma: no cover -- P9: TYPE_CHECKING only, no runtime import
     from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
     from src.perception.types import Detections3D
+
+# Keep the typed exception imports visible at module scope — they are the
+# failure surface DetectorWorker catches and escalates via on_backend_crash.
+# Assigning to a sentinel silences unused-import lint without hiding them.
+_BRIDGE_CRASH_EXCEPTIONS = (BridgeHangError, SubprocessDiedError)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,6 +119,7 @@ class DetectorWorkerPool:
         lifter_name: str,
         intrinsics_per_robot: dict[str, "CameraIntrinsics"],
         lifter_params: dict | None = None,
+        streaming_viz: Any = None,
     ) -> None:
         """Construct one ``DetectorWorker`` per rid with its own detector + lifter.
 
@@ -139,6 +146,13 @@ class DetectorWorkerPool:
                 leak into per-worker lifter instances. Plan 03-06 added
                 this kwarg to thread ``app.state.pending_lifter_params``
                 from the ``main.py`` restart block (D-10).
+            streaming_viz: Optional reference to the coordinator's
+                ``StreamingVisualizer``. When set, :meth:`on_backend_crash`
+                (Plan 05-09 / D-03) appends a ``crash_fallback`` message to
+                ``streaming_viz._message_queue`` on subprocess-backend crash.
+                Default ``None`` keeps unit-test construction trivial and
+                lets ``main.py`` wire the viz post-construction via
+                :meth:`set_streaming_viz` if the construction order needs it.
         """
         self.backend_name = backend_name
         self.lifter_name = lifter_name
@@ -147,9 +161,18 @@ class DetectorWorkerPool:
         params = dict(backend_params or {})
         lifter_kwargs = dict(lifter_params or {})
         self._lifter_params = lifter_kwargs  # retained for repr/debug
+        self._backend_params = params  # retained for fallback + debug
+        self._intrinsics_per_robot = dict(intrinsics_per_robot)
+        # Plan 05-09 (D-03): streaming_viz ref used by on_backend_crash to
+        # emit the crash_fallback WS message. See set_streaming_viz for the
+        # post-construction wiring path main.py uses.
+        self._streaming_viz: Any = streaming_viz
         # Plan 04-05 (D-10): serialize concurrent hot-swappers. Held only
         # during the per-worker ref rebind loop (≪1ms); registry.create runs
         # OUTSIDE the lock so failing swaps don't block queued swappers.
+        # Plan 05-09 reuses the same lock for on_backend_crash atomicity —
+        # detector hot-swap and lifter hot-swap both rebind worker refs and
+        # must not interleave.
         self._swap_lock = threading.Lock()
         self._workers: dict[str, DetectorWorker] = {}
         for rid in robot_ids:
@@ -163,7 +186,19 @@ class DetectorWorkerPool:
                 detector=detector,
                 lifter=lifter,
                 intrinsics=intrinsics_per_robot[rid],
+                pool_ref=self,  # D-03 — reverse ref for on_backend_crash
             )
+
+    def set_streaming_viz(self, streaming_viz: Any) -> None:
+        """Store the StreamingVisualizer ref used by :meth:`on_backend_crash`.
+
+        Plan 05-09 (D-03). ``main.py`` constructs the pool and the streaming
+        visualizer in the same restart block, but the construction order may
+        vary — this post-init setter lets the wiring happen once both objects
+        exist. Idempotent: calling multiple times just overwrites the ref.
+        ``None`` clears it (and the crash handler degrades to log-only).
+        """
+        self._streaming_viz = streaming_viz
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -277,6 +312,148 @@ class DetectorWorkerPool:
                 w._lifter = new_lifters[rid]  # atomic attribute write under GIL
             self.lifter_name = new_lifter_name
             self._lifter_params = lifter_kwargs
+
+    # ------------------------------------------------------------------
+    # Plan 05-09 (D-03) — crash fallback handler.
+    # ------------------------------------------------------------------
+
+    def _dummy_frame_for(self, rid: str) -> "SensorFrame":
+        """Return a zero-RGB-and-depth ``SensorFrame`` for fallback warmup.
+
+        Used by :meth:`on_backend_crash` to warm the freshly-constructed
+        YOLOv11 fallback before atomic swap. 480×640 matches the Phase 1
+        MuJoCo default frame size so the warmup's JIT/trace path is
+        representative; the zero contents keep the warmup fast (≪1 s) and
+        deterministic.
+        """
+        # Local import keeps sensor_types out of module-scope (Pitfall P9).
+        from src.bridge.sensor_types import SensorFrame
+
+        return SensorFrame(
+            rgb=np.zeros((480, 640, 3), dtype=np.uint8),
+            depth=np.zeros((480, 640), dtype=np.float32),
+            ground_truth_pose=np.eye(4),
+            sim_time=0.0,
+        )
+
+    def on_backend_crash(
+        self,
+        crashed_backend: str,
+        reason: str,
+        fallback: str = "yolov11",
+    ) -> None:
+        """D-03 — emit ``crash_fallback`` WS + atomically swap to a fallback backend.
+
+        Mirror of the SLAM crash pattern in
+        ``src/exploration/exploration_loop.py:207``. Triggered by
+        :class:`DetectorWorker` when ``detector.process_frame`` raises
+        :class:`BridgeHangError` or :class:`SubprocessDiedError` (Plan 05-05
+        typed exceptions from :class:`SubprocessDetectorBridge`).
+
+        Steps (in order):
+
+          1. Append a ``crash_fallback`` envelope to
+             ``self._streaming_viz._message_queue`` when a viz is wired. The
+             envelope matches the SLAM precedent literally
+             (``type``/``payload.subsystem``/``payload.crashed_backend``/
+             ``payload.fallback_backend``/``payload.reason``) so the frontend
+             ``useWebSocket`` handler + ``CrashToast`` (Phase 3) consume it
+             without a new branch. Emission failures are logged and swallowed
+             — the worker thread must never block on viz I/O (T-5-05).
+
+          2. Mark ``crashed_backend`` unavailable in the registry (D-04) so
+             the detector dropdown greys it out with the crash reason until
+             the coordinator restarts. Failures (unknown name, etc.) are
+             logged and do not abort the fallback.
+
+          3. Construct one fresh ``fallback`` backend **per worker**
+             (per-instance separation invariant from ``__init__``), warm it
+             with a dummy frame, then rebind every worker's ``_detector``
+             under ``self._swap_lock``. The construction + warmup run
+             OUTSIDE the lock so a failing fallback cannot leave workers
+             with torn state. ``self.backend_name`` updates inside the lock
+             so ``repr`` / dropdown reflects the live backend.
+
+        Exceptions from step 3 are logged but NOT re-raised — a crashed
+        fallback is still better than leaving the caller thread with a dead
+        bridge, and the worker loop tolerates subsequent crashes because
+        each ``process_frame`` exception is caught in :class:`DetectorWorker`.
+        """
+        _LOGGER.warning(
+            "on_backend_crash: crashed=%s reason=%r → fallback=%s",
+            crashed_backend,
+            reason,
+            fallback,
+        )
+
+        # Step 1 — WS message (same envelope as SLAM crash at exploration_loop.py:207).
+        viz = self._streaming_viz
+        if viz is not None and hasattr(viz, "_message_queue"):
+            try:
+                viz._message_queue.append(
+                    {
+                        "type": "crash_fallback",
+                        "payload": {
+                            "subsystem": "detector",
+                            "crashed_backend": crashed_backend,
+                            "fallback_backend": fallback,
+                            "reason": reason,
+                        },
+                    }
+                )
+            except Exception:  # noqa: BLE001 — viz enqueue must never block the worker
+                _LOGGER.exception(
+                    "on_backend_crash: failed to enqueue crash_fallback message"
+                )
+        else:
+            _LOGGER.warning(
+                "on_backend_crash: no streaming_viz wired — "
+                "skipping crash_fallback WS emit (fallback still proceeding)."
+            )
+
+        # Step 2 — Session-scoped availability lockout (D-04).
+        try:
+            DetectorRegistry.set_available(
+                crashed_backend,
+                False,
+                reason=f"{reason} — restart the coordinator to retry.",
+            )
+        except Exception:  # noqa: BLE001 — registry lookup failure must not block fallback
+            _LOGGER.exception(
+                "on_backend_crash: set_available(%s, False) failed",
+                crashed_backend,
+            )
+
+        # Step 3 — Construct + warm fallback per worker, then atomic ref swap.
+        try:
+            import src.perception.backends  # noqa: F401 -- trigger registration
+            new_detectors: dict[str, Any] = {}
+            for rid in self._workers:
+                det = DetectorRegistry.create(fallback)
+                try:
+                    det.warmup(self._dummy_frame_for(rid))
+                except Exception:  # noqa: BLE001 — log and continue; swap still proceeds
+                    _LOGGER.exception(
+                        "on_backend_crash: fallback %s warmup failed for %s",
+                        fallback,
+                        rid,
+                    )
+                new_detectors[rid] = det
+            with self._swap_lock:
+                for rid, w in self._workers.items():
+                    w._detector = new_detectors[rid]  # atomic attr write under GIL
+                self.backend_name = fallback
+            _LOGGER.info(
+                "on_backend_crash: swapped crashed %s → %s across %d workers",
+                crashed_backend,
+                fallback,
+                len(self._workers),
+            )
+        except Exception:  # noqa: BLE001 — fallback construction is second-order
+            _LOGGER.exception(
+                "on_backend_crash: fallback construction failed for %s",
+                fallback,
+            )
 
     def shutdown(self) -> None:
         """Signal every worker to stop and join its thread (bounded 2 s each).
