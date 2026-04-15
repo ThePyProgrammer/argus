@@ -6,6 +6,7 @@ nyquist_compliant: true
 wave_0_complete: false
 created: 2026-04-15
 updated: 2026-04-15
+revision: "SC#2 end-to-end delivery — BLOCKERS 1-4 + WARNINGS 5-6 closed"
 ---
 
 # Phase 6 — Validation Strategy
@@ -47,20 +48,21 @@ Filled by the planner as tasks were emitted. One row per task that commits a `py
 | 6-02-02 | 02 | 0 | DET-METRICS-03 | T-6-01 | N/A | collection stub | `pytest tests/contract/ --collect-only -q` | ✅ post-commit | ⬜ pending |
 | 6-02-03 | 02 | 0 | DET-METRICS-04/05 + CLI | — | N/A | collection stub | `pytest tests/integration/test_detections_export.py tests/integration/test_rss_smoke_backends.py tests/test_main_args.py --collect-only -q` | ✅ post-commit | ⬜ pending |
 | 6-03-01 | 03 | 0 | DET-METRICS-01 (FE) | — | N/A | vitest stub | `cd frontend && npx vitest run src/stores/__tests__/metricsStore.detection.shape.test.ts` | ✅ post-commit | ⬜ pending |
-| 6-04-01 | 04 | 1 | DET-METRICS-01 | T-6-01, T-6-06 | no mAP keys, bounded deques | unit | `pytest tests/metrics/test_detection_metrics_tracker.py -v` | ❌ W0 dep on 02 | ⬜ pending |
+| 6-04-01 | 04 | 1 | DET-METRICS-01, DET-METRICS-02 | T-6-01, T-6-06 | no mAP keys, bounded deques (jitter maxlen=30, GT err_ring maxlen=60), record_gt_match + reset_gt, detection_gt_metrics in payload | unit | `pytest tests/metrics/test_detection_metrics_tracker.py -v` (7 tests) | ❌ W0 dep on 02 | ⬜ pending |
 | 6-05-01 | 05 | 1 | DET-METRICS-02 | T-6-04 | yaml.safe_load only | fixture-YAML build | `python -c "import yaml; d=yaml.safe_load(open('tests/perception/fixtures/scene_rotated_chair_gt.yaml')); assert 'chair' in d"` | ✅ post-commit | ⬜ pending |
 | 6-05-02 | 05 | 1 | DET-METRICS-02 | T-6-04, T-6-07 | geom_xpos used, safe_load, fail-fast | unit | `pytest tests/metrics/test_mujoco_gt.py -v` | ❌ W0 dep on 02 | ⬜ pending |
 | 6-06-01 | 06 | 1 | DET-METRICS-04 | T-6-02, T-6-03, T-6-06 | tempfile.gettempdir, to_wire only, lock | unit | `pytest tests/metrics/test_detection_export.py -v` | ✅ post-commit | ⬜ pending |
 | 6-07-01 | 07 | 1 | DET-METRICS-02 | T-6-04 | mapping validates end-to-end | script | `python -c "…assert all body names resolve via mj_name2id and have a geom…"` (see Plan 07 `<verify>`) | ✅ post-commit | ⬜ pending |
-| 6-08-01 | 08 | 2 | DET-METRICS-01/03/04 | T-6-01, T-6-08 | payload guard + graceful GT | module import | `python -c "from backend.web.streaming_viz import _assert_no_map_keys; _assert_no_map_keys({'r':{'mAP':1}})"` expect AssertionError | ✅ post-commit | ⬜ pending |
-| 6-08-02 | 08 | 2 | DET-METRICS-03 | T-6-01 | runtime guard triggers on forbidden keys | unit | `pytest tests/contract/test_no_map_in_payload.py -v` | ❌ W0 dep on 02 | ⬜ pending |
+| 6-08-01 | 08 | 2 | DET-METRICS-01/02/03/04 | T-6-01, T-6-08 | payload guard + graceful GT + detection_gt_metrics emission (SC#2) | module import | `python -c "from backend.web.streaming_viz import _assert_no_map_keys; _assert_no_map_keys({'r':{'mAP':1}})"` expect AssertionError | ✅ post-commit | ⬜ pending |
+| 6-08-02 | 08 | 2 | DET-METRICS-03 | T-6-01 | runtime guard triggers on forbidden keys AT ANY DEPTH (including nested under detection_gt_metrics) | unit | `pytest tests/contract/test_no_map_in_payload.py -v` (6 tests) | ❌ W0 dep on 02 | ⬜ pending |
 | 6-09-01 | 09 | 2 | DET-METRICS-04 | T-6-02, T-6-05 | ndjson media type, no path param | route registration | `python -c "from backend.web.detector_routes import router; assert any('/detections/export' in r.path for r in router.routes)"` | ✅ post-commit | ⬜ pending |
 | 6-09-02 | 09 | 2 | DET-METRICS-04 | T-6-02, T-6-05 | round-trip ±1e-6, 404, MIME | integration | `pytest tests/integration/test_detections_export.py -v --timeout=120` | ❌ W0 dep on 02 | ⬜ pending |
-| 6-10-01 | 10 | 3 | DET-METRICS-01 | — | public detector accessor | module import | `python -c "from src.perception.worker import DetectorWorker; assert isinstance(DetectorWorker.__dict__['detector'], property)"` | ✅ post-commit | ⬜ pending |
-| 6-10-02 | 10 | 3 | DET-METRICS-01/02/03 | T-6-08, T-6-09 | pump uses sim_now, graceful GT, CLI flag reserved | CLI test | `pytest tests/test_main_args.py -v --timeout=60` | ❌ W0 dep on 02 | ⬜ pending |
+| 6-10-01 | 10 | 3 | DET-METRICS-01, DET-METRICS-02 | — | public detector accessor + MultiBridge.mj_model/mj_data accessors (BLOCKER 2 prerequisite per RESEARCH Pitfall 8) | module import | `python -c "from src.perception.worker import DetectorWorker; from src.bridge.multi_bridge import MultiBridge; assert isinstance(DetectorWorker.__dict__['detector'], property) and hasattr(MultiBridge, 'mj_model') and hasattr(MultiBridge, 'mj_data')"` | ✅ post-commit | ⬜ pending |
+| 6-10-02 | 10 | 3 | DET-METRICS-01/02/03 | T-6-08, T-6-09 | pump uses sim_now, consumes match_detection return value via record_gt_match, graceful GT, CLI flag reserved, no parse_args-only fallback | CLI test | `pytest tests/test_main_args.py -v --timeout=60` | ❌ W0 dep on 02 | ⬜ pending |
+| 6-10-03 | 10 | 3 | DET-METRICS-02 | T-6-08 | BLOCKER 2 fix — attach_gt_extractor wired at bootstrap; WARNING 6 fix — scene_office1_gt.yaml resolves every body against scene_office1.xml | integration | `pytest tests/integration/test_gt_extractor_attach.py -v --timeout=60` | ✅ post-commit | ⬜ pending |
 | 6-11-01 | 11 | 4 | DET-METRICS-01 | T-6-01 | FE types declared, no forbidden strings | typecheck | `cd frontend && npx tsc --noEmit` | ✅ post-commit | ⬜ pending |
-| 6-11-02 | 11 | 4 | DET-METRICS-01 | T-6-01 | single-set updater, slices present | vitest | `cd frontend && npx vitest run src/stores/__tests__/metricsStore.detection.shape.test.ts` | ❌ W0 dep on 03 | ⬜ pending |
-| 6-11-03 | 11 | 4 | DET-METRICS-01/03 | T-6-01, T-6-10 | 7 rows, separator, traffic-light, no forbidden strings | typecheck + grep | `cd frontend && npx tsc --noEmit && ! grep -qE '(mAP|map_50|map_75|mean_average_precision)' frontend/src/components/MetricsPanel.tsx` | ✅ post-commit | ⬜ pending |
+| 6-11-02 | 11 | 4 | DET-METRICS-01, DET-METRICS-02 | T-6-01 | 6-arg single-set updater, THREE slices present (detectionPerRobot, detectionHistory, detectionGtPerRobot), SC#2 round-trip | vitest | `cd frontend && npx vitest run src/stores/__tests__/metricsStore.detection.shape.test.ts` (3 tests) | ❌ W0 dep on 03 | ⬜ pending |
+| 6-11-03 | 11 | 4 | DET-METRICS-01/02/03 | T-6-01, T-6-10 | 9 rows (7 SC#1 + err m + recall per UI-SPEC Amendment 2026-04-15), separator, traffic-light on fresh only, aggregateCenterError/aggregateRecall helpers, no forbidden strings | typecheck + grep | `cd frontend && npx tsc --noEmit && ! grep -qE '(mAP|map_50|map_75|mean_average_precision)' frontend/src/components/MetricsPanel.tsx` | ✅ post-commit | ⬜ pending |
 | 6-12-01 | 12 | 5 | DET-METRICS-03 | T-6-01, T-6-11 | grep invariant + runtime-guard presence | contract | `pytest tests/contract/test_no_map_in_ui.py -v` | ❌ W0 dep on 02 | ⬜ pending |
 | 6-13-01 | 13 | 5 | DET-METRICS-05 | T-6-12 | parametrized RSS, honest-skip, OWLv2 absent | integration | `pytest tests/integration/test_rss_smoke_backends.py -m "not slow_boxer" -v --timeout=300` | ❌ W0 dep on 02 | ⬜ pending |
 
@@ -115,3 +117,11 @@ Wave 0 (infrastructure scaffolds, MUST land before any implementation wave) — 
 - [x] `nyquist_compliant: true` set in frontmatter after planner filled the verification map
 
 **Approval:** Planner — 2026-04-15. Nyquist compliant (every task in the map has an automated command or a Wave 0 scaffold dependency; wave_0_complete flips to true after Plans 01–03 execute).
+
+**Revision 2026-04-15 (iteration 1/3):** Planner addressed 4 BLOCKERS + 2 WARNINGS from checker:
+- BLOCKER 1 (SC#2 end-to-end delivery): Plan 04 gained `record_gt_match` + `reset_gt` + `_gt_state` + `detection_gt_metrics` in payload. Plan 08 surfaces `detection_gt_metrics` in `_update_stats` payload. Plan 10 consumes `match_detection` return value via `record_gt_match`. Plan 11 adds 2 UI rows (`err m`, `recall`) + `detectionGtPerRobot` store slice + 6-arg `updateAllMetrics`.
+- BLOCKER 2 (MuJoCoGTExtractor instantiation): Plan 10 Task 3 wires `attach_gt_extractor` at coordinator bootstrap; Task 1 Step 3 adds `MultiBridge.mj_model` / `mj_data` accessors.
+- BLOCKER 3 (Plan 05 dependency): Removed `7` from `depends_on`; Plan 05 stays Wave 1 with `[1, 2]`.
+- BLOCKER 4 (RESEARCH.md): Renamed `## Open Questions` → `## Open Questions (RESOLVED)` with per-question `RESOLVED:` lines cross-linking to implementing plans.
+- WARNING 5 (Plan 10 Task 2 fallback): Removed parse_args-only fallback; subprocess or in-process `main()` only.
+- WARNING 6 (scene_office1_gt.yaml integration): Plan 10 Task 3 integration test `test_scene_office1_gt_mapping_resolves` exercises the real production scene + YAML end-to-end.
