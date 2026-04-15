@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMetricsStore } from '../stores/metricsStore';
 import { robotColor } from '../utils/palette';
 import Sparkline from './Sparkline';
+import type { DetectionGtMetrics } from '../utils/messageTypes';
 
 const STATUS_DOT_COLORS: Record<string, string> = {
   ok: '#2ecc71',
@@ -28,6 +29,42 @@ function formatDelta(current: number, baseline: number): { text: string; color: 
   };
 }
 
+// Phase 6 DET-METRICS-01 — single-source empty-state formatter.
+// Returns `--` at #888 when value is null/undefined; otherwise formats
+// with caller's formatter at the neutral #e0e0e0 text color.
+function formatMetric(
+  v: number | null | undefined,
+  formatter: (x: number) => string,
+): { text: string; color: string } {
+  if (v == null) return { text: '--', color: '#888' };
+  return { text: formatter(v), color: '#e0e0e0' };
+}
+
+// UI-SPEC §Color — `fresh` traffic-light: <=1s normal, <=3s warning, >3s destructive.
+function freshnessColor(v: number): string {
+  if (v <= 1.0) return '#e0e0e0';
+  if (v <= 3.0) return '#f1c40f';
+  return '#e74c3c';
+}
+
+// SC#2 revision 2026-04-15 — aggregate across classes per robot (simple mean).
+// `null` result → row renders `--` at #888. Both aggregates are displayed as
+// neutral `#e0e0e0` (no traffic-light; SC#2 reports the number as-is).
+function aggregateCenterError(gt: DetectionGtMetrics | undefined): number | null {
+  if (!gt) return null;
+  const vals = Object.values(gt)
+    .map((c) => c.center_error_m)
+    .filter((v): v is number => v != null);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function aggregateRecall(gt: DetectionGtMetrics | undefined): number | null {
+  if (!gt || Object.keys(gt).length === 0) return null;
+  const vals = Object.values(gt).map((c) => c.per_class_recall);
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
 export default function MetricsPanel() {
   const [collapsed, setCollapsed] = useState(true);
   const perRobot = useMetricsStore((s) => s.perRobot);
@@ -35,6 +72,11 @@ export default function MetricsPanel() {
   const viewMode = useMetricsStore((s) => s.viewMode);
   const history = useMetricsStore((s) => s.history);
   const setViewMode = useMetricsStore((s) => s.setViewMode);
+  // Phase 6 DET-METRICS-01/02 — detection subsection selectors.
+  // detectionHistory intentionally NOT selected here (UI-SPEC D-06 defers
+  // sparklines; history populates the store for future use only).
+  const detectionPerRobot = useMetricsStore((s) => s.detectionPerRobot);
+  const detectionGtPerRobot = useMetricsStore((s) => s.detectionGtPerRobot);
 
   const robotIds = Object.keys(perRobot);
   const firstRobotId = robotIds[0] ?? null;
@@ -169,6 +211,69 @@ export default function MetricsPanel() {
                               </span>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Phase 6 DET-METRICS-01/02 — DETECTION subsection (UI-SPEC locked; 2 rows added via Amendment 2026-04-15) */}
+                        <div style={{
+                          marginTop: '12px',
+                          marginBottom: '8px',
+                          paddingTop: '8px',
+                          borderTop: '1px solid #2a2a4a',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          letterSpacing: '1px',
+                          textTransform: 'uppercase',
+                          color: '#666',
+                        }}>
+                          detection
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {(() => {
+                            const det = detectionPerRobot[robotId];
+                            const detGt = detectionGtPerRobot[robotId];
+                            const rows: Array<[string, { text: string; color: string }]> = [
+                              ['infer p50', formatMetric(det?.inference_ms_p50, (v) => `${v.toFixed(1)} ms`)],
+                              ['infer p95', formatMetric(det?.inference_ms_p95, (v) => `${v.toFixed(1)} ms`)],
+                              ['det/frame', formatMetric(det?.detections_per_frame, (v) => `${v}`)],
+                              ['conf', formatMetric(det?.mean_confidence, (v) => `${(v * 100).toFixed(0)}%`)],
+                              ['queue', formatMetric(det?.queue_depth, (v) => `${v}`)],
+                            ];
+                            // freshness row: traffic-light override (UI-SPEC §Color)
+                            const freshCell = det?.freshness_s == null
+                              ? { text: '--', color: '#888' }
+                              : { text: `${det.freshness_s.toFixed(2)}s`, color: freshnessColor(det.freshness_s) };
+                            const jitterCell = formatMetric(det?.jitter_m, (v) => `${v.toFixed(3)}m`);
+                            // SC#2 rows — aggregate per-robot across classes (UI-SPEC Amendment 2026-04-15):
+                            const errCell = formatMetric(aggregateCenterError(detGt), (v) => `${v.toFixed(3)} m`);
+                            const recallCell = formatMetric(aggregateRecall(detGt), (v) => `${(v * 100).toFixed(0)}%`);
+                            return (
+                              <>
+                                {rows.map(([label, cell]) => (
+                                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '12px', color: '#888' }}>{label}</span>
+                                    <span style={{ fontSize: '13px', fontFamily: 'monospace', color: cell.color }}>{cell.text}</span>
+                                  </div>
+                                ))}
+                                <div key="fresh" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ fontSize: '12px', color: '#888' }}>{'fresh'}</span>
+                                  <span style={{ fontSize: '13px', fontFamily: 'monospace', color: freshCell.color }}>{freshCell.text}</span>
+                                </div>
+                                <div key="jitter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ fontSize: '12px', color: '#888' }}>{'jitter'}</span>
+                                  <span style={{ fontSize: '13px', fontFamily: 'monospace', color: jitterCell.color }}>{jitterCell.text}</span>
+                                </div>
+                                {/* SC#2 rows — UI-SPEC Amendment 2026-04-15 */}
+                                <div key="err-m" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ fontSize: '12px', color: '#888' }}>{'err m'}</span>
+                                  <span style={{ fontSize: '13px', fontFamily: 'monospace', color: errCell.color }}>{errCell.text}</span>
+                                </div>
+                                <div key="recall" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                  <span style={{ fontSize: '12px', color: '#888' }}>{'recall'}</span>
+                                  <span style={{ fontSize: '13px', fontFamily: 'monospace', color: recallCell.color }}>{recallCell.text}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
