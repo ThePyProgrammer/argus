@@ -313,6 +313,88 @@ class DetectorWorkerPool:
             self.lifter_name = new_lifter_name
             self._lifter_params = lifter_kwargs
 
+    def swap_backend(
+        self,
+        new_backend_name: str,
+        new_backend_params: dict | None = None,
+    ) -> None:
+        """Hot-swap the detector on every worker atomically (Phase 7 D-11).
+
+        Mirror of :meth:`swap_lifter` with two additions:
+          1. Warmup is MANDATORY (backends are stateful — ONNX sessions,
+             ultralytics model caches, subprocess bridges — cold first-inference
+             must run before binding). Warmup runs OUTSIDE ``self._swap_lock``
+             so the ~25-30 s first-inference cost does not block other workers'
+             submit/latest calls.
+          2. Emits ``detector_swap_complete`` WS envelope via
+             ``self._streaming_viz._message_queue`` so the frontend ApplyBar
+             can dismiss the hot-apply toast and DetectorDropdown can reflect
+             the new active backend.
+
+        Failure handling (07-RESEARCH.md Pitfall 8 — warmup-failure rollback):
+          - Construct ALL backends via ``DetectorRegistry.create`` — OUTSIDE lock.
+          - Warm ALL fresh backends via ``.warmup(dummy)`` — OUTSIDE lock.
+          - If ANY step for ANY worker raises: exception propagates, no worker
+            is mutated, ``self.backend_name`` unchanged. Caller (Plan 07-09
+            ``apply_pipeline``) converts to HTTP 400 with vendor reason.
+
+        Documented behavior (not a bug — Phase 4 D-10 / Pitfall 6):
+          - In-flight ``process_frame`` calls complete on the OLD backend
+            (Python captured method-bound ref at dispatch time).
+          - Next ``submit`` uses the new backend.
+          - Worker queue state (``drops_since_session_start``) is preserved
+            for metrics continuity.
+
+        Args:
+            new_backend_name: Name registered in ``DetectorRegistry``
+                (e.g., ``"yolov11"``, ``"rtdetrv2"``).
+            new_backend_params: Optional kwargs forwarded to
+                ``DetectorRegistry.create``. ``None`` is treated as empty.
+
+        Raises:
+            ValueError: Unknown backend name (from ``DetectorRegistry.create``).
+            Exception: Propagated from ``warmup`` (e.g., subprocess bridge
+                hang, ONNX session init failure). Pool state unchanged.
+        """
+        # Force @detector_backend side-effect registration (mirror of swap_lifter).
+        import src.perception.backends  # noqa: F401
+
+        backend_kwargs = dict(new_backend_params or {})
+
+        # Construct + warm per-worker OUTSIDE the lock. Any failure raises
+        # without touching existing worker state (Pitfall 8 — atomic success).
+        new_detectors: dict[str, Any] = {}
+        for rid in self._workers:
+            det = DetectorRegistry.create(new_backend_name, **backend_kwargs)
+            det.warmup(self._dummy_frame_for(rid))
+            new_detectors[rid] = det
+
+        # Atomic rebind under _swap_lock (≪1 ms). Uses the same lock as
+        # swap_lifter + on_backend_crash so those paths cannot interleave.
+        with self._swap_lock:
+            for rid, w in self._workers.items():
+                w._detector = new_detectors[rid]  # atomic attr write under GIL
+            self.backend_name = new_backend_name
+            self._backend_params = backend_kwargs
+
+        # Emit WS envelope (best-effort — viz enqueue MUST NOT fail the swap).
+        viz = self._streaming_viz
+        if viz is not None and hasattr(viz, "_message_queue"):
+            try:
+                viz._message_queue.append(
+                    {
+                        "type": "detector_swap_complete",
+                        "payload": {
+                            "backend": new_backend_name,
+                            "reason": "hot_swap",
+                        },
+                    }
+                )
+            except Exception:  # noqa: BLE001 — viz enqueue must never fail the swap
+                _LOGGER.exception(
+                    "swap_backend: failed to enqueue detector_swap_complete"
+                )
+
     # ------------------------------------------------------------------
     # Plan 05-09 (D-03) — crash fallback handler.
     # ------------------------------------------------------------------
