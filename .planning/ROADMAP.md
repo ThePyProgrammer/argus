@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: per-robot-worker-and-wire-plumbing** - Per-robot DetectorWorker, REST/WS plumbing, canonical OBB wire format + round-trip test (completed 2026-04-14)
 - [ ] **Phase 3: frontend-picker-and-ui** - Detector dropdown, lifter dropdown, param panel, restart overlay, RGB bbox overlay
 - [ ] **Phase 4: real-3d-obb-pipeline** - PointClusterLifter (PCA-OBB), single geometry path, dumb-renderer frontend
-- [ ] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess, RT-DETRv2 in-process ONNX, OWLv2 open-vocab, pinned checkpoints
+- [ ] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess (3D-native), RT-DETRv2 in-process ONNX, pinned checkpoints, crash fallback (OWLv2 dropped 2026-04-15 — see Phase 5 CONTEXT D-10)
 - [ ] **Phase 6: detection-metrics-and-mujoco-gt** - MetricsPanel populated, MuJoCo GT extractor, center_error_m, JSONL export, RSS smoke test
 - [ ] **Phase 7: pipeline-editor-perception-nodes** - DetectorNode, Detection3DNode, TrackerNode, per-edge type validation, perception_rgbd preset
 - [ ] **Phase 8: stretch-tracker-fusion-semantic-map** - ByteTrack, multi-robot fusion, SemanticMap TTL layer, heterogeneous per-robot backends (time-gated)
@@ -101,16 +101,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 **UI hint**: yes
 
 ### Phase 5: second-backends-boxer-rtdetr-owlv2
-**Goal**: Plug in three new backends as the pluggability regression test — BoxeR in subprocess (3D-native OBBs), RT-DETRv2-S in-process ONNX (real-time transformer), OWLv2 for open-vocab — with pinned checkpoints, warmup, and crash-fallback to YOLO.
+**Goal**: Plug in two new backends as the pluggability regression test — BoxeR in subprocess (3D-native OBBs), RT-DETRv2-S in-process ONNX (real-time transformer) — with pinned checkpoints, warmup, and crash-fallback to YOLO. *(OWLv2 was scoped originally but dropped during Phase 5 discuss 2026-04-15 — conflicts with real-time pipeline constraint; see Phase 5 CONTEXT.md D-10.)*
 **Depends on**: Phase 4
-**Requirements**: DET-MODELS-02, DET-MODELS-03, DET-MODELS-04, DET-MODELS-06, DET-MODELS-07, DET-MODELS-08
+**Requirements**: DET-MODELS-02, DET-MODELS-03, DET-MODELS-06, DET-MODELS-07, DET-MODELS-08 *(DET-MODELS-04 dropped — moved to REQUIREMENTS.md Out of Scope)*
 **Success Criteria** (what must be TRUE):
   1. User selects `RTDETRv2` from the dropdown, sees the restart overlay for ≤30 s (first inference warmup), then sees OBBs rendered at ≥3 FPS on the default MuJoCo scene.
   2. User selects `BoxeR` from the dropdown, the subprocess venv boots via `setup_boxer_subprocess.sh`, warmup completes, and 3D-native OBBs appear in Three.js (bypassing the lifter) within the BoxeR worker's first few frames.
   3. Killing the BoxeR subprocess manually (`kill -9 <pid>`) triggers a `crash_fallback` WS message within 5 s, the active detector auto-switches to YOLOv11, and a `CrashToast` appears in the frontend.
   4. `make download-models` pre-fetches every checkpoint to `./models/` and each backend loads with `revision=<sha>` pinned; running with network disabled after pre-fetch still boots all backends.
-  5. OWLv2 accepts a text prompt via parameter panel, returns bboxes for the prompted class in 1–4 s/frame, and is visibly marked "on-demand, not real-time" in the capability badge.
-  6. `LICENSES.md` contains the BoxeR CC-BY-NC-4.0 entry with upstream attribution link.
+  5. `LICENSES.md` contains the BoxeR CC-BY-NC-4.0 entry with upstream attribution link, and the BoxeR backend advertises `license: "CC-BY-NC-4.0"` via its capability dict (rendered by Phase 3's existing capability badge path).
 **Plans**: TBD
 **Research flag**: needed (verify `facebook/boxer` repo structure, current checkpoint names, and Python 3.12 compatibility via Context7 at phase-planning time — do not trust April 2026 memory for 2022 CVPR code)
 

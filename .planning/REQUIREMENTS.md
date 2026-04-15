@@ -24,7 +24,7 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 - [x] **DET-MODELS-01**: Existing Ultralytics YOLOv11-nano detector is refactored behind `DetectorProtocol` as `YOLOv11Backend` with zero behavioral regression (verified by fixture-frame regression test)
 - [ ] **DET-MODELS-02**: RT-DETRv2-S backend (`PekingU/rtdetr_v2_r18vd`) ships as an in-process ONNX-accelerated real-time transformer detector, ≤250 ms/frame at 320px on CPU
 - [ ] **DET-MODELS-03**: facebook/BoxeR ships as a subprocess-isolated backend via `SubprocessDetectorBridge` (ZMQ PAIR + msgpack, 5 s watchdog, crash fallback); installs into its own worker venv and emits 3D OBBs natively
-- [ ] **DET-MODELS-04**: OWLv2 open-vocabulary backend (`google/owlv2-base-patch16-ensemble`) ships for zero-shot text-prompted detection; marked as on-demand (not a real-time backend)
+- [~] **DET-MODELS-04**: ~~OWLv2 open-vocabulary backend (`google/owlv2-base-patch16-ensemble`) ships for zero-shot text-prompted detection; marked as on-demand (not a real-time backend)~~ — **DROPPED 2026-04-15 (Phase 5 discuss)**. Moved to Out of Scope: conflicts with real-time pipeline constraint. See Phase 5 CONTEXT.md D-10.
 - [x] **DET-MODELS-05**: User can select detector backend pre-session via REST (`POST /api/detectors/select`) which triggers restart — hot-swap mid-session is explicitly out of scope
 - [ ] **DET-MODELS-06**: Backend crash in BoxeR subprocess emits `crash_fallback` WS message, falls back to YOLOv11, and shows a `CrashToast` in the frontend
 - [ ] **DET-MODELS-07**: Every checkpoint is pinned by `revision=` SHA; `make download-models` script pre-fetches all weights to `./models/` for offline / CI
@@ -96,6 +96,7 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 - **`mAP` reporting without committed labeled evaluation set** — forbidden; `center_error_m` + `per_class_recall` against MuJoCo GT is the honest replacement.
 - **Per-frame model re-initialization** — models load once, backend instance holds the reference.
 - **Real-time BoxeR** — 5–30 s/frame on CPU; shipped as offline / reference-quality backend only. Not a regression target.
+- **OWLv2 open-vocabulary as a live selectable backend** (was DET-MODELS-04) — dropped 2026-04-15 during Phase 5 discuss. A 1–4 s/frame backend in a 30 Hz worker loop starves the real-time pipeline; text-prompted open-vocab detection needs a dedicated one-shot labeling workflow, not a live backend variant. Phase 3 D-05's `input_type` capability key reservation remains in place for any future milestone that ships that workflow.
 
 ---
 
@@ -115,7 +116,7 @@ Each requirement maps to exactly one phase. Filled by roadmapper 2026-04-13.
 | DET-MODELS-01 | Phase 1 (detector-api-foundation) |
 | DET-MODELS-02 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
 | DET-MODELS-03 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| DET-MODELS-04 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
+| ~~DET-MODELS-04~~ | ~~Phase 5~~ — **DROPPED 2026-04-15** (see Out of Scope) |
 | DET-MODELS-05 | Phase 2 (per-robot-worker-and-wire-plumbing) |
 | DET-MODELS-06 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
 | DET-MODELS-07 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
@@ -148,7 +149,7 @@ Each requirement maps to exactly one phase. Filled by roadmapper 2026-04-13.
 | DET-STRETCH-03 | Phase 8 (stretch-tracker-fusion-semantic-map) |
 | DET-STRETCH-04 | Phase 8 (stretch-tracker-fusion-semantic-map) |
 
-**Coverage:** 42/42 requirements mapped ✓
+**Coverage:** 41/41 active requirements mapped ✓ (DET-MODELS-04 dropped 2026-04-15 → Out of Scope)
 **Orphans:** none
 **Duplicates:** none
 
@@ -156,3 +157,4 @@ Each requirement maps to exactly one phase. Filled by roadmapper 2026-04-13.
 
 *Defined: 2026-04-13 — pre-roadmap*
 *Traceability filled: 2026-04-13 — 8 phases, 100% coverage*
+*Amended 2026-04-15 — DET-MODELS-04 (OWLv2) dropped during Phase 5 discuss; coverage recount 42 → 41*
