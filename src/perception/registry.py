@@ -153,7 +153,15 @@ class DetectorRegistry:
 
     @classmethod
     def list_backends(cls) -> list[dict]:
-        """List all registered detectors with availability + capability metadata."""
+        """List all registered detectors with availability + capability metadata.
+
+        Plan 05-05 D-04: honors any ``set_available`` override (session-scoped,
+        used by the pool's crash handler to mark a crashed backend unavailable
+        until the process restarts). The override ONLY applies when the class
+        loads successfully — if the dotted class path cannot be resolved, we
+        still surface ``available=False`` with a "Cannot load ..." reason,
+        because evaluating the override on a missing class would be bogus.
+        """
         result: list[dict] = []
         for name, info in list(cls._backends.items()):
             entry: dict[str, Any] = {"name": name, "display": info["display"]}
@@ -164,14 +172,29 @@ class DetectorRegistry:
                 entry["capabilities"] = {}
                 entry["parameter_schema"] = {}
             else:
-                available, reason = _probe_availability(klass)
-                entry["available"] = available
-                if not available:
-                    entry["reason"] = reason or (
-                        f"{klass.__qualname__}.available() reported unavailable"
+                override = info.get("_override_available")
+                if override is not None:
+                    available, reason = override
+                    entry["available"] = bool(available)
+                    if not available:
+                        entry["reason"] = reason or (
+                            "Marked unavailable by set_available()."
+                        )
+                    entry["capabilities"] = dict(getattr(klass, "CAPABILITIES", {}))
+                    entry["parameter_schema"] = dict(
+                        getattr(klass, "PARAMETER_SCHEMA", {})
                     )
-                entry["capabilities"] = dict(getattr(klass, "CAPABILITIES", {}))
-                entry["parameter_schema"] = dict(getattr(klass, "PARAMETER_SCHEMA", {}))
+                else:
+                    available, reason = _probe_availability(klass)
+                    entry["available"] = available
+                    if not available:
+                        entry["reason"] = reason or (
+                            f"{klass.__qualname__}.available() reported unavailable"
+                        )
+                    entry["capabilities"] = dict(getattr(klass, "CAPABILITIES", {}))
+                    entry["parameter_schema"] = dict(
+                        getattr(klass, "PARAMETER_SCHEMA", {})
+                    )
             result.append(entry)
         return result
 
@@ -195,12 +218,48 @@ class DetectorRegistry:
         return klass(**kwargs)
 
     @classmethod
+    def set_available(
+        cls, name: str, available: bool, reason: str | None = None
+    ) -> None:
+        """Override availability for a registered backend (session-scoped, D-04).
+
+        Used by :meth:`DetectorWorkerPool.on_backend_crash` (Plan 05-09) to lock
+        out a crashed backend until the process restarts. Frontend
+        ``DetectorDropdown`` reads ``available`` / ``reason`` from
+        :meth:`list_backends` and greys out the entry per Phase 3 D-06.
+
+        Semantics:
+            * ``available=False, reason="..."`` — overrides the
+              ``klass.available()`` probe and forces unavailable. The stored
+              reason is surfaced verbatim via ``list_backends()``; when
+              ``reason`` is ``None`` a default "Marked unavailable by
+              set_available()." fallback is used.
+            * ``available=True, reason=None`` — clears any prior override and
+              re-surfaces the probe result (i.e. restores healthy backend).
+            * Not intended for general use — this is the pool's crash-handler
+              hook. Raises ``ValueError`` if ``name`` is not registered.
+
+        Session-scoped: stored inside the in-process ``_backends`` dict. On the
+        next process start, registry rebuilds with probe-fresh availability.
+        D-04 explicitly rejects auto-retry loops — one crash means the backend
+        is dead until restart.
+        """
+        if name not in cls._backends:
+            raise ValueError(
+                f"Unknown detector backend '{name}'. "
+                f"Available: {list(cls._backends.keys())}"
+            )
+        cls._backends[name]["_override_available"] = (bool(available), reason)
+
+    @classmethod
     def get_default(cls) -> str:
         return cls._default
 
     @classmethod
     def _clear(cls) -> None:
-        """Test helper only. Clears all registered backends."""
+        """Test helper only. Clears all registered backends, including any
+        ``set_available`` overrides — override state lives inside the
+        per-backend dict so resetting ``cls._backends = {}`` drops it too."""
         cls._backends = {}
 
 

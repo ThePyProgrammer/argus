@@ -45,6 +45,21 @@ def get_detector_thread_budget(num_robots: int = 1) -> int:
     return max(2, cpu // (2 + max(1, num_robots)))
 
 
+def get_default_budget() -> int:
+    """Return the process-global default thread budget (Phase 1 D-04 invariant).
+
+    Phase 5 Plan 05-05 (D-07): ORT session construction in
+    ``src/perception/backends/rtdetrv2_backend.py`` (Plan 05-07) reads this to
+    set ``sess_options.intra_op_num_threads`` — the ORT backend MUST NOT
+    hardcode a thread count (that would violate the Phase 1 invariant that
+    ALL thread budget config flows through this file — see Pitfall P19).
+
+    This is a plain public getter over the module-private ``_DEFAULT_BUDGET``
+    so backends do not reach into the underscore-prefixed symbol directly.
+    """
+    return _DEFAULT_BUDGET
+
+
 def _configure() -> None:
     global _CONFIGURED
     if _CONFIGURED:
