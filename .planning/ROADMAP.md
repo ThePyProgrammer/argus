@@ -161,7 +161,18 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Loading the `perception_rgbd` built-in preset wires MuJoCoBridge → DetectorNode(YOLOv11) → Detection3DNode(PointCluster) → visualization and, on Apply, produces live OBBs in the 3D viewer end-to-end.
   4. Changing the `backend` param on a `DetectorNode` from `yolov11` to `rtdetrv2` and applying the pipeline swaps the per-robot `DetectorWorker` backend without a full coordinator restart (verified by watching PID stability in logs).
   5. `pipeline_routes.py` maps `detector_generic` node definitions to `DetectorWorkerPool` entries so node params flow through to worker construction kwargs.
-**Plans**: TBD
+**Plans**: 11 plans
+- [ ] 07-01-PLAN.md — Wave 0 Python pytest skip-stubs (7 test files)
+- [ ] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (5 test files)
+- [ ] 07-03-PLAN.md — src/tracking/ package: TrackerProtocol + TrackerRegistry + NoneTracker (D-13)
+- [ ] 07-04-PLAN.md — PipelineConfig + NodeCatalog + PipelineBuilder.build extension for perception
+- [ ] 07-05-PLAN.md — DetectorWorkerPool.swap_backend (D-11) + 5 atomicity tests
+- [ ] 07-06-PLAN.md — PortDataType/NodeCategory union extension + findPortTypeMismatches (D-07, D-09)
+- [ ] 07-07-PLAN.md — nodeDefinitions.ts 3 perception node defs + color maps + NodePalette ordering (D-03..D-07)
+- [ ] 07-08-PLAN.md — pipelineStore.ts:101 + pipelineSerializer.ts:112 dataType fix + ApplyBar hot-apply toast (D-08, UI-SPEC)
+- [ ] 07-09-PLAN.md — apply_pipeline diff-then-dispatch + hot-apply integration test (D-10)
+- [ ] 07-10-PLAN.md — data/presets/builtin/perception_rgbd.json + contract test (D-15, D-16)
+- [ ] 07-11-PLAN.md — main.py lifter hook + last_applied_pipeline_config lifecycle + on_backend_crash hook (D-12)
 **Research flag**: standard
 **UI hint**: yes
 
@@ -191,5 +202,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. real-3d-obb-pipeline | 0/7 | Planning complete | - |
 | 5. second-backends-boxer-rtdetr-owlv2 | 12/12 | Complete   | 2026-04-15 |
 | 6. detection-metrics-and-mujoco-gt | 13/13 | Complete   | 2026-04-15 |
-| 7. pipeline-editor-perception-nodes | 0/TBD | Not started | - |
+| 7. pipeline-editor-perception-nodes | 0/11 | Planning complete | - |
 | 8. stretch-tracker-fusion-semantic-map | 0/TBD | Not started | - |
