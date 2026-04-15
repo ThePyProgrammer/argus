@@ -21,3 +21,6 @@ frontend/public/scene_colored.glb
 
 # Generated files
 frontend/tsconfig.tsbuildinfo
+
+# Phase 5 (D-01): BoxeR subprocess venv — owns its own torch/DINOv3/BoxerNet stack
+subprocess_venvs/
