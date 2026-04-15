@@ -46,7 +46,7 @@ def _make_det(centers: list[tuple[float, float, float]], classes: list[str], sco
               capture_timestamp: float = 0.0) -> FakeDetections3D:
     items = [
         FakeOBB(center=np.asarray(c, dtype=np.float64), score=s, class_name=cn)
-        for c, s, cn in zip(centers, classes, scores)
+        for c, cn, s in zip(centers, classes, scores)
     ]
     return FakeDetections3D(items=items, capture_timestamp=capture_timestamp)
 
