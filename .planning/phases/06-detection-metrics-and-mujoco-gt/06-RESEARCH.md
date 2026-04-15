@@ -598,32 +598,39 @@ def _update_stats(self, robot_data, total_coverage, merge_count):
 | A7 | DetectorWorker and pool can expose `worker.detector` and `pool.workers` properties without touching the worker contract | Pitfall 3 | LOW — both are pure read-only accessors; no concurrency contract change |
 | A8 | `frames[rid].sim_time` is in float seconds, monotonic per session | Pitfall 4 / Example 3 | LOW — verified `multi_bridge.py:402` computes it as `_step_count * _dt`; monotonic by construction |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All questions resolved during planning revision 2026-04-15. Each entry names the plan(s) that implement the recommendation.
 
 1. **`data.xpos` vs `data.geom_xpos` — confirm with planner before Plan 03 ships**
    - What we know: All bodies in scene_office1.xml have body-origin at world (0,0,0); CONTEXT D-08 names `data.xpos`.
    - What's unclear: Whether the planner wants to (a) silently switch the extractor to `geom_xpos`, (b) escalate as a CONTEXT amendment, or (c) patch `scene_office1.xml` to add `pos=` to each labeled body (pulled from `geom_xpos` once at script time).
    - Recommendation: (a) — extractor uses `data.geom_xpos`. Document in module docstring. The mapping file already lists body names; no contract change.
+   - **RESOLVED:** Plan 05 implements `MuJoCoGTExtractor.gt_positions` using `data.geom_xpos[first_geom_of_body]` (RESEARCH F1). Module docstring references D-08, D-09, F1. Acceptance criteria grep-verify `data.geom_xpos` present and `data.xpos[` absent.
 
 2. **`MuJoCoGTExtractor` ownership: who holds the reference?**
    - What we know: CONTEXT canonical_refs says "extractor reuses scene_builder's mjModel handle"; bridge owns `_model` + `_data`; coordinator drives the per-tick pump.
    - What's unclear: Is the extractor instantiated by `WebStreamingViz` (with bridge refs threaded in) or by `Coordinator.set_viz`?
    - Recommendation: `Coordinator.set_viz` — it already has `_bridge` and `_viz` in scope, and the extractor needs both.
+   - **RESOLVED:** Plan 10 coordinator-init task wires `streaming_viz.attach_gt_extractor(Path("data/scenes/scene_office1_gt.yaml"), bridge.mj_model, bridge.mj_data)` at bootstrap. `WebStreamingViz.attach_gt_extractor` (Plan 08) stores the extractor with graceful-degradation try/except. Plan 10 also exposes `MultiBridge.mj_model` / `mj_data` public accessors if they're private (RESEARCH Pitfall 8). Integration test in Plan 10 asserts `streaming_viz.gt_extractor is not None` and `"chair" in streaming_viz.gt_extractor.all_classes()` post-bootstrap.
 
 3. **Per-class jitter aggregation: max vs mean?**
    - What we know: D-03 says "UI shows the aggregate `max` across classes per robot".
    - What's unclear: Edge case where one class has 1 datapoint (stddev = 0) and another has 30; `max` masks the noisy class.
    - Recommendation: `max` per CONTEXT; planner's discretion if "median across classes with ≥3 datapoints" is preferred. Document in panel cell tooltip.
+   - **RESOLVED:** Plan 04 `DetectionMetricsTracker.record_frame` computes per-class stddev and emits `jitter_m = max(class_jitters)` per CONTEXT D-03. Test 4 (`test_nn_jitter_within_gate`) covers the multi-class max aggregation path.
 
 4. **JSONL writer file rotation timing on `reset_cloud_tracking()`**
    - What we know: D-12 says new UUID on `reset_cloud_tracking`; old file NOT deleted.
    - What's unclear: Can the open `_fp` be mid-write when reset fires? Pump runs on coordinator thread; reset is called via REST handler thread.
    - Recommendation: Lock-protect rotation. `DetectionExportWriter.rotate(new_session_id)` acquires `self._lock`, closes old fp, opens new fp. Single `threading.Lock`.
+   - **RESOLVED:** Plan 06 implements `DetectionExportWriter.rotate(new_session_id)` with `threading.Lock`-protected fp swap. Plan 08 `WebStreamingViz.reset_cloud_tracking` calls `self._detection_export.rotate(new_session_id)` exactly once per reset. Tracker state is intentionally preserved (CONTEXT D-12).
 
 5. **The 0.5 m jitter gate vs 1.0 m center_error gate semantic divergence**
    - What we know: D-03 jitter gate = 0.5 m, D-09 center_error gate = 1.0 m. Different gates for different purposes.
    - What's unclear: A detection within 0.7 m of a tracked center counts toward jitter (> 0.5 m gate fails) but counts as a correct GT instance (< 1.0 m gate passes). Could leak inconsistent semantics into the panel.
    - Recommendation: Document explicitly in panel cell help-text. CONTEXT discretion allows tuning these independently per scene; for `scene_office1.xml` the chair geom_xpos values are >2 m apart so neither gate has cross-class collision risk.
+   - **RESOLVED:** Plan 04 uses `_JITTER_GATE_M = 0.5` constant (D-03) for jitter NN matching. Plan 05 `MuJoCoGTExtractor.match_detection` uses `_DEFAULT_GATE_M = 1.0` (D-09) for GT correctness matching. Both constants are documented in module docstrings with their decision IDs so downstream tuning by scene does not collide.
 
 ## Environment Availability
 

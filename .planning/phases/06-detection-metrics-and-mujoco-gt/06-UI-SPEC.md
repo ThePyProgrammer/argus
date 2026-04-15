@@ -332,3 +332,53 @@ Locked minimums (all already met by the existing panel; detection subsection inh
 - [ ] Dimension 6 Registry Safety: PASS
 
 **Approval:** pending
+
+---
+
+## Amendment 2026-04-15 — SC#2 Row Additions (err m, recall)
+
+**Context:** Revision checker found that SC#2 deliverables (`center_error_m`, `per_class_recall`) were absent from the 7-row detection inventory locked above. Plans 04/08/10/11 were returning tracker state, payload surfacing, coordinator pump consumption, and store slices — but the UI had no rows to render them. This amendment extends the row inventory from 7 to 9 without reopening the broader UI-SPEC.
+
+**Scope of amendment (strictly additive):**
+
+- Row count: 7 → **9**.
+- Append order: after `jitter`, render `err m`, then `recall`.
+- All other UI-SPEC decisions (tokens, spacing, typography, palette, interaction, accessibility, registry safety) remain unchanged.
+
+### New Row Inventory (rows 8–9)
+
+| # | Label     | Source (store)                          | Format          | Empty-State | Color    |
+|---|-----------|-----------------------------------------|-----------------|-------------|----------|
+| 8 | `err m`   | aggregate mean of `center_error_m` across `detectionGtPerRobot[rid][class].center_error_m` (excluding `null`) | `${v.toFixed(3)} m` (space before `m` — matches SLAM `m` convention) | `--` at `#888` when `detectionGtPerRobot[rid]` is undefined OR all classes have `center_error_m === null` | Neutral `#e0e0e0` always |
+| 9 | `recall`  | aggregate mean of `per_class_recall` across `detectionGtPerRobot[rid][class].per_class_recall` | `${(v * 100).toFixed(0)}%` (no space before `%` — matches `conf` convention) | `--` at `#888` when `detectionGtPerRobot[rid]` is undefined OR has no classes | Neutral `#e0e0e0` always |
+
+### Copywriting Rules (extend §Copywriting)
+
+- **`err m` label** → pipes through `center_error_m` aggregate. Unit suffix `" m"` (leading space matches SLAM ATE convention in the existing spec).
+- **`recall` label** → pipes through `per_class_recall` aggregate. Unit `"%"` (no leading space matches `conf` convention in the existing spec).
+- **Empty-state:** Both rows emit `--` rendered at `#888` when there is no aggregate value to show (no GT classes mapped OR no classes with a non-null center_error).
+
+### Color Rules (extend §Color Role)
+
+- **Both rows use the neutral value color `#e0e0e0`.** NO traffic-light gradient. Rationale: SC#2 literal specification is "report the number as-is"; any threshold would be a planner-injected judgement not sanctioned by CONTEXT. The operator reads the raw scalar and decides what's acceptable.
+
+### Aggregation Rules
+
+- **Simple mean across mapped classes per robot.** No weighting by sample count. Classes with `center_error_m: null` are excluded from the `err m` numerator (but NOT from the `recall` numerator — recall has a defined 0.0 default per Plan 04).
+- Aggregation is a UI-level concern; the store holds the full per-class breakdown so later phases can expose a class-drill-down without touching the store schema.
+
+### Planner / Executor / Auditor Guidance
+
+- **For gsd-planner:** The 9-row inventory is the new lock. Any future addition requires a further amendment. Deferred sparkline history for err_m / recall remains deferred (D-06).
+- **For gsd-executor:** Copy the row markup verbatim from the existing SLAM ATE row (unchanged from the pre-amendment spec). The new rows differ only in label text, source field, formatter, and NO color override (unlike `fresh`). Do NOT introduce per-class drill-down in this phase.
+- **For gsd-ui-auditor:** 9 row labels per robot column under Live tab. Two of them (`err m`, `recall`) render `--` / `#888` when no GT mapping is active — this is expected behavior, not a bug.
+
+### Dimension Sign-Off Deltas
+
+- Copywriting: 2 new row labels + 2 new copywriting rules → re-verify PASS after amendment.
+- Color: new rows use existing `#e0e0e0` / `#888` tokens only → no palette change.
+- Typography: new rows use existing 12px label / 13px mono value → no change.
+- Spacing: inherits the 8px vertical gap of the row stack → no change.
+- Registry Safety: unchanged.
+- Accessibility: unchanged (same inline-style presentational pattern as rows 1–7).
+
