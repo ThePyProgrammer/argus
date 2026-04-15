@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import type { SlamMetrics, MetricHistory } from '../utils/messageTypes';
+import type {
+  SlamMetrics,
+  MetricHistory,
+  DetectionMetrics,
+  DetectionMetricHistory,
+  DetectionGtMetrics,
+} from '../utils/messageTypes';
 
 interface MetricsStoreState {
   /** Per-robot live metrics */
@@ -18,6 +24,12 @@ interface MetricsStoreState {
   meshVertices: number[][] | null;
   meshFaces: number[][] | null;
   meshColors: number[][] | null;
+  /** Phase 6 DET-METRICS-01 — per-robot detection metrics slice */
+  detectionPerRobot: Record<string, DetectionMetrics>;
+  /** Phase 6 DET-METRICS-01 — per-robot detection history (ring buffers) */
+  detectionHistory: Record<string, DetectionMetricHistory>;
+  /** Phase 6 SC#2 revision 2026-04-15 — per-robot per-class GT aggregates */
+  detectionGtPerRobot: Record<string, DetectionGtMetrics>;
 
   // Setters
   updateMetrics: (robotId: string, metrics: SlamMetrics) => void;
@@ -25,6 +37,9 @@ interface MetricsStoreState {
     slam_metrics: Record<string, SlamMetrics>,
     baseline: Record<string, SlamMetrics> | null,
     history: Record<string, MetricHistory>,
+    detection_metrics: Record<string, DetectionMetrics>,
+    detection_history: Record<string, DetectionMetricHistory>,
+    detection_gt_metrics: Record<string, DetectionGtMetrics>,
   ) => void;
   setBaseline: (baseline: Record<string, SlamMetrics> | null) => void;
   setViewMode: (mode: 'live' | 'baseline') => void;
@@ -52,18 +67,27 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   meshVertices: null,
   meshFaces: null,
   meshColors: null,
+  detectionPerRobot: {},
+  detectionHistory: {},
+  detectionGtPerRobot: {},
 
   updateMetrics: (robotId, metrics) =>
     set((state) => ({
       perRobot: { ...state.perRobot, [robotId]: metrics },
     })),
 
-  // Single set() call with all three fields to avoid 3 re-renders per stats message
-  updateAllMetrics: (slam_metrics, baseline, history) =>
+  // Phase v2.0 13-01 invariant: ONE set() call covers all stats fields
+  // to preserve the one-re-render-per-stats-message guarantee. Do NOT
+  // split into multiple setters (Phase 6 DET-METRICS-01 — 6-arg revision
+  // 2026-04-15 adds detection_metrics + detection_history + detection_gt_metrics).
+  updateAllMetrics: (slam_metrics, baseline, history, detection_metrics, detection_history, detection_gt_metrics) =>
     set({
       perRobot: slam_metrics,
       baseline: baseline,
       history,
+      detectionPerRobot: detection_metrics,
+      detectionHistory: detection_history,
+      detectionGtPerRobot: detection_gt_metrics,
     }),
 
   setBaseline: (baseline) => set({ baseline }),

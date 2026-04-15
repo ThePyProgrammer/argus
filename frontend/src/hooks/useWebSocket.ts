@@ -18,6 +18,9 @@ import type {
   Detection3DEnvelope,
   DetectorRestartCompletePayload,
   DetectorParamAckPayload,
+  DetectionMetrics,
+  DetectionMetricHistory,
+  DetectionGtMetrics,
 } from '../utils/messageTypes';
 
 /**
@@ -109,12 +112,23 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
         case 'stats': {
           const payload = msg.payload as StatsPayload;
           store.updateStats(payload);
-          // Dispatch SLAM metrics to metricsStore
+          // Dispatch SLAM + detection metrics to metricsStore (single set()).
           if (payload.slam_metrics) {
+            // Phase 6 DET-METRICS-01/02 — detection payload keys added by
+            // streaming_viz.py (Plan 08/10) and SC#2 revision 2026-04-15.
+            const detectionMetrics =
+              ((payload as unknown as { detection_metrics?: Record<string, DetectionMetrics> }).detection_metrics) ?? {};
+            const detectionHistory =
+              ((payload as unknown as { detection_history?: Record<string, DetectionMetricHistory> }).detection_history) ?? {};
+            const detectionGtMetrics =
+              ((payload as unknown as { detection_gt_metrics?: Record<string, DetectionGtMetrics> }).detection_gt_metrics) ?? {};
             useMetricsStore.getState().updateAllMetrics(
               payload.slam_metrics as Record<string, SlamMetrics>,
               (payload.baseline as Record<string, SlamMetrics> | null) ?? null,
               (payload.metric_history as Record<string, MetricHistory>) ?? {},
+              detectionMetrics,
+              detectionHistory,
+              detectionGtMetrics,
             );
           }
           break;
