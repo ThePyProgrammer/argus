@@ -70,17 +70,81 @@ def verify_or_record(path: Path) -> None:
 
 
 def download_rtdetrv2() -> None:
-    """Download RT-DETRv2 snapshot + export to ONNX. Plan 11 fills this in.
+    """Snapshot + optimum ONNX export + sha256 verify + rollback on failure.
 
-    Skeleton raises NotImplementedError with the tracking reference so CI
-    and humans both see a clear "not yet implemented" signal instead of a
-    silent pass that would mask a broken download pipeline.
+    Order of operations:
+      1. Short-circuit if models/rtdetrv2/<SHA>/model.onnx exists AND sha256
+         matches EXPECTED_SHA256 (idempotent re-run).
+      2. mkdir -p models/rtdetrv2/<SHA>/
+      3. snapshot_download(PekingU/rtdetr_v2_r18vd, revision=SHA) →
+         models/rtdetrv2/<SHA>/pt/
+      4. optimum.exporters.onnx.main_export(pt/, 320x320) →
+         models/rtdetrv2/<SHA>/model.onnx  (D-08 static 320x320)
+      5. sha256 verify model.onnx (record on first run — stdout "[NEW SHA]"
+         line for the developer to commit; enforce-on-subsequent).
+      6. On ANY exception between steps 2-5, shutil.rmtree(
+         models/rtdetrv2/<SHA>/) and re-raise (T-5-03 rollback mitigation).
+
+    The EXPECTED_SHA256 manifest starts empty; after the first successful
+    download the developer copies the printed "[NEW SHA]" line into this
+    file's EXPECTED_SHA256 dict and commits it. CI then enforces the pin.
     """
-    raise NotImplementedError(
-        "Plan 05-11 (Wave 3) fills in this function body. See "
-        ".planning/phases/05-second-backends-boxer-rtdetr-owlv2/05-RESEARCH.md "
-        "'Makefile + download_models.py Contract (D-13)' for the full impl."
-    )
+    target = RT_DETRV2_MODEL_DIR
+    pt_dir = target / "pt"
+    onnx_path = target / "model.onnx"
+
+    # Short-circuit if the artifact already exists AND sha256 matches — idempotent re-run
+    if onnx_path.exists():
+        try:
+            verify_or_record(onnx_path)
+            print(f"[download_rtdetrv2] {onnx_path} already present and verified; skipping.")
+            return
+        except RuntimeError as exc:
+            print(f"[download_rtdetrv2] existing artifact failed sha256 check: {exc}")
+            print(f"[download_rtdetrv2] removing {target} and re-downloading.")
+            shutil.rmtree(target)
+
+    target.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Step 2-3: HuggingFace snapshot at pinned revision.
+        from huggingface_hub import snapshot_download  # noqa: PLC0415
+        print(f"[download_rtdetrv2] snapshot_download {RT_DETRV2_REPO}@{RT_DETRV2_SHA} -> {pt_dir}")
+        snapshot_download(
+            repo_id=RT_DETRV2_REPO,
+            revision=RT_DETRV2_SHA,
+            local_dir=str(pt_dir),
+            local_dir_use_symlinks=False,
+        )
+
+        # Step 4: optimum ONNX export (static input shape 320x320 per D-08).
+        from optimum.exporters.onnx import main_export  # noqa: PLC0415
+        print(f"[download_rtdetrv2] optimum main_export -> {onnx_path}")
+        main_export(
+            model_name_or_path=str(pt_dir),
+            output=target,
+            task="object-detection",
+            input_shapes={"pixel_values": [1, 3, 320, 320]},
+            monolith=True,
+            no_post_process=True,
+        )
+
+        # Step 5: sha256 verify (or record on first run).
+        if not onnx_path.exists():
+            raise RuntimeError(
+                f"optimum export completed but {onnx_path} not found — "
+                f"check optimum's output_dir handling."
+            )
+        verify_or_record(onnx_path)
+        print(f"[download_rtdetrv2] done. artifact at {onnx_path}")
+
+    except Exception as exc:  # noqa: BLE001 — T-5-03 rollback must catch EVERYTHING
+        # Rollback: remove the entire pinned-SHA directory so the next
+        # invocation starts clean. Do NOT leave a half-populated dir.
+        print(f"[download_rtdetrv2] FAILED: {exc}. Rolling back {target}.")
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=False)
+        raise
 
 
 def download_boxer() -> None:
