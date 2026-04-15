@@ -1,35 +1,81 @@
-"""Plan 07-10 target — DET-PIPELINE-04 (perception_rgbd preset integrity).
+"""Plan 07-10 — DET-PIPELINE-04 perception_rgbd preset contract lockdown."""
+from __future__ import annotations
 
-Loads data/presets/builtin/perception_rgbd.json, runs through PipelineBuilder.build,
-asserts no ValueError + resulting PipelineConfig has:
-  - detector_name == "yolov11"
-  - lifter_name == "point_cluster"
-  - tracker_name == "none"
-  - backend_name == "icp"
-  - merger_name == "icp_union"
-"""
+import json
+from pathlib import Path
+
 import pytest
 
-pytest.skip(
-    "Wave 0 stub — DET-PIPELINE-04 preset contract (implemented in Plan 07-10)",
-    allow_module_level=True,
-)
+from src.coordination.merge_registry import MergeRegistry
+from src.coordination.pipeline_builder import PipelineBuilder
+from src.slam.registry import SLAMRegistry
+
+
+PRESET_PATH = Path(__file__).parent.parent.parent / "data" / "presets" / "builtin" / "perception_rgbd.json"
+
+
+@pytest.fixture(autouse=True)
+def _populate_registries():
+    """Register minimal SLAM + merger entries (without importing the
+    heavy-dependency backends like open3d). The preset validator only checks
+    registry membership — class paths are never resolved in `build`.
+    Perception/lifter/tracker registries are import-safe and registered via
+    their package __init__ side effects.
+    """
+    SLAMRegistry._clear()
+    MergeRegistry._clear()
+    SLAMRegistry.register(
+        "icp", "ICP Odometry", "src.slam.backends.icp_backend.ICPBackend"
+    )
+    MergeRegistry.register(
+        "icp_union", "ICP Union",
+        "src.coordination.merge_strategies.icp_union.ICPUnionStrategy",
+    )
+    import src.perception.backends  # noqa: F401
+    import src.perception.lifters   # noqa: F401
+    import src.tracking.trackers    # noqa: F401
+    yield
+    SLAMRegistry._clear()
+    MergeRegistry._clear()
 
 
 def test_perception_rgbd_preset_builds_cleanly() -> None:
-    # TODO Plan 07-10: json.loads the preset file, call PipelineBuilder().build,
-    # assert all 5 fields above.
-    assert False, "implemented in Plan 07-10"
+    preset = json.loads(PRESET_PATH.read_text())
+    assert preset["name"] == "Perception + RGBD"
+    config = PipelineBuilder().build({"nodes": preset["nodes"], "edges": preset["edges"]})
+    assert config.backend_name == "icp"
+    assert config.merger_name == "icp_union"
+    assert config.detector_name == "yolov11"
+    assert config.lifter_name == "point_cluster"
+    assert config.tracker_name == "none"
 
 
 def test_perception_rgbd_preset_has_expected_topology() -> None:
-    # TODO Plan 07-10: assert preset contains exactly 7 nodes with ids
-    # sensor_1, slam_1, merger_1, detector_1, detection3d_1, tracker_1, viz_1
-    # and 11 edges linking them per CONTEXT D-15.
-    assert False, "implemented in Plan 07-10"
+    preset = json.loads(PRESET_PATH.read_text())
+    node_ids = sorted(n["id"] for n in preset["nodes"])
+    assert node_ids == sorted([
+        "sensor_1", "slam_1", "merger_1",
+        "detector_1", "detection3d_1", "tracker_1",
+        "viz_1",
+    ])
+    assert len(preset["edges"]) == 11
+
+    # Every edge's endpoints resolve to a node id in the preset.
+    ids = set(node_ids)
+    for edge in preset["edges"]:
+        assert edge["source"] in ids
+        assert edge["target"] in ids
+        assert "sourceHandle" in edge
+        assert "targetHandle" in edge
 
 
 def test_perception_rgbd_preset_positions_match_ui_spec() -> None:
-    # TODO Plan 07-10: assert detector_1.position == {"x": 350, "y": 300}, etc.
-    # per CONTEXT D-16 exact coordinates.
-    assert False, "implemented in Plan 07-10"
+    preset = json.loads(PRESET_PATH.read_text())
+    by_id = {n["id"]: n for n in preset["nodes"]}
+    assert by_id["sensor_1"]["position"] == {"x": 50, "y": 225}
+    assert by_id["slam_1"]["position"] == {"x": 350, "y": 100}
+    assert by_id["merger_1"]["position"] == {"x": 650, "y": 100}
+    assert by_id["detector_1"]["position"] == {"x": 350, "y": 300}
+    assert by_id["detection3d_1"]["position"] == {"x": 650, "y": 300}
+    assert by_id["tracker_1"]["position"] == {"x": 950, "y": 300}
+    assert by_id["viz_1"]["position"] == {"x": 1150, "y": 200}

@@ -1,0 +1,25 @@
+{
+  "name": "Perception + RGBD",
+  "nodes": [
+    {"id": "sensor_1", "type": "sensor_rgbd", "params": {}, "position": {"x": 50, "y": 225}},
+    {"id": "slam_1", "type": "slam_icp", "params": {}, "position": {"x": 350, "y": 100}},
+    {"id": "merger_1", "type": "merger_icp_union", "params": {}, "position": {"x": 650, "y": 100}},
+    {"id": "detector_1", "type": "detector_yolov11", "params": {}, "position": {"x": 350, "y": 300}},
+    {"id": "detection3d_1", "type": "detection3d_point_cluster", "params": {}, "position": {"x": 650, "y": 300}},
+    {"id": "tracker_1", "type": "tracker_none", "params": {}, "position": {"x": 950, "y": 300}},
+    {"id": "viz_1", "type": "viz_output", "params": {}, "position": {"x": 1150, "y": 200}}
+  ],
+  "edges": [
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "slam_1", "targetHandle": "image_in"},
+    {"source": "slam_1", "sourceHandle": "cloud_out", "target": "merger_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "merger_1", "targetHandle": "pose_in"},
+    {"source": "merger_1", "sourceHandle": "merged_out", "target": "viz_1", "targetHandle": "cloud_in"},
+    {"source": "slam_1", "sourceHandle": "pose_out", "target": "viz_1", "targetHandle": "pose_in"},
+    {"source": "sensor_1", "sourceHandle": "image_out", "target": "detector_1", "targetHandle": "image_in"},
+    {"source": "sensor_1", "sourceHandle": "depth_out", "target": "detector_1", "targetHandle": "depth_in"},
+    {"source": "detector_1", "sourceHandle": "detections_2d_out", "target": "detection3d_1", "targetHandle": "detections_2d_in"},
+    {"source": "sensor_1", "sourceHandle": "depth_out", "target": "detection3d_1", "targetHandle": "depth_in"},
+    {"source": "detection3d_1", "sourceHandle": "detections_3d_out", "target": "tracker_1", "targetHandle": "detections_3d_in"},
+    {"source": "tracker_1", "sourceHandle": "tracks_out", "target": "viz_1", "targetHandle": "tracks_in"}
+  ]
+}
