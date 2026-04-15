@@ -478,3 +478,24 @@ class MultiRobotBridge:
     def robot_ids(self) -> tuple[str, ...]:
         """All robot IDs in this simulation."""
         return self._config.robot_ids
+
+    @property
+    def mj_model(self):
+        """Public accessor for the MuJoCo model handle (Phase 6 BLOCKER 2 / RESEARCH Pitfall 8).
+
+        Exposed so the coordinator bootstrap can attach the GT extractor
+        (``streaming_viz.attach_gt_extractor(yaml, mj_model, mj_data)``)
+        without reaching into ``self._model`` via ``# noqa: SLF001``. Returns
+        ``None`` if :meth:`start` has not been called yet; callers guard with
+        ``hasattr`` and a ``is not None`` check.
+        """
+        return self._model
+
+    @property
+    def mj_data(self):
+        """Public accessor for the MuJoCo data handle (Phase 6 BLOCKER 2 / RESEARCH Pitfall 8).
+
+        Exposed alongside :attr:`mj_model` for the GT-extractor bootstrap.
+        Returns ``None`` if :meth:`start` has not been called yet.
+        """
+        return self._data
