@@ -20,9 +20,25 @@ handshake test exercises spawn/send/recv/kill/cleanup via
 ``scripts/echo_detector_worker.py``. Phase 5 (DET-MODELS-03) composes this
 class into a BoxeR backend — one bridge instance per backend, NOT per robot.
 
+Phase 5 extensions (Plan 05-05):
+  * Typed exceptions ``BridgeHangError`` / ``SubprocessDiedError`` replace the
+    Phase 2 silent ``return None`` failure paths. The pool crash handler
+    (Plan 05-09) catches them to drive the ``crash_fallback`` WS + YOLOv11
+    swap (RESEARCH D-03).
+  * ``wait_for_handshake(timeout_s)`` mitigates Open Risk #3 — BoxeR takes
+    5–15 s to load weights; the first ``send_frame`` cannot race the worker's
+    ``PAIR.connect()``. This method polls both Popen liveness and
+    ``zmq.Poller(POLLOUT)`` readiness.
+  * Background stdout/stderr drain thread mitigates T-5-05 — a chatty worker
+    whose stdout fills the Popen PIPE buffer (~64 KB) would otherwise block
+    indefinitely on ``write()`` and never reply, triggering a bogus
+    ``BridgeHangError``. The thread reads to EOF and logs each line.
+
 Threading: a single thread owns each bridge instance's socket exclusively.
 pyzmq sockets are not thread-safe; the Phase 5 per-robot worker thread will
-own its bridge's socket. Callers MUST NOT share a bridge across threads.
+own its bridge's socket. Callers MUST NOT share a bridge across threads. The
+drain thread reads ONLY ``process.stdout`` (which Popen merges with stderr via
+``stderr=STDOUT``), never the ZMQ socket — so it cannot race the caller.
 """
 
 from __future__ import annotations
@@ -30,6 +46,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import threading
 from typing import Any
 
 import msgpack
@@ -37,6 +54,34 @@ import numpy as np
 import zmq
 
 logger = logging.getLogger(__name__)
+
+
+class BridgeHangError(RuntimeError):
+    """Raised when SubprocessDetectorBridge.send_frame exceeds HANG_TIMEOUT_MS.
+
+    Phase 5 DET-MODELS-06: DetectorWorkerPool.on_backend_crash catches this
+    (along with SubprocessDiedError) to trigger the crash_fallback WS +
+    YOLOv11 swap per RESEARCH D-03.
+    """
+
+
+class SubprocessDiedError(RuntimeError):
+    """Raised when SubprocessDetectorBridge detects the worker Popen has exited.
+
+    Detected via ``Popen.poll() != None`` OR via ``zmq.ZMQError`` during
+    send/recv. Also raised pre-start (bridge is not alive).
+    """
+
+
+class BridgeHandshakeError(RuntimeError):
+    """Raised by ``wait_for_handshake`` on protocol-level handshake failure.
+
+    Reserved for future strict-protocol handshakes (e.g. worker-advertised
+    schema negotiation). The current POLLOUT-readiness gate raises
+    :class:`BridgeHangError` on timeout and :class:`SubprocessDiedError` on
+    early worker exit; this class exists so downstream plans have a typed
+    hook if they add a schema handshake.
+    """
 
 
 class SubprocessDetectorBridge:
@@ -57,15 +102,27 @@ class SubprocessDetectorBridge:
                 depth.tobytes(),  # optional — only if depth is not None
             ]
 
-        Incoming (from worker to bridge)::
+        Incoming (from worker to bridge, Phase 5 D-02 extended schema — ADDITIVE)::
 
-            msgpack({"ts": float, "inference_ms": float, "n_det": int,
-                     "classes": list[int], "scores": list[float],
-                     "bboxes": list[list[float]]})
+            msgpack({
+                "ts": float,
+                "inference_ms": float,
+                "n_det": int,
+                "classes": list[int],
+                "scores": list[float],
+                "bboxes": list[list[float]],       # 2D xyxy in pixels (Phase 2 — kept for CameraFeed)
+                "boxes_3d": list[dict] | None,     # NEW Phase 5 — OMITTED or None when backend not 3D-native
+                # each boxes_3d dict carries:
+                #   {"tx", "ty", "tz",            # center, world frame, meters
+                #    "qx", "qy", "qz", "qw",      # quaternion xyzw
+                #    "w",  "h",  "d"}             # extent (FULL, not half — composer divides by 2 per D-02)
+            })
 
     The bridge does NOT interpret the reply — it returns the raw ``dict`` to
     its caller. Phase 5's backend parses classes/scores/bboxes into concrete
-    detection dataclasses.
+    detection dataclasses and, when present, constructs :class:`OrientedBox3D`
+    instances from the ``boxes_3d`` entries via ``to_wire()`` (Phase 1 D-10
+    single-quaternion-construction-site invariant holds).
     """
 
     HANG_TIMEOUT_MS = 5000  # per must_haves/truths — locked at Phase 2
@@ -91,6 +148,10 @@ class SubprocessDetectorBridge:
         self._ctx: zmq.Context | None = None
         self._socket: zmq.Socket | None = None
         self._alive = False
+        # T-5-05 mitigation: background drain of Popen.stdout (with stderr
+        # merged via stderr=STDOUT) so a chatty worker cannot wedge us by
+        # filling the PIPE buffer.
+        self._stdout_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------
     # Public properties
@@ -122,6 +183,13 @@ class SubprocessDetectorBridge:
               :class:`zmq.Again` instead of blocking indefinitely.
             * ``LINGER = 0`` so ``ctx.term()`` on cleanup cannot hang
               if the worker crashed mid-reply.
+
+        Popen config:
+            * ``stderr=STDOUT`` merges both streams into ``stdout``.
+            * ``bufsize=1`` gives line-buffered stdout so the drain thread
+              emits log lines promptly.
+            * The daemon drain thread is spawned immediately so even a
+              burst of pre-handshake stdout output cannot fill the pipe.
         """
         self._ctx = zmq.Context()
         self._socket = self._ctx.socket(zmq.PAIR)
@@ -134,9 +202,73 @@ class SubprocessDetectorBridge:
         self._process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # merged — one drain thread covers both
+            bufsize=1,
+            text=True,
         )
         self._alive = True
+
+        # Start drain thread AFTER Popen is assigned so the thread never sees
+        # a None _process. daemon=True ensures the thread does not block
+        # interpreter shutdown if the worker somehow leaks.
+        self._stdout_thread = threading.Thread(
+            target=self._drain_worker_output,
+            name=f"detector-bridge-drain-{self._process.pid}",
+            daemon=True,
+        )
+        self._stdout_thread.start()
+
+    def wait_for_handshake(self, timeout_s: float = 60.0) -> None:
+        """Block until the worker has connected and the socket is write-ready.
+
+        Open Risk #3 (RESEARCH): BoxeR takes 5–15 s to load DINOv3+BoxerNet
+        weights before calling ``PAIR.connect()``. The FIRST ``send_frame``
+        cannot race that — without a gate, the bridge's send succeeds into
+        a queue with no consumer and the subsequent ``recv`` times out
+        within 5 s, triggering a bogus :class:`BridgeHangError` even though
+        the worker is healthy.
+
+        Implementation: poll both ``Popen.poll()`` (to fail fast if the
+        worker crashed during weight load) and ``zmq.Poller(POLLOUT)``
+        readiness (which flips True only after the peer connects a PAIR
+        socket). The POLLOUT semantics here are reliable because PAIR sockets
+        only report writable when a peer is connected — unlike PUSH/ROUTER.
+
+        Args:
+            timeout_s: Maximum time to wait for the handshake. Default 60 s
+                accommodates BoxeR's weight-load worst case (weights +
+                DINOv3 + first CUDA init on a cold box).
+
+        Raises:
+            SubprocessDiedError: worker Popen exited before the handshake
+                completed.
+            BridgeHangError: worker did not connect within ``timeout_s``.
+        """
+        if self._process is None or self._socket is None:
+            raise SubprocessDiedError(
+                "bridge is not alive (start() not called or teardown already ran)"
+            )
+
+        deadline = self._now() + max(0.0, timeout_s)
+        poller = zmq.Poller()
+        poller.register(self._socket, zmq.POLLOUT)
+        # Poll in short slices so we can observe Popen death between slices
+        # without waiting the full timeout.
+        slice_ms = 100
+        while True:
+            if self._process.poll() is not None:
+                code = self._process.returncode
+                raise SubprocessDiedError(
+                    f"worker exited with code {code} before handshake"
+                )
+            events = dict(poller.poll(slice_ms))
+            if events.get(self._socket) == zmq.POLLOUT:
+                logger.info("bridge handshake complete for %s", self._endpoint)
+                return
+            if self._now() >= deadline:
+                raise BridgeHangError(
+                    f"worker did not connect within {timeout_s}s"
+                )
 
     def send_frame(
         self,
@@ -144,13 +276,14 @@ class SubprocessDetectorBridge:
         depth: np.ndarray | None,
         timestamp: float,
         params: dict | None = None,
-    ) -> dict | None:
+    ) -> dict:
         """Send one frame to the worker, receive and decode the reply dict.
 
-        Returns the raw reply dict on success. Returns ``None`` on any failure
-        path (hang, crash, ZMQ error, unexpected exception). All failure paths
-        funnel through :meth:`_kill_process` so the bridge cannot be left in a
-        half-alive state.
+        Returns the raw reply dict on success. Failure paths raise typed
+        exceptions (Plan 05-05): :class:`BridgeHangError` on RCVTIMEO and
+        :class:`SubprocessDiedError` on Popen exit / ZMQ error / pre-start
+        call. All failure paths funnel through :meth:`_kill_process` so the
+        bridge cannot be left in a half-alive state.
 
         Args:
             rgb: ``(H, W, 3) uint8`` colour image.
@@ -159,18 +292,23 @@ class SubprocessDetectorBridge:
             timestamp: Simulation time in seconds (mirrors SLAM bridge).
             params: Optional per-frame backend parameters (score threshold,
                 topk, etc.). Passed opaquely inside the msgpack header.
+
+        Raises:
+            SubprocessDiedError: bridge not started, Popen exited, or ZMQ
+                reported a fatal transport error.
+            BridgeHangError: worker did not reply within ``hang_timeout_ms``.
         """
         if not self._alive:
-            return None
+            raise SubprocessDiedError(
+                "bridge is not alive (start() not called or teardown already ran)"
+            )
 
         # Crash detection: Popen has exited since last call.
         if self._process is not None and self._process.poll() is not None:
-            logger.warning(
-                "Detector subprocess exited with code %d",
-                self._process.returncode,
-            )
+            code = self._process.returncode
+            logger.warning("Detector subprocess exited with code %d", code)
             self._cleanup()
-            return None
+            raise SubprocessDiedError(f"worker exited with code {code}")
 
         try:
             header_dict: dict[str, Any] = {
@@ -201,15 +339,19 @@ class SubprocessDetectorBridge:
                 "Detector subprocess hung (no response in %dms)", self._timeout
             )
             self._kill_process()
-            return None
+            raise BridgeHangError(
+                f"no response in {self._timeout}ms"
+            ) from None
         except zmq.ZMQError as exc:
             logger.error("Detector ZMQ error: %s", exc)
             self._kill_process()
-            return None
+            raise SubprocessDiedError(f"zmq error: {exc}") from exc
         except Exception as exc:  # noqa: BLE001 — transport must never leak
             logger.error("Unexpected error in detector send_frame: %s", exc)
             self._kill_process()
-            return None
+            raise SubprocessDiedError(
+                f"unexpected error in send_frame: {exc}"
+            ) from exc
 
     def shutdown(self) -> None:
         """Gracefully tear down the worker and release all resources."""
@@ -219,10 +361,39 @@ class SubprocessDetectorBridge:
     # Internal teardown
     # ------------------------------------------------------------------
 
+    def _drain_worker_output(self) -> None:
+        """Read Popen.stdout (merged with stderr) to EOF, logging each line.
+
+        T-5-05 mitigation: without this, a chatty worker fills the ~64 KB
+        OS pipe buffer and then blocks on its next ``print()`` — no reply
+        ever reaches the bridge and ``send_frame`` raises a bogus
+        :class:`BridgeHangError`.
+
+        Runs as a daemon thread. Exits on EOF (worker closes stdout / exits).
+        Never raises — any exception is swallowed + logged; the drain must
+        not be able to crash the main bridge thread.
+        """
+        proc = self._process
+        if proc is None or proc.stdout is None:
+            return
+        pid = proc.pid
+        try:
+            # ``for line in proc.stdout`` uses the text-mode iterator with
+            # bufsize=1 (line-buffered) so every print() the worker emits
+            # surfaces promptly in the parent's logs.
+            for line in proc.stdout:
+                try:
+                    logger.info("[worker %d] %s", pid, line.rstrip())
+                except Exception:  # noqa: BLE001 — drain must never raise
+                    pass
+        except Exception as exc:  # noqa: BLE001 — drain must never raise
+            logger.debug("drain thread for worker %d ended: %s", pid, exc)
+
     def _kill_process(self) -> None:
         """Kill the worker subprocess and run :meth:`_cleanup`.
 
-        Safe to call repeatedly and before :meth:`start`.
+        Safe to call repeatedly and before :meth:`start`. Joins the drain
+        thread briefly so it doesn't outlive the Popen reference.
         """
         self._alive = False
         if self._process is not None:
@@ -232,6 +403,14 @@ class SubprocessDetectorBridge:
             except Exception:  # noqa: BLE001 — cleanup must never raise
                 pass
             self._process = None
+        # Join the drain thread — after Popen is killed + stdout closed,
+        # the for-loop inside the thread will EOF and the thread will exit.
+        if self._stdout_thread is not None:
+            try:
+                self._stdout_thread.join(timeout=1.0)
+            except Exception:  # noqa: BLE001
+                pass
+            self._stdout_thread = None
         self._cleanup()
 
     def _cleanup(self) -> None:
@@ -262,3 +441,13 @@ class SubprocessDetectorBridge:
                     os.unlink(sock_path)
                 except OSError:
                     pass
+
+    # ------------------------------------------------------------------
+    # Small seam for tests — monkeypatchable clock.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _now() -> float:
+        import time
+
+        return time.monotonic()
