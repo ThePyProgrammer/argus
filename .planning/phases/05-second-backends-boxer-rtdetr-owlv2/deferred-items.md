@@ -35,3 +35,42 @@ Items discovered during execution that are out of scope for the current plan but
 uv lock 2>&1 | grep -i "warning\|error" | grep -v "yanked"  # must be empty
 uv run python -c "from optimum.exporters.onnx import main_export; print('OK')"  # must succeed
 ```
+
+---
+
+## Plan 05-05: Pre-existing `fastapi` / `torch` import errors outside scope
+
+**Discovered:** 2026-04-15 during 05-05 execution while running the phase-wide
+`uv run pytest tests/ -m "not slow_boxer and not network"` regression command
+from the plan's `<verification>` block.
+
+**Issue:** Several test modules fail at collection or run time with
+``ModuleNotFoundError: No module named 'fastapi'`` (or `'torch'`) on a default
+``uv sync`` — the ``perception`` + ``web`` optional extras are not
+auto-installed by `uv sync` without `--all-extras`. Affected files (not caused
+by Plan 05-05):
+
+- `tests/mcp/test_mcp_server.py`
+- `tests/perception/test_detector_routes.py`
+- `tests/perception/test_lifter_routes.py`
+- `tests/perception/test_lifter_hotswap.py` (fastapi)
+- `tests/web/test_*` (all five)
+- `tests/perception/test_protocol_contracts.py::test_torch_backend_mixin_*` (torch)
+- `tests/perception/test_point_cluster_lifter.py::test_open3d_extent_divided_by_two` (open3d)
+- `tests/slam/test_openvins_backend.py::TestOpenVINSRegistration::test_registered_as_openvins` (missing openvins stub on plain install)
+- `tests/integration/test_multi_mode.py` + `tests/integration/test_multi_robot_integration.py` (ValueError on coordinator construction — pre-existing, unrelated to detector bridge)
+
+**Scope decision:** Not auto-fixed per the executor's SCOPE BOUNDARY rule — these
+failures exist on the pre-05-05 base (commit ``10202b7``) and are caused by
+development-install profile mismatches, not by the bridge changes in 05-05.
+The narrow verification command the plan specifies
+(`uv run pytest tests/perception/test_subprocess_bridge*.py tests/perception/test_crash_fallback.py tests/perception/test_registry.py tests/perception/test_thread_config.py --timeout=30`)
+passes cleanly. Phase-level CI configuration for auto-installing `[perception,web]`
+extras is a Phase 6+ concern.
+
+**Required action (future / environment hygiene):**
+1. Document `uv sync --extra perception --extra web --extra dev` in CONTRIBUTING
+   or a `Makefile` target so contributors get a working test bed.
+2. Consider splitting the top-level `tests/` into extra-gated subpackages with
+   `pytest_plugins`-based skips when the extra is absent.
+

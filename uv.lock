@@ -114,6 +114,11 @@ web = [
     { name = "websockets" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-timeout" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "evo", specifier = ">=1.0.0" },
@@ -140,6 +145,9 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'web'", specifier = ">=12.0" },
 ]
 provides-extras = ["perception", "teleop", "web", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-timeout", specifier = ">=2.4.0" }]
 
 [[package]]
 name = "attrs"
