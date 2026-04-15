@@ -194,17 +194,6 @@ class DetectorWorker:
         with self._lock:
             return self._latest
 
-    @property
-    def detector(self):
-        """Public accessor for the underlying detector backend (Phase 6 F3).
-
-        Used by the coordinator detection-metrics pump. Read-only — the
-        returned object satisfies :class:`DetectorProtocol` (imported under
-        ``TYPE_CHECKING``), so downstream callers rely on duck typing
-        (e.g. ``.get_metrics()``) rather than a runtime-imported annotation.
-        """
-        return self._detector
-
     def inspect(self) -> dict:
         """Snapshot of queue depth + drop count + last submit sim-time.
 
