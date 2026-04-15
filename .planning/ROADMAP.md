@@ -164,9 +164,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 12 plans
 - [x] 07-01-PLAN.md — Wave 0 Python pytest skip-stubs (7 test files)
 - [x] 07-02-PLAN.md — Wave 0 frontend vitest skip-stubs (6 test files; +NodeInspector.backendDropdown iter 1)
-- [ ] 07-03-PLAN.md — src/tracking/ package: TrackerProtocol + TrackerRegistry + NoneTracker (D-13)
-- [ ] 07-04-PLAN.md — PipelineConfig + NodeCatalog + PipelineBuilder.build extension for perception
-- [ ] 07-05-PLAN.md — DetectorWorkerPool.swap_backend (D-11) + 5 atomicity tests
+- [x] 07-03-PLAN.md — src/tracking/ package: TrackerProtocol + TrackerRegistry + NoneTracker (D-13)
+- [x] 07-04-PLAN.md — PipelineConfig + NodeCatalog + PipelineBuilder.build extension for perception
+- [x] 07-05-PLAN.md — DetectorWorkerPool.swap_backend (D-11) + 5 atomicity tests
 - [ ] 07-06-PLAN.md — PortDataType/NodeCategory union extension + findPortTypeMismatches (D-07, D-09)
 - [ ] 07-07-PLAN.md — nodeDefinitions.ts 3 perception node defs + color maps + NodePalette ordering (D-03..D-07)
 - [ ] 07-08-PLAN.md — pipelineStore.ts:101 + pipelineSerializer.ts:112 dataType fix + ApplyBar hot-apply toast (D-08, UI-SPEC)
