@@ -194,10 +194,17 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
               `Backend ${payload.crashed_backend} crashed, fell back to ICP`
             );
             slamState.setActive('icp', 'ICP Odometry', {});
+          } else if (subsystem === 'detector') {
+            // Phase 5 DET-MODELS-06 — populate detectorStore.crashMessage so CrashToast renders,
+            // and mirror the SLAM pattern by setting active backend to the fallback (yolov11).
+            const detectorState = useDetectorStore.getState();
+            detectorState.setCrashMessage(
+              `Backend ${payload.crashed_backend} crashed, fell back to ${payload.fallback_backend}`
+            );
+            detectorState.setActive(payload.fallback_backend, 'YOLOv11-nano', {});
           } else {
-            // Phase 5 DET-MODELS-06 will handle subsystem === 'detector' here.
-            console.log(
-              `[crash_fallback] subsystem=${subsystem}: ${payload.crashed_backend} -> ${payload.fallback_backend}`
+            console.warn(
+              `[crash_fallback] unknown subsystem=${subsystem}: ${payload.crashed_backend} -> ${payload.fallback_backend}`
             );
           }
           break;

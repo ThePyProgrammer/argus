@@ -556,6 +556,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         dummy_frames[rid] = cached
                     detector_pool.warmup_all(dummy_frames)
                     detector_pool.start()
+                    # Phase 5 D-03 — wire streaming_viz so pool.on_backend_crash
+                    # can append crash_fallback messages to the WS queue.
+                    if streaming_viz is not None:
+                        detector_pool.set_streaming_viz(streaming_viz)
                     coordinator._detector_pool = detector_pool
                     # Plan 04-05 (Open Question #4): expose the pool via
                     # app.state so POST /api/detectors/lifter-hotswap can
