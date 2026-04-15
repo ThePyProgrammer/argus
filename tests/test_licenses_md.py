@@ -1,31 +1,34 @@
-"""DET-MODELS-08 — LICENSES.md content verification (Wave 0 skeleton, Plan 05-04).
+"""DET-MODELS-08 — LICENSES.md content verification (Plan 05-08 activation).
 
-Unlike the other Wave 0 skeletons, this test ALREADY has an implementation
-after Plan 05-02 lands (LICENSES.md is created in that plan). We still use
-pytest.skip stubs here so Wave 0 validation is clean across all 7 files;
-Plan 05-02 removes these skips in its own commit.
+LICENSES.md was created by Plan 05-02. These tests verify it has the
+required entries + NC compliance mechanism section.
 """
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 
 LICENSES_PATH = Path(__file__).parent.parent / "LICENSES.md"
 
 
 def test_licenses_md_exists() -> None:
-    pytest.skip("Plan 05-02 fills in: simple file existence check.")
+    assert LICENSES_PATH.is_file(), f"LICENSES.md missing at {LICENSES_PATH}"
 
 
 def test_boxer_cc_by_nc_present() -> None:
-    pytest.skip("Plan 05-02 fills in: LICENSES.md contains 'CC-BY-NC-4.0'.")
+    content = LICENSES_PATH.read_text()
+    assert "CC-BY-NC-4.0" in content
+    assert "facebook/BoxeR" in content or "facebookresearch/boxer" in content
 
 
 def test_agpl_apache_mit_entries_present() -> None:
-    pytest.skip("Plan 05-02 fills in: LICENSES.md lists AGPL-3.0, Apache-2.0, MIT rows.")
+    content = LICENSES_PATH.read_text()
+    # Per D-14 schema — all three SPDX tags must appear for the corresponding deps.
+    assert "AGPL-3.0" in content   # Ultralytics YOLOv11
+    assert "Apache-2.0" in content  # RT-DETRv2 (and many others)
+    assert "MIT" in content        # ONNX Runtime, FastAPI
 
 
 def test_nc_compliance_section_present() -> None:
-    pytest.skip("Plan 05-02 fills in: 'NC Compliance Mechanism' H2 section exists.")
+    content = LICENSES_PATH.read_text()
+    assert "## NC Compliance Mechanism" in content or "NC Compliance Mechanism" in content
