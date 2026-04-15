@@ -13,6 +13,7 @@ const CATEGORY_ICONS: Record<NodeCategory, string> = {
   splitter: '\u2194',      // left-right arrow
   parameter: '\u{1F522}',  // numbers
   output: '\u{1F4FA}',     // TV
+  perception: '\u{1F50D}', // magnifying glass (Phase 7 DET-PIPELINE-01)
 };
 
 // Status badge colors

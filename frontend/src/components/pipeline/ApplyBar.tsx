@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePipelineStore } from '../../stores/pipelineStore';
 
 import { ConfirmModal } from '../ConfirmModal';
 import { RestartOverlay } from '../RestartOverlay';
 import { PresetSelector } from './PresetSelector';
+
+interface HotApplyToastState {
+  visible: boolean;
+  changed: string[];
+}
 
 export function ApplyBar() {
   const isDirty = usePipelineStore((s) => s.isDirty);
@@ -14,6 +19,16 @@ export function ApplyBar() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [hotToast, setHotToast] = useState<HotApplyToastState>({ visible: false, changed: [] });
+
+  // Auto-dismiss toast after 3000ms (UI-SPEC Lifetime 3000ms + 200ms fade).
+  useEffect(() => {
+    if (!hotToast.visible) return;
+    const timeoutId = window.setTimeout(() => {
+      setHotToast((prev) => ({ ...prev, visible: false }));
+    }, 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [hotToast.visible]);
 
   function handleApplyClick() {
     usePipelineStore.getState().validate();
@@ -41,9 +56,17 @@ export function ApplyBar() {
         if (!res.ok) throw new Error(`Apply failed: ${res.status}`);
         return res.json();
       })
-      .then(() => {
+      .then((body) => {
         usePipelineStore.getState().markApplied();
-        // isApplying cleared by slam_restart_complete WS handler in useWebSocket.ts
+        if (body && body.status === 'hot-applied') {
+          // Phase 7 DET-PIPELINE-05 — no restart happened; clear isApplying now
+          // (Pitfall 5: no slam_restart_complete WS will fire).
+          usePipelineStore.getState().setIsApplying(false);
+          const changed = Array.isArray(body.changed) ? (body.changed as string[]) : [];
+          setHotToast({ visible: true, changed });
+        }
+        // status === 'restarting': isApplying cleared by slam_restart_complete WS handler
+        // in useWebSocket.ts (existing behavior preserved).
       })
       .catch((err) => {
         setApplyError(err.message ?? 'Pipeline apply failed');
@@ -87,6 +110,25 @@ export function ApplyBar() {
     maxHeight: 200,
     overflowY: 'auto',
     zIndex: 50,
+  };
+
+  // Hot-apply toast — UI-SPEC Hot-Apply Toast Pixel Spec.
+  const hotToastStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: '100%',
+    left: 16,
+    background: '#1e3a2a',
+    border: '1px solid #4caf50',
+    borderRadius: 4,
+    padding: '8px 12px',
+    marginBottom: 4,
+    minWidth: 240,
+    maxWidth: 480,
+    zIndex: 50,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    cursor: 'pointer',
   };
 
   return (
@@ -149,6 +191,39 @@ export function ApplyBar() {
               {err.message}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Hot-apply success toast — Phase 7 DET-PIPELINE-05 */}
+      {hotToast.visible && (
+        <div
+          style={hotToastStyle}
+          role="status"
+          aria-live="polite"
+          onClick={() => setHotToast((p) => ({ ...p, visible: false }))}
+        >
+          <div style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: '#a5d6a7',
+            lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            <span style={{ color: '#4caf50', marginRight: 6, fontSize: 12 }}>{'\u2713'}</span>
+            Pipeline updated in place
+          </div>
+          {hotToast.changed.length > 0 && (
+            <div style={{
+              fontSize: 10,
+              fontWeight: 400,
+              color: '#888',
+              lineHeight: 1.4,
+              marginTop: 2,
+            }}>
+              {hotToast.changed.join(' \u00b7 ')}
+            </div>
+          )}
         </div>
       )}
 
