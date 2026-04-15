@@ -33,7 +33,11 @@ import time
 import numpy as np
 import pytest
 
-from src.perception.subprocess_bridge import SubprocessDetectorBridge
+from src.perception.subprocess_bridge import (
+    BridgeHangError,
+    SubprocessDetectorBridge,
+    SubprocessDiedError,
+)
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 ECHO_SCRIPT = str(REPO_ROOT / "scripts" / "echo_detector_worker.py")
@@ -195,13 +199,15 @@ def test_kill_triggers_none_reply_within_timeout(bridge):
     # Give the kernel time to deliver the signal + Popen to observe the exit.
     time.sleep(0.3)
 
-    # Next send: either the crash-detection (Popen.poll()) path returns None
-    # immediately, OR zmq.Again fires within HANG_TIMEOUT_MS. Either way the
-    # bridge MUST NOT hang past HANG_TIMEOUT_MS + modest slack.
+    # Next send: Plan 05-05 flipped the return-None failure paths to typed
+    # exceptions. Either the crash-detection (Popen.poll()) path raises
+    # SubprocessDiedError immediately, OR zmq.Again-after-kill bubbles up as
+    # SubprocessDiedError within HANG_TIMEOUT_MS. Either way the bridge MUST
+    # NOT hang past HANG_TIMEOUT_MS + modest slack and MUST NOT return a dict.
     t0 = time.monotonic()
-    reply = bridge.send_frame(rgb, depth, timestamp=2.0)
+    with pytest.raises((SubprocessDiedError, BridgeHangError)):
+        bridge.send_frame(rgb, depth, timestamp=2.0)
     elapsed = time.monotonic() - t0
-    assert reply is None, "bridge returned non-None reply after worker kill"
     assert elapsed < bridge.HANG_TIMEOUT_MS / 1000.0 + 1.0, (
         f"bridge hung {elapsed:.2f}s after worker kill "
         f"(expected ≤{bridge.HANG_TIMEOUT_MS / 1000.0 + 1.0:.1f}s)"
@@ -254,3 +260,96 @@ def test_shutdown_closes_context_and_socket_handles():
     assert b._socket is None, "_cleanup() did not null the socket reference"
     assert b._ctx is None, "_cleanup() did not null the zmq.Context reference"
     assert b._process is None, "_kill_process() did not null the Popen reference"
+
+
+# ---------------------------------------------------------------------------
+# Plan 05-05: typed exceptions + handshake + stdout drain thread.
+# ---------------------------------------------------------------------------
+
+
+def test_send_frame_before_start_raises_subprocess_died():
+    """Plan 05-05: was ``return None`` → now raises SubprocessDiedError."""
+    b = _make_bridge()
+    rgb, depth = _dummy_frame()
+    with pytest.raises(SubprocessDiedError):
+        b.send_frame(rgb, depth, timestamp=0.0)
+
+
+def test_wait_for_handshake_returns_on_socket_ready(bridge):
+    """Open Risk #3: wait_for_handshake returns without raising when worker connects."""
+    bridge.start()
+    # wait_for_handshake must wait long enough for the echo worker to import
+    # msgpack+zmq and call connect() on the PAIR socket.
+    bridge.wait_for_handshake(timeout_s=10.0)
+    # After a successful handshake, send_frame should round-trip normally.
+    rgb, depth = _dummy_frame()
+    reply = bridge.send_frame(rgb, depth, timestamp=0.0)
+    assert reply is not None
+
+
+def test_wait_for_handshake_raises_on_dead_worker():
+    """If the worker Popen has already exited, wait_for_handshake raises SubprocessDiedError."""
+    # Spawn a worker that exits immediately (--zmq missing → argparse error → exit 2).
+    b = SubprocessDetectorBridge(
+        binary_path="/bin/false",  # exits 1 immediately; bridge will observe poll()!=None
+        hang_timeout_ms=500,
+    )
+    try:
+        b.start()
+        # Give the kernel a moment to deliver the exit to Popen.
+        time.sleep(0.3)
+        with pytest.raises(SubprocessDiedError):
+            b.wait_for_handshake(timeout_s=2.0)
+    finally:
+        b.shutdown()
+
+
+def test_stdout_drain_does_not_block_on_verbose_worker(tmp_path):
+    """T-5-05: Popen.PIPE stdout DoS mitigated by background drain thread.
+
+    Spawn a worker that writes a burst of stdout lines interleaved with replies.
+    Without the drain thread, stdout PIPE buffer (~64 KB) would fill and the
+    worker would block on write() → no reply → BridgeHangError. With the drain
+    thread reading in the background, the bridge keeps receiving replies.
+    """
+    # Craft a chatty worker that mirrors echo_detector_worker but also spams
+    # stdout between replies.
+    chatty = tmp_path / "chatty_worker.py"
+    chatty.write_text(
+        "#!/usr/bin/env python3\n"
+        "import argparse, sys, msgpack, zmq\n"
+        "ap = argparse.ArgumentParser()\n"
+        "ap.add_argument('--zmq', dest='zmq_endpoint', required=True)\n"
+        "args = ap.parse_args()\n"
+        "ctx = zmq.Context(); sock = ctx.socket(zmq.PAIR); sock.connect(args.zmq_endpoint)\n"
+        "try:\n"
+        "    while True:\n"
+        "        parts = sock.recv_multipart()\n"
+        "        if not parts: continue\n"
+        "        header = msgpack.unpackb(parts[0], raw=False)\n"
+        "        # Spam ~8 KB of stdout before replying — cumulatively exceeds\n"
+        "        # PIPE buffer after a few frames if bridge isn't draining.\n"
+        "        for i in range(128):\n"
+        "            print('chatty-log-line-' + 'x'*50, flush=True)\n"
+        "        reply = msgpack.packb({'ts': float(header.get('ts', 0.0)),\n"
+        "                               'inference_ms': 0.0, 'n_det': 0,\n"
+        "                               'classes': [], 'scores': [], 'bboxes': []})\n"
+        "        sock.send(reply)\n"
+        "except (KeyboardInterrupt, zmq.ContextTerminated):\n"
+        "    pass\n"
+    )
+    chatty.chmod(0o755)
+
+    b = SubprocessDetectorBridge(binary_path=str(chatty))
+    try:
+        b.start()
+        time.sleep(0.3)
+        rgb, depth = _dummy_frame()
+        # Run enough frames that the PIPE would fill without a drain.
+        for i in range(10):
+            reply = b.send_frame(rgb, depth, timestamp=float(i))
+            assert reply is not None, (
+                f"frame {i} hung — drain thread likely not draining stdout"
+            )
+    finally:
+        b.shutdown()

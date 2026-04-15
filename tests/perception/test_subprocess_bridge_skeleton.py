@@ -22,7 +22,10 @@ import os
 import numpy as np
 import pytest
 
-from src.perception.subprocess_bridge import SubprocessDetectorBridge
+from src.perception.subprocess_bridge import (
+    SubprocessDetectorBridge,
+    SubprocessDiedError,
+)
 from src.slam.backends.subprocess_bridge import SubprocessSLAMBridge
 
 
@@ -88,11 +91,15 @@ class TestInitialState:
         bridge = _make_bridge(ipc_endpoint="ipc:///tmp/detector_bridge_init_test")
         assert bridge.endpoint == "ipc:///tmp/detector_bridge_init_test"
 
-    def test_send_frame_before_start_returns_none(self):
+    def test_send_frame_before_start_raises_subprocess_died(self):
+        # Plan 05-05: was ``return None`` — now raises SubprocessDiedError so
+        # that the pool's crash handler can catch the typed error instead of
+        # branching on a silent None sentinel.
         bridge = _make_bridge()
         rgb = np.zeros((4, 4, 3), dtype=np.uint8)
         depth = np.zeros((4, 4), dtype=np.float32)
-        assert bridge.send_frame(rgb, depth, timestamp=0.0) is None
+        with pytest.raises(SubprocessDiedError):
+            bridge.send_frame(rgb, depth, timestamp=0.0)
 
     def test_shutdown_before_start_is_safe(self):
         bridge = _make_bridge()
