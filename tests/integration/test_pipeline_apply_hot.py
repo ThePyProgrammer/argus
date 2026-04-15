@@ -19,14 +19,40 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.web.pipeline_routes import router as pipeline_router
+from src.coordination.merge_registry import MergeRegistry
 from src.coordination.pipeline_builder import PipelineConfig
+from src.slam.registry import SLAMRegistry
 
 
 @pytest.fixture(autouse=True)
 def _populate_registries():
-    import src.perception.backends  # noqa: F401
-    import src.perception.lifters   # noqa: F401
-    import src.tracking.trackers    # noqa: F401
+    """Register minimal SLAM + merger entries (without importing open3d).
+
+    The `test_slam_backend_change_triggers_restart` test swaps slam_icp →
+    slam_orbslam3, so we register BOTH backend names here. We do NOT import
+    src.slam.backends (transitive open3d dep); class paths are never resolved
+    in the apply-path — only registry membership matters for PipelineBuilder.
+    """
+    SLAMRegistry._clear()
+    MergeRegistry._clear()
+    SLAMRegistry.register(
+        "icp", "ICP Odometry", "src.slam.backends.icp_backend.ICPBackend"
+    )
+    SLAMRegistry.register(
+        "orbslam3", "ORB-SLAM3",
+        "src.slam.backends.orbslam3_backend.ORBSLAM3Backend",
+    )
+    MergeRegistry.register(
+        "icp_union", "ICP Union",
+        "src.coordination.merge_strategies.icp_union.ICPUnionStrategy",
+    )
+    # Perception registries (no heavy deps at import time).
+    import src.perception.backends                 # noqa: F401
+    import src.perception.lifters                  # noqa: F401
+    import src.tracking.trackers                   # noqa: F401
+    yield
+    SLAMRegistry._clear()
+    MergeRegistry._clear()
 
 
 @pytest.fixture
