@@ -100,8 +100,8 @@ async def apply_pipeline(req: PipelineApplyRequest, request: Request):
             and config.merger_name == last_config.merger_name
             and config.merger_params == last_config.merger_params
             and config.filter_chain == last_config.filter_chain
-            and config.tracker_name == last_config.tracker_name
-            and config.tracker_params == last_config.tracker_params
+            # tracker_name and tracker_params REMOVED from structural check
+            # (Phase 8 Pitfall 8 — tracker is hot-swappable like detector/lifter)
         )
         detector_changed = (
             config.detector_name != last_config.detector_name
@@ -111,8 +111,12 @@ async def apply_pipeline(req: PipelineApplyRequest, request: Request):
             config.lifter_name != last_config.lifter_name
             or config.lifter_params != last_config.lifter_params
         )
+        tracker_changed = (
+            config.tracker_name != last_config.tracker_name
+            or config.tracker_params != last_config.tracker_params
+        )
 
-        if structural_unchanged and (detector_changed or lifter_changed):
+        if structural_unchanged and (detector_changed or lifter_changed or tracker_changed):
             # HOT-APPLY PATH
             pool = getattr(request.app.state, "detector_pool", None)
             if pool is None:
@@ -166,6 +170,23 @@ async def apply_pipeline(req: PipelineApplyRequest, request: Request):
                     else "lifter_params"
                 )
 
+            if tracker_changed:
+                try:
+                    pool.swap_tracker(
+                        config.tracker_name,
+                        dict(config.tracker_params),
+                    )
+                except (ValueError, ImportError) as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"swap_tracker failed: {exc}",
+                    )
+                changed.append(
+                    "tracker_name"
+                    if config.tracker_name != last_config.tracker_name
+                    else "tracker_params"
+                )
+
             request.app.state.last_applied_pipeline_config = config
             request.app.state.last_applied_topology_digest = topology_digest
             return {
@@ -173,6 +194,7 @@ async def apply_pipeline(req: PipelineApplyRequest, request: Request):
                 "changed": changed,
                 "active_detector": config.detector_name,
                 "active_lifter": config.lifter_name,
+                "active_tracker": config.tracker_name,
             }
 
     # RESTART PATH (existing + topology-digest update for next diff)
