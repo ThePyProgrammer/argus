@@ -33,6 +33,10 @@ const EXPECTED_EXTRAS = new Set<string>([
   // Restart-subsystem tracking (Plan 10 Task 1 / D-12)
   'restartSubsystem',
   'setRestartSubsystem',
+  // Phase 8 DET-STRETCH-04: per-robot backend tracking
+  'perRobotBackend',
+  'setPerRobotBackend',
+  'setAllPerRobotBackends',
 ]);
 
 describe('detectorStore structural equivalence with slamStore (D-03)', () => {

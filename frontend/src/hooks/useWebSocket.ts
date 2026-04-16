@@ -5,6 +5,7 @@ import { useSlamStore, fetchSlamState } from '../stores/slamStore';
 import { useDetectorStore, fetchDetectorState } from '../stores/detectorStore';
 import { useMetricsStore } from '../stores/metricsStore';
 import { usePipelineStore } from '../stores/pipelineStore';
+import { useSemanticMapStore } from '../stores/semanticMapStore';
 import type {
   WSMessage,
   RobotListPayload,
@@ -130,6 +131,19 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
               detectionHistory,
               detectionGtMetrics,
             );
+          }
+          // Phase 8 DET-STRETCH-02: fused detections
+          const fusedDetections = (payload as any).fused_detections ?? [];
+          useMetricsStore.getState().setFusedDetections(fusedDetections);
+
+          // Phase 8 DET-STRETCH-03: semantic map delta
+          const semanticMap = (payload as any).semantic_map;
+          if (semanticMap) {
+            const smStore = useSemanticMapStore.getState();
+            if (semanticMap.active) smStore.addOrUpdate(semanticMap.active);
+            if (semanticMap.expired_ids) smStore.remove(semanticMap.expired_ids);
+            // Update sim time for opacity computation
+            smStore.setCurrentSimTime((payload as StatsPayload).elapsed ?? 0);
           }
           break;
         }

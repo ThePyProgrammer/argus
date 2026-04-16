@@ -5,6 +5,7 @@ import type {
   DetectionMetrics,
   DetectionMetricHistory,
   DetectionGtMetrics,
+  FusedDetection,
 } from '../utils/messageTypes';
 
 interface MetricsStoreState {
@@ -30,6 +31,8 @@ interface MetricsStoreState {
   detectionHistory: Record<string, DetectionMetricHistory>;
   /** Phase 6 SC#2 revision 2026-04-15 — per-robot per-class GT aggregates */
   detectionGtPerRobot: Record<string, DetectionGtMetrics>;
+  /** Phase 8 DET-STRETCH-02 — fused cross-robot detections */
+  fusedDetections: FusedDetection[];
 
   // Setters
   updateMetrics: (robotId: string, metrics: SlamMetrics) => void;
@@ -46,6 +49,7 @@ interface MetricsStoreState {
   setOutputMode: (mode: 'cloud' | 'voxel' | 'mesh') => void;
   setOutputHidden: (hidden: boolean) => void;
   updateHistory: (robotId: string, history: MetricHistory) => void;
+  setFusedDetections: (detections: FusedDetection[]) => void;
   setMeshData: (
     vertices: number[][],
     faces: number[][],
@@ -70,6 +74,7 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
   detectionPerRobot: {},
   detectionHistory: {},
   detectionGtPerRobot: {},
+  fusedDetections: [],
 
   updateMetrics: (robotId, metrics) =>
     set((state) => ({
@@ -104,6 +109,7 @@ export const useMetricsStore = create<MetricsStoreState>()((set) => ({
     set((state) => ({
       history: { ...state.history, [robotId]: history },
     })),
+  setFusedDetections: (detections) => set({ fusedDetections: detections }),
   setMeshData: (vertices, faces, colors = null) =>
     set({ meshVertices: vertices, meshFaces: faces, meshColors: colors }),
   clearMeshData: () =>

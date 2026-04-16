@@ -155,3 +155,38 @@ export interface DetectionGtClass {
   per_class_recall: number;
 }
 export type DetectionGtMetrics = Record<string, DetectionGtClass>;
+
+/** Fused cross-robot detection from DetectionFusionManager (DET-STRETCH-02). */
+export interface FusedDetection {
+  fused_track_id: number;
+  class_name: string;
+  score: number;
+  center: [number, number, number];
+  half_extents: [number, number, number];
+  quaternion: [number, number, number, number];
+  robot_ids: string[];
+  source_track_ids: number[];
+}
+
+/** Semantic map object with TTL (DET-STRETCH-03). */
+export interface SemanticMapObject {
+  fused_track_id: number;
+  class_name: string;
+  center: [number, number, number];
+  half_extents: [number, number, number];
+  quaternion: [number, number, number, number];
+  score: number;
+  last_seen: number;
+  ttl: number;
+}
+
+/** Semantic map delta update from server. */
+export interface SemanticMapDelta {
+  active: SemanticMapObject[];
+  expired_ids: number[];
+}
+
+/** Per-robot backend status from GET /api/detectors/active extension (DET-STRETCH-04). */
+export interface PerRobotBackendStatus {
+  [robotId: string]: string;
+}

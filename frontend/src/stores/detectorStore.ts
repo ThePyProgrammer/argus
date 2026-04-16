@@ -54,6 +54,11 @@ interface DetectorStoreState {
   // render the correct RestartOverlay (detector vs lifter).
   restartSubsystem: 'detector' | 'lifter' | null;
 
+  // Phase 8 DET-STRETCH-04: per-robot backend tracking
+  perRobotBackend: Record<string, string>;
+  setPerRobotBackend: (robotId: string, backend: string) => void;
+  setAllPerRobotBackends: (mapping: Record<string, string>) => void;
+
   // --- Detector setters (mirror slamStore) ---
   setBackends: (backends: DetectorBackend[]) => void;
   setActive: (name: string, display: string, parameters: Record<string, unknown>) => void;
@@ -97,6 +102,12 @@ export const useDetectorStore = create<DetectorStoreState>((set) => ({
 
   // D-12 stacked overlay discriminator default
   restartSubsystem: null,
+
+  // Phase 8 DET-STRETCH-04: per-robot backend tracking
+  perRobotBackend: {},
+  setPerRobotBackend: (robotId, backend) =>
+    set((s) => ({ perRobotBackend: { ...s.perRobotBackend, [robotId]: backend } })),
+  setAllPerRobotBackends: (mapping) => set({ perRobotBackend: mapping }),
 
   // Detector setters
   setBackends: (backends: DetectorBackend[]) => set({ backends }),
@@ -148,6 +159,9 @@ export async function fetchDetectorState(): Promise<void> {
     if (activeRes.ok) {
       const data = await activeRes.json();
       store.setActive(data.backend, data.display, data.parameters);
+      if (data.per_robot) {
+        store.setAllPerRobotBackends(data.per_robot);
+      }
     }
     if (liftersRes.ok) {
       const data = await liftersRes.json();
