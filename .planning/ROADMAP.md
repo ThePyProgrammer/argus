@@ -191,10 +191,10 @@ Plans:
 - [x] 08-01-PLAN.md — Wave 0 test skip-stubs (6 pytest + 1 vitest)
 - [x] 08-02-PLAN.md — ByteTrackTracker (3D center distance association, Hungarian, class-gated)
 - [x] 08-03-PLAN.md — Heterogeneous per-robot backends (swap_backend_for_robot + REST extension)
-- [ ] 08-04-PLAN.md — Worker/pool tracker integration + jitter upgrade (D-01, D-05, D-06)
-- [ ] 08-05-PLAN.md — DetectionFusionManager + SemanticMap (backend data structures)
-- [ ] 08-06-PLAN.md — streaming_viz wiring + pipeline_routes tracker hot-apply
-- [ ] 08-07-PLAN.md — Frontend: types, stores, SemanticMapLayer, MetricsPanel, NodeInspector
+- [x] 08-04-PLAN.md — Worker/pool tracker integration + jitter upgrade (D-01, D-05, D-06)
+- [x] 08-05-PLAN.md — DetectionFusionManager + SemanticMap (backend data structures)
+- [x] 08-06-PLAN.md — streaming_viz wiring + pipeline_routes tracker hot-apply
+- [x] 08-07-PLAN.md — Frontend: types, stores, SemanticMapLayer, MetricsPanel, NodeInspector
 **Research flag**: light (ByteTrack spatial association threshold + multi-robot fusion radius tuning for indoor office scenes)
 **UI hint**: yes
 
