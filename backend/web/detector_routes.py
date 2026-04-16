@@ -19,7 +19,7 @@ Threat model (mirror SLAM — see 02-08-PLAN.md <threat_model>):
            precedent; users click once at a time in practice).
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -54,8 +54,18 @@ async def list_backends():
 
 
 @router.post("/select")
-async def select_backend(req: SelectRequest, request: Request):
-    """Select a detector backend by name, triggering simulation restart (D-02)."""
+async def select_backend(
+    req: SelectRequest,
+    request: Request,
+    robot_id: str | None = Query(None, description="Target specific robot; omit for all"),
+):
+    """Select a detector backend by name.
+
+    When ``robot_id`` is provided, performs a per-robot hot-swap via
+    ``pool.swap_backend_for_robot`` (D-14, DET-STRETCH-04) — no restart
+    needed. When omitted, triggers simulation restart for all robots (D-02,
+    original behavior).
+    """
     backends = {b["name"]: b for b in DetectorRegistry.list_backends()}
     if req.backend not in backends:
         raise HTTPException(status_code=404, detail=f"Unknown backend: {req.backend}")
@@ -64,27 +74,49 @@ async def select_backend(req: SelectRequest, request: Request):
             status_code=400,
             detail=f"Backend unavailable: {backends[req.backend].get('reason', 'unknown')}",
         )
-    request.app.state.pending_detector_backend = req.backend
-    if req.params:
-        request.app.state.pending_detector_params = req.params
-    command_cb = getattr(request.app.state, "command_callback", None)
-    if command_cb:
-        command_cb({"action": "restart"})
-    return {"status": "restarting", "backend": req.backend}
+
+    if robot_id is not None:
+        # Per-robot hot-swap (D-14): no restart needed
+        pool = getattr(request.app.state, "detector_pool", None)
+        if pool is None:
+            raise HTTPException(status_code=503, detail="Detector pool not initialized")
+        try:
+            pool.swap_backend_for_robot(robot_id, req.backend, req.params)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Per-robot swap failed: {exc}")
+        return {
+            "status": "ok",
+            "active": pool.backend_name,
+            "per_robot": pool.per_robot_backends,
+        }
+    else:
+        # Existing behavior: all robots, trigger restart
+        request.app.state.pending_detector_backend = req.backend
+        if req.params:
+            request.app.state.pending_detector_params = req.params
+        command_cb = getattr(request.app.state, "command_callback", None)
+        if command_cb:
+            command_cb({"action": "restart"})
+        return {"status": "restarting", "backend": req.backend}
 
 
 @router.get("/active")
 async def get_active(request: Request):
-    """Return the currently active detector backend name + config."""
+    """Return the currently active detector backend name + config + per_robot breakdown."""
     active = getattr(
         request.app.state, "active_detector_backend", DetectorRegistry.get_default()
     )
     backends = {b["name"]: b for b in DetectorRegistry.list_backends()}
     info = backends.get(active, {})
+    pool = getattr(request.app.state, "detector_pool", None)
+    per_robot = pool.per_robot_backends if pool is not None else {}
     return {
         "backend": active,
         "display": info.get("display", active),
         "parameters": info.get("parameter_schema", {}),
+        "per_robot": per_robot,
     }
 
 
