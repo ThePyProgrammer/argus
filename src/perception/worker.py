@@ -111,10 +111,17 @@ class DetectorWorker:
         lifter: "Detection3DProtocol",
         intrinsics: "CameraIntrinsics",
         pool_ref: Any = None,
+        tracker: Any = None,
     ) -> None:
         self._rid = robot_id
         self._detector = detector
         self._lifter = lifter
+        # Phase 8 D-01: per-robot tracker instance (NoneTracker or ByteTrack).
+        if tracker is None:
+            from src.tracking.trackers.none import NoneTracker
+
+            tracker = NoneTracker()
+        self._tracker = tracker
         self._intrinsics = intrinsics
         # Plan 05-09 (D-03): reverse ref used by ``_loop`` to call
         # ``pool.on_backend_crash`` when the bridge raises a typed crash
@@ -237,13 +244,15 @@ class DetectorWorker:
         self._detector.warmup(dummy_frame)
 
     def reset(self) -> None:
-        """Reset detector + lifter state and drop any queued/latest frame.
+        """Reset detector + lifter + tracker state and drop any queued/latest frame.
 
         Does NOT reset ``_drops`` (session-lifetime counter). Does NOT stop
         the thread -- callers continue to call ``submit`` after ``reset``.
         """
         self._detector.reset()
         self._lifter.reset()
+        if hasattr(self._tracker, "reset"):
+            self._tracker.reset()
         with self._lock:
             self._pending = None
             self._latest = None
@@ -328,6 +337,14 @@ class DetectorWorker:
                     "DetectorWorker %s: lift failed: %s", self._rid, exc
                 )
                 continue
+            # Phase 8 D-01: tracker stamps track_id after lifter.lift()
+            try:
+                dets_3d = self._tracker.track(dets_3d)
+            except Exception as exc:
+                _LOGGER.exception(
+                    "DetectorWorker %s: tracker failed: %s", self._rid, exc
+                )
+                # Graceful degradation: continue with untracked detections
             with self._lock:
                 self._latest = dets_3d
 

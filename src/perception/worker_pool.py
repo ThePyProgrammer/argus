@@ -120,6 +120,8 @@ class DetectorWorkerPool:
         intrinsics_per_robot: dict[str, "CameraIntrinsics"],
         lifter_params: dict | None = None,
         streaming_viz: Any = None,
+        tracker_name: str = "none",
+        tracker_params: dict | None = None,
     ) -> None:
         """Construct one ``DetectorWorker`` per rid with its own detector + lifter.
 
@@ -156,6 +158,8 @@ class DetectorWorkerPool:
         """
         self.backend_name = backend_name
         self.lifter_name = lifter_name
+        # Phase 8 Plan 04 (DET-STRETCH-01): tracker name + params for per-robot trackers.
+        self.tracker_name = tracker_name
         # Phase 8 Plan 03 (DET-STRETCH-04): per-robot backend tracking.
         # Each robot starts on the same backend; swap_backend_for_robot()
         # diverges individual entries. swap_backend() (all-robots) resets
@@ -167,6 +171,9 @@ class DetectorWorkerPool:
         # change the kwargs that were forwarded to the registry.
         params = dict(backend_params or {})
         lifter_kwargs = dict(lifter_params or {})
+        # Phase 8 Plan 04: tracker kwargs — defensive copy mirrors backend/lifter pattern.
+        tracker_kwargs = dict(tracker_params or {})
+        self._tracker_params = dict(tracker_kwargs)
         self._lifter_params = lifter_kwargs  # retained for repr/debug
         self._backend_params = params  # retained for fallback + debug
         self._intrinsics_per_robot = dict(intrinsics_per_robot)
@@ -188,6 +195,10 @@ class DetectorWorkerPool:
         # detector hot-swap and lifter hot-swap both rebind worker refs and
         # must not interleave.
         self._swap_lock = threading.Lock()
+        # Phase 8 Plan 04: force tracker registration before create().
+        import src.tracking.trackers  # noqa: F401 -- side-effect registration
+        from src.tracking.registry import TrackerRegistry
+
         self._workers: dict[str, DetectorWorker] = {}
         for rid in robot_ids:
             # Per-robot instance separation — two separate create() calls
@@ -195,12 +206,14 @@ class DetectorWorkerPool:
             # tested by test_instance_separation_backend_mutations_do_not_leak.
             detector = DetectorRegistry.create(backend_name, **params)
             lifter = Detection3DRegistry.create(lifter_name, **lifter_kwargs)
+            tracker = TrackerRegistry.create(tracker_name, **tracker_kwargs)
             self._workers[rid] = DetectorWorker(
                 robot_id=rid,
                 detector=detector,
                 lifter=lifter,
                 intrinsics=intrinsics_per_robot[rid],
                 pool_ref=self,  # D-03 — reverse ref for on_backend_crash
+                tracker=tracker,
             )
 
     def set_streaming_viz(self, streaming_viz: Any) -> None:
@@ -338,6 +351,30 @@ class DetectorWorkerPool:
                 w._lifter = new_lifters[rid]  # atomic attribute write under GIL
             self.lifter_name = new_lifter_name
             self._lifter_params = lifter_kwargs
+
+    def swap_tracker(
+        self,
+        new_tracker_name: str,
+        new_tracker_params: dict | None = None,
+    ) -> None:
+        """Hot-swap the tracker on every worker atomically (D-05).
+
+        Mirrors swap_lifter. No warmup needed (trackers are pure-Python state
+        machines, not model-loading backends). Track state resets on swap.
+        """
+        import src.tracking.trackers  # noqa: F401
+        from src.tracking.registry import TrackerRegistry
+
+        tracker_kwargs = dict(new_tracker_params or {})
+        new_trackers = {
+            rid: TrackerRegistry.create(new_tracker_name, **tracker_kwargs)
+            for rid in self._workers
+        }
+        with self._swap_lock:
+            for rid, w in self._workers.items():
+                w._tracker = new_trackers[rid]
+            self.tracker_name = new_tracker_name
+            self._tracker_params = tracker_kwargs
 
     def swap_backend(
         self,
