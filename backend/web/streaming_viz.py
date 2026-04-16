@@ -20,6 +20,8 @@ from src.metrics.detection_export import DetectionExportWriter
 from src.metrics.detection_metrics_tracker import DetectionMetricsTracker
 from src.metrics.metrics_tracker import MetricsTracker
 from src.metrics.mujoco_gt import MuJoCoGTExtractor
+from src.perception.fusion import DetectionFusionManager
+from src.perception.semantic_map import SemanticMap
 from backend.web.message_types import (
     CLOUD_DELTA,
     CLOUD_FULL,
@@ -107,6 +109,14 @@ class WebStreamingViz:
         # if the YAML is missing or bodies don't resolve — RESEARCH F7).
         self._gt_extractor: MuJoCoGTExtractor | None = None
 
+        # Phase 8 DET-STRETCH-02/03: cross-robot fusion + semantic map.
+        self._fusion_manager = DetectionFusionManager(cluster_radius=0.5)
+        self._semantic_map = SemanticMap(ttl=10.0)
+        # Reverse ref to the DetectorWorkerPool — wired post-construction
+        # by main.py via set_detector_pool(). None until then; _update_stats
+        # degrades gracefully (emits empty fused_detections / semantic_map).
+        self._detector_pool: Any = None
+
     def reset_cloud_tracking(self) -> None:
         """Clear cached voxel state to force a full cloud resend.
 
@@ -170,6 +180,16 @@ class WebStreamingViz:
                 "GT metrics will show N/A",
                 exc,
             )
+
+    def set_detector_pool(self, pool: Any) -> None:
+        """Wire the DetectorWorkerPool ref for fusion + semantic map access.
+
+        Phase 8 DET-STRETCH-02/03. Called post-construction from main.py's
+        restart block (mirrors pool.set_streaming_viz(streaming_viz) pattern).
+        Without this call, _detector_pool is None and fused_detections /
+        semantic_map WS keys are always empty.
+        """
+        self._detector_pool = pool
 
     def reset_metrics(self) -> None:
         """Reset per-robot metrics (preserves baseline for comparison)."""
@@ -490,6 +510,23 @@ class WebStreamingViz:
         # frontend (Plan 11) expects the full set.
         detection_payload = self._detection_metrics_tracker.get_stats_payload()
 
+        # Phase 8 DET-STRETCH-02: cross-robot fusion
+        # Collect latest tracked detections from all workers
+        fused_detections: list[dict] = []
+        semantic_map_delta: dict[str, Any] = {"active": [], "expired_ids": []}
+        pool = self._detector_pool
+        if pool is not None:
+            per_robot_dets: dict[str, Any] = {}
+            for rid in pool.robot_ids:
+                dets = pool.latest(rid)
+                if dets is not None:
+                    per_robot_dets[rid] = dets
+            if per_robot_dets:
+                fused_detections = self._fusion_manager.fuse(per_robot_dets, elapsed)
+                # Phase 8 DET-STRETCH-03: semantic map update + delta
+                self._semantic_map.update(fused_detections, elapsed)
+                semantic_map_delta = self._semantic_map.get_delta(elapsed)
+
         payload = {
             "total_coverage": total_coverage,
             "merge_count": merge_count,
@@ -501,6 +538,8 @@ class WebStreamingViz:
             "detection_metrics": detection_payload["detection_metrics"],
             "detection_history": detection_payload["detection_history"],
             "detection_gt_metrics": detection_payload["detection_gt_metrics"],
+            "fused_detections": fused_detections,
+            "semantic_map": semantic_map_delta,
         }
         # DET-METRICS-03 / T-6-01 runtime guard — recursive walk rejects
         # mAP-family keys at any nesting depth including inside the new

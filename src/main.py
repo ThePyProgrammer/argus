@@ -583,6 +583,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     # can append crash_fallback messages to the WS queue.
                     if streaming_viz is not None:
                         detector_pool.set_streaming_viz(streaming_viz)
+                        # Phase 8 DET-STRETCH-02/03: reverse ref so
+                        # _update_stats can call pool.latest() for fusion.
+                        streaming_viz.set_detector_pool(detector_pool)
                     # Phase 7 DET-PIPELINE-05 D-12 — wire app.state so
                     # pool.on_backend_crash can update
                     # last_applied_pipeline_config.detector_name after a
