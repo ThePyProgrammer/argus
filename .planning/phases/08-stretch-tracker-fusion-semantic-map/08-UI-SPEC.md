@@ -43,8 +43,8 @@ Declared values (must be multiples of 4, matching existing pipeline-editor and d
 | 2xl | 48px | Reserved (not used in Phase 8 additions) |
 | 3xl | 64px | Reserved (not used in Phase 8 additions) |
 
-**Exceptions (pre-existing, must not regress):**
-- MetricsPanel uses `12px` padding (inherited from Phase 3 / Phase 6). Phase 8 additions to MetricsPanel continue using 12px, not 16px. Documented exception from strict 4-based scale.
+**Named exception token (pre-existing, must not regress):**
+- `panel` = `12px` — MetricsPanel and NodeInspector separator padding (inherited from Phase 3 / Phase 6, continued in Phase 7). 12 is a multiple of 4 but not in the standard 7-token set. Phase 8 additions to MetricsPanel and NodeInspector continue using 12px for separator margins, not 16px. Legacy exception explicitly tokenized for executor traceability.
 - Three.js canvas coordinates for SemanticMapLayer OBB positions are world-frame meters, not UI spacing tokens. Intentionally outside the spacing scale.
 
 ---
@@ -116,6 +116,11 @@ Semantic map wireframe OBBs use per-class colors. The color source is the existi
 
 Render-order enforcement: SemanticMapLayer `<group>` is added to `worldRoot` BEFORE `DetectionBoxManager` group so Three.js painter's algorithm renders semantic ghosts behind live detections. Set `renderOrder: -1` on the semantic map group and `depthWrite: false` on its material.
 
+**Primary focal-point declarations (Phase 8 additions):**
+- **NodeInspector per-robot section:** The robot-color left-border strip (3px `robotColor(index)`) on each per-robot row is the primary visual anchor. It creates immediate visual association with the same robot's color in MetricsPanel and the 3D scene.
+- **ControlPanel semantic map toggle:** The active-state green background (`#1b5e20`) is the intended visual anchor, consistent with the existing `Show Scene` toggle pattern.
+- **MetricsPanel fusion subsection:** The uppercase `FUSION` header in `#666` at 10px mirrors the existing `DETECTION` header and serves as the section entry point.
+
 ### Per-Robot Override Visual (DET-STRETCH-04)
 
 In NodeInspector, the per-robot override section uses:
@@ -138,7 +143,7 @@ No new primary CTA in Phase 8. Existing `Apply Pipeline` remains the action verb
 |---------|------|
 | Primary CTA | `Apply Pipeline` (unchanged from `ApplyBar.tsx`) |
 | Fused-detection subsection header (NEW) | `fusion` -- lowercase, 10px, weight 600, letterSpacing 1, uppercase via CSS `textTransform: 'uppercase'`, color `#666`. Matches existing MetricsPanel "detection" subsection header style. |
-| Fused-detection metric label (NEW) | `fused` -- left-aligned, 12px, color `#888`. Displays the count of fused cross-robot detections. |
+| Fused-detection metric label (NEW) | `fused` -- left-aligned, 11px, weight 600, color `#888`. Displays the count of fused cross-robot detections. |
 | Fused-detection metric value (NEW) | `{count}` -- monospace, 13px, color `#e0e0e0`. Integer count of fused objects from `fused_detections` WS key. |
 | Per-robot override section header (NEW) | `Per-Robot Override` -- rendered as uppercase subsection header in NodeInspector when the selected node is `detector_generic` and the system has >1 robot. |
 | Per-robot dropdown label (NEW) | `Robot {N}` -- e.g. "Robot 0", "Robot 1". 11px, weight 600, color `#888`. Left-aligned. |
@@ -276,7 +281,7 @@ Renders inside the existing MetricsPanel "Live" view, after the per-robot detect
 | Section separator | `borderTop: '1px solid #2a2a4a'`, `marginTop: 12px`, `paddingTop: 8px` (matches existing "detection" subsection separator) |
 | Section header | `fontSize: 10`, `fontWeight: 600`, `letterSpacing: '1px'`, `textTransform: 'uppercase'`, `color: '#666'`. Text: `fusion` |
 | Metric row | Single row: label `fused`, value = integer count. Layout: `display: 'flex', justifyContent: 'space-between', alignItems: 'baseline'` |
-| Label style | `fontSize: 12`, `color: '#888'` |
+| Label style | `fontSize: 11`, `fontWeight: 600`, `color: '#888'` |
 | Value style | `fontSize: 13`, `fontFamily: 'monospace'`, `color: '#e0e0e0'` |
 | Empty value | `0` (not `--`; zero fused detections is a valid state) |
 
