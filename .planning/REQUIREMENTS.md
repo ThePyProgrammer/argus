@@ -67,10 +67,10 @@ Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
 
 ### DET-STRETCH — Differentiators (Phase 8, time-gated)
 
-- [ ] **DET-STRETCH-01**: ByteTrack multi-object tracker assigns stable `track_id` per detection (class + spatial IoU association, Apache-2.0)
-- [ ] **DET-STRETCH-02**: World-frame multi-robot detection fusion merges same-class detections within a 0.5 m cluster radius across robots
-- [ ] **DET-STRETCH-03**: `SemanticMap` with per-object TTL renders as a ghosted Three.js layer alongside the 3D map
-- [ ] **DET-STRETCH-04**: Heterogeneous per-robot backends — each robot may run a different detector (architectural support is in Phase 1; UI + coordinator wiring land here)
+- [x] **DET-STRETCH-01**: ByteTrack multi-object tracker assigns stable `track_id` per detection (class + spatial IoU association, Apache-2.0)
+- [x] **DET-STRETCH-02**: World-frame multi-robot detection fusion merges same-class detections within a 0.5 m cluster radius across robots
+- [x] **DET-STRETCH-03**: `SemanticMap` with per-object TTL renders as a ghosted Three.js layer alongside the 3D map
+- [x] **DET-STRETCH-04**: Heterogeneous per-robot backends — each robot may run a different detector (architectural support is in Phase 1; UI + coordinator wiring land here)
 
 ---
 
