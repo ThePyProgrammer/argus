@@ -14,11 +14,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: detector-api-foundation** - Protocol + Registry + YOLO-behind-Protocol + thread config + eval-mode contract (completed 2026-04-13)
 - [x] **Phase 2: per-robot-worker-and-wire-plumbing** - Per-robot DetectorWorker, REST/WS plumbing, canonical OBB wire format + round-trip test (completed 2026-04-14)
-- [ ] **Phase 3: frontend-picker-and-ui** - Detector dropdown, lifter dropdown, param panel, restart overlay, RGB bbox overlay
-- [ ] **Phase 4: real-3d-obb-pipeline** - PointClusterLifter (PCA-OBB), single geometry path, dumb-renderer frontend
+- [x] **Phase 3: frontend-picker-and-ui** - Detector dropdown, lifter dropdown, param panel, restart overlay, RGB bbox overlay (completed 2026-04-14)
+- [x] **Phase 4: real-3d-obb-pipeline** - PointClusterLifter (PCA-OBB), single geometry path, dumb-renderer frontend (completed 2026-04-15)
 - [x] **Phase 5: second-backends-boxer-rtdetr-owlv2** - BoxeR subprocess (3D-native), RT-DETRv2 in-process ONNX, pinned checkpoints, crash fallback (OWLv2 dropped 2026-04-15 — see Phase 5 CONTEXT D-10) (completed 2026-04-15)
 - [x] **Phase 6: detection-metrics-and-mujoco-gt** - MetricsPanel populated, MuJoCo GT extractor, center_error_m, JSONL export, RSS smoke test (completed 2026-04-15)
-- [ ] **Phase 7: pipeline-editor-perception-nodes** - DetectorNode, Detection3DNode, TrackerNode, per-edge type validation, perception_rgbd preset
+- [x] **Phase 7: pipeline-editor-perception-nodes** - DetectorNode, Detection3DNode, TrackerNode, per-edge type validation, perception_rgbd preset (completed 2026-04-15)
 - [ ] **Phase 8: stretch-tracker-fusion-semantic-map** - ByteTrack, multi-robot fusion, SemanticMap TTL layer, heterogeneous per-robot backends (time-gated)
 
 ## Phase Details
@@ -199,9 +199,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. detector-api-foundation | 5/5 | Complete   | 2026-04-13 |
 | 2. per-robot-worker-and-wire-plumbing | 12/12 | Complete   | 2026-04-14 |
-| 3. frontend-picker-and-ui | 0/11 | Planning complete | - |
-| 4. real-3d-obb-pipeline | 0/7 | Planning complete | - |
+| 3. frontend-picker-and-ui | 11/11 | Complete   | 2026-04-14 |
+| 4. real-3d-obb-pipeline | 7/7 | Complete   | 2026-04-15 |
 | 5. second-backends-boxer-rtdetr-owlv2 | 12/12 | Complete   | 2026-04-15 |
 | 6. detection-metrics-and-mujoco-gt | 13/13 | Complete   | 2026-04-15 |
-| 7. pipeline-editor-perception-nodes | 0/11 | Planning complete | - |
+| 7. pipeline-editor-perception-nodes | 12/12 | Complete   | 2026-04-15 |
 | 8. stretch-tracker-fusion-semantic-map | 0/TBD | Not started | - |
