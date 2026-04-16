@@ -182,18 +182,26 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on**: Phase 7
 **Requirements**: DET-STRETCH-01, DET-STRETCH-02, DET-STRETCH-03, DET-STRETCH-04
 **Success Criteria** (what must be TRUE):
-  1. Running a session with ByteTrack enabled produces stable `track_id` values across frames for the same physical object — verified by a persistent chair keeping a single `track_id` across ≥100 consecutive frames.
+  1. Running a session with ByteTrack enabled produces stable `track_id` values across frames for the same physical object — verified by a persistent chair keeping a single `track_id` across >=100 consecutive frames.
   2. Two robots detecting the same chair within a 0.5 m cluster radius in world frame produce a single fused detection with a shared `track_id` in the merged metrics view, not two separate entries.
   3. SemanticMap renders as a ghosted Three.js layer alongside the 3D reconstruction map; objects disappear from the layer after their per-object TTL expires (user observes a fade-out within TTL seconds of leaving FOV).
   4. Per-robot detector selection works end-to-end — user sets Robot 0 to `yolov11` and Robot 1 to `rtdetrv2` via UI, both robots' detections appear in MetricsPanel under their own backend labels, and the coordinator boots the appropriate worker per robot without crashes.
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+- [ ] 08-01-PLAN.md — Wave 0 test skip-stubs (6 pytest + 1 vitest)
+- [ ] 08-02-PLAN.md — ByteTrackTracker (3D center distance association, Hungarian, class-gated)
+- [ ] 08-03-PLAN.md — Heterogeneous per-robot backends (swap_backend_for_robot + REST extension)
+- [ ] 08-04-PLAN.md — Worker/pool tracker integration + jitter upgrade (D-01, D-05, D-06)
+- [ ] 08-05-PLAN.md — DetectionFusionManager + SemanticMap (backend data structures)
+- [ ] 08-06-PLAN.md — streaming_viz wiring + pipeline_routes tracker hot-apply
+- [ ] 08-07-PLAN.md — Frontend: types, stores, SemanticMapLayer, MetricsPanel, NodeInspector
 **Research flag**: light (ByteTrack spatial association threshold + multi-robot fusion radius tuning for indoor office scenes)
 **UI hint**: yes
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -204,4 +212,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. second-backends-boxer-rtdetr-owlv2 | 12/12 | Complete   | 2026-04-15 |
 | 6. detection-metrics-and-mujoco-gt | 13/13 | Complete   | 2026-04-15 |
 | 7. pipeline-editor-perception-nodes | 12/12 | Complete   | 2026-04-15 |
-| 8. stretch-tracker-fusion-semantic-map | 0/TBD | Not started | - |
+| 8. stretch-tracker-fusion-semantic-map | 0/7 | Not started | - |
