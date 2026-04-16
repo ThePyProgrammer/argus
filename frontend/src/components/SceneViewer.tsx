@@ -7,12 +7,14 @@ import { MeshManager } from './MeshManager';
 import { RobotMarkerManager } from './RobotMarker';
 import { TrajectoryTrailManager } from './TrajectoryTrail';
 import { DetectionBoxManager } from './DetectionBoxes';
+import { SemanticMapLayer } from './SemanticMapLayer';
 import { CameraFrustumManager } from './CameraFrustum';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
 import { useSlamStore } from '../stores/slamStore';
 import { useDetectorStore } from '../stores/detectorStore';
 import { useMetricsStore } from '../stores/metricsStore';
+import { useSemanticMapStore } from '../stores/semanticMapStore';
 import { RestartOverlay } from './RestartOverlay';
 import { CrashToast } from './CrashToast';
 import { useSceneLoader } from '../hooks/useSceneLoader';
@@ -100,6 +102,7 @@ export default function SceneViewer() {
     const robotMarkerManager = new RobotMarkerManager(worldRoot);
     const trailManager = new TrajectoryTrailManager(worldRoot);
     const detectionBoxManager = new DetectionBoxManager(worldRoot);
+    const semanticMapLayer = new SemanticMapLayer(worldRoot);
     const cameraFrustumManager = new CameraFrustumManager(worldRoot);
 
     // --- Cloud offset subscription ---
@@ -158,6 +161,17 @@ export default function SceneViewer() {
             robot.colorIndex,
           );
         }
+      }
+    });
+
+    // --- Semantic map layer subscription (Phase 8 DET-STRETCH-03) ---
+    const unsubSemantic = useSemanticMapStore.subscribe((state, prev) => {
+      if (state.visible !== prev.visible) {
+        semanticMapLayer.setVisible(state.visible);
+      }
+      if (state.objects !== prev.objects) {
+        const allObjects = Object.values(state.objects);
+        semanticMapLayer.updateObjects(allObjects);
       }
     });
 
@@ -326,6 +340,15 @@ export default function SceneViewer() {
         }
       }
 
+      // Phase 8 DET-STRETCH-03: per-frame semantic map opacity fade
+      const smState = useSemanticMapStore.getState();
+      if (smState.visible) {
+        const simTime = smState.currentSimTime;
+        for (const [key, obj] of Object.entries(smState.objects)) {
+          semanticMapLayer.updateOpacityForObject(key, obj.last_seen, obj.ttl, simTime);
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -354,6 +377,7 @@ export default function SceneViewer() {
       unsubMetrics();
       unsubOutputHidden();
       unsubSceneColor();
+      unsubSemantic();
       renderer.domElement.removeEventListener('click', handleClick);
       window.removeEventListener('focus-robot', handleCenterOnRobot);
       window.removeEventListener('resize', handleResize);
@@ -365,6 +389,7 @@ export default function SceneViewer() {
       robotMarkerManager.dispose();
       trailManager.dispose();
       detectionBoxManager.dispose();
+      semanticMapLayer.dispose();
       cameraFrustumManager.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {

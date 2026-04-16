@@ -77,6 +77,8 @@ export default function MetricsPanel() {
   // sparklines; history populates the store for future use only).
   const detectionPerRobot = useMetricsStore((s) => s.detectionPerRobot);
   const detectionGtPerRobot = useMetricsStore((s) => s.detectionGtPerRobot);
+  // Phase 8 DET-STRETCH-02 — fused detection count
+  const fusedDetections = useMetricsStore((s) => s.fusedDetections);
 
   const robotIds = Object.keys(perRobot);
   const firstRobotId = robotIds[0] ?? null;
@@ -280,6 +282,23 @@ export default function MetricsPanel() {
                   })}
                 </div>
               )}
+              {/* Phase 8 DET-STRETCH-02 — FUSION subsection (cross-robot aggregate) */}
+              <div style={{ borderTop: '1px solid #2a2a4a', marginTop: 12, paddingTop: 8 }}>
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  color: '#666',
+                  marginBottom: 8,
+                }}>
+                  fusion
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#888' }}>fused</span>
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: '#e0e0e0' }}>{fusedDetections.length}</span>
+                </div>
+              </div>
             </>
           )}
 

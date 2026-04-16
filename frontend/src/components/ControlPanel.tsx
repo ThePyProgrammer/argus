@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useControlStore } from '../stores/controlStore';
 import { useRobotStore } from '../stores/robotStore';
 import { useMetricsStore } from '../stores/metricsStore';
+import { useSemanticMapStore } from '../stores/semanticMapStore';
 import AlgorithmSection from './AlgorithmSection';
 import DetectorSection from './DetectorSection';
 import SliderField from './SliderField';
@@ -31,6 +32,8 @@ export default function ControlPanel() {
   const colorMode = useRobotStore((s) => s.colorMode);
   const outputMode = useMetricsStore((s) => s.outputMode);
   const setOutputMode = useMetricsStore((s) => s.setOutputMode);
+  const semanticMapVisible = useSemanticMapStore((s) => s.visible);
+  const setSemanticMapVisible = useSemanticMapStore((s) => s.setVisible);
 
   const handleStartStop = () => {
     const action = isRunning ? 'stop' : 'start';
@@ -148,6 +151,22 @@ export default function ControlPanel() {
           }}
         >
           {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
+        </button>
+        <button
+          onClick={() => setSemanticMapVisible(!semanticMapVisible)}
+          style={{
+            padding: '4px 8px',
+            fontSize: 11,
+            fontWeight: 600,
+            borderRadius: 3,
+            cursor: 'pointer',
+            width: '100%',
+            background: semanticMapVisible ? '#1b5e20' : '#37474f',
+            color: '#e0e0e0',
+            border: '1px solid #444',
+          }}
+        >
+          Semantic Map
         </button>
       </div>
 

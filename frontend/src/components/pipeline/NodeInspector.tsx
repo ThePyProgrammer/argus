@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { usePipelineStore } from '../../stores/pipelineStore';
 import { useControlStore } from '../../stores/controlStore';
+import { useDetectorStore } from '../../stores/detectorStore';
+import { useRobotStore } from '../../stores/robotStore';
+import { robotColor } from '../../utils/palette';
 import { CATEGORY_COLORS } from '../../utils/nodeDefinitions';
 import { debounce } from '../../utils/debounce';
 import SliderField from '../SliderField';
@@ -20,6 +24,10 @@ export function NodeInspector() {
   const nodes = usePipelineStore((s) => s.nodes);
   // Phase 7 D-02 — backend hot-swap dropdown reads catalog from the store.
   const availableRegistryNodes = usePipelineStore((s) => s.availableRegistryNodes);
+  // Phase 8 DET-STRETCH-04 — per-robot backend override
+  const robots = useRobotStore((s) => s.robots);
+  const perRobotBackend = useDetectorStore((s) => s.perRobotBackend);
+  const [perRobotError, setPerRobotError] = useState<Record<string, string>>({});
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -133,6 +141,102 @@ export function NodeInspector() {
             })()}
           </select>
         )}
+
+      {/* Phase 8 DET-STRETCH-04 — per-robot backend override section */}
+      {selectedNode.data.nodeType === 'detector_generic' && robots.size > 1 && (
+        <div>
+          <div style={{ borderTop: '1px solid #2a2a4a', margin: '12px 0 8px 0' }} />
+          <div style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            color: '#666',
+            marginBottom: 8,
+          }}>
+            per-robot override
+          </div>
+          {[...robots.entries()].map(([rid, _robot], index) => (
+            <div key={rid} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 8,
+              borderLeft: `3px solid ${robotColor(index)}`,
+              paddingLeft: 8,
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#888', minWidth: 60 }}>
+                Robot {index}
+              </span>
+              <select
+                aria-label={`Backend for ${rid}`}
+                value={perRobotBackend[rid] ?? registryName ?? ''}
+                onChange={async (e) => {
+                  const newBackend = e.target.value;
+                  try {
+                    setPerRobotError((prev) => {
+                      const next = { ...prev };
+                      delete next[rid];
+                      return next;
+                    });
+                    const res = await fetch(
+                      `/api/detectors/select?robot_id=${encodeURIComponent(rid)}`,
+                      {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ backend: newBackend }),
+                      },
+                    );
+                    if (res.ok) {
+                      useDetectorStore.getState().setPerRobotBackend(rid, newBackend);
+                    } else {
+                      const detail = await res.text();
+                      setPerRobotError((prev) => ({
+                        ...prev,
+                        [rid]: `Backend swap failed for ${rid}: ${detail}`,
+                      }));
+                    }
+                  } catch (err) {
+                    setPerRobotError((prev) => ({
+                      ...prev,
+                      [rid]: `Backend swap failed for ${rid}: ${err instanceof Error ? err.message : 'unknown error'}`,
+                    }));
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '4px 8px',
+                  background: '#0a0a14',
+                  color: '#e0e0e0',
+                  border: '1px solid #2a2a4a',
+                  borderRadius: 3,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                {(() => {
+                  const baseKind = selectedNode.data.nodeType!.replace(/_generic$/, '');
+                  return availableRegistryNodes
+                    .filter(
+                      (rn) =>
+                        rn.category === 'perception' && rn.type.startsWith(`${baseKind}_`),
+                    )
+                    .map((rn) => (
+                      <option key={rn.type} value={rn.registryName}>
+                        {rn.label}
+                      </option>
+                    ));
+                })()}
+              </select>
+              {perRobotError[rid] && (
+                <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4, marginLeft: 16 }}>
+                  {perRobotError[rid]}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Separator */}
       <div style={{ borderTop: '1px solid #2a2a4a', margin: '16px 0' }} />
