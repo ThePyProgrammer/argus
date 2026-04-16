@@ -145,25 +145,33 @@ class DetectionMetricsTracker:
         entry["confidence_history"].append(mean_conf)
         entry["freshness_history"].append(freshness)
 
-        # Jitter: per-class nearest-neighbor against last tracked center, 0.5m gate (D-03).
+        # Jitter: per-key nearest-neighbor against last tracked center, 0.5m gate (D-03).
+        # Phase 8 D-06: track_id-based jitter lookup (stable across frames).
         tracked = entry["_tracked_centers"]
         class_jitters: list[float] = []
         for obb in items:
             cls = getattr(obb, "class_name", "")
             center = np.asarray(obb.center, dtype=np.float64).reshape(3)
-            if cls not in tracked:
-                tracked[cls] = deque(maxlen=_JITTER_HISTORY)
-                tracked[cls].append(center)
+            # Phase 8 D-06: use track_id when available for stable cross-frame jitter.
+            track_id = getattr(obb, "track_id", None)
+            if track_id is not None:
+                key = f"_tid_{track_id}"
             else:
-                history = tracked[cls]
+                # Fallback: class-name-based nearest-neighbor proxy (pre-Phase-8 / tracker_none)
+                key = cls
+            if key not in tracked:
+                tracked[key] = deque(maxlen=_JITTER_HISTORY)
+                tracked[key].append(center)
+            else:
+                history = tracked[key]
                 last = history[-1]
                 if np.linalg.norm(center - last) <= _JITTER_GATE_M:
                     history.append(center)
                 else:
-                    # NN gate failed — re-seed this class (D-03 step 2).
+                    # NN gate failed — re-seed this key (D-03 step 2).
                     history.clear()
                     history.append(center)
-            hist = tracked[cls]
+            hist = tracked[key]
             if len(hist) >= 2:
                 arr = np.stack(list(hist), axis=0)
                 mean = arr.mean(axis=0)
