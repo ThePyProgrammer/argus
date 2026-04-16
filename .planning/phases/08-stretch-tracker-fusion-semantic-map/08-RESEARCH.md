@@ -498,22 +498,25 @@ class SemanticMap:
 
 **If this table is empty:** N/A -- 3 assumed claims listed above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **SemanticMap pipeline node: include or defer?**
    - What we know: CONTEXT discretion says "if trivial, include; if complex, defer". A passthrough node with just a `ttl` parameter and no new port types is trivial.
    - What's unclear: Whether the pipeline builder needs a new node type definition or can reuse tracker_generic pattern.
    - Recommendation: Include it if the implementation adds fewer than 30 lines to pipeline_builder.py. Otherwise defer.
+   - RESOLVED: Deferred — plans exclude it. Pipeline builder extension is non-trivial and the SemanticMap operates independently of the pipeline graph in Phase 8.
 
 2. **scipy.optimize.linear_sum_assignment vs greedy for ByteTrack?**
    - What we know: At <20 detections per frame (indoor office scene), both are sub-millisecond. Greedy is simpler but may misassign in ambiguous cases.
    - What's unclear: Whether any test scenario produces ambiguous-enough detections to expose greedy's suboptimality.
    - Recommendation: Use scipy (Hungarian) -- it's already installed, proven correct, and the cost is negligible. This is the recommendation for Claude's discretion.
+   - RESOLVED: scipy.optimize.linear_sum_assignment — Plan 02 implements it. Already installed (scipy 1.17.1), proven correct, negligible cost.
 
 3. **Hot-apply for tracker params: extend or restart?**
    - What we know: pipeline_routes.py currently treats tracker_name/tracker_params as structural fields (change = restart). CONTEXT discretion asks whether to make them hot-applicable.
    - What's unclear: Whether tracker state should be preserved across param changes (e.g., changing match_thresh while tracks are active).
    - Recommendation: Make tracker changes hot-applicable via pool.swap_tracker(). Tracker state resets on swap (fresh instance), which is acceptable since users changing tracker params expect behavior to change immediately. Cost: ~10 lines in pipeline_routes.py.
+   - RESOLVED: Hot-apply via swap_tracker() — Plan 06 Task 2 implements the tracker_changed diff branch in pipeline_routes.py.
 
 ## Environment Availability
 

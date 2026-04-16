@@ -40,10 +40,10 @@ created: 2026-04-16
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 08-01-01 | 01 | 0 | DET-STRETCH-01 | — | N/A | unit | `uv run pytest tests/tracking/test_bytetrack_tracker.py -x -q` | ❌ W0 | ⬜ pending |
 | 08-02-01 | 02 | 1 | DET-STRETCH-01 | — | N/A | unit | `uv run pytest tests/tracking/test_bytetrack_association.py -x -q` | ❌ W0 | ⬜ pending |
-| 08-03-01 | 03 | 2 | DET-STRETCH-04 | — | N/A | unit | `uv run pytest tests/perception/test_heterogeneous_backends.py -x -q` | ❌ W0 | ⬜ pending |
-| 08-04-01 | 04 | 3 | DET-STRETCH-02 | — | N/A | unit | `uv run pytest tests/perception/test_fusion_manager.py -x -q` | ❌ W0 | ⬜ pending |
-| 08-05-01 | 05 | 4 | DET-STRETCH-03 | — | N/A | unit | `uv run pytest tests/perception/test_semantic_map.py -x -q` | ❌ W0 | ⬜ pending |
-| 08-06-01 | 06 | 5 | DET-STRETCH-01 | — | N/A | integration | `uv run pytest tests/integration/test_bytetrack_e2e.py -x -q` | ❌ W0 | ⬜ pending |
+| 08-03-01 | 03 | 1 | DET-STRETCH-04 | — | N/A | unit | `uv run pytest tests/perception/test_heterogeneous_backends.py -x -q` | ❌ W0 | ⬜ pending |
+| 08-04-01 | 04 | 2 | DET-STRETCH-01 | — | N/A | unit | `uv run pytest tests/perception/test_fusion_manager.py -x -q` | ❌ W0 | ⬜ pending |
+| 08-05-01 | 05 | 2 | DET-STRETCH-03 | — | N/A | unit | `uv run pytest tests/perception/test_semantic_map.py -x -q` | ❌ W0 | ⬜ pending |
+| 08-06-01 | 06 | 3 | DET-STRETCH-01 | — | N/A | integration | `uv run pytest tests/integration/test_bytetrack_e2e.py -x -q` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
