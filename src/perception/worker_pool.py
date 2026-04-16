@@ -156,6 +156,13 @@ class DetectorWorkerPool:
         """
         self.backend_name = backend_name
         self.lifter_name = lifter_name
+        # Phase 8 Plan 03 (DET-STRETCH-04): per-robot backend tracking.
+        # Each robot starts on the same backend; swap_backend_for_robot()
+        # diverges individual entries. swap_backend() (all-robots) resets
+        # every entry. Updated inside _swap_lock in all mutation paths.
+        self._per_robot_backends: dict[str, str] = {
+            rid: backend_name for rid in robot_ids
+        }
         # Defensive copy: caller's dict mutations cannot retro-actively
         # change the kwargs that were forwarded to the registry.
         params = dict(backend_params or {})
@@ -395,6 +402,9 @@ class DetectorWorkerPool:
                 w._detector = new_detectors[rid]  # atomic attr write under GIL
             self.backend_name = new_backend_name
             self._backend_params = backend_kwargs
+            # Phase 8 Plan 03: keep _per_robot_backends in sync (all-robots swap).
+            for rid in self._workers:
+                self._per_robot_backends[rid] = new_backend_name
 
         # Emit WS envelope (best-effort — viz enqueue MUST NOT fail the swap).
         viz = self._streaming_viz
@@ -412,6 +422,56 @@ class DetectorWorkerPool:
             except Exception:  # noqa: BLE001 — viz enqueue must never fail the swap
                 _LOGGER.exception(
                     "swap_backend: failed to enqueue detector_swap_complete"
+                )
+
+    def swap_backend_for_robot(
+        self,
+        rid: str,
+        new_backend_name: str,
+        new_backend_params: dict | None = None,
+    ) -> None:
+        """Hot-swap the detector on a SINGLE robot atomically (D-13, DET-STRETCH-04).
+
+        Same construct-warmup-rebind pattern as :meth:`swap_backend` but scoped
+        to one worker. ``_per_robot_backends[rid]`` updated inside
+        ``_swap_lock``.
+
+        Raises:
+            ValueError: If ``rid`` not in pool or backend unknown.
+        """
+        if rid not in self._workers:
+            raise ValueError(
+                f"Unknown robot_id: {rid!r}. "
+                f"Known: {sorted(self._workers.keys())}"
+            )
+        # Force @detector_backend side-effect registration.
+        import src.perception.backends  # noqa: F401
+
+        backend_kwargs = dict(new_backend_params or {})
+        det = DetectorRegistry.create(new_backend_name, **backend_kwargs)
+        det.warmup(self._dummy_frame_for(rid))
+
+        with self._swap_lock:
+            self._workers[rid]._detector = det
+            self._per_robot_backends[rid] = new_backend_name
+
+        # WS notification (best-effort)
+        viz = self._streaming_viz
+        if viz is not None and hasattr(viz, "_message_queue"):
+            try:
+                viz._message_queue.append(
+                    {
+                        "type": "detector_swap_complete",
+                        "payload": {
+                            "backend": new_backend_name,
+                            "robot_id": rid,
+                            "reason": "per_robot_swap",
+                        },
+                    }
+                )
+            except Exception:  # noqa: BLE001 — viz enqueue must never fail the swap
+                _LOGGER.exception(
+                    "swap_backend_for_robot: WS enqueue failed"
                 )
 
     # ------------------------------------------------------------------
@@ -442,6 +502,7 @@ class DetectorWorkerPool:
         crashed_backend: str,
         reason: str,
         fallback: str = "yolov11",
+        robot_id: str | None = None,
     ) -> None:
         """D-03 — emit ``crash_fallback`` WS + atomically swap to a fallback backend.
 
@@ -525,53 +586,85 @@ class DetectorWorkerPool:
                 crashed_backend,
             )
 
-        # Step 3 — Construct + warm fallback per worker, then atomic ref swap.
+        # Step 3 — Construct + warm fallback, then atomic ref swap.
+        # Phase 8 Plan 03 (DET-STRETCH-04): when ``robot_id`` is provided,
+        # scope the fallback to that single robot only. When ``None`` (the
+        # pre-existing behavior), swap every worker.
         try:
             import src.perception.backends  # noqa: F401 -- trigger registration
-            new_detectors: dict[str, Any] = {}
-            for rid in self._workers:
+
+            if robot_id is not None:
+                # --- Scoped fallback: single robot ---
                 det = DetectorRegistry.create(fallback)
                 try:
-                    det.warmup(self._dummy_frame_for(rid))
-                except Exception:  # noqa: BLE001 — log and continue; swap still proceeds
+                    det.warmup(self._dummy_frame_for(robot_id))
+                except Exception:  # noqa: BLE001 — log and continue
                     _LOGGER.exception(
                         "on_backend_crash: fallback %s warmup failed for %s",
                         fallback,
-                        rid,
+                        robot_id,
                     )
-                new_detectors[rid] = det
-            with self._swap_lock:
-                for rid, w in self._workers.items():
-                    w._detector = new_detectors[rid]  # atomic attr write under GIL
-                self.backend_name = fallback
-            _LOGGER.info(
-                "on_backend_crash: swapped crashed %s → %s across %d workers",
-                crashed_backend,
-                fallback,
-                len(self._workers),
-            )
+                with self._swap_lock:
+                    self._workers[robot_id]._detector = det
+                    self._per_robot_backends[robot_id] = fallback
+                _LOGGER.info(
+                    "on_backend_crash: swapped crashed %s → %s for robot %s",
+                    crashed_backend,
+                    fallback,
+                    robot_id,
+                )
+            else:
+                # --- All-robots fallback (original behavior) ---
+                new_detectors: dict[str, Any] = {}
+                for rid in self._workers:
+                    det = DetectorRegistry.create(fallback)
+                    try:
+                        det.warmup(self._dummy_frame_for(rid))
+                    except Exception:  # noqa: BLE001 — log and continue; swap still proceeds
+                        _LOGGER.exception(
+                            "on_backend_crash: fallback %s warmup failed for %s",
+                            fallback,
+                            rid,
+                        )
+                    new_detectors[rid] = det
+                with self._swap_lock:
+                    for rid, w in self._workers.items():
+                        w._detector = new_detectors[rid]  # atomic attr write under GIL
+                    self.backend_name = fallback
+                    # Phase 8 Plan 03: update all per-robot entries.
+                    for rid in self._workers:
+                        self._per_robot_backends[rid] = fallback
+                _LOGGER.info(
+                    "on_backend_crash: swapped crashed %s → %s across %d workers",
+                    crashed_backend,
+                    fallback,
+                    len(self._workers),
+                )
+
             # Plan 07-11 (DET-PIPELINE-05 D-12 Pitfall 3): update the hot-apply
             # diff baseline so a subsequent user apply that switches back to
             # the crashed backend is not mis-diffed as "no change" against a
             # stale last_applied.detector_name. The app_state ref is wired
             # post-construction by main.py via :meth:`set_app_state`; when it
             # is None (unit-test or pre-wire path), this is a no-op.
-            try:
-                from dataclasses import replace
-                app_state = self._app_state
-                last = (
-                    getattr(app_state, "last_applied_pipeline_config", None)
-                    if app_state is not None
-                    else None
-                )
-                if last is not None:
-                    app_state.last_applied_pipeline_config = replace(
-                        last, detector_name=fallback
+            # Only update when all robots were swapped (robot_id is None).
+            if robot_id is None:
+                try:
+                    from dataclasses import replace
+                    app_state = self._app_state
+                    last = (
+                        getattr(app_state, "last_applied_pipeline_config", None)
+                        if app_state is not None
+                        else None
                     )
-            except Exception:  # noqa: BLE001 — diff baseline is a best-effort hint
-                _LOGGER.exception(
-                    "on_backend_crash: failed to update last_applied_pipeline_config"
-                )
+                    if last is not None:
+                        app_state.last_applied_pipeline_config = replace(
+                            last, detector_name=fallback
+                        )
+                except Exception:  # noqa: BLE001 — diff baseline is a best-effort hint
+                    _LOGGER.exception(
+                        "on_backend_crash: failed to update last_applied_pipeline_config"
+                    )
         except Exception:  # noqa: BLE001 — fallback construction is second-order
             _LOGGER.exception(
                 "on_backend_crash: fallback construction failed for %s",
@@ -645,6 +738,12 @@ class DetectorWorkerPool:
     def robot_ids(self) -> list[str]:
         """List of managed robot ids (order matches construction)."""
         return list(self._workers.keys())
+
+    @property
+    def per_robot_backends(self) -> dict[str, str]:
+        """Return a snapshot of per-robot backend assignments (DET-STRETCH-04)."""
+        with self._swap_lock:
+            return dict(self._per_robot_backends)
 
     def get_worker(self, rid: str) -> DetectorWorker | None:
         """Escape hatch for tests + Phase 6 probes. None if rid unknown."""

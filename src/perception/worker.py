@@ -294,6 +294,7 @@ class DetectorWorker:
                         self._pool_ref.on_backend_crash(
                             crashed_backend=self._backend_registry_name(),
                             reason=f"{type(exc).__name__}: {exc}",
+                            robot_id=self._rid,
                         )
                     except Exception:  # noqa: BLE001 — must not kill the worker thread
                         _LOGGER.exception(
