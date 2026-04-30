@@ -158,7 +158,7 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
           ...robot,
           coveragePct: robotStats.coverage_pct,
           voxelCount: robotStats.voxel_count,
-          action: runtime?.state ?? robotStats.action,
+          action: robotStats.action,
           platform: platformMetadata?.name ?? robot.platform,
           platformMetadata,
           runtimeState: runtime?.state ?? robot.runtimeState,

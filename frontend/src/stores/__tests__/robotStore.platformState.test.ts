@@ -66,4 +66,30 @@ describe('robotStore platform state', () => {
     expect(robot.collisionCount).toBe(1);
     expect(robot.nearMissCount).toBe(2);
   });
+
+  it('stores stats action separately from runtime state', () => {
+    useRobotStore.getState().setRobotList(['robot_a']);
+
+    useRobotStore.getState().updateStats({
+      total_coverage: 10,
+      merge_count: 1,
+      elapsed: 2,
+      robots: {
+        robot_a: {
+          coverage_pct: 10,
+          voxel_count: 20,
+          action: 'exploring',
+          runtime_status: {
+            state: 'fallen',
+            fall_reason: 'none',
+            disabled: false,
+          },
+        },
+      },
+    });
+
+    const robot = useRobotStore.getState().robots.get('robot_a')!;
+    expect(robot.action).toBe('exploring');
+    expect(robot.runtimeState).toBe('fallen');
+  });
 });
