@@ -50,7 +50,7 @@ def test_policy_output_shape_and_clamp_count(tmp_path):
     assert np.isfinite(action).all()
     assert action[-1] == 1.0
     assert controller.health().policy_loaded is True
-    assert controller.health().actuator_clamp_count == 4
+    assert controller.health().actuator_clamp_count == 1
 
 
 def test_invalid_policy_output_uses_safe_default(tmp_path):

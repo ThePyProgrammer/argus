@@ -76,12 +76,11 @@ class X2PolicyController:
 
         clipped = np.clip(raw, self.lower, self.upper).astype(np.float64, copy=False)
         clipped_count = int(np.count_nonzero(clipped != raw))
-        clamp_count = self.actuator_count if clipped_count else 0
         self._health = ControllerHealth(
             policy_loaded=True,
             action_shape_valid=True,
             nan_guard_ok=True,
-            actuator_clamp_count=clamp_count,
+            actuator_clamp_count=clipped_count,
             message="ok",
         )
         return clipped.copy()
