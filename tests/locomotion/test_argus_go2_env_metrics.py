@@ -89,6 +89,7 @@ def _step_once(env: ArgusGo2Env, action: np.ndarray, mj_step):
 
 
 def test_step_info_contains_nested_locomotion_metrics():
+    """D-01 D-02 D-04: compact nested per-step info exposes defined metric records."""
     env, data = _make_env()
 
     def mj_step(_model, fake_data):
@@ -111,11 +112,15 @@ def test_step_info_contains_nested_locomotion_metrics():
         "contact_terrain",
     }
     assert {"vx_error", "fall_rate", "action_delta_norm", "duty_factor"}.isdisjoint(info)
+    assert all(not isinstance(value, np.ndarray) for value in info["locomotion_metrics"].values())
+    assert "qpos" not in str(info["locomotion_metrics"])
+    assert "qvel" not in str(info["locomotion_metrics"])
     assert "tracking_error_norm" in info["locomotion_metrics"]["command_tracking"]
     assert "action_delta_norm" in info["locomotion_metrics"]["action_quality"]
 
 
 def test_failure_threshold_sets_terminated_true():
+    """LOC-METRICS-02: D-05 D-06 D-08 threshold overrides terminate immediately."""
     config = ArgusGo2EnvConfig(
         sim_steps_per_frame=1,
         metrics_config=LocomotionMetricsConfig(min_base_height_m=0.25, min_progress_m_per_s=0.001),
@@ -138,6 +143,7 @@ def test_failure_threshold_sets_terminated_true():
 
 
 def test_terminal_or_truncated_step_contains_episode_summary():
+    """D-04 D-07: survival to truncation is successful episode summary semantics."""
     env, _data = _make_env(ArgusGo2EnvConfig(sim_steps_per_frame=1, max_episode_steps=1))
 
     def mj_step(_model, fake_data):
@@ -158,9 +164,12 @@ def test_terminal_or_truncated_step_contains_episode_summary():
         "action_quality",
         "contact_terrain",
     }
+    assert info["locomotion_metrics_summary"]["success"] is True
+    assert info["locomotion_metrics_summary"]["failure_reason"] is None
 
 
 def test_reset_starts_fresh_episode_metrics_without_clearing_baseline():
+    """D-03: reset starts fresh active buffer while preserving captured baseline."""
     env = ArgusGo2Env(ArgusGo2EnvConfig(sim_steps_per_frame=1))
     try:
         env._metrics.record_step(
@@ -214,6 +223,7 @@ def test_metrics_record_validated_control_target_not_raw_velocity_action():
 
 
 def test_measured_command_tracking_uses_world_pose_deltas_and_wrapped_yaw():
+    """LOC-METRICS-01: command tracking uses world pose deltas and wrapped yaw."""
     env, data = _make_env(ArgusGo2EnvConfig(sim_steps_per_frame=1))
     data.qpos[0:2] = [1.0, -2.0]
     _set_yaw(data, math.pi - 0.05)
@@ -241,6 +251,7 @@ def test_measured_command_tracking_uses_world_pose_deltas_and_wrapped_yaw():
 
 
 def test_last_locomotion_metrics_summary_survives_reset_until_next_completion():
+    """D-03 D-04: last_locomotion_metrics_summary persists until next completed episode."""
     env, _data = _make_env(ArgusGo2EnvConfig(sim_steps_per_frame=1, max_episode_steps=1))
 
     def mj_step_first(_model, fake_data):
