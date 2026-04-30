@@ -1,160 +1,104 @@
-# Requirements: v3.0 Pluggable Perception & 3D Object Detection
+# Requirements: v4.0 Benchmarkable Locomotion Environment
 
-**Defined:** 2026-04-13
-**Core Value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time — with user-selectable SLAM algorithms, detection backends, and live metrics.
-
----
-
-## v3.0 Requirements
-
-Each requirement maps to exactly one roadmap phase (filled in by roadmapper).
-
-### DET-API — Pluggable Detector Abstraction
-
-- [x] **DET-API-01**: System exposes `DetectorProtocol` runtime-checkable interface with `process_frame`, `reset`, `warmup`, `get_metrics`, `CAPABILITIES`, `PARAMETER_SCHEMA`
-- [x] **DET-API-02**: System exposes `DetectorRegistry` with `@detector_backend` decorator, lazy class-path loading, and availability reporting (`available: false` + install hint when deps missing)
-- [x] **DET-API-03**: System exposes separate `Detection3DProtocol` + `Detection3DRegistry` for 3D lifters (PCA-OBB, median-depth, etc.), with `outputs_3d_natively` capability flag so end-to-end backends bypass the lifter
-- [x] **DET-API-04**: Each robot runs its own `DetectorWorker` thread with a single-slot latest-frame queue (newest-wins backpressure); worker pool is keyed by robot_id
-- [x] **DET-API-05**: Every detection result carries `capture_pose` + `capture_timestamp` from the submission time so downstream consumers do not re-associate stale poses
-- [x] **DET-API-06**: Process-global thread-pool configuration (`torch`, `OMP`, `MKL`, `OPENBLAS`) is set in `src/_thread_config.py` before any torch import; no module-scope `torch.set_num_threads()` in individual files
-- [x] **DET-API-07**: Every backend `__init__` calls `model.eval()` and wraps inference in `torch.inference_mode()`; enforced by a smoke test that caps RSS growth at 200 MB after 100 inferences
-
-### DET-MODELS — Detection Backends
-
-- [x] **DET-MODELS-01**: Existing Ultralytics YOLOv11-nano detector is refactored behind `DetectorProtocol` as `YOLOv11Backend` with zero behavioral regression (verified by fixture-frame regression test)
-- [ ] **DET-MODELS-02**: RT-DETRv2-S backend (`PekingU/rtdetr_v2_r18vd`) ships as an in-process ONNX-accelerated real-time transformer detector, ≤250 ms/frame at 320px on CPU
-- [ ] **DET-MODELS-03**: facebook/BoxeR ships as a subprocess-isolated backend via `SubprocessDetectorBridge` (ZMQ PAIR + msgpack, 5 s watchdog, crash fallback); installs into its own worker venv and emits 3D OBBs natively
-- [~] **DET-MODELS-04**: ~~OWLv2 open-vocabulary backend (`google/owlv2-base-patch16-ensemble`) ships for zero-shot text-prompted detection; marked as on-demand (not a real-time backend)~~ — **DROPPED 2026-04-15 (Phase 5 discuss)**. Moved to Out of Scope: conflicts with real-time pipeline constraint. See Phase 5 CONTEXT.md D-10.
-- [x] **DET-MODELS-05**: User can select detector backend pre-session via REST (`POST /api/detectors/select`) which triggers restart — hot-swap mid-session is explicitly out of scope
-- [ ] **DET-MODELS-06**: Backend crash in BoxeR subprocess emits `crash_fallback` WS message, falls back to YOLOv11, and shows a `CrashToast` in the frontend
-- [ ] **DET-MODELS-07**: Every checkpoint is pinned by `revision=` SHA; `make download-models` script pre-fetches all weights to `./models/` for offline / CI
-- [ ] **DET-MODELS-08**: LICENSES.md documents BoxeR CC-BY-NC-4.0 restriction
-
-### DET-3D — Real Oriented 3D Bounding Boxes
-
-- [x] **DET-3D-01**: `PointClusterLifter` is the default 3D lifter — MAD-filtered depth frustum + DBSCAN cluster rejection + Open3D `compute_oriented_bounding_box(robust=True)`, yaw-only for indoor MVP, gravity-aligned
-- [x] **DET-3D-02**: `MedianDepthLifter` is kept as a named legacy lifter with `outputs_oriented=False` (wraps existing `detection_3d.py` behavior) — for compatibility, not default
-- [x] **DET-3D-03**: Server emits canonical OBB wire format: `(center[3], half_extents[3], quaternion[4] in xyzw with qw>=0, class_id, class_name, score, track_id)` via `OrientedBox3D.to_wire()`; inline quaternion construction in backends is forbidden
-- [x] **DET-3D-04**: Round-trip test enforces `obb == OrientedBox3D.from_wire(obb.to_wire())` to ±1e-6 across all backends and lifters
-- [x] **DET-3D-05**: Frontend `DetectionBoxManager` / `OBBManager` renders OBBs verbatim from wire format via `InstancedMesh`; client-side focal-length / FoV back-projection is deleted
-- [x] **DET-3D-06**: Single projection path lives in `src/perception/geometry.py` — removes the hardcoded 70° FOV + duplicate projection paths that previously existed in `detector.py` and `detection_3d.py`
-- [x] **DET-3D-07**: Lifter falls back to `MedianDepthLifter` when the depth frustum has fewer than 50 valid pixels, preserving behavior for degenerate cases
-
-### DET-UI — Frontend Controls
-
-- [x] **DET-UI-01**: Frontend exposes a Detector dropdown with capability badges (framework, license, CPU latency hint), mirroring the v2.0 SLAM picker
-- [x] **DET-UI-02**: Frontend exposes a Lifter dropdown; hidden when the active detector has `outputs_3d_natively: true`
-- [x] **DET-UI-03**: Parameter panel renders detector `PARAMETER_SCHEMA` as sliders/toggles with debounced `detector_param_update` WebSocket sends, mirroring SLAM param panel
-- [x] **DET-UI-04**: Backend switch shows restart overlay until `detector_restart_complete` is received; UI does not report "ready" until `warmup()` completes
-- [x] **DET-UI-05**: Camera feed panel renders 2D bbox overlay (class + confidence) per robot
-- [x] **DET-UI-06**: `detectorStore` (Zustand) mirrors `slamStore` structure (flat state + setters, REST-fetched backend list, restart polling)
-
-### DET-METRICS — Honest Measurement
-
-- [ ] **DET-METRICS-01**: MetricsPanel shows per-robot detection metrics: `inference_ms p50/p95`, `detections/frame`, `mean_confidence`, queue depth, freshness (`sim_now - capture_timestamp`), `3d_center_jitter_m` (stddev of a persistent object's 3D center over 30 frames)
-- [ ] **DET-METRICS-02**: MuJoCo ground-truth extractor pulls body positions via `mj_name2id + data.xpos`; coordinator matches detected class_name to body name
-- [ ] **DET-METRICS-03**: System reports `center_error_m` and `per_class_recall` against MuJoCo GT; `mAP` is explicitly forbidden in the UI unless a labeled eval set is committed alongside the scene
-- [ ] **DET-METRICS-04**: Detection history export endpoint (`GET /api/detections/export`) streams per-session JSONL with full OBB + class + confidence + timestamps
-- [ ] **DET-METRICS-05**: Memory smoke test caps RSS growth at 200 MB over 100 inferences per backend (catches forgotten `eval()` / `inference_mode()` regressions)
-
-### DET-PIPELINE — React Flow Integration
-
-- [ ] **DET-PIPELINE-01**: Pipeline editor exposes `DetectorNode`, `Detection3DNode`, `TrackerNode` node definitions under a new `perception` category
-- [ ] **DET-PIPELINE-02**: Pipeline editor gains `Detections2D` and `Detections3D` port data types with distinct colors
-- [ ] **DET-PIPELINE-03**: `pipelineValidation.ts` reports per-edge type mismatches (today's code has a hardcoded PointCloud edge type bug at `pipelineStore.ts:101` — fix as part of this requirement)
-- [ ] **DET-PIPELINE-04**: A `perception_rgbd` built-in preset wires MuJoCoBridge → DetectorNode(YOLOv11) → Detection3DNode(PointCluster) → visualization
-- [ ] **DET-PIPELINE-05**: `pipeline_routes.py` maps `detector_generic` nodes to `DetectorWorkerPool` so the pipeline can swap backends via node params without a full restart
-
-### DET-STRETCH — Differentiators (Phase 8, time-gated)
-
-- [x] **DET-STRETCH-01**: ByteTrack multi-object tracker assigns stable `track_id` per detection (class + spatial IoU association, Apache-2.0)
-- [x] **DET-STRETCH-02**: World-frame multi-robot detection fusion merges same-class detections within a 0.5 m cluster radius across robots
-- [x] **DET-STRETCH-03**: `SemanticMap` with per-object TTL renders as a ghosted Three.js layer alongside the 3D map
-- [x] **DET-STRETCH-04**: Heterogeneous per-robot backends — each robot may run a different detector (architectural support is in Phase 1; UI + coordinator wiring land here)
+**Defined:** 2026-04-30
+**Core Value:** Turn Argus locomotion from a hard-coded analytical gait demo into a repeatable benchmark harness where controller families can be compared across scenarios, seeds, and metrics.
 
 ---
 
-## Future Requirements (v4.0+)
+## v4.0 Requirements
 
-- Hot-swap detector mid-session (mirror of v2.0 SLAM precedent — pre-session selection is sufficient for v3.0)
-- GPU-required SOTA 3D detectors (BEVFormer, WildDet3D, 3D-MOOD, CenterPoint, CubeRCNN) — requires NVIDIA GPU, not a CPU-sim deliverable
-- Open-vocabulary detection at useful FPS (Grounding DINO full pipeline)
-- Online active learning / model retraining in sim
-- Semantic SLAM loop closure using detected objects as landmarks
-- RF-DETR-Nano as a third real-time transformer option (blocked on torch pin conflicts)
+Each requirement maps to exactly one roadmap phase.
+
+### LOC-ENV — Benchmark Environment Contract
+
+- [ ] **LOC-ENV-01**: Developer can run a Gymnasium-style `ArgusGo2Env` wrapper with `reset(seed=...)` and `step(action)` returning observation, reward, terminated, truncated, and info.
+- [ ] **LOC-ENV-02**: Developer can choose at least flat-ground, low-friction, slope, rough-heightfield, and push-disturbance scenarios from a named scenario catalog.
+- [ ] **LOC-ENV-03**: Developer can run deterministic seeded resets that reproduce robot spawn pose, terrain parameters, command schedule, and disturbance timing.
+- [ ] **LOC-ENV-04**: Developer can select action modes for velocity command, joint-position target, and residual-over-baseline control without changing the environment API.
+
+### LOC-CTRL — Controller Comparison Seam
+
+- [ ] **LOC-CTRL-01**: Developer can register locomotion controllers behind a common protocol that maps environment observation plus command into actuator/action output.
+- [ ] **LOC-CTRL-02**: Existing analytical trot controller is exposed as the default baseline controller through the same protocol.
+- [ ] **LOC-CTRL-03**: Developer can add placeholder adapters for residual policy, direct policy, and future MPC/WBC controllers without modifying the MuJoCo bridge internals.
+- [ ] **LOC-CTRL-04**: Multi-robot and single-robot bridges share the same controller/action abstraction where practical, so comparison logic is not duplicated.
+
+### LOC-METRICS — Locomotion Metrics
+
+- [ ] **LOC-METRICS-01**: Evaluation captures command tracking error for forward velocity, lateral velocity, and yaw rate.
+- [ ] **LOC-METRICS-02**: Evaluation captures stability metrics: fall rate, roll/pitch bounds, base height deviation, and distance before failure.
+- [ ] **LOC-METRICS-03**: Evaluation captures control-quality metrics: action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation.
+- [ ] **LOC-METRICS-04**: Evaluation captures terrain/contact proxies: foot slip, foot clearance, contact timing/duty factor, and scenario success rate.
+- [ ] **LOC-METRICS-05**: Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds.
+
+### LOC-EVAL — Repeatable Evaluation Runner
+
+- [ ] **LOC-EVAL-01**: Developer can run a CLI evaluation command that executes a controller across a scenario matrix and fixed seed list.
+- [ ] **LOC-EVAL-02**: Evaluation produces an aggregate comparison table with per-controller mean, standard deviation, and failure counts.
+- [ ] **LOC-EVAL-03**: Evaluation stores enough metadata to reproduce a run: git commit, controller id, scenario id, seed, environment config, and action mode.
+- [ ] **LOC-EVAL-04**: Evaluation includes regression tests that prevent the analytical trot baseline from silently degrading on the flat-ground smoke scenario.
+
+### LOC-REPORT — Research Harness Documentation
+
+- [ ] **LOC-REPORT-01**: Developer can read a concise harness guide explaining observation space, action modes, reward/metric definitions, and scenario catalog.
+- [ ] **LOC-REPORT-02**: Developer can see an explicit comparison matrix explaining which controller families are supported now versus intentionally deferred.
+- [ ] **LOC-REPORT-03**: Developer can use the final report from `outputs/locomotion-rd-systems.md` as the rationale link for milestone scope.
+
+---
+
+## Future Requirements (v5.0+)
+
+- **LOC-RL-01**: Train a residual RL policy over the analytical trot baseline.
+- **LOC-RL-02**: Train a direct proprioceptive RL policy producing PD joint targets.
+- **LOC-MPC-01**: Add centroidal/convex MPC stance-force planning.
+- **LOC-WBC-01**: Add whole-body control or inverse-dynamics QP layer.
+- **LOC-ROS-01**: Add ROS 2 / ros2_control hardware-style deployment interface.
+- **LOC-PERCEPT-01**: Add perception-conditioned locomotion over stairs/gaps/obstacles.
 
 ---
 
 ## Out of Scope
 
-- **Hot-swap detector mid-session** — v2.0 SLAM precedent: pre-session selection with restart is sufficient; complexity of mid-session swap not justified by UX benefit.
-- **GPU-dependent detectors** — hard CPU-only constraint from MuJoCo platform.
-- **Multiple heavy detectors running simultaneously on all robots** — CPU budget collapse; one active backend per session is the supported mode.
-- **Client-side 3D geometry reconstruction from 2D bbox + focal length** — actively harmful; DET-3D-05 explicitly deletes the existing implementation.
-- **DeepSORT CNN re-ID tracker** — CPU killer on our budget; ByteTrack chosen instead.
-- **VLM `scene_describer` mixed into detection pipeline** — 3–5 s/frame, kept as a separate subsystem.
-- **`mAP` reporting without committed labeled evaluation set** — forbidden; `center_error_m` + `per_class_recall` against MuJoCo GT is the honest replacement.
-- **Per-frame model re-initialization** — models load once, backend instance holds the reference.
-- **Real-time BoxeR** — 5–30 s/frame on CPU; shipped as offline / reference-quality backend only. Not a regression target.
-- **OWLv2 open-vocabulary as a live selectable backend** (was DET-MODELS-04) — dropped 2026-04-15 during Phase 5 discuss. A 1–4 s/frame backend in a 30 Hz worker loop starves the real-time pipeline; text-prompted open-vocab detection needs a dedicated one-shot labeling workflow, not a live backend variant. Phase 3 D-05's `input_type` capability key reservation remains in place for any future milestone that ships that workflow.
+- **Training RL policies** — v4.0 builds the evaluation harness and action/controller seams first.
+- **Implementing MPC/WBC** — current stack lacks the dynamics/contact/torque-control infrastructure for a safe implementation in this milestone.
+- **Hardware deployment** — simulation-only until benchmark results justify a ROS/hardware architecture milestone.
+- **Replacing the analytical trot** — it stays as the deterministic baseline comparator.
+- **Frontend visualization overhaul** — CLI artifacts and documentation are sufficient for the benchmark milestone.
 
 ---
 
 ## Traceability
 
-Each requirement maps to exactly one phase. Filled by roadmapper 2026-04-13.
+Each requirement maps to exactly one phase.
 
 | Requirement | Phase |
 |-------------|-------|
-| DET-API-01 | Phase 1 (detector-api-foundation) |
-| DET-API-02 | Phase 1 (detector-api-foundation) |
-| DET-API-03 | Phase 1 (detector-api-foundation) |
-| DET-API-04 | Phase 2 (per-robot-worker-and-wire-plumbing) |
-| DET-API-05 | Phase 2 (per-robot-worker-and-wire-plumbing) |
-| DET-API-06 | Phase 1 (detector-api-foundation) |
-| DET-API-07 | Phase 1 (detector-api-foundation) |
-| DET-MODELS-01 | Phase 1 (detector-api-foundation) |
-| DET-MODELS-02 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| DET-MODELS-03 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| ~~DET-MODELS-04~~ | ~~Phase 5~~ — **DROPPED 2026-04-15** (see Out of Scope) |
-| DET-MODELS-05 | Phase 2 (per-robot-worker-and-wire-plumbing) |
-| DET-MODELS-06 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| DET-MODELS-07 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| DET-MODELS-08 | Phase 5 (second-backends-boxer-rtdetr-owlv2) |
-| DET-3D-01 | Phase 4 (real-3d-obb-pipeline) |
-| DET-3D-02 | Phase 4 (real-3d-obb-pipeline) |
-| DET-3D-03 | Phase 2 (per-robot-worker-and-wire-plumbing) |
-| DET-3D-04 | Phase 2 (per-robot-worker-and-wire-plumbing) |
-| DET-3D-05 | Phase 4 (real-3d-obb-pipeline) |
-| DET-3D-06 | Phase 4 (real-3d-obb-pipeline) |
-| DET-3D-07 | Phase 4 (real-3d-obb-pipeline) |
-| DET-UI-01 | Phase 3 (frontend-picker-and-ui) |
-| DET-UI-02 | Phase 3 (frontend-picker-and-ui) |
-| DET-UI-03 | Phase 3 (frontend-picker-and-ui) |
-| DET-UI-04 | Phase 3 (frontend-picker-and-ui) |
-| DET-UI-05 | Phase 3 (frontend-picker-and-ui) |
-| DET-UI-06 | Phase 3 (frontend-picker-and-ui) |
-| DET-METRICS-01 | Phase 6 (detection-metrics-and-mujoco-gt) |
-| DET-METRICS-02 | Phase 6 (detection-metrics-and-mujoco-gt) |
-| DET-METRICS-03 | Phase 6 (detection-metrics-and-mujoco-gt) |
-| DET-METRICS-04 | Phase 6 (detection-metrics-and-mujoco-gt) |
-| DET-METRICS-05 | Phase 6 (detection-metrics-and-mujoco-gt) |
-| DET-PIPELINE-01 | Phase 7 (pipeline-editor-perception-nodes) |
-| DET-PIPELINE-02 | Phase 7 (pipeline-editor-perception-nodes) |
-| DET-PIPELINE-03 | Phase 7 (pipeline-editor-perception-nodes) |
-| DET-PIPELINE-04 | Phase 7 (pipeline-editor-perception-nodes) |
-| DET-PIPELINE-05 | Phase 7 (pipeline-editor-perception-nodes) |
-| DET-STRETCH-01 | Phase 8 (stretch-tracker-fusion-semantic-map) |
-| DET-STRETCH-02 | Phase 8 (stretch-tracker-fusion-semantic-map) |
-| DET-STRETCH-03 | Phase 8 (stretch-tracker-fusion-semantic-map) |
-| DET-STRETCH-04 | Phase 8 (stretch-tracker-fusion-semantic-map) |
+| LOC-ENV-01 | Phase 1 (locomotion-env-contract) |
+| LOC-ENV-02 | Phase 1 (locomotion-env-contract) |
+| LOC-ENV-03 | Phase 1 (locomotion-env-contract) |
+| LOC-ENV-04 | Phase 1 (locomotion-env-contract) |
+| LOC-CTRL-01 | Phase 2 (controller-plugin-baseline) |
+| LOC-CTRL-02 | Phase 2 (controller-plugin-baseline) |
+| LOC-CTRL-03 | Phase 2 (controller-plugin-baseline) |
+| LOC-CTRL-04 | Phase 2 (controller-plugin-baseline) |
+| LOC-METRICS-01 | Phase 3 (locomotion-metrics-instrumentation) |
+| LOC-METRICS-02 | Phase 3 (locomotion-metrics-instrumentation) |
+| LOC-METRICS-03 | Phase 3 (locomotion-metrics-instrumentation) |
+| LOC-METRICS-04 | Phase 3 (locomotion-metrics-instrumentation) |
+| LOC-METRICS-05 | Phase 4 (evaluation-runner-and-regression) |
+| LOC-EVAL-01 | Phase 4 (evaluation-runner-and-regression) |
+| LOC-EVAL-02 | Phase 4 (evaluation-runner-and-regression) |
+| LOC-EVAL-03 | Phase 4 (evaluation-runner-and-regression) |
+| LOC-EVAL-04 | Phase 4 (evaluation-runner-and-regression) |
+| LOC-REPORT-01 | Phase 5 (harness-docs-and-comparison-matrix) |
+| LOC-REPORT-02 | Phase 5 (harness-docs-and-comparison-matrix) |
+| LOC-REPORT-03 | Phase 5 (harness-docs-and-comparison-matrix) |
 
-**Coverage:** 41/41 active requirements mapped ✓ (DET-MODELS-04 dropped 2026-04-15 → Out of Scope)
+**Coverage:** 20/20 active requirements mapped ✓
 **Orphans:** none
 **Duplicates:** none
 
 ---
 
-*Defined: 2026-04-13 — pre-roadmap*
-*Traceability filled: 2026-04-13 — 8 phases, 100% coverage*
-*Amended 2026-04-15 — DET-MODELS-04 (OWLv2) dropped during Phase 5 discuss; coverage recount 42 → 41*
+*Defined: 2026-04-30 — pre-roadmap*
+*Traceability filled: 2026-04-30 — 5 phases, 100% coverage*

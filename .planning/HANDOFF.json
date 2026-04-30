@@ -1,0 +1,128 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-30T13:18:37+08:00",
+  "context": "research",
+  "phase": null,
+  "phase_name": "v4.0 milestone planning",
+  "phase_dir": ".planning",
+  "plan": null,
+  "task": null,
+  "total_tasks": 0,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Explain Argus backend architecture",
+      "status": "done",
+      "summary": "Mapped backend architecture: src.main web runtime, FastAPI/WebSocket layer, coordinator, bridge, SLAM, perception, and frontend streaming flow."
+    },
+    {
+      "id": 2,
+      "name": "Explain Argus locomotion model",
+      "status": "done",
+      "summary": "Traced velocity command -> TrotGaitController -> 12 Go2 joint-position targets -> MuJoCo position actuators."
+    },
+    {
+      "id": 3,
+      "name": "Deep research locomotion R&D systems",
+      "status": "done",
+      "summary": "Produced final report, provenance, draft, plan, and four research files under outputs/ for locomotion control families/toolchains and Argus comparison."
+    },
+    {
+      "id": 4,
+      "name": "Define v4.0 Benchmarkable Locomotion Environment requirements",
+      "status": "done",
+      "summary": "User approved LOC-ENV, LOC-CTRL, LOC-METRICS, LOC-EVAL, and LOC-REPORT requirements; RL/MPC/WBC/hardware are deferred."
+    },
+    {
+      "id": 5,
+      "name": "Draft v4.0 milestone artifacts",
+      "status": "done",
+      "summary": "Updated PROJECT, STATE, REQUIREMENTS, ROADMAP, MILESTONES, and research SUMMARY; archived active v3.0 requirements/roadmap/research."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 1,
+      "name": "Roadmap approval",
+      "status": "human_action_pending",
+      "description": "User needs to approve or revise .planning/ROADMAP.md before phase planning starts."
+    },
+    {
+      "id": 2,
+      "name": "Start Phase 1 planning",
+      "status": "not_started",
+      "description": "After roadmap approval, run /gsd-plan-phase 1 for locomotion-env-contract."
+    },
+    {
+      "id": 3,
+      "name": "Commit docs after approval if required",
+      "status": "not_started",
+      "description": "config.json has commit_docs=true; this pause commit is WIP, not final roadmap approval."
+    }
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Approve or revise the v4.0 roadmap",
+      "context": ".planning/ROADMAP.md is drafted but not yet approved by the user.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Use existing locomotion deep research instead of running another research round for v4.0",
+      "rationale": "User selected 'Use existing'; outputs/locomotion-rd-systems.md already covered the relevant control/toolchain landscape and Argus mapping.",
+      "phase": "milestone setup"
+    },
+    {
+      "decision": "Benchmark harness before new locomotion controllers",
+      "rationale": "Research showed Argus is currently analytical trot + position actuators; controller improvements need repeatable scenarios, seeds, metrics, and action/controller seams first.",
+      "phase": "v4.0"
+    },
+    {
+      "decision": "Analytical trot remains the default deterministic comparator",
+      "rationale": "The current controller is inspectable, already integrated, and useful as a baseline for residual/direct/MPC/WBC comparisons.",
+      "phase": "v4.0"
+    },
+    {
+      "decision": "RL training, MPC/WBC implementation, ROS/hardware, and frontend overhaul are out of scope",
+      "rationale": "v4.0 is scoped to environment, controller seams, metrics, runner, and documentation; advanced controllers are future milestones.",
+      "phase": "v4.0"
+    }
+  ],
+  "files_changed_for_wip_commit": [
+    ".planning/.continue-here.md",
+    ".planning/HANDOFF.json",
+    ".planning/MILESTONES.md",
+    ".planning/PROJECT.md",
+    ".planning/REQUIREMENTS.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md",
+    ".planning/research/SUMMARY.md",
+    ".planning/milestones/v3.0-REQUIREMENTS.md",
+    ".planning/milestones/v3.0-ROADMAP.md",
+    ".planning/milestones/v3.0-research/",
+    "outputs/.plans/locomotion-rd-systems.md",
+    "outputs/.drafts/locomotion-rd-systems-draft.md",
+    "outputs/locomotion-rd-systems*.md"
+  ],
+  "not_included": [
+    "Untracked CLAUDE.md existed before this pause and should not be committed unless the user asks.",
+    "Untracked outputs/agibot-x2-swarm* artifacts appear unrelated to the locomotion milestone and should not be included in the WIP commit."
+  ],
+  "advisory_constraints": [
+    {
+      "description": "Do not rely on gsd-sdk query subcommands in this checkout without checking support first; gsd-sdk query failed earlier with a usage error.",
+      "severity": "advisory",
+      "prevention": "Use direct file reads/writes and normal git commands when the query helper is unavailable."
+    },
+    {
+      "description": "Fish shell unmatched globs fail noisily for absent planning directories/files.",
+      "severity": "advisory",
+      "prevention": "Use find or guard globs carefully when detecting optional GSD artifacts."
+    }
+  ],
+  "next_action": "Ask the user to approve or revise .planning/ROADMAP.md. If approved, run /gsd-plan-phase 1 for locomotion-env-contract.",
+  "context_notes": "The milestone setup is complete and paused at the roadmap approval gate. No implementation phase has started. The active v4.0 docs are intentionally CLI/research-harness focused."
+}

@@ -2,11 +2,11 @@
 
 ## What This Is
 
-A simulation-based system where N Unitree Go2 quadruped robots autonomously explore a MuJoCo environment, split the space between them via Voronoi partitioning, and produce a combined real-time 3D reconstruction map — all controlled from a browser-based Command & Control interface with Three.js visualization, pluggable SLAM backends, and a visual pipeline editor.
+A simulation-based system where N Unitree Go2 quadruped robots autonomously explore a MuJoCo environment, split the space between them via Voronoi partitioning, and produce a combined real-time 3D reconstruction map — all controlled from a browser-based Command & Control interface with Three.js visualization, pluggable SLAM and perception backends, and a benchmarkable locomotion harness for comparing robot-dog controllers.
 
 ## Core Value
 
-Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time — with user-selectable SLAM algorithms, merge strategies, and live performance metrics.
+Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
 
 ## Requirements
 
@@ -27,57 +27,69 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - ✓ Output format toggle (point cloud, voxel grid, mesh visualization) — v2.0
 - ✓ Replace ICP-based map merging with pose-graph optimization — v2.0
 - ✓ Interactive pipeline graph editor (ComfyUI-style) — v2.0
+- ✓ Generic object-detection API with pluggable detector and 3D lifter backends — v3.0
+- ✓ YOLOv11 baseline, RT-DETRv2, and subprocess-isolated BoxeR detection backends — v3.0
+- ✓ Real oriented 3D bounding boxes with canonical server-owned wire format — v3.0
+- ✓ Frontend detector/lifter picker, parameter panel, restart overlay, and live detection metrics — v3.0
+- ✓ Pipeline-editor nodes for detector, 3D-projection, and tracker stages — v3.0
+- ✓ ByteTrack tracking, multi-robot detection fusion, semantic map layer, and heterogeneous per-robot detector support — v3.0
 
 ### Active
 
-- ☐ Generic object-detection API with pluggable backends (v3.0)
-- ☐ facebook/BoxeR (HuggingFace) detector integrated alongside YOLO (v3.0)
-- ☐ Real 3D oriented bounding box regression (replace depth-median 2D→3D projection) (v3.0)
-- ☐ Frontend detector picker, parameter panel, live detection metrics (v3.0)
-- ☐ Pipeline-editor nodes for detector + 3D-projection stages (v3.0)
+- ☐ Gymnasium-style `ArgusGo2Env` benchmark wrapper with deterministic seeded resets (v4.0)
+- ☐ Named locomotion scenario catalog: flat ground, low friction, slope, rough heightfield, and push disturbance (v4.0)
+- ☐ Controller plugin seam for analytical trot, residual policies, direct policies, and future MPC/WBC adapters (v4.0)
+- ☐ Locomotion metrics suite for command tracking, stability, control quality, contact/terrain proxies, and failure rates (v4.0)
+- ☐ Repeatable CLI evaluation runner with JSONL/CSV exports, aggregate comparison table, metadata, and baseline regression test (v4.0)
+- ☐ Harness guide and explicit controller-family comparison matrix grounded in the locomotion R&D report (v4.0)
 
 ### Out of Scope
 
 - Physical/real-world deployment — simulation only
 - Custom UE5 scene creation — using MuJoCo procedural scenes
 - Post-processing refinement pipeline — real-time map is the deliverable
-- Offline mode — real-time is core value
+- Offline-only C2 mode — real-time is core value
 - DimOS dependency — replaced with in-process transport (v1.0)
-- Deep learning SLAM backends (DROID-SLAM, DPV-SLAM, SL-SLAM) — requires NVIDIA GPU, defer to v3.0
-- Neural representation SLAM backends (Photo-SLAM, SplaTAM) — requires GPU, defer to v3.0
+- Deep learning SLAM backends (DROID-SLAM, DPV-SLAM, SL-SLAM) — requires NVIDIA GPU
+- Neural representation SLAM backends (Photo-SLAM, SplaTAM) — requires GPU
 - LiDAR SLAM — cameras only, system exists to replace LiDAR
 - Hot-swap SLAM algorithm mid-session — pre-session selection sufficient
+- RL policy training — v4.0 builds the benchmark harness, not trained policies
+- MPC/WBC implementation — v4.0 creates compatible seams and metrics, not full model-based control
+- ROS 2 / hardware deployment — future architecture milestone after simulation evaluation is repeatable
+- Frontend visualization overhaul — v4.0 can expose artifacts through CLI/docs first
 
-## Current Milestone: v3.0 Pluggable Perception & 3D Object Detection
+## Current Milestone: v4.0 Benchmarkable Locomotion Environment
 
-**Goal:** Extend the v2.0 pluggable-backend pattern to perception — decouple object detection from Ultralytics YOLO behind a generic detector API, add transformer-based backends (facebook/BoxeR and others surfaced by research), and upgrade the 3D bounding box pipeline from depth-median 2D→3D projection to real oriented 3D boxes.
+**Goal:** Turn Argus locomotion from a hard-coded analytical baseline into a benchmarkable comparison harness for analytical gait, residual learning, direct RL, MPC/WBC, and future ROS/hardware-oriented controllers.
 
 **Target features:**
-- Generic detector API + registry (mirror of SLAMProtocol / SLAMRegistry)
-- Existing YOLO detector refactored behind the new interface (zero behavioral regression)
-- facebook/BoxeR (HuggingFace) detector plugged in as a second backend
-- Real 3D oriented bounding box regression (replace depth-median center projection)
-- Frontend detector picker, per-algorithm parameter panel, restart overlay
-- Live detection metrics (FPS, #detections, confidence stats) in MetricsPanel
-- Pipeline-editor nodes for detector + 3D-projection stages
-- Additional backends discovered by deep research — scope locked after research completes
+- Gymnasium-style `ArgusGo2Env` with `reset(seed=...)` and `step(action)` semantics
+- Scenario catalog for flat ground, low friction, slope, rough heightfield, and push-disturbance tests
+- Deterministic seeded resets covering spawn pose, terrain, command schedule, and disturbances
+- Action modes for velocity command, joint-position target, and residual-over-baseline control
+- Controller protocol/registry with analytical trot as the default deterministic baseline
+- Metrics suite for command tracking, stability, action quality, contact/terrain proxies, and failures
+- CLI evaluation runner over controller × scenario × seed matrices with reproducible metadata
+- Harness documentation and comparison matrix linking scope to `outputs/locomotion-rd-systems.md`
 
-**Key context:** CPU-only constraint (no NVIDIA GPU). Subprocess isolation + ZMQ transport reused from v2.0 for heavy models. Graceful fallback when backends missing.
+**Key context:** The locomotion R&D report concludes Argus currently sits in the analytical gait + MuJoCo position-servo baseline family. v4.0 deliberately benchmarks and instruments this baseline before adding RL, MPC, WBC, or hardware-oriented control.
 
 ## Current State
 
-**Shipped:** v2.0 Generic SLAM API (2026-03-25)
+**Shipped:** v3.0 Pluggable Perception & 3D Object Detection (2026-04-30)
 
-**Codebase:** ~18,400 LOC (Python + TypeScript), 219 files
-**Tech stack:** MuJoCo, Open3D, GTSAM (optional), FastAPI, React 18, Three.js, React Flow, Zustand 5
-**Tests:** 122+ passing (pytest), TypeScript clean on all pipeline/SLAM code
+**Active:** v4.0 Benchmarkable Locomotion Environment planning complete; roadmap pending approval.
+
+**Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, and Zustand.
 
 ## Constraints
 
-- **Platform**: MuJoCo — CPU-only physics simulation
+- **Platform**: MuJoCo — CPU-first physics simulation
 - **Robots**: N Unitree Go2 quadrupeds (simulated, default 2)
 - **Real-time**: Map builds live as robots explore, not post-processed
 - **Interface**: Browser-based C2 at localhost:8000
+- **Locomotion benchmark**: repeatable seeds, explicit scenarios, and machine-readable metrics are required before controller claims count
 
 ## Key Decisions
 
@@ -91,9 +103,14 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 | WebStreamingViz over Rerun | Browser-accessible, no desktop app needed | ✓ Good — replaced Phase 4 Rerun path |
 | Position actuators over torque | Go2 XML uses motor (torque); position servos needed for gait control | ✓ Good — reliable trot gait |
 | Generic SLAM API over hardcoded ICP | Research shows ICP wrong for sparse clouds; abstraction enables algorithm comparison | ✓ Good — 4 backends plugged in cleanly |
-| Subprocess isolation for C++ backends | ORB-SLAM3/OpenVINS/SVO Pro crash risk; subprocess + ZMQ keeps main process alive | ✓ Good — crash detection + ICP fallback |
+| Subprocess isolation for C++/heavy backends | Native and ML backends can crash or stall; subprocess + ZMQ keeps main process alive | ✓ Good — crash detection + fallback |
 | Pose-graph optimization over ICP merge | ICP union naive for multi-robot; PGO produces globally consistent maps | ✓ Good — Open3D PGO + GTSAM iSAM2 |
-| React Flow for pipeline editor | Only mature React node-graph library; ComfyUI-style UX | ✓ Good — 10 presets, typed ports, live animation |
+| React Flow for pipeline editor | Only mature React node-graph library; ComfyUI-style UX | ✓ Good — typed ports, presets, live animation |
+| Benchmark harness before new locomotion controllers | The research report shows advanced locomotion requires state/contact instrumentation and repeatable metrics first | v4.0 formalizes env, scenarios, metrics, and controller seams before RL/MPC/WBC |
+| Gymnasium-style environment API | Standard reset/step contract makes RL, evaluation, and regression tests share one interface | v4.0 uses `ArgusGo2Env` as the benchmark boundary |
+| Analytical trot remains the baseline | The existing controller is deterministic, inspectable, and already integrated with MuJoCo position actuators | v4.0 registers it behind the same controller protocol as future controllers |
+| Metrics are first-class output | Locomotion claims need scenario/seed aggregates, not visual demos | v4.0 exports JSONL/CSV plus summaries for comparisons |
+| Future-controller adapters are seams, not implementations | Avoid half-building RL/MPC/WBC without training/control infrastructure | v4.0 ships placeholders and extension points only |
 
 ## Evolution
 
@@ -113,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 — v3.0 Pluggable Perception milestone started*
+*Last updated: 2026-04-30 — v4.0 Benchmarkable Locomotion Environment milestone started*

@@ -1,120 +1,84 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: milestone
-status: executing
-stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-04-16T05:50:51.984Z"
-last_activity: 2026-04-16
+milestone: v4.0
+milestone_name: Benchmarkable Locomotion Environment
+status: planning
+stopped_at: roadmap drafted, pending approval (2026-04-30)
+last_updated: "2026-04-30"
+last_activity: 2026-04-30
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 79
-  completed_plans: 79
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-13)
+See: .planning/PROJECT.md (updated 2026-04-30)
 
-**Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real-time — with user-selectable SLAM algorithms, detection backends, and live metrics.
-**Current focus:** Phase 08 — stretch-tracker-fusion-semantic-map
+**Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
+**Current focus:** v4.0 — Benchmarkable Locomotion Environment
 
 ## Current Position
 
-Phase: 08
+Phase: Not started
 Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-16
+Status: Roadmap drafted, pending approval
+Last activity: 2026-04-30
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-**Velocity (v2.0 historical, for trend reference):**
+No v4.0 execution metrics yet.
 
-- Total plans completed: 27 (v2.0)
-- Average duration: 6min
-- Total execution time: ~145min (includes post-checkpoint ORB-SLAM3 fixes)
+**Historical reference:**
 
-**v3.0 Velocity:**
-
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
-
-**By Phase (v2.0 history preserved):**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 08 | 7 | - | - |
-| 10 | 3/3 | 10min | 3min |
-| 09 | 3/3 | 12min | 4min |
-| 11 | 2/2 | ~78min | ~39min |
-| 12 | 4/4 | 12min | 3min |
-| Phase 13 P01 | 5min | 2 tasks | 9 files |
-| Phase 13 P02 | 3min | 2 tasks | 5 files |
-| Phase 13 P03 | 6min | 2 tasks | 6 files |
-| Phase 14 P01 | 3min | 2 tasks | 6 files |
-| Phase 14 P02 | 5min | 2 tasks | 9 files |
-| Phase 14 P03 | 4min | 2 tasks | 4 files |
-| Phase 14 P04 | 4min | 2 tasks | 4 files |
-| Phase 14 P05 | 4min | 2 tasks | 5 files |
-| Phase 15 P02 | 1min | 1 tasks | 2 files |
-| Phase 15 P01 | 2min | 2 tasks | 4 files |
-| Phase 08 P01 | 2min | 2 tasks | 7 files |
-| Phase 08 P02 | 3min | 1 tasks | 4 files |
-| Phase 08 P03 | 7min | 2 tasks | 4 files |
+- v1.0 shipped multi-robot 3D reconstruction MVP.
+- v2.0 shipped Generic SLAM API and pipeline editor foundation.
+- v3.0 shipped pluggable perception, real 3D OBBs, detection metrics, pipeline perception nodes, and semantic detection fusion.
 
 ## Accumulated Context
 
-### Decisions (v3.0 — locked pre-roadmap from research)
+### Decisions (v4.0 — locked pre-roadmap)
 
-Full decision log in PROJECT.md. Recent decisions affecting current work:
+- **Benchmark before controller sophistication:** the locomotion R&D report shows Argus currently uses analytical trot + MuJoCo position actuators; v4.0 must make that baseline measurable before adding RL/MPC/WBC.
+- **Gymnasium-style API:** `ArgusGo2Env` is the common reset/step boundary for evaluation, regression tests, and future learning workflows.
+- **Scenario catalog:** flat ground, low friction, slope, rough heightfield, and push disturbance are the minimum named scenarios for useful locomotion comparisons.
+- **Controller protocol:** the existing analytical trot is the default registered controller; residual/direct-policy/MPC/WBC entries are seams/placeholders, not implementations.
+- **Metrics-first evaluation:** command tracking, stability, control quality, contact proxies, exports, and reproducibility metadata are required outputs, not optional diagnostics.
+- **CLI-first benchmark:** frontend overhaul is out of scope; machine-readable artifacts and concise docs are enough for this milestone.
 
-- **Protocol split:** `DetectorProtocol` (2D) and `Detection3DProtocol` (3D lifter) are separate runtime-checkable Protocols with separate registries; end-to-end backends signal `outputs_3d_natively` and bypass the lifter.
-- **Per-robot DetectorWorker:** one worker thread per robot (not a shared drain), single-slot latest-frame queue with newest-wins backpressure; `DetectorWorkerPool = {rid -> DetectorWorker}`.
-- **Subprocess bridge:** `SubprocessDetectorBridge` is a distinct class from `SubprocessSLAMBridge` (same shape, separate failure domain); BoxeR is always subprocess-isolated (CC-BY-NC-4.0, 5–30 s/frame, heavy dep cocktail).
-- **OBB wire format locked:** `(center[3], half_extents[3], quaternion[4] in xyzw with qw>=0, class_id, class_name, score, track_id)` — server owns all geometry, frontend is a dumb renderer. Inline quaternion construction in backends is forbidden; `OrientedBox3D.to_wire()` is the only path.
-- **Default 3D lifter:** `PointClusterLifter` — MAD-filtered depth frustum + DBSCAN + Open3D `compute_oriented_bounding_box(robust=True)`, yaw-only for indoor MVP. `MedianDepthLifter` is a named legacy lifter, not default.
-- **Thread config:** moved to `src/_thread_config.py` imported before any torch/numpy import in `main.py`; no module-scope `torch.set_num_threads()` anywhere else.
-- **Honest metrics:** `mAP` forbidden in UI without a committed labeled eval set; `center_error_m` + `per_class_recall` against MuJoCo GT via `mj_name2id + data.xpos` is the replacement.
-- **Checkpoint pinning:** every HF checkpoint pinned by `revision=<sha>`; `make download-models` pre-fetches weights to `./models/` for offline/CI.
+### Research Basis
 
-### Decisions (v2.0 — historical reference)
-
-Full v2.0 decision log retained in PROJECT.md. Key architectural precedents v3.0 reuses:
-
-- v2.0: Generic SLAM API over hardcoded ICP — research shows ICP wrong for sparse point clouds
-- v2.0: 4 backends: existing ICP (baseline), ORB-SLAM3, OpenVINS, SVO Pro
-- v2.0: Pre-session algorithm selection primary; hot-swap deferred to v3.0 (now confirmed deferred further)
-- v2.0: SLAM backends produce poses only; dense clouds generated from depth images (sparse/dense mismatch fix)
-- [Phase 15-02]: ICP fallback swap placed inside same if-guard as crash_fallback WS emission
-- [Phase 15]: slam_restart_complete emitted inside _restart_lock block to guarantee all restart state committed before notification
-- [Phase 14]: Kahn's algorithm for DAG cycle detection in PipelineBuilder (reused in v3.0 DET-PIPELINE-03)
-- [12-02]: ZMQ PAIR socket with IPC transport for low-latency C++ subprocess communication (mirror for `SubprocessDetectorBridge`)
+- Final report: `outputs/locomotion-rd-systems.md`
+- Provenance: `outputs/locomotion-rd-systems.provenance.md`
+- Planning summary: `.planning/research/SUMMARY.md`
 
 ### Roadmap Evolution
 
 - 2026-03-23: v2.0 roadmap created — 6 phases (8-13), 23 requirements mapped
-- 2026-03-23: Phase 14 added: Interactive ComfyUI esque React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
+- 2026-03-23: Phase 14 added: Interactive ComfyUI-style React Flow state graph creation system to customize the end-to-end SLAM pipeline + parameters
 - 2026-04-13: v3.0 milestone started — Pluggable Perception & 3D Object Detection, phase numbering reset to 1
 - 2026-04-13: v3.0 ROADMAP.md created — 8 phases, 42 requirements, 100% coverage
+- 2026-04-30: v4.0 milestone started — Benchmarkable Locomotion Environment, 5 phases, 20 requirements, 100% coverage
 
 ### Pending Todos
 
-None yet.
+- Approve v4.0 roadmap.
+- Start `/gsd-plan-phase 1` for `locomotion-env-contract` after approval.
+- Commit planning docs if the roadmap is approved and the workflow proceeds with `commit_docs: true`.
 
 ### Blockers/Concerns
 
-- **Phase 5 (BoxeR) requires live research:** verify `facebook/boxer` repo state, current checkpoint names, and Python 3.12 compatibility via Context7 at phase-planning time. Do not trust April 2026 memory for 2022 CVPR code.
-- **Phase 6 requires scene inventory:** 30-min MuJoCo office scene XML class-labeled geom check at phase-planning time (needed for MuJoCo GT extractor).
-- **Phase 8 is time-gated:** cut if core phases (1–7) slip.
-- CPU-only constraint remains (no NVIDIA GPU). Subprocess isolation + ZMQ transport reused from v2.0 for heavy models (BoxeR).
-- BoxeR is CC-BY-NC-4.0 — must be documented in LICENSES.md (DET-MODELS-08).
+- Deterministic reset must cover MuJoCo state, terrain parameters, command schedule, and push timing; partial seeding is not enough for this milestone.
+- Current position-actuator stack is not a torque-control stack; MPC/WBC work must remain deferred unless a later milestone changes actuator/state/control assumptions.
+- Multi-robot direct-action parity may expose bridge duplication; solve the controller/action seam once rather than creating evaluation-only shortcuts.
+- Contact/terrain metrics depend on reliable MuJoCo contact and foot identity mapping; validate early in Phase 3 planning.
 
 ### Quick Tasks Completed
 
@@ -130,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-13 — v3.0 roadmap created
-Stopped at: Completed 08-03-PLAN.md
+Last activity: 2026-04-30 — v4.0 roadmap drafted
+Stopped at: roadmap approval gate
 Resume file: None

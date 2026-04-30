@@ -1,5 +1,33 @@
 # Milestones
 
+## v3.0 Pluggable Perception & 3D Object Detection (Shipped: 2026-04-30)
+
+**Phases completed:** 8 phases, 79 plans
+
+**Key accomplishments:**
+
+- Generic detector and 3D lifter protocols/registries, mirroring the v2.0 SLAM abstraction pattern
+- Existing YOLOv11 detector refactored behind the detector protocol with regression coverage
+- Per-robot detector workers with newest-wins backpressure, restart plumbing, and canonical OBB wire format
+- Frontend detector/lifter picker, parameter panel, restart overlay, RGB bbox overlay, and detector Zustand store
+- PointClusterLifter replacing median-depth projection with real oriented 3D boxes from depth-frustum point clusters
+- RT-DETRv2 and subprocess-isolated BoxeR backends with pinned-model/download infrastructure, crash fallback, and license documentation
+- Honest MuJoCo-grounded detection metrics, detection export, and UI guards against unsupported mAP claims
+- React Flow perception nodes for detector, 3D lifter, and tracker stages with typed ports and hot-apply backend dispatch
+- ByteTrack tracking, multi-robot detection fusion, semantic map TTL layer, and heterogeneous per-robot detector support
+
+### Requirements
+
+- See: `.planning/milestones/v3.0-REQUIREMENTS.md`
+
+### Archive
+
+- Roadmap: `.planning/milestones/v3.0-ROADMAP.md`
+- Requirements: `.planning/milestones/v3.0-REQUIREMENTS.md`
+- Research: `.planning/milestones/v3.0-research/`
+
+---
+
 ## v2.0 Generic SLAM API (Shipped: 2026-03-25)
 
 **Phases completed:** 7 phases, 24 plans, 46 tasks
