@@ -63,6 +63,11 @@ def available_action_modes() -> list[str]:
     return sorted(_ACTION_MODES)
 
 
+def joint_position_bounds() -> tuple[np.ndarray, np.ndarray]:
+    """Return copied 12-joint Go2 position target bounds."""
+    return _JOINT_LOW.copy(), _JOINT_HIGH.copy()
+
+
 def build_action_space(mode: str) -> spaces.Box:
     """Build the Gymnasium action space for an action mode.
 
