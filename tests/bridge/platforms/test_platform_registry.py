@@ -10,6 +10,8 @@ from src.bridge.platforms.base import RobotController
 from src.bridge.platforms.registry import (
     clear_platform_registry,
     create_platform,
+    ensure_platform_registered,
+    get_platform_factory,
     list_platforms,
     register_platform,
 )
@@ -122,6 +124,36 @@ def test_duplicate_registration_is_rejected():
         assert "already registered" in str(exc)
     else:
         raise AssertionError("duplicate platform registration was accepted")
+
+
+def test_get_platform_factory_returns_registered_factory_or_none():
+    assert get_platform_factory("dummy") is None
+
+    register_platform("dummy", _Platform)
+
+    assert get_platform_factory("dummy") is _Platform
+
+
+def test_ensure_platform_registered_is_idempotent_for_same_factory():
+    ensure_platform_registered("dummy", _Platform)
+    ensure_platform_registered("dummy", _Platform)
+
+    assert list_platforms() == ["dummy"]
+    assert create_platform("dummy").metadata.name == "dummy"
+
+
+def test_ensure_platform_registered_rejects_conflicting_factory():
+    class _ConflictingPlatform(_Platform):
+        pass
+
+    ensure_platform_registered("dummy", _Platform)
+
+    try:
+        ensure_platform_registered("dummy", _ConflictingPlatform)
+    except ValueError as exc:
+        assert "already registered" in str(exc)
+    else:
+        raise AssertionError("conflicting platform registration was accepted")
 
 
 def test_unknown_platform_message_names_known_platforms():

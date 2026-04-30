@@ -4,14 +4,12 @@ from src.bridge.platforms.go2 import Go2Platform
 from src.bridge.platforms.registry import (
     clear_platform_registry,
     create_platform,
+    ensure_platform_registered,
     list_platforms,
     register_platform,
 )
 
-try:
-    register_platform("go2", Go2Platform)
-except ValueError:
-    pass
+ensure_platform_registered("go2", Go2Platform)
 
 __all__ = [
     "Go2Platform",

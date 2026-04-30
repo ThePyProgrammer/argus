@@ -91,6 +91,21 @@ class Go2Platform:
     def make_controller(self, robot_id: str) -> Go2VelocityController:
         return Go2VelocityController()
 
+    def _qvel_start_for_qpos(self, model: Any, qpos_start: int) -> int:
+        if model is None or not hasattr(model, "jnt_qposadr") or not hasattr(model, "jnt_dofadr"):
+            return qpos_start
+
+        qpos_addresses = np.asarray(model.jnt_qposadr)
+        matches = np.flatnonzero(qpos_addresses == qpos_start)
+        if matches.size == 0:
+            return qpos_start
+
+        dof_addresses = np.asarray(model.jnt_dofadr)
+        joint_id = int(matches[0])
+        if joint_id >= dof_addresses.size:
+            return qpos_start
+        return int(dof_addresses[joint_id])
+
     def extract_state(self, model: Any, data: Any, qpos_start: int, sim_time: float) -> RobotState:
         if data is None:
             pose = np.eye(4, dtype=np.float64)
@@ -109,9 +124,10 @@ class Go2Platform:
         pose[:3, 3] = data.qpos[qpos_start:qpos_start + 3]
         quat = data.qpos[qpos_start + 3:qpos_start + 7]
         pose[:3, :3] = quat_to_rotation_matrix(quat)
+        qvel_start = self._qvel_start_for_qpos(model, qpos_start)
         joint_positions = data.qpos[qpos_start + 7:qpos_start + 19].copy()
-        joint_velocities = data.qvel[qpos_start + 6:qpos_start + 18].copy() if len(data.qvel) >= qpos_start + 18 else np.zeros(12)
-        base_velocity = data.qvel[qpos_start:qpos_start + 3].copy() if len(data.qvel) >= qpos_start + 3 else np.zeros(3)
+        joint_velocities = data.qvel[qvel_start + 6:qvel_start + 18].copy() if len(data.qvel) >= qvel_start + 18 else np.zeros(12)
+        base_velocity = data.qvel[qvel_start:qvel_start + 3].copy() if len(data.qvel) >= qvel_start + 3 else np.zeros(3)
         fallen = pose[2, 3] < 0.16
         reason = FallReason.BASE_HEIGHT if fallen else FallReason.NONE
         return RobotState(
