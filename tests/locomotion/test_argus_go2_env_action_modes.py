@@ -84,10 +84,16 @@ def test_residual_baseline_decode_adds_clipped_residual_to_baseline():
         PREVIOUS_COMMAND,
     )
 
+    baseline = TrotGaitController().compute(
+        float(PREVIOUS_COMMAND[0]),
+        float(PREVIOUS_COMMAND[1]),
+        float(PREVIOUS_COMMAND[2]),
+        DT,
+    )
     assert decoded.shape == (12,)
     assert decoded.dtype == np.float64
     assert np.all(np.isfinite(decoded))
-    assert not np.allclose(decoded, residual)
+    np.testing.assert_allclose(decoded, baseline + residual)
 
 
 def test_residual_baseline_decode_clips_residual_before_adding_baseline():
@@ -137,6 +143,20 @@ def test_decode_rejects_nan_action_values(mode):
     action[0] = np.nan
 
     with pytest.raises(ValueError, match="finite"):
+        decode_action(action, mode, gait, DT, PREVIOUS_COMMAND)
+
+
+@pytest.mark.parametrize(
+    ("mode", "action"),
+    [
+        (ACTION_MODE_VELOCITY, np.array([999.0, 0.0, 0.0], dtype=np.float32)),
+        (ACTION_MODE_JOINT_POSITION, np.array([2.0, 0.9, -1.8] * 4, dtype=np.float32)),
+    ],
+)
+def test_decode_rejects_out_of_bounds_action_values(mode, action):
+    gait = TrotGaitController()
+
+    with pytest.raises(ValueError, match="bounds"):
         decode_action(action, mode, gait, DT, PREVIOUS_COMMAND)
 
 

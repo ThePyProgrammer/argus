@@ -63,7 +63,7 @@ def decode_action(
     This helper does not mutate MuJoCo state.
     """
     if mode == ACTION_MODE_VELOCITY:
-        command = _as_finite_vector(action, (3,))
+        command = _as_bounded_vector(action, _VELOCITY_LOW, _VELOCITY_HIGH)
         decoded = gait.compute(
             float(command[0]),
             float(command[1]),
@@ -73,7 +73,7 @@ def decode_action(
         return _ensure_decoded_control(decoded)
 
     if mode == ACTION_MODE_JOINT_POSITION:
-        return _as_finite_vector(action, (12,))
+        return _as_bounded_vector(action, _JOINT_LOW, _JOINT_HIGH)
 
     if mode == ACTION_MODE_RESIDUAL_BASELINE:
         residual = _as_finite_vector(action, (12,))
@@ -97,6 +97,17 @@ def _as_finite_vector(action: Sequence[float] | np.ndarray, shape: tuple[int, ..
         raise ValueError(f"Action must have shape {shape}, got {vector.shape}")
     if not np.all(np.isfinite(vector)):
         raise ValueError("Action values must be finite")
+    return vector
+
+
+def _as_bounded_vector(
+    action: Sequence[float] | np.ndarray,
+    low: np.ndarray,
+    high: np.ndarray,
+) -> np.ndarray:
+    vector = _as_finite_vector(action, low.shape)
+    if np.any(vector < low.astype(np.float64)) or np.any(vector > high.astype(np.float64)):
+        raise ValueError("Action values must be within the action space bounds")
     return vector
 
 
