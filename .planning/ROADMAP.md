@@ -116,7 +116,7 @@ Plans:
 - [x] 03-04-PLAN.md — Harden Phase 3 validation coverage and run Nyquist quick/full checks.
 
 **Wave 5 *(gap closure; blocked on Wave 4 completion)***
-- [ ] 03-05-PLAN.md — Gate progress-stall termination on non-trivial desired translational commands and add zero-command standing regressions.
+- [x] 03-05-PLAN.md — Gate progress-stall termination on non-trivial desired translational commands and add zero-command standing regressions.
 
 **Research flag**: standard
 
