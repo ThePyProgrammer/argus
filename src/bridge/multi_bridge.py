@@ -11,23 +11,14 @@ from typing import Any
 
 import numpy as np
 
-from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
+from src.bridge.collision_state import compute_collision_summaries
 from src.bridge.multi_robot_config import MultiRobotConfig
-from src.bridge.platforms.go2 import Go2Platform
+from src.bridge.platforms import create_platform
+from src.bridge.platforms.types import RobotCommand, RobotRuntimeStatus, RobotState
 from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_office_scene
-from src.locomotion.gait_controller import TrotGaitController
-from src.locomotion.gait_params import GaitParams
+from src.bridge.sensor_types import SensorFrame, quat_to_rotation_matrix
 
 logger = logging.getLogger(__name__)
-
-# Actuator name suffixes in the order they appear in go2.xml
-_ACTUATOR_NAMES = [
-    "FL_hip", "FL_thigh", "FL_calf",
-    "FR_hip", "FR_thigh", "FR_calf",
-    "RL_hip", "RL_thigh", "RL_calf",
-    "RR_hip", "RR_thigh", "RR_calf",
-]
-
 
 class MultiRobotBridge:
     """Bridge for N Go2 robots in a shared MuJoCo simulation.
@@ -48,20 +39,24 @@ class MultiRobotBridge:
         self._overview_renderer: Any = None
         self._step_count: int = 0
         self._dt: float = 0.0
-
-        # Per-robot state discovered at start() time via mj_name2id
-        self._qpos_starts: dict[str, int] = {}  # robot_id -> qpos start index (7 elements)
-        self._ctrl_indices: dict[str, list[int]] = {}  # robot_id -> list of 12 ctrl indices
-        self._cam_ids: dict[str, int] = {}  # robot_id -> camera ID
-
-        # Velocity buffers
-        self._velocities: dict[str, tuple[np.ndarray, float]] = {
-            rid: (np.zeros(2), 0.0) for rid in self._config.robot_ids
+        self._platform = create_platform(
+            self._config.platform,
+            **({"model_dir": self._config.model_dir} if self._config.platform == "go2" else {}),
+            **self._config.platform_config,
+        )
+        self._qpos_starts: dict[str, int] = {}
+        self._ctrl_indices: dict[str, list[int]] = {}
+        self._cam_ids: dict[str, int] = {}
+        self._commands: dict[str, RobotCommand] = {
+            rid: RobotCommand.stand() for rid in self._config.robot_ids
         }
-
-        # Trot gait controllers (one per robot)
-        self._gaits: dict[str, TrotGaitController] = {
-            rid: TrotGaitController() for rid in self._config.robot_ids
+        self._controllers = {
+            rid: self._platform.make_controller(rid) for rid in self._config.robot_ids
+        }
+        self._runtime_status: dict[str, RobotRuntimeStatus] = {}
+        self._collision_summaries: dict[str, dict[str, int]] = {
+            rid: {"collision_count": 0, "near_miss_count": 0}
+            for rid in self._config.robot_ids
         }
 
         # Last captured frames
@@ -93,15 +88,15 @@ class MultiRobotBridge:
         self._step_count = 0
 
         # Generate combined XML
-        if self._config.scene == "office":
+        if self._config.scene == "office" and self._config.platform == "go2":
             xml_str, assets = build_two_robot_office_scene(
-                self._config.model_dir,
+                self._platform.metadata.model_dir,
                 self._config.spawn_positions,
             )
             self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
         else:
             xml_str, assets = build_multi_robot_scene(
-                Go2Platform(model_dir=self._config.model_dir),
+                self._platform,
                 self._config.spawn_positions,
             )
             self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
@@ -136,7 +131,7 @@ class MultiRobotBridge:
 
             # Discover actuator ctrl indices
             ctrl_ids = []
-            for act_name in _ACTUATOR_NAMES:
+            for act_name in self._platform.actuator_names():
                 full_name = f"{robot_id}_{act_name}"
                 act_id = mujoco.mj_name2id(
                     self._model, mujoco.mjtObj.mjOBJ_ACTUATOR, full_name
@@ -155,21 +150,26 @@ class MultiRobotBridge:
 
         # Set initial standing pose and heading for both robots
         import math
+        initial_qpos = self._platform.initial_joint_qpos()
         n_robots = len(self._config.robot_ids)
         for i, robot_id in enumerate(self._config.robot_ids):
             qstart = self._qpos_starts[robot_id]
-            # qpos layout: [x, y, z, qw, qx, qy, qz, joint1..joint12]
-            # Set yaw: spread robots evenly around 360°
             yaw = (2 * math.pi * i) / n_robots
-            self._data.qpos[qstart + 3] = math.cos(yaw / 2)  # qw
-            self._data.qpos[qstart + 4] = 0.0                 # qx
-            self._data.qpos[qstart + 5] = 0.0                 # qy
-            self._data.qpos[qstart + 6] = math.sin(yaw / 2)   # qz
-            self._data.qpos[qstart + 7 : qstart + 19] = STANDING_QPOS
-            # Set ctrl to standing via gait controller (zero velocity = standing)
-            standing = self._gaits[robot_id].compute(0.0, 0.0, 0.0, 0.0)
-            for i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = standing[i]
+            self._data.qpos[qstart + 3] = math.cos(yaw / 2)
+            self._data.qpos[qstart + 4] = 0.0
+            self._data.qpos[qstart + 5] = 0.0
+            self._data.qpos[qstart + 6] = math.sin(yaw / 2)
+            self._data.qpos[qstart + 7:qstart + 7 + len(initial_qpos)] = initial_qpos
+            state = self._platform.extract_state(self._model, self._data, qstart, sim_time=0.0)
+            ctrl = self._controllers[robot_id].compute(RobotCommand.stand(), state, self._dt or 0.02)
+            for ctrl_i, act_id in enumerate(self._ctrl_indices[robot_id]):
+                self._data.ctrl[act_id] = ctrl[ctrl_i]
+            self._runtime_status[robot_id] = self._platform.runtime_status(
+                robot_id,
+                state,
+                RobotCommand.stand(),
+                self._controllers[robot_id].health(),
+            )
 
         # Settle physics
         for _ in range(self._config.boot_phase_steps):
@@ -213,9 +213,21 @@ class MultiRobotBridge:
         if self._model is None:
             raise RuntimeError("Bridge not started -- call start() first")
 
-        # Apply velocity-to-ctrl for each robot
+        # Apply platform controller outputs for each robot
         for robot_id in self._config.robot_ids:
-            ctrl = self._velocity_to_ctrl(robot_id)
+            status = self.get_runtime_status(robot_id)
+            command = RobotCommand.stop() if status.disabled else self._commands[robot_id]
+            state = self._platform.extract_state(
+                self._model,
+                self._data,
+                self._qpos_starts[robot_id],
+                self._step_count * self._dt,
+            )
+            ctrl = self._controllers[robot_id].compute(command, state, self._dt)
+            if ctrl.shape != (len(self._ctrl_indices[robot_id]),):
+                raise RuntimeError(
+                    f"Controller for {robot_id} returned {ctrl.shape}, expected {(len(self._ctrl_indices[robot_id]),)}"
+                )
             for i, act_id in enumerate(self._ctrl_indices[robot_id]):
                 self._data.ctrl[act_id] = ctrl[i]
 
@@ -233,6 +245,34 @@ class MultiRobotBridge:
             # Only record if moved enough (avoids clutter when stationary)
             if not trace or np.linalg.norm(pos - trace[-1]) > 0.05:
                 trace.append(pos)
+
+        positions = {
+            rid: self._data.qpos[self._qpos_starts[rid]:self._qpos_starts[rid] + 3].copy()
+            for rid in self._config.robot_ids
+        }
+        self._collision_summaries = compute_collision_summaries(
+            positions,
+            footprint_radius=self._platform.metadata.footprint_radius,
+        )
+        for rid in self._config.robot_ids:
+            state = self._platform.extract_state(
+                self._model,
+                self._data,
+                self._qpos_starts[rid],
+                self._step_count * self._dt,
+            )
+            summary = self._collision_summaries[rid]
+            status = self._platform.runtime_status(
+                rid,
+                state,
+                self._commands[rid],
+                self._controllers[rid].health(),
+                collision_count=summary["collision_count"],
+                near_miss_count=summary["near_miss_count"],
+            )
+            self._runtime_status[rid] = status
+            if status.disabled:
+                self._commands[rid] = RobotCommand.stop()
 
         if self._viewer_handle is not None:
             try:
@@ -283,7 +323,39 @@ class MultiRobotBridge:
             linear: (2,) array [vx, vy].
             angular: Angular velocity (positive = turn left).
         """
-        self._velocities[robot_id] = (np.asarray(linear, dtype=np.float64), float(angular))
+        self.set_command(robot_id, RobotCommand.velocity(linear, angular))
+
+    def set_command(self, robot_id: str, command: RobotCommand) -> None:
+        if robot_id not in self._commands:
+            raise KeyError(f"Unknown robot_id: {robot_id}")
+        self._commands[robot_id] = command
+
+    def stop_robot(self, robot_id: str) -> None:
+        self.set_command(robot_id, RobotCommand.stop())
+
+    def recover_robot(self, robot_id: str) -> None:
+        self._controllers[robot_id].reset()
+        self.set_command(robot_id, RobotCommand.recover())
+
+    def get_runtime_status(self, robot_id: str) -> RobotRuntimeStatus:
+        if robot_id in self._runtime_status:
+            return self._runtime_status[robot_id]
+        if robot_id not in self._commands:
+            raise KeyError(f"Unknown robot_id: {robot_id}")
+        return self._platform.runtime_status(
+            robot_id,
+            self._default_state(),
+            self._commands[robot_id],
+            self._controllers[robot_id].health(),
+        )
+
+    @property
+    def platform_metadata(self):
+        return self._platform.metadata
+
+    @property
+    def runtime_statuses(self) -> dict[str, RobotRuntimeStatus]:
+        return dict(self._runtime_status)
 
     def get_frame(self, robot_id: str) -> SensorFrame:
         """Return the last captured frame for the specified robot.
@@ -295,6 +367,9 @@ class MultiRobotBridge:
             The most recently captured SensorFrame for that robot.
         """
         return self._last_frames[robot_id]
+
+    def get_last_frame(self, robot_id: str) -> SensorFrame:
+        return self.get_frame(robot_id)
 
     def stop(self) -> None:
         """Clean up MuJoCo resources."""
@@ -355,6 +430,23 @@ class MultiRobotBridge:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _default_state(self) -> RobotState:
+        try:
+            return self._platform.extract_state(None, None, 0, 0.0)
+        except Exception:
+            pose = np.eye(4, dtype=np.float64)
+            pose[:3, 3] = [0.0, 0.0, self._platform.metadata.spawn_height]
+            initial_qpos = self._platform.initial_joint_qpos()
+            return RobotState(
+                base_pose=pose,
+                base_velocity=np.zeros(3, dtype=np.float64),
+                joint_positions=initial_qpos,
+                joint_velocities=np.zeros_like(initial_qpos),
+                orientation_quat=np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64),
+                contacts=(),
+                sim_time=0.0,
+            )
 
     def _capture_frame(self, robot_id: str) -> SensorFrame:
         """Render RGB + depth from robot's camera, extract pose.
@@ -444,24 +536,6 @@ class MultiRobotBridge:
         qw = self._data.qpos[start + 3]
         qz = self._data.qpos[start + 6]
         return 2.0 * math.atan2(qz, qw)
-
-    def _velocity_to_ctrl(self, robot_id: str) -> np.ndarray:
-        """Convert buffered velocity to 12-element joint position targets.
-
-        Uses TrotGaitController for proper trot gait with position-controlled
-        actuators, matching MuJoCoBridge._velocity_to_ctrl() behaviour.
-
-        Args:
-            robot_id: Which robot's velocity buffer to read.
-
-        Returns:
-            (12,) float64 joint position targets.
-        """
-        linear, angular = self._velocities[robot_id]
-        dt = self._dt  # self._dt already includes sim_steps_per_frame
-        vx = float(linear[0]) if len(linear) > 0 else 0.0
-        vy = float(linear[1]) if len(linear) > 1 else 0.0
-        return self._gaits[robot_id].compute(vx, vy, angular, dt)
 
     # ------------------------------------------------------------------
     # Properties
