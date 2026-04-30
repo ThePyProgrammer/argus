@@ -53,6 +53,36 @@ export default function RobotCard({ robot }: RobotCardProps) {
           {robot.action}
         </span>
       </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: '6px',
+        fontSize: '11px', color: '#9ca3af',
+      }}>
+        <span>{robot.platformMetadata?.display_name ?? robot.platform}</span>
+        <span style={{
+          color: robot.disabled ? '#ff6b6b' : '#8fd18f',
+          textTransform: 'capitalize',
+          fontWeight: 600,
+        }}>
+          {robot.runtimeState}
+        </span>
+      </div>
+      {robot.fallReason !== 'none' && (
+        <div style={{ marginTop: '4px', fontSize: '11px', color: '#ffb86b' }}>
+          Fall: {robot.fallReason}
+        </div>
+      )}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: '4px',
+        fontSize: '11px', color: '#aaa',
+      }}>
+        <span>
+          Controller: {robot.controllerHealth?.policy_loaded === false ? 'no policy' : 'ok'}
+        </span>
+        <span>Near misses: {robot.nearMissCount}</span>
+      </div>
+      <div style={{ marginTop: '4px', fontSize: '11px', color: robot.collisionCount > 0 ? '#ff6b6b' : '#777' }}>
+        Collisions: {robot.collisionCount}
+      </div>
       <div
         style={{
           display: 'flex',
