@@ -68,6 +68,7 @@ class LocomotionMetricsConfig:
     min_base_height_m: float = 0.18
     base_height_tolerance_m: float = 0.12
     min_progress_m_per_s: float = 0.03
+    min_progress_command_speed_m_per_s: float = 0.05
     progress_window_steps: int = 25
     joint_limit_tolerance_rad: float = 1e-3
     saturation_margin_fraction: float = 0.05
@@ -89,6 +90,8 @@ class LocomotionMetricsConfig:
                 raise ValueError(f"{name} must be a positive finite value")
         if self.progress_window_steps < 1:
             raise ValueError("progress_window_steps must be >= 1")
+        if not np.isfinite(self.min_progress_command_speed_m_per_s) or self.min_progress_command_speed_m_per_s < 0.0:
+            raise ValueError("min_progress_command_speed_m_per_s must be a non-negative finite value")
         if not (0.0 < self.saturation_margin_fraction < 0.5):
             raise ValueError("saturation_margin_fraction must be between 0.0 and 0.5")
 
@@ -203,7 +206,7 @@ class LocomotionMetricsCollector:
             raise ValueError("dt must be positive")
 
         command_tracking = _command_tracking_payload(desired, measured)
-        stability, failure_reason = self._stability_payload(roll, pitch, height, xy, delta_t)
+        stability, failure_reason = self._stability_payload(desired_command=desired, roll=roll, pitch=pitch, height=height, xy=xy, dt=delta_t)
         action_quality = self._action_quality_payload(action, previous, previous_previous, qpos, qvel, delta_t)
         if foot_positions_world is not None or foot_contacts is not None:
             contact_terrain = self._contact_terrain_payload(
@@ -267,6 +270,7 @@ class LocomotionMetricsCollector:
 
     def _stability_payload(
         self,
+        desired_command: np.ndarray,
         roll: float,
         pitch: float,
         height: float,
@@ -281,7 +285,7 @@ class LocomotionMetricsCollector:
             failure_reason = "pitch_limit"
         elif height < self.config.min_base_height_m:
             failure_reason = "base_height_low"
-        elif self._progress_stalled(distance, dt):
+        elif self._progress_stalled(desired_command, distance, dt):
             failure_reason = "progress_stalled"
 
         return {
@@ -293,7 +297,10 @@ class LocomotionMetricsCollector:
             "failure_reason": failure_reason,
         }, failure_reason
 
-    def _progress_stalled(self, current_distance: float, dt: float) -> bool:
+    def _progress_stalled(self, desired_command: np.ndarray, current_distance: float, dt: float) -> bool:
+        desired_translational_speed = float(np.linalg.norm(desired_command[:2]))
+        if desired_translational_speed < self.config.min_progress_command_speed_m_per_s:
+            return False
         if len(self._steps) < self.config.progress_window_steps:
             return False
         window = list(self._steps)[-self.config.progress_window_steps :]
