@@ -15,7 +15,7 @@ The journey is intentionally staged: (1) define the environment/scenario/action-
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: locomotion-env-contract** - Gymnasium-style `ArgusGo2Env`, scenario catalog, seeded reset determinism, and action-mode contract — completed 2026-04-30
-- [ ] **Phase 2: controller-plugin-baseline** - Locomotion controller protocol/registry, analytical trot baseline adapter, future-controller placeholders, and bridge abstraction alignment
+- [x] **Phase 2: controller-plugin-baseline** - Locomotion controller protocol/registry, analytical trot baseline adapter, future-controller placeholders, and bridge abstraction alignment — completed 2026-04-30
 - [ ] **Phase 3: locomotion-metrics-instrumentation** - Command tracking, stability, action-quality, and terrain/contact metrics collected from simulation state
 - [ ] **Phase 4: evaluation-runner-and-regression** - CLI scenario/seed matrix runner, JSONL/CSV/summary exports, reproducibility metadata, and analytical-baseline regression test
 - [ ] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link
@@ -69,18 +69,18 @@ Cross-cutting constraints:
 Plans:
 
 **Wave 1**
-- [ ] 02-01-PLAN.md — Add locomotion controller protocol, registry, analytical baseline adapter, unavailable future-controller placeholders, and Wave 0 protocol/registry tests.
+- [x] 02-01-PLAN.md — Add locomotion controller protocol, registry, analytical baseline adapter, unavailable future-controller placeholders, and Wave 0 protocol/registry tests.
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 02-02-PLAN.md — Add shared controller dispatch and validated control-target application helpers with fake-data tests.
+- [x] 02-02-PLAN.md — Add shared controller dispatch and validated control-target application helpers with fake-data tests.
 
 **Wave 3 *(blocked on Wave 2 completion)***
-- [ ] 02-03-PLAN.md — Wire `ArgusGo2Env` to registered controller selection and reset/step metadata attribution.
-- [ ] 02-04-PLAN.md — Refactor `MuJoCoBridge` internals to use the registered analytical controller seam while preserving `SensorFrame` returns.
-- [ ] 02-05-PLAN.md — Refactor `MultiRobotBridge` internals to use per-robot registered analytical controllers while preserving `dict[str, SensorFrame]` returns.
+- [x] 02-03-PLAN.md — Wire `ArgusGo2Env` to registered controller selection and reset/step metadata attribution.
+- [x] 02-04-PLAN.md — Refactor `MuJoCoBridge` internals to use the registered analytical controller seam while preserving `SensorFrame` returns.
+- [x] 02-05-PLAN.md — Refactor `MultiRobotBridge` internals to use per-robot registered analytical controllers while preserving `dict[str, SensorFrame]` returns.
 
 **Wave 4 *(blocked on Wave 3 completion)***
-- [ ] 02-06-PLAN.md — Run final Phase 2 test hardening and cross-plan coverage assertions for decisions, requirements, threats, and deferred boundaries.
+- [x] 02-06-PLAN.md — Run final Phase 2 test hardening and cross-plan coverage assertions for decisions, requirements, threats, and deferred boundaries.
 
 Cross-cutting constraints:
 - Implement all locked decisions D-01 through D-15 from `02-CONTEXT.md` exactly; do not implement deferred RL/direct/MPC/WBC/ROS/hardware/frontend selection work.
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
-| 2. controller-plugin-baseline | 0/6 | Not started | - |
+| 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
 | 3. locomotion-metrics-instrumentation | 0/TBD | Not started | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
@@ -157,4 +157,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 2 planned 2026-04-30. Continue with `/gsd-execute-phase 2` for `controller-plugin-baseline`.
+Phase 2 completed 2026-04-30. Continue with `/gsd-discuss-phase 3` for `locomotion-metrics-instrumentation`.

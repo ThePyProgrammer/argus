@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: ready_to_execute
-stopped_at: Phase 2 planned; ready to execute controller-plugin-baseline (2026-04-30)
+status: ready_to_plan
+stopped_at: Phase 2 completed and verified; ready to discuss/plan Phase 3 locomotion-metrics-instrumentation (2026-04-30)
 last_updated: "2026-04-30"
 last_activity: 2026-04-30
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 5
-  percent: 20
+  completed_plans: 11
+  percent: 40
 ---
 
 # Project State
@@ -25,16 +25,17 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 ## Current Position
 
-Phase: 2 — controller-plugin-baseline
-Plan: 6 plans ready to execute
-Status: Phase 2 planned; ready to execute
+Phase: 3 — locomotion-metrics-instrumentation
+Plan: not planned yet
+Status: Phase 2 completed and verified; Phase 3 ready to discuss/plan
 Last activity: 2026-04-30
 
-Progress: [██░░░░░░░░] 20%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
-No v4.0 execution metrics yet.
+Phase 2 verification: controller-plugin-baseline passed with 5/5 must-haves verified.
+Regression gate: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` → 186 passed, 2 pre-existing pytest config warnings.
 
 **Historical reference:**
 
@@ -66,17 +67,17 @@ No v4.0 execution metrics yet.
 - 2026-04-13: v3.0 milestone started — Pluggable Perception & 3D Object Detection, phase numbering reset to 1
 - 2026-04-13: v3.0 ROADMAP.md created — 8 phases, 42 requirements, 100% coverage
 - 2026-04-30: v4.0 milestone started — Benchmarkable Locomotion Environment, 5 phases, 20 requirements, 100% coverage
+- 2026-04-30: Phase 2 completed — controller protocol/registry, analytical trot adapter, unavailable future-controller placeholders, env/bridge controller seam, clean code review, and verification passed.
 
 ### Pending Todos
 
-- Start `/gsd-execute-phase 2` for `controller-plugin-baseline`.
+- Start `/gsd-discuss-phase 3` for `locomotion-metrics-instrumentation`.
 - Address advisory code-review warning if desired: `ArgusGo2Env` advertises `rgb_array` render mode without implementing `render()`.
 
 ### Blockers/Concerns
 
 - Deterministic reset must cover MuJoCo state, terrain parameters, command schedule, and push timing; partial seeding is not enough for this milestone.
 - Current position-actuator stack is not a torque-control stack; MPC/WBC work must remain deferred unless a later milestone changes actuator/state/control assumptions.
-- Multi-robot direct-action parity may expose bridge duplication; solve the controller/action seam once rather than creating evaluation-only shortcuts.
 - Contact/terrain metrics depend on reliable MuJoCo contact and foot identity mapping; validate early in Phase 3 planning.
 
 ### Quick Tasks Completed
@@ -93,6 +94,6 @@ No v4.0 execution metrics yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — Phase 2 planned and verified; ready to execute
-Stopped at: ready to execute Phase 2 (`controller-plugin-baseline`)
-Resume file: .planning/phases/02-controller-plugin-baseline/02-01-PLAN.md
+Last activity: 2026-04-30 — Phase 2 completed and verified
+Stopped at: ready to discuss/plan Phase 3 (`locomotion-metrics-instrumentation`)
+Resume file: .planning/phases/02-controller-plugin-baseline/02-VERIFICATION.md

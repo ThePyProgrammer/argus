@@ -18,10 +18,10 @@ Each requirement maps to exactly one roadmap phase.
 
 ### LOC-CTRL — Controller Comparison Seam
 
-- [ ] **LOC-CTRL-01**: Developer can register locomotion controllers behind a common protocol that maps environment observation plus command into actuator/action output.
-- [ ] **LOC-CTRL-02**: Existing analytical trot controller is exposed as the default baseline controller through the same protocol.
-- [ ] **LOC-CTRL-03**: Developer can add placeholder adapters for residual policy, direct policy, and future MPC/WBC controllers without modifying the MuJoCo bridge internals.
-- [ ] **LOC-CTRL-04**: Multi-robot and single-robot bridges share the same controller/action abstraction where practical, so comparison logic is not duplicated.
+- [x] **LOC-CTRL-01**: Developer can register locomotion controllers behind a common protocol that maps environment observation plus command into actuator/action output. Validated in Phase 2.
+- [x] **LOC-CTRL-02**: Existing analytical trot controller is exposed as the default baseline controller through the same protocol. Validated in Phase 2.
+- [x] **LOC-CTRL-03**: Developer can add placeholder adapters for residual policy, direct policy, and future MPC/WBC controllers without modifying the MuJoCo bridge internals. Validated in Phase 2.
+- [x] **LOC-CTRL-04**: Multi-robot and single-robot bridges share the same controller/action abstraction where practical, so comparison logic is not duplicated. Validated in Phase 2.
 
 ### LOC-METRICS — Locomotion Metrics
 
