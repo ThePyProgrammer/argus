@@ -126,6 +126,27 @@ def test_env_rejects_invalid_actions_before_state_advances(mode, bad_action, mes
         env.close()
 
 
+@pytest.mark.parametrize("mode", [ACTION_MODE_JOINT_POSITION, ACTION_MODE_RESIDUAL_BASELINE])
+def test_env_rejects_invalid_non_velocity_action_after_schedule_advances_without_state_change(mode):
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=mode))
+    try:
+        observation, _info = env.reset(seed=123)
+        command_before = observation["command"].copy()
+        previous_action_before = observation["previous_action"].copy()
+        second = env._scenario_sample.command_schedule[1]
+        env._step_count = int(np.ceil(float(second["time"]) / env._dt))
+        step_count_before = env.step_count
+
+        with pytest.raises(ValueError, match="shape"):
+            env.step(np.zeros(3, dtype=np.float32))
+
+        assert env.step_count == step_count_before
+        np.testing.assert_allclose(env._command, command_before)
+        np.testing.assert_allclose(env._previous_action, previous_action_before)
+    finally:
+        env.close()
+
+
 def test_velocity_command_action_space_shape_and_bounds():
     """velocity_command exposes a three-value command action space."""
     space = build_action_space(ACTION_MODE_VELOCITY)

@@ -89,17 +89,20 @@ class ArgusGo2Env(gymnasium.Env):
         action: np.ndarray,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         """Apply a mode-specific action and return the Gymnasium five-tuple."""
+        command = self._command
         if self.config.action_mode != ACTION_MODE_VELOCITY:
-            self._command = self._command_at_time(self._current_sim_time())
+            command = self._command_at_time(self._current_sim_time())
         ctrl = decode_action(
             action,
             self.config.action_mode,
             self._gait,
             self._dt,
-            self._command,
+            command,
         )
         if self.config.action_mode == ACTION_MODE_VELOCITY:
             self._command = np.asarray(action, dtype=np.float32).copy()
+        else:
+            self._command = command
         self._previous_action = ctrl.astype(np.float32)
 
         if self._data is not None:
