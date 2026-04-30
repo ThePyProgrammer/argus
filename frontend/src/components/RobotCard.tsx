@@ -18,13 +18,14 @@ function controllerHealthLabel(controllerHealth: RobotInfo['controllerHealth']):
   }
 
   const message = controllerHealth?.message;
+  const trimmedMessage = typeof message === 'string' ? message.trim() : '';
   const hasKnownFailure = CONTROLLER_HEALTH_BOOLEAN_KEYS.some(
     (key) => controllerHealth?.[key] === false,
   );
 
   if (hasKnownFailure) {
-    return typeof message === 'string' && message.trim() !== '' && message !== 'ok'
-      ? message
+    return trimmedMessage !== '' && trimmedMessage !== 'ok'
+      ? trimmedMessage
       : 'degraded';
   }
 

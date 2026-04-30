@@ -57,4 +57,17 @@ describe('RobotCard platform runtime state', () => {
     expect(screen.queryByText('Controller: ok')).toBeNull();
     expect(screen.getByText('Controller: invalid output')).toBeTruthy();
   });
+
+  it('trims controller health messages before treating ok as degraded', () => {
+    render(<RobotCard robot={robot({
+      controllerHealth: {
+        policy_loaded: true,
+        nan_guard_ok: false,
+        message: ' ok ',
+      },
+    })} />);
+
+    expect(screen.queryByText('Controller: ok')).toBeNull();
+    expect(screen.getByText('Controller: degraded')).toBeTruthy();
+  });
 });
