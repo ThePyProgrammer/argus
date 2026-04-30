@@ -130,6 +130,15 @@ class TestMuJoCoBridgeUnit:
         assert not np.allclose(bridge._data.ctrl, np.zeros(12))
         mj_step.assert_called()
 
+    def test_single_bridge_phase2_contract_covers_d10_d11_d12_and_t204(self):
+        """Single bridge keeps SensorFrame return contract while using analytical_trot seam."""
+        bridge = MuJoCoBridge()
+        signature = inspect.signature(MuJoCoBridge.step)
+
+        assert signature.return_annotation is SensorFrame
+        assert "SensorFrame" in str(signature)
+        assert bridge._controller.compute({}, bridge._velocity_command(), 0.02).metadata["controller_id"] == "analytical_trot"
+
 
 # ---------------------------------------------------------------------------
 # Integration tests (require MuJoCo + Go2 model)

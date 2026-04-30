@@ -122,6 +122,8 @@ def test_controller_registry_analytical_metadata_contains_required_fields():
     assert entry["controller_id"] == "analytical_trot"
     assert entry["display_name"]
     assert entry["capabilities"]["family"] == entry["family"]
+    assert entry["parameter_summary"]["gait_params"]
+    assert len(entry["parameter_hash"]) == 16
 
 
 @pytest.mark.parametrize("controller_id", sorted(PLACEHOLDER_IDS))
@@ -132,9 +134,27 @@ def test_controller_registry_placeholder_controllers_are_discoverable_but_unavai
 
     assert entry["available"] is False
     assert entry.get("reason")
+    assert entry["parameter_summary"] == {"placeholder": True, "reason": entry["reason"]}
     with pytest.raises(UnavailableControllerError) as exc_info:
         ControllerRegistry.create(controller_id)
 
     message = str(exc_info.value)
     assert f"Controller '{controller_id}' is unavailable" in message
     assert entry["reason"] in message
+
+
+def test_controller_registry_phase2_requirement_and_decision_coverage_is_explicit():
+    """Pin LOC-CTRL-01/02/03 plus D-05/D-06/D-07/D-08 in one registry seam check."""
+    from src.locomotion.controllers import ControllerRegistry
+
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+
+    assert ControllerRegistry.get_default() == "analytical_trot"
+    assert entries["analytical_trot"]["available"] is True
+    assert entries["analytical_trot"]["capabilities"]["family"] == "analytical"
+    assert entries["analytical_trot"]["capabilities"]["multi_robot_supported"] is True
+    for controller_id in ("residual_policy", "direct_policy", "mpc", "wbc"):
+        assert entries[controller_id]["available"] is False
+        assert entries[controller_id]["reason"]
+        assert entries[controller_id]["parameter_hash"]
+        assert entries[controller_id]["parameter_summary"]["placeholder"] is True

@@ -171,3 +171,16 @@ def test_dispatch_controller_rejects_invalid_result_without_mutating_ctrl() -> N
         dispatch_controller(controller, {}, LocomotionCommand(), 0.02, data=fake_data)
 
     np.testing.assert_allclose(fake_data.ctrl, before)
+
+
+def test_dispatch_phase2_threat_gate_blocks_non_finite_targets_before_data_ctrl_write() -> None:
+    """D-09/D-12 and T-2-03 require the shared seam to validate before mutation."""
+    for bad_value in (np.nan, np.inf):
+        controller = FakeController(action=np.array([bad_value] + [0.0] * 11, dtype=np.float64))
+        fake_data = FakeData()
+        before = fake_data.ctrl.copy()
+
+        with pytest.raises(ValueError, match="finite"):
+            dispatch_controller(controller, {}, LocomotionCommand(), 0.02, data=fake_data)
+
+        np.testing.assert_allclose(fake_data.ctrl, before)

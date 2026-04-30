@@ -109,11 +109,18 @@ def test_multi_bridge_step_public_contract_is_dict_of_sensor_frames():
 def test_multi_bridge_initializes_one_controller_per_robot_id():
     """Each configured robot owns a distinct registered controller instance."""
     from src.bridge.multi_bridge import MultiRobotBridge
+    from src.locomotion.controllers import LocomotionCommand
 
     bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
 
     assert set(bridge._controllers) == {"robot_a", "robot_b"}
     assert bridge._controllers["robot_a"] is not bridge._controllers["robot_b"]
+    assert bridge._controllers["robot_a"].compute({}, LocomotionCommand(), 0.02).metadata[
+        "controller_id"
+    ] == "analytical_trot"
+    assert bridge._controllers["robot_b"].compute({}, LocomotionCommand(), 0.02).metadata[
+        "controller_id"
+    ] == "analytical_trot"
 
 
 def test_multi_bridge_step_before_start_still_raises_not_started():

@@ -49,6 +49,26 @@ def test_analytical_trot_controller_compute_matches_existing_gait_controller():
     np.testing.assert_allclose(result.action, expected)
     assert result.metadata["controller_id"] == "analytical_trot"
     assert result.metadata["action_mode"] == "joint_position"
+    assert result.metadata["family"] == "analytical"
+    assert result.metadata["parameter_hash"]
+    assert result.metadata["parameter_summary"]
+
+
+def test_analytical_trot_result_metadata_covers_protocol_decisions():
+    """D-01/D-02/D-03/D-04/D-08 require finite action-mapper output plus metadata."""
+    from src.locomotion.controllers import AnalyticalTrotController, LocomotionCommand
+
+    result = AnalyticalTrotController().compute(
+        {"qpos": np.zeros(19, dtype=np.float64)},
+        LocomotionCommand(vx=0.1, vy=0.0, yaw_rate=0.2, metadata={"source": "test"}),
+        0.02,
+    )
+
+    assert result.action.shape == (12,)
+    assert np.all(np.isfinite(result.action))
+    assert result.metadata["controller_id"] == "analytical_trot"
+    assert result.metadata["action_mode"] == "joint_position"
+    assert result.metadata["deterministic"] is True
 
 
 def test_analytical_trot_controller_reset_isolates_state_for_same_command_sequence():

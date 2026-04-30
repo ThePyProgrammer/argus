@@ -138,6 +138,26 @@ def test_reset_returns_observation_and_info():
     assert controller_metadata["parameter_summary"]
     assert controller_metadata["capabilities"]
     assert controller_metadata["available"] is True
+    assert info["controller_metadata"] == controller_metadata
+
+
+def test_controller_metadata_reset_and_step_surface_covers_phase2_decisions():
+    """D-13/D-14/D-15 require full reset metadata and compact step attribution."""
+    env = ArgusGo2Env()
+    try:
+        _obs, reset_info = env.reset(seed=123)
+        step_result = env.step(np.array([0.0, 0.0, 0.0], dtype=np.float32))
+    finally:
+        env.close()
+
+    _obs, _reward, _terminated, _truncated, step_info = step_result
+    controller_metadata = reset_info["controller_metadata"]
+    assert controller_metadata["controller_id"] == "analytical_trot"
+    assert controller_metadata["parameter_hash"]
+    assert controller_metadata["parameter_summary"]
+    assert step_info["controller_id"] == "analytical_trot"
+    assert step_info["action_mode"] == "velocity_command"
+    assert "controller_metadata" not in step_info
 
 
 def test_step_returns_gymnasium_five_tuple():
