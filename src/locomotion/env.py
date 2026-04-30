@@ -18,7 +18,7 @@ from src.locomotion.scenarios import ScenarioSample, build_scenario_xml, sample_
 class ArgusGo2EnvConfig:
     scenario_id: str = "flat_ground"
     action_mode: str = "velocity_command"
-    model_dir: str = "models/unitree_go2"
+    model_dir: str | None = None
     sim_steps_per_frame: int = 10
     max_episode_steps: int = 500
     render_mode: str | None = None
@@ -130,6 +130,11 @@ class ArgusGo2Env(gymnasium.Env):
         """Number of successful environment steps since the last reset."""
         return self._step_count
 
+    def _resolved_model_dir(self) -> Path:
+        if self.config.model_dir is not None:
+            return Path(self.config.model_dir).expanduser().resolve()
+        return Path(__file__).resolve().parents[2] / "models" / "unitree_go2"
+
     def _try_initialize_mujoco(self) -> None:
         if self._model is not None and self._data is not None:
             return
@@ -142,15 +147,14 @@ class ArgusGo2Env(gymnasium.Env):
             self._data = None
             return
 
-        model_dir = Path(self.config.model_dir)
-        if not (model_dir / "go2.xml").exists():
-            self._model = None
-            self._data = None
-            return
+        model_dir = self._resolved_model_dir()
+        go2_xml = model_dir / "go2.xml"
+        if not go2_xml.exists():
+            raise FileNotFoundError(f"Go2 model not found: {go2_xml}")
         if self._scenario_sample is None:
             return
 
-        xml, assets = build_scenario_xml(self.config.model_dir, self._scenario_sample)
+        xml, assets = build_scenario_xml(str(model_dir), self._scenario_sample)
         self._model = mujoco.MjModel.from_xml_string(xml, assets)
         self._load_heightfield_data()
         self._data = mujoco.MjData(self._model)

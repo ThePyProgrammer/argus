@@ -72,6 +72,18 @@ def test_default_config_uses_flat_ground_velocity_command():
 
     assert config.scenario_id == "flat_ground"
     assert config.action_mode == "velocity_command"
+    assert config.model_dir is None
+
+
+def test_default_model_dir_resolves_from_package_independent_of_cwd():
+    env = ArgusGo2Env()
+    try:
+        resolved = env._resolved_model_dir()
+    finally:
+        env.close()
+
+    assert resolved.name == "unitree_go2"
+    assert (resolved / "go2.xml").exists()
 
 
 def test_default_env_exposes_observation_and_action_spaces():
