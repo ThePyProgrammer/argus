@@ -377,9 +377,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
 
     configure_mcp(coordinator, list(config.robot_ids))
 
+    platform_metadata = None
+    if hasattr(bridge, "platform_metadata") and hasattr(bridge.platform_metadata, "to_wire"):
+        platform_wire = bridge.platform_metadata.to_wire()
+        platform_metadata = {rid: platform_wire for rid in config.robot_ids}
+
     app, streaming_viz = create_app(
         list(config.robot_ids),
         command_cb=coordinator.handle_command,
+        platform_metadata=platform_metadata,
         slam_reset_cb=_reset_slam,
         mcp_endpoint=mcp_endpoint,
         cloud_config_fns={
