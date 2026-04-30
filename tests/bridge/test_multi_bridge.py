@@ -5,6 +5,9 @@ Scene builder XML output is tested with the actual go2.xml model file.
 """
 
 from pathlib import Path
+import inspect
+import sys
+import types
 
 import numpy as np
 import pytest
@@ -68,6 +71,103 @@ def test_build_two_robot_scene_spawn_positions():
     # robot_a base body should have pos containing "1 2 0.3" (approx)
     assert "1 2" in xml_str or "1.0 2.0" in xml_str
     assert "5 6" in xml_str or "5.0 6.0" in xml_str
+
+
+# ---------- MultiRobotBridge controller seam tests ----------
+
+
+def _sensor_frame_at(x: float) -> SensorFrame:
+    pose = np.eye(4, dtype=np.float64)
+    pose[0, 3] = x
+    return SensorFrame(
+        rgb=np.zeros((1, 1, 3), dtype=np.uint8),
+        depth=None,
+        ground_truth_pose=pose,
+        sim_time=0.0,
+    )
+
+
+class _FakeData:
+    def __init__(self, ctrl_size: int = 24) -> None:
+        self.ctrl = np.zeros(ctrl_size, dtype=np.float64)
+        self.qpos = np.zeros(32, dtype=np.float64)
+
+
+class _FakeModel:
+    pass
+
+
+def test_multi_bridge_step_public_contract_is_dict_of_sensor_frames():
+    """MultiRobotBridge.step remains the no-arg dict-return public contract."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    signature = inspect.signature(MultiRobotBridge.step)
+    assert list(signature.parameters) == ["self"]
+    assert signature.return_annotation == dict[str, SensorFrame]
+
+
+def test_multi_bridge_initializes_one_controller_per_robot_id():
+    """Each configured robot owns a distinct registered controller instance."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
+
+    assert set(bridge._controllers) == {"robot_a", "robot_b"}
+    assert bridge._controllers["robot_a"] is not bridge._controllers["robot_b"]
+
+
+def test_multi_bridge_step_before_start_still_raises_not_started():
+    """The controller seam must not change pre-start lifecycle errors."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
+
+    with pytest.raises(RuntimeError, match="not started"):
+        bridge.step()
+
+
+def test_multi_bridge_step_writes_controller_targets_by_robot_ctrl_indices(monkeypatch):
+    """Fake-started bridge applies each robot controller output to its own ctrl indices."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    step_calls: list[tuple[object, object]] = []
+    fake_mujoco = types.SimpleNamespace(
+        mj_step=lambda model, data: step_calls.append((model, data))
+    )
+    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
+
+    bridge = MultiRobotBridge(
+        MultiRobotConfig(robot_ids=("robot_a", "robot_b"), sim_steps_per_frame=2)
+    )
+    bridge._model = _FakeModel()
+    bridge._data = _FakeData()
+    bridge._dt = 0.02
+    bridge._ctrl_indices = {
+        "robot_a": list(range(0, 12)),
+        "robot_b": list(range(12, 24)),
+    }
+    bridge._qpos_starts = {"robot_a": 0, "robot_b": 16}
+    bridge._capture_frame = lambda robot_id: _sensor_frame_at(1.0 if robot_id == "robot_a" else 2.0)
+
+    bridge.set_velocity("robot_a", np.array([0.3, 0.0]), 0.0)
+    bridge.set_velocity("robot_b", np.array([0.0, 0.2]), 0.5)
+
+    frames = bridge.step()
+
+    assert isinstance(frames, dict)
+    assert set(frames) == {"robot_a", "robot_b"}
+    assert all(isinstance(frame, SensorFrame) for frame in frames.values())
+    assert bridge.step_count == 1
+    assert bridge._last_frames == frames
+    assert len(step_calls) == 2
+
+    robot_a_ctrl = bridge._data.ctrl[:12].copy()
+    robot_b_ctrl = bridge._data.ctrl[12:24].copy()
+    assert robot_a_ctrl.shape == (12,)
+    assert robot_b_ctrl.shape == (12,)
+    assert np.any(robot_a_ctrl != 0.0)
+    assert np.any(robot_b_ctrl != 0.0)
+    assert not np.allclose(robot_a_ctrl, robot_b_ctrl)
 
 
 # ---------- MockMultiRobotBridge tests ----------
