@@ -1,6 +1,6 @@
 ---
 phase: 01-locomotion-env-contract
-reviewed: 2026-04-30T00:00:00Z
+reviewed: 2026-04-30T08:30:19Z
 depth: standard
 files_reviewed: 10
 files_reviewed_list:
@@ -15,136 +15,65 @@ files_reviewed_list:
   - tests/locomotion/test_argus_go2_env_determinism.py
   - tests/locomotion/test_argus_go2_env_scenarios.py
 findings:
-  critical: 2
+  critical: 0
   warning: 1
   info: 0
-  total: 3
+  total: 1
 status: issues_found
 ---
 
 # Phase 1: Code Review Report
 
-**Reviewed:** 2026-04-30T00:00:00Z
+**Reviewed:** 2026-04-30T08:30:19Z
 **Depth:** standard
 **Files Reviewed:** 10
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the locomotion environment contract implementation, action decoding, observation helpers, scenario generation, packaging dependency changes, and the listed contract tests. `uv.lock` was provided in scope but excluded from source review as a lock file per review rules.
+Reviewed the Phase 1 locomotion environment contract, action-space decoding, observation helpers, scenario sampling/XML generation, packaging metadata, and listed locomotion tests at standard depth. The previously reported blockers are fixed: non-plane terrain XML removes the flat benchmark floor, joint-position bounds match the per-leg Go2 FL/FR/RL/RR actuator order, and real MuJoCo-backed resets now rebuild models after randomized terrain samples so reported metadata and physics terrain do not stay stale.
 
-The test suite passed locally with `.venv/bin/python -m pytest` for the listed locomotion tests, but standard-depth review found correctness defects not covered by the current assertions. The rough-heightfield scenario creates a flat zero-valued heightfield, the default model path silently disables MuJoCo when the process is not launched from the repository root, and the sampled command schedule is exposed as metadata without being applied during stepping.
-
-## Critical Issues
-
-### CR-01: Rough-heightfield scenario creates a flat zero-valued heightfield
-
-**Classification:** BLOCKER
-
-**File:** `src/locomotion/scenarios.py:168-175`
-
-**Issue:** `_add_rough_heightfield` declares an MJCF `<hfield>` with `nrow`, `ncol`, and `size`, but it never supplies height data via `content`/`file` or asset bytes. MuJoCo loads this as an all-zero heightfield, so the `rough_heightfield` benchmark scenario is physically flat despite reporting randomized `roughness_amplitude`. This directly invalidates the named scenario catalog behavior for rough terrain and lets the current tests pass while exercising no roughness.
-
-**Fix:** Generate deterministic heightfield samples from the seeded scenario sample, serialize them into the MJCF-supported heightfield representation, and load them through assets. One safe direction is to store the generated grid in the `ScenarioSample` metadata or add an asset payload returned by `build_scenario_xml`:
-
-```python
-def _add_rough_heightfield(
-    asset: ET.Element,
-    worldbody: ET.Element,
-    sample: ScenarioSample,
-    assets: dict[str, bytes],
-) -> None:
-    size = int(sample.terrain_parameters.get("heightfield_size", 16))
-    bounded_size = int(np.clip(size, 4, 64))
-    amplitude = float(sample.terrain_parameters.get("roughness_amplitude", 0.02))
-    heights = np.asarray(sample.terrain_parameters["heightfield_data"], dtype=np.float32)
-    heights = heights.reshape((bounded_size, bounded_size))
-    asset_name = "rough_heightfield.bin"
-    assets[asset_name] = heights.astype(np.float32).tobytes()
-    ET.SubElement(
-        asset,
-        "hfield",
-        name="rough_heightfield",
-        file=asset_name,
-        nrow=str(bounded_size),
-        ncol=str(bounded_size),
-        size=f"5 5 {max(amplitude, 0.02):g} 0.02",
-    )
-```
-
-Also add a regression test that loads the generated model and asserts `np.ptp(model.hfield_data) > 0` for `rough_heightfield`.
-
-### CR-02: Default model path silently disables physics outside the repository root
-
-**Classification:** BLOCKER
-
-**File:** `src/locomotion/env.py:145-149`
-
-**Issue:** `ArgusGo2EnvConfig.model_dir` defaults to the relative string `models/unitree_go2`, and `_try_initialize_mujoco` checks it with `Path(self.config.model_dir)`. If a user imports the package or runs the environment from any working directory other than the repository root, `(model_dir / "go2.xml").exists()` is false and the environment silently sets `_model`/`_data` to `None`. `reset()` and `step()` still return Gymnasium-shaped results, but no MuJoCo physics runs. That is an incorrect benchmark environment: callers can believe they are evaluating locomotion while receiving zero observations and no simulation.
-
-**Fix:** Resolve the default model directory relative to the installed project/package location, or fail loudly when the configured model path is missing. For example:
-
-```python
-@dataclass
-class ArgusGo2EnvConfig:
-    scenario_id: str = "flat_ground"
-    action_mode: str = "velocity_command"
-    model_dir: str | None = None
-
-
-def _resolved_model_dir(self) -> Path:
-    if self.config.model_dir is not None:
-        return Path(self.config.model_dir).expanduser().resolve()
-    return Path(__file__).resolve().parents[2] / "models" / "unitree_go2"
-
-
-def _try_initialize_mujoco(self) -> None:
-    ...
-    model_dir = self._resolved_model_dir()
-    go2_xml = model_dir / "go2.xml"
-    if not go2_xml.exists():
-        raise FileNotFoundError(f"Go2 model not found: {go2_xml}")
-```
-
-If a no-physics fallback is intentionally supported, make it explicit with a configuration flag such as `allow_missing_mujoco: bool = False`; do not silently downgrade the benchmark path.
+One API correctness warning remains: the environment advertises `rgb_array` rendering and accepts `render_mode`, but does not implement `render()`, so users selecting the advertised mode cannot obtain frames through the Gymnasium API.
 
 ## Warnings
 
-### WR-01: Sampled command schedule is reported but never applied during an episode
+### WR-01: Advertised render mode has no render implementation
 
 **Classification:** WARNING
 
-**File:** `src/locomotion/env.py:72-77`
+**File:** `src/locomotion/env.py:24,31,44`
 
-**Issue:** `reset()` initializes `_command` from `command_schedule[0]`, but `step()` never advances the sampled command schedule by simulation time. For `joint_position` and `residual_baseline` modes, `_command` stays at the initial zero command forever; for `velocity_command`, `_command` is overwritten by the action instead of the sampled schedule. This makes `command_schedule` misleading benchmark metadata and undermines residual-over-baseline control, which decodes against `_command` but has no separate command input in its 12-value action API.
+**Issue:** `ArgusGo2EnvConfig` exposes `render_mode`, `ArgusGo2Env.metadata` advertises `rgb_array`, and `__init__` stores `self.render_mode`, but the class does not implement `render()`. A caller can construct `ArgusGo2Env(ArgusGo2EnvConfig(render_mode="rgb_array"))` because the mode is advertised, but the Gymnasium render API will not return an RGB frame. That is an incorrect public contract rather than a style concern.
 
-**Fix:** Apply the active scheduled command before decoding non-velocity actions, or remove `command_schedule` from the benchmark contract if actions are meant to be the only command source. A concrete implementation could be:
+**Fix:** Either remove the advertised render mode until rendering is supported, or implement `render()` and validate unsupported modes during initialization. For example:
 
 ```python
-def _command_at_time(self, sim_time: float) -> np.ndarray:
-    sample = self._scenario_sample
-    if sample is None:
-        return self._command
-    active = sample.command_schedule[0]
-    for item in sample.command_schedule:
-        if float(item["time"]) <= sim_time + 1e-12:
-            active = item
-        else:
-            break
-    return np.array([active["vx"], active["vy"], active["omega"]], dtype=np.float32)
+class ArgusGo2Env(gymnasium.Env):
+    metadata = {"render_modes": ["rgb_array"]}
 
+    def __init__(self, config: ArgusGo2EnvConfig | None = None) -> None:
+        self.config = config or ArgusGo2EnvConfig()
+        if self.config.render_mode not in (None, "rgb_array"):
+            raise ValueError("render_mode must be None or 'rgb_array'")
+        ...
 
-def step(self, action: np.ndarray):
-    if self.config.action_mode != ACTION_MODE_VELOCITY:
-        self._command = self._command_at_time(self._current_sim_time())
-    ctrl = decode_action(action, self.config.action_mode, self._gait, self._dt, self._command)
-    ...
+    def render(self) -> np.ndarray | None:
+        if self.render_mode is None:
+            return None
+        if self._model is None or self._data is None:
+            self._try_initialize_mujoco()
+            self._reset_mujoco_state()
+        if self._renderer is None:
+            import mujoco
+            self._renderer = mujoco.Renderer(self._model)
+        self._renderer.update_scene(self._data)
+        return self._renderer.render()
 ```
 
-Add tests that step past the second schedule entry in `joint_position` or `residual_baseline` mode and assert `info["command_schedule"]` corresponds to an applied `observation["command"]`.
+Add a contract test that constructs the env with `render_mode="rgb_array"`, calls `reset()`, then asserts `render()` returns an `H x W x 3` array when MuJoCo is available.
 
 ---
 
-_Reviewed: 2026-04-30T00:00:00Z_
+_Reviewed: 2026-04-30T08:30:19Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_

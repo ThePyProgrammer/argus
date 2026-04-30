@@ -68,6 +68,10 @@ class ArgusGo2Env(gymnasium.Env):
         self._last_seed = seed
         self._scenario_sample = sample_scenario(self.config.scenario_id, self.np_random,
                                                 heightfield_size=self.config.heightfield_size)
+        if self._model is not None and self._data is not None and self._is_real_mujoco_model():
+            self._model = None
+            self._data = None
+            self._dt = 0.002 * self.config.sim_steps_per_frame
         self._step_count = 0
         first_command = self._scenario_sample.command_schedule[0]
         self._command = np.array(

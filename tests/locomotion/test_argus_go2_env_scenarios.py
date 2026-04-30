@@ -157,6 +157,15 @@ def test_slope_scenario_xml_contains_slope_named_marker():
     assert any("slope" in name for name in named_elements)
 
 
+def test_slope_scenario_xml_uses_slope_without_flat_benchmark_floor():
+    sample = sample_scenario("slope", np.random.default_rng(123))
+
+    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+
+    assert root.find("./worldbody/geom[@name='slope_benchmark_marker']") is not None
+    assert root.find("./worldbody/geom[@name='benchmark_floor']") is None
+
+
 def test_rough_heightfield_scenario_xml_contains_bounded_heightfield_marker():
     sample = sample_scenario("rough_heightfield", np.random.default_rng(123), heightfield_size=128)
 
@@ -168,6 +177,15 @@ def test_rough_heightfield_scenario_xml_contains_bounded_heightfield_marker():
     assert sample.terrain_parameters["heightfield_size"] <= 64
     assert hfield is not None
     assert geom is not None
+
+
+def test_rough_heightfield_scenario_xml_uses_heightfield_without_flat_benchmark_floor():
+    sample = sample_scenario("rough_heightfield", np.random.default_rng(123))
+
+    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+
+    assert root.find("./worldbody/geom[@name='rough_heightfield_geom']") is not None
+    assert root.find("./worldbody/geom[@name='benchmark_floor']") is None
 
 
 def test_rough_heightfield_sample_contains_nonflat_deterministic_heights():

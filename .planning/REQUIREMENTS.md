@@ -11,10 +11,10 @@ Each requirement maps to exactly one roadmap phase.
 
 ### LOC-ENV — Benchmark Environment Contract
 
-- [ ] **LOC-ENV-01**: Developer can run a Gymnasium-style `ArgusGo2Env` wrapper with `reset(seed=...)` and `step(action)` returning observation, reward, terminated, truncated, and info.
-- [ ] **LOC-ENV-02**: Developer can choose at least flat-ground, low-friction, slope, rough-heightfield, and push-disturbance scenarios from a named scenario catalog.
-- [ ] **LOC-ENV-03**: Developer can run deterministic seeded resets that reproduce robot spawn pose, terrain parameters, command schedule, and disturbance timing.
-- [ ] **LOC-ENV-04**: Developer can select action modes for velocity command, joint-position target, and residual-over-baseline control without changing the environment API.
+- [x] **LOC-ENV-01**: Developer can run a Gymnasium-style `ArgusGo2Env` wrapper with `reset(seed=...)` and `step(action)` returning observation, reward, terminated, truncated, and info. Validated in Phase 1.
+- [x] **LOC-ENV-02**: Developer can choose at least flat-ground, low-friction, slope, rough-heightfield, and push-disturbance scenarios from a named scenario catalog. Validated in Phase 1.
+- [x] **LOC-ENV-03**: Developer can run deterministic seeded resets that reproduce robot spawn pose, terrain parameters, command schedule, and disturbance timing. Validated in Phase 1.
+- [x] **LOC-ENV-04**: Developer can select action modes for velocity command, joint-position target, and residual-over-baseline control without changing the environment API. Validated in Phase 1.
 
 ### LOC-CTRL — Controller Comparison Seam
 

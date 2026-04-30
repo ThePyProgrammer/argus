@@ -15,8 +15,40 @@ ACTION_MODE_RESIDUAL_BASELINE = "residual_baseline"
 
 _VELOCITY_LOW = np.array([-1.0, -1.0, -3.0], dtype=np.float32)
 _VELOCITY_HIGH = np.array([1.0, 1.0, 3.0], dtype=np.float32)
-_JOINT_LOW = np.array([-1.0472, -1.5708, -2.7227] * 4, dtype=np.float32)
-_JOINT_HIGH = np.array([1.0472, 4.5379, -0.83776] * 4, dtype=np.float32)
+_JOINT_LOW = np.array(
+    [
+        -1.0472,
+        -1.5708,
+        -2.7227,
+        -1.0472,
+        -1.5708,
+        -2.7227,
+        -1.0472,
+        -0.5236,
+        -2.7227,
+        -1.0472,
+        -0.5236,
+        -2.7227,
+    ],
+    dtype=np.float32,
+)
+_JOINT_HIGH = np.array(
+    [
+        1.0472,
+        3.4907,
+        -0.83776,
+        1.0472,
+        3.4907,
+        -0.83776,
+        1.0472,
+        4.5379,
+        -0.83776,
+        1.0472,
+        4.5379,
+        -0.83776,
+    ],
+    dtype=np.float32,
+)
 _RESIDUAL_LOW = np.full(12, -0.25, dtype=np.float32)
 _RESIDUAL_HIGH = np.full(12, 0.25, dtype=np.float32)
 _ACTION_MODES: Final[tuple[str, ...]] = (

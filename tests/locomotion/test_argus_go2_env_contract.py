@@ -192,6 +192,37 @@ def test_step_advances_mujoco_sim_time_when_integration_available():
         env.close()
 
 
+def test_reset_rebuilds_mujoco_model_for_new_randomized_terrain_sample():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(scenario_id="rough_heightfield"))
+    built_samples = []
+
+    def build_xml(_model_dir, sample):
+        built_samples.append(sample)
+        return "<mujoco/>", {}
+
+    fake_mujoco = SimpleNamespace(
+        MjModel=SimpleNamespace(
+            from_xml_string=MagicMock(
+                side_effect=lambda _xml, _assets: type("FakeMujocoModel", (_FakeModel,), {"__module__": "mujoco"})()
+            )
+        ),
+        MjData=MagicMock(side_effect=lambda _model: _FakeData()),
+        mj_resetData=lambda _model, _data: None,
+        mj_forward=lambda _model, _data: None,
+    )
+
+    try:
+        with patch("src.locomotion.env.build_scenario_xml", side_effect=build_xml):
+            with patch.dict("sys.modules", {"mujoco": fake_mujoco}):
+                env.reset(seed=123)
+                env.reset(seed=456)
+    finally:
+        env.close()
+
+    assert len(built_samples) == 2
+    assert built_samples[0].terrain_parameters["heightfield_data"] != built_samples[1].terrain_parameters["heightfield_data"]
+
+
 def test_step_decodes_action_writes_ctrl_and_calls_mj_step_configured_count():
     env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode="joint_position", sim_steps_per_frame=3))
     fake_data = _FakeData()

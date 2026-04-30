@@ -14,7 +14,7 @@ The journey is intentionally staged: (1) define the environment/scenario/action-
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: locomotion-env-contract** - Gymnasium-style `ArgusGo2Env`, scenario catalog, seeded reset determinism, and action-mode contract
+- [x] **Phase 1: locomotion-env-contract** - Gymnasium-style `ArgusGo2Env`, scenario catalog, seeded reset determinism, and action-mode contract — completed 2026-04-30
 - [ ] **Phase 2: controller-plugin-baseline** - Locomotion controller protocol/registry, analytical trot baseline adapter, future-controller placeholders, and bridge abstraction alignment
 - [ ] **Phase 3: locomotion-metrics-instrumentation** - Command tracking, stability, action-quality, and terrain/contact metrics collected from simulation state
 - [ ] **Phase 4: evaluation-runner-and-regression** - CLI scenario/seed matrix runner, JSONL/CSV/summary exports, reproducibility metadata, and analytical-baseline regression test
@@ -36,17 +36,17 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 
 **Wave 1**
-- [ ] 01-01-PLAN.md — Add Gymnasium dependency, `ArgusGo2Env` contract, observation helpers, and LOC-ENV-01 tests.
+- [x] 01-01-PLAN.md — Add Gymnasium dependency, `ArgusGo2Env` contract, observation helpers, and LOC-ENV-01 tests.
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 01-02-PLAN.md — Add named scenario catalog and deterministic reset metadata for LOC-ENV-02/03.
-- [ ] 01-03-PLAN.md — Add action-mode spaces and safe decoding helpers for LOC-ENV-04.
+- [x] 01-02-PLAN.md — Add named scenario catalog and deterministic reset metadata for LOC-ENV-02/03.
+- [x] 01-03-PLAN.md — Add action-mode spaces and safe decoding helpers for LOC-ENV-04.
 
 **Wave 3 *(blocked on Wave 2 completion)***
-- [ ] 01-04-PLAN.md — Wire scenario/action helpers into the environment API.
+- [x] 01-04-PLAN.md — Wire scenario/action helpers into the environment API.
 
 **Wave 4 *(blocked on Wave 3 completion)***
-- [ ] 01-05-PLAN.md — Add scenario MJCF generation, MuJoCo reset lifecycle, and bridge regression verification.
+- [x] 01-05-PLAN.md — Add scenario MJCF generation, MuJoCo reset lifecycle, and bridge regression verification.
 
 Cross-cutting constraints:
 - Preserve the existing non-Gym simulation/web paths while adding the benchmark wrapper.
@@ -113,7 +113,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. locomotion-env-contract | 0/5 | Planned | - |
+| 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 0/TBD | Not started | - |
 | 3. locomotion-metrics-instrumentation | 0/TBD | Not started | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
@@ -135,4 +135,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Roadmap approved 2026-04-30. Start with `/gsd-execute-phase 1` for `locomotion-env-contract`.
+Phase 1 completed 2026-04-30. Continue with `/gsd-discuss-phase 2` for `controller-plugin-baseline`.

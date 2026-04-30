@@ -85,13 +85,18 @@ def build_scenario_xml(model_dir: str, sample: ScenarioSample) -> tuple[str, dic
     if worldbody is None:
         worldbody = ET.SubElement(root, "worldbody")
 
-    _upsert_benchmark_floor(worldbody, sample)
     terrain_kind = str(sample.terrain_parameters.get("terrain_kind", "plane"))
     assets = _load_asset_bytes(model_path / "assets")
-    if terrain_kind == "slope":
+    if terrain_kind == "plane":
+        _upsert_benchmark_floor(worldbody, sample)
+    elif terrain_kind == "slope":
+        _remove_existing_floor(worldbody)
         _add_slope_marker(worldbody, sample)
     elif terrain_kind == "heightfield":
+        _remove_existing_floor(worldbody)
         _add_rough_heightfield(asset, worldbody, sample, assets)
+    else:
+        raise ValueError(f"Unknown terrain_kind: {terrain_kind}")
     _ensure_light(worldbody)
     _ensure_visual_settings(root)
 
@@ -132,11 +137,15 @@ def sample_scenario(
     )
 
 
-def _upsert_benchmark_floor(worldbody: ET.Element, sample: ScenarioSample) -> None:
-    friction = float(sample.terrain_parameters.get("friction_coefficient", 1.0))
+def _remove_existing_floor(worldbody: ET.Element) -> None:
     for geom in worldbody.findall("geom"):
         if geom.get("type") == "plane" or geom.get("name") in {"floor", "benchmark_floor"}:
             worldbody.remove(geom)
+
+
+def _upsert_benchmark_floor(worldbody: ET.Element, sample: ScenarioSample) -> None:
+    friction = float(sample.terrain_parameters.get("friction_coefficient", 1.0))
+    _remove_existing_floor(worldbody)
     ET.SubElement(
         worldbody,
         "geom",

@@ -161,8 +161,40 @@ def test_joint_position_action_space_shape_and_bounds():
     space = build_action_space(ACTION_MODE_JOINT_POSITION)
 
     assert space.shape == (12,)
-    expected_low = np.array([-1.0472, -1.5708, -2.7227] * 4, dtype=np.float32)
-    expected_high = np.array([1.0472, 4.5379, -0.83776] * 4, dtype=np.float32)
+    expected_low = np.array(
+        [
+            -1.0472,
+            -1.5708,
+            -2.7227,
+            -1.0472,
+            -1.5708,
+            -2.7227,
+            -1.0472,
+            -0.5236,
+            -2.7227,
+            -1.0472,
+            -0.5236,
+            -2.7227,
+        ],
+        dtype=np.float32,
+    )
+    expected_high = np.array(
+        [
+            1.0472,
+            3.4907,
+            -0.83776,
+            1.0472,
+            3.4907,
+            -0.83776,
+            1.0472,
+            4.5379,
+            -0.83776,
+            1.0472,
+            4.5379,
+            -0.83776,
+        ],
+        dtype=np.float32,
+    )
     np.testing.assert_allclose(space.low, expected_low)
     np.testing.assert_allclose(space.high, expected_high)
 
