@@ -10,11 +10,69 @@ from src.locomotion.actions import (
     build_action_space,
     decode_action,
 )
+from src.locomotion.env import ArgusGo2Env, ArgusGo2EnvConfig
 from src.locomotion.gait_controller import TrotGaitController
 
 
 DT = 0.02
 PREVIOUS_COMMAND = np.array([0.2, 0.0, 0.0], dtype=np.float32)
+VALID_ENV_ACTIONS = {
+    ACTION_MODE_VELOCITY: np.array([0.1, 0.0, 0.0], dtype=np.float32),
+    ACTION_MODE_JOINT_POSITION: np.tile(np.array([0.0, 0.9, -1.8], dtype=np.float32), 4),
+    ACTION_MODE_RESIDUAL_BASELINE: np.zeros(12, dtype=np.float32),
+}
+REPRODUCIBILITY_INFO_KEYS = {
+    "seed",
+    "scenario_id",
+    "sampled_parameters",
+    "action_mode",
+    "command_schedule",
+    "disturbance_schedule",
+}
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_shape"),
+    [
+        (ACTION_MODE_VELOCITY, (3,)),
+        (ACTION_MODE_JOINT_POSITION, (12,)),
+        (ACTION_MODE_RESIDUAL_BASELINE, (12,)),
+    ],
+)
+def test_env_action_space_shape_follows_configured_action_mode(mode, expected_shape):
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=mode))
+    try:
+        assert env.action_space.shape == expected_shape
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize("mode", [ACTION_MODE_VELOCITY, ACTION_MODE_JOINT_POSITION, ACTION_MODE_RESIDUAL_BASELINE])
+def test_env_step_uses_one_public_api_and_reports_reproducibility_info(mode):
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=mode))
+    try:
+        _obs, reset_info = env.reset(seed=123)
+        result = env.step(VALID_ENV_ACTIONS[mode])
+    finally:
+        env.close()
+
+    assert len(result) == 5
+    _obs, _reward, _terminated, _truncated, step_info = result
+    assert REPRODUCIBILITY_INFO_KEYS <= reset_info.keys()
+    assert REPRODUCIBILITY_INFO_KEYS <= step_info.keys()
+    assert step_info["seed"] == 123
+    assert step_info["action_mode"] == mode
+
+
+def test_env_rejects_nan_action_before_step_count_advances():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=ACTION_MODE_VELOCITY))
+    try:
+        env.reset(seed=123)
+        with pytest.raises(ValueError, match="finite"):
+            env.step(np.array([np.nan, 0.0, 0.0], dtype=np.float32))
+        assert env.step_count == 0
+    finally:
+        env.close()
 
 
 def test_velocity_command_action_space_shape_and_bounds():
