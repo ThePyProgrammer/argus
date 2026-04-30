@@ -64,6 +64,22 @@ def test_env_step_uses_one_public_api_and_reports_reproducibility_info(mode):
     assert step_info["action_mode"] == mode
 
 
+def test_env_joint_position_config_selects_twelve_value_action_space():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode="joint_position"))
+    try:
+        assert env.action_space.shape == (12,)
+    finally:
+        env.close()
+
+
+def test_env_residual_baseline_config_selects_twelve_value_action_space():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode="residual_baseline"))
+    try:
+        assert env.action_space.shape == (12,)
+    finally:
+        env.close()
+
+
 def test_env_rejects_nan_action_before_step_count_advances():
     env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=ACTION_MODE_VELOCITY))
     try:
