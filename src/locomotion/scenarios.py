@@ -286,6 +286,8 @@ def _sample_terrain_parameters(
             "friction_coefficient": 1.0,
             "slope_radians": 0.0,
             "heightfield_size": bounded_size,
+            "heightfield_extent_x": 5.0,
+            "heightfield_extent_y": 5.0,
             "roughness_amplitude": amplitude,
             "heightfield_data": tuple(float(value) for value in heights.ravel()),
         }

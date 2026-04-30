@@ -10,6 +10,33 @@ from typing import Any
 import numpy as np
 
 from src.locomotion.actions import joint_position_bounds
+from src.locomotion.scenarios import ScenarioSample
+
+
+FOOT_GEOM_NAMES: tuple[str, ...] = ("FL", "FR", "RL", "RR")
+
+
+@dataclass(frozen=True)
+class Go2FootMapping:
+    """Strict mapping from canonical Go2 foot names to MuJoCo geom ids."""
+
+    foot_geom_ids: dict[str, int]
+
+    @classmethod
+    def from_mujoco_model(cls, model: Any) -> "Go2FootMapping":
+        """Resolve exactly FL, FR, RL, and RR foot geoms from a MuJoCo model."""
+        import mujoco
+
+        foot_geom_ids: dict[str, int] = {}
+        for name in FOOT_GEOM_NAMES:
+            geom_id = int(mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name))
+            if geom_id < 0:
+                raise ValueError(f"Missing required Go2 foot geom '{name}'")
+            foot_geom_ids[name] = geom_id
+        ids = list(foot_geom_ids.values())
+        if len(set(ids)) != len(ids):
+            raise ValueError(f"Duplicate Go2 foot geom ids resolved: {ids}")
+        return cls(foot_geom_ids=foot_geom_ids)
 
 
 _JOINT_NAMES: tuple[str, ...] = (
@@ -100,6 +127,12 @@ class LocomotionMetricsCollector:
         self._failure_reason: str | None = None
         self._distance_before_failure_m: float | None = None
         self._total_steps_seen = 0
+        self._previous_foot_positions: dict[str, np.ndarray] | None = None
+        self._previous_foot_contacts: dict[str, bool] | None = None
+        self._contact_counts: dict[str, int] = dict.fromkeys(FOOT_GEOM_NAMES, 0)
+        self._slip_history: dict[str, list[float]] = {name: [] for name in FOOT_GEOM_NAMES}
+        self._clearance_history: dict[str, list[float]] = {name: [] for name in FOOT_GEOM_NAMES}
+        self._scenario_failed = False
 
     @property
     def baseline(self) -> LocomotionEpisodeSummary | None:
@@ -117,6 +150,12 @@ class LocomotionMetricsCollector:
         self._failure_reason = None
         self._distance_before_failure_m = None
         self._total_steps_seen = 0
+        self._previous_foot_positions = None
+        self._previous_foot_contacts = None
+        self._contact_counts = dict.fromkeys(FOOT_GEOM_NAMES, 0)
+        self._slip_history = {name: [] for name in FOOT_GEOM_NAMES}
+        self._clearance_history = {name: [] for name in FOOT_GEOM_NAMES}
+        self._scenario_failed = False
 
     def capture_baseline(self) -> None:
         """Snapshot the current episode summary as the comparison baseline."""
@@ -138,6 +177,10 @@ class LocomotionMetricsCollector:
         joint_qvel: Sequence[float] | np.ndarray,
         dt: float,
         contact_terrain_payload: Mapping[str, Any] | None = None,
+        foot_positions_world: Mapping[str, Sequence[float] | np.ndarray] | None = None,
+        foot_contacts: Mapping[str, bool] | None = None,
+        terrain_height_m: float | Mapping[str, float] = 0.0,
+        scenario_failed: bool | None = None,
     ) -> LocomotionMetricStep:
         """Validate a simulation snapshot and append one locomotion metric record."""
         desired = _as_finite_vector(desired_command, (3,), "desired_command")
@@ -162,7 +205,16 @@ class LocomotionMetricsCollector:
         command_tracking = _command_tracking_payload(desired, measured)
         stability, failure_reason = self._stability_payload(roll, pitch, height, xy, delta_t)
         action_quality = self._action_quality_payload(action, previous, previous_previous, qpos, qvel, delta_t)
-        contact_terrain = _compact_mapping(contact_terrain_payload or {})
+        if foot_positions_world is not None or foot_contacts is not None:
+            contact_terrain = self._contact_terrain_payload(
+                foot_positions_world=foot_positions_world,
+                foot_contacts=foot_contacts,
+                terrain_height_m=terrain_height_m,
+                scenario_failed=scenario_failed,
+                dt=delta_t,
+            )
+        else:
+            contact_terrain = _compact_mapping(contact_terrain_payload or {})
 
         if self._failure_reason is None and failure_reason is not None:
             self._failure_reason = failure_reason
@@ -368,10 +420,167 @@ class LocomotionMetricsCollector:
             ),
         }
 
+    def _contact_terrain_payload(
+        self,
+        *,
+        foot_positions_world: Mapping[str, Sequence[float] | np.ndarray] | None,
+        foot_contacts: Mapping[str, bool] | None,
+        terrain_height_m: float | Mapping[str, float],
+        scenario_failed: bool | None,
+        dt: float,
+    ) -> dict[str, Any]:
+        positions = _validate_foot_positions(foot_positions_world)
+        contacts = _validate_foot_contacts(foot_contacts)
+        terrain_heights = _terrain_heights_by_foot(terrain_height_m)
+        if scenario_failed is not None:
+            self._scenario_failed = self._scenario_failed or bool(scenario_failed)
+
+        per_foot_contact: dict[str, bool] = {}
+        slip: dict[str, float] = {}
+        clearance: dict[str, float] = {}
+        transition: dict[str, str] = {}
+        previous_positions = self._previous_foot_positions
+        previous_contacts = self._previous_foot_contacts or dict.fromkeys(FOOT_GEOM_NAMES, False)
+
+        for name in FOOT_GEOM_NAMES:
+            current_contact = bool(contacts[name])
+            per_foot_contact[name] = current_contact
+            if current_contact:
+                self._contact_counts[name] += 1
+            terrain_height = terrain_heights[name]
+            clearance[name] = float(positions[name][2] - terrain_height)
+            self._clearance_history[name].append(clearance[name])
+
+            if current_contact and previous_positions is not None:
+                delta_xy = positions[name][:2] - previous_positions[name][:2]
+                slip[name] = float(np.linalg.norm(delta_xy) / dt)
+            else:
+                slip[name] = 0.0
+            self._slip_history[name].append(slip[name])
+
+            was_contact = bool(previous_contacts[name])
+            if current_contact and not was_contact:
+                transition[name] = "touchdown"
+            elif was_contact and not current_contact:
+                transition[name] = "liftoff"
+            else:
+                transition[name] = "none"
+
+        self._previous_foot_positions = {name: positions[name].copy() for name in FOOT_GEOM_NAMES}
+        self._previous_foot_contacts = dict(per_foot_contact)
+        return {
+            "per_foot_contact": per_foot_contact,
+            "foot_xy_velocity_when_contact": slip,
+            "foot_clearance_m": clearance,
+            "contact_transition": transition,
+        }
+
     def _contact_terrain_summary(self, steps: list[LocomotionMetricStep]) -> dict[str, Any]:
         if not steps:
             return {}
-        return dict(steps[-1].contact_terrain)
+        step_count = max(self._total_steps_seen, 1)
+        duty_factor = {
+            name: float(self._contact_counts[name] / step_count) for name in FOOT_GEOM_NAMES
+        }
+        slip_mean = {
+            name: float(np.mean(self._slip_history[name])) if self._slip_history[name] else 0.0
+            for name in FOOT_GEOM_NAMES
+        }
+        slip_max = {
+            name: float(np.max(self._slip_history[name])) if self._slip_history[name] else 0.0
+            for name in FOOT_GEOM_NAMES
+        }
+        clearance_min = {
+            name: float(np.min(self._clearance_history[name])) if self._clearance_history[name] else 0.0
+            for name in FOOT_GEOM_NAMES
+        }
+        clearance_max = {
+            name: float(np.max(self._clearance_history[name])) if self._clearance_history[name] else 0.0
+            for name in FOOT_GEOM_NAMES
+        }
+        return {
+            **dict(steps[-1].contact_terrain),
+            "duty_factor": duty_factor,
+            "slip_mean_m_per_s": slip_mean,
+            "slip_max_m_per_s": slip_max,
+            "clearance_min_m": clearance_min,
+            "clearance_max_m": clearance_max,
+            "gait_symmetry_contact_balance": float(max(duty_factor.values()) - min(duty_factor.values())),
+            "scenario_success": self._failure_reason is None and not self._scenario_failed,
+        }
+
+
+def terrain_height_at(sample: ScenarioSample | None, x: float, y: float) -> float:
+    """Return terrain height at world XY for a sampled locomotion scenario."""
+    x_value = _as_finite_scalar(x, "x")
+    y_value = _as_finite_scalar(y, "y")
+    if sample is None:
+        return 0.0
+    params = sample.terrain_parameters
+    terrain_kind = str(params.get("terrain_kind", "plane"))
+    if terrain_kind == "plane":
+        return 0.0
+    if terrain_kind == "slope":
+        slope = _as_finite_scalar(params.get("slope_radians", 0.0), "slope_radians")
+        z_offset = _as_finite_scalar(params.get("slope_z_offset", -0.04), "slope_z_offset")
+        return float(np.tan(slope) * x_value + z_offset)
+    if terrain_kind == "heightfield":
+        return _heightfield_height_at(params, x_value, y_value)
+    raise ValueError(f"Unknown terrain_kind: {terrain_kind}")
+
+
+def foot_contact_payload_from_mujoco(
+    mapping: Go2FootMapping,
+    data: Any,
+    sample: ScenarioSample | None,
+) -> dict[str, Any]:
+    """Build collector contact inputs from MuJoCo geom positions and contacts."""
+    inverse = {geom_id: name for name, geom_id in mapping.foot_geom_ids.items()}
+    foot_positions_world = {
+        name: np.asarray(data.geom_xpos[geom_id], dtype=np.float64).copy()
+        for name, geom_id in mapping.foot_geom_ids.items()
+    }
+    foot_contacts = dict.fromkeys(FOOT_GEOM_NAMES, False)
+    for idx in range(int(getattr(data, "ncon", 0))):
+        contact = data.contact[idx]
+        for geom_id in (int(contact.geom1), int(contact.geom2)):
+            foot_name = inverse.get(geom_id)
+            if foot_name is not None:
+                foot_contacts[foot_name] = True
+    terrain_height_m = {
+        name: terrain_height_at(sample, float(position[0]), float(position[1]))
+        for name, position in foot_positions_world.items()
+    }
+    return {
+        "foot_positions_world": foot_positions_world,
+        "foot_contacts": foot_contacts,
+        "terrain_height_m": terrain_height_m,
+    }
+
+
+def _heightfield_height_at(params: Mapping[str, Any], x: float, y: float) -> float:
+    size = int(params.get("heightfield_size", 0))
+    data = params.get("heightfield_data")
+    if size <= 0 or data is None:
+        raise ValueError("heightfield terrain requires heightfield_size and heightfield_data")
+    heights = np.asarray(data, dtype=np.float64).reshape((size, size))
+    extent_x = _as_finite_scalar(params.get("heightfield_extent_x", 5.0), "heightfield_extent_x")
+    extent_y = _as_finite_scalar(params.get("heightfield_extent_y", 5.0), "heightfield_extent_y")
+    if extent_x <= 0.0 or extent_y <= 0.0:
+        raise ValueError("heightfield extents must be positive")
+    u = np.clip((x + extent_x) / (2.0 * extent_x), 0.0, 1.0) * (size - 1)
+    v = np.clip((y + extent_y) / (2.0 * extent_y), 0.0, 1.0) * (size - 1)
+    x0 = int(np.floor(u))
+    y0 = int(np.floor(v))
+    x1 = min(x0 + 1, size - 1)
+    y1 = min(y0 + 1, size - 1)
+    tx = float(u - x0)
+    ty = float(v - y0)
+    z00 = heights[y0, x0]
+    z10 = heights[y0, x1]
+    z01 = heights[y1, x0]
+    z11 = heights[y1, x1]
+    return float((1.0 - tx) * (1.0 - ty) * z00 + tx * (1.0 - ty) * z10 + (1.0 - tx) * ty * z01 + tx * ty * z11)
 
 
 def _command_tracking_payload(desired: np.ndarray, measured: np.ndarray) -> dict[str, Any]:
@@ -408,6 +617,42 @@ def _as_finite_scalar(value: float, name: str) -> float:
 
 def _counts_by_joint(mask: np.ndarray) -> dict[str, int]:
     return {joint: int(bool(mask[idx])) for idx, joint in enumerate(_JOINT_NAMES)}
+
+
+def _validate_foot_positions(
+    foot_positions_world: Mapping[str, Sequence[float] | np.ndarray] | None,
+) -> dict[str, np.ndarray]:
+    if foot_positions_world is None:
+        raise ValueError("foot_positions_world is required when recording contact terrain metrics")
+    positions: dict[str, np.ndarray] = {}
+    for name in FOOT_GEOM_NAMES:
+        if name not in foot_positions_world:
+            raise ValueError(f"Missing foot position for {name}")
+        positions[name] = _as_finite_vector(foot_positions_world[name], (3,), f"foot_positions_world[{name}]")
+    return positions
+
+
+def _validate_foot_contacts(foot_contacts: Mapping[str, bool] | None) -> dict[str, bool]:
+    if foot_contacts is None:
+        raise ValueError("foot_contacts is required when recording contact terrain metrics")
+    contacts: dict[str, bool] = {}
+    for name in FOOT_GEOM_NAMES:
+        if name not in foot_contacts:
+            raise ValueError(f"Missing foot contact for {name}")
+        contacts[name] = bool(foot_contacts[name])
+    return contacts
+
+
+def _terrain_heights_by_foot(terrain_height_m: float | Mapping[str, float]) -> dict[str, float]:
+    if isinstance(terrain_height_m, Mapping):
+        heights: dict[str, float] = {}
+        for name in FOOT_GEOM_NAMES:
+            if name not in terrain_height_m:
+                raise ValueError(f"Missing terrain height for {name}")
+            heights[name] = _as_finite_scalar(terrain_height_m[name], f"terrain_height_m[{name}]")
+        return heights
+    scalar = _as_finite_scalar(terrain_height_m, "terrain_height_m")
+    return dict.fromkeys(FOOT_GEOM_NAMES, scalar)
 
 
 def _compact_mapping(payload: Mapping[str, Any]) -> dict[str, Any]:
