@@ -47,6 +47,7 @@ dev = [
 markers = [
     "slow_boxer: tests requiring a real BoxeR subprocess (skipped unless explicitly selected; CI runs nightly)",
     "network: tests requiring network access to HuggingFace or GitHub (skipped by default)",
+    "x2_asset: tests requiring licensed local AGIBOT X2 MuJoCo assets",
 ]
 
 [dependency-groups]
