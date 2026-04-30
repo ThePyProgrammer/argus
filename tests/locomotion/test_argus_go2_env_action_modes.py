@@ -80,13 +80,34 @@ def test_env_residual_baseline_config_selects_twelve_value_action_space():
         env.close()
 
 
-def test_env_rejects_nan_action_before_step_count_advances():
-    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=ACTION_MODE_VELOCITY))
+@pytest.mark.parametrize(
+    ("mode", "bad_action", "message"),
+    [
+        (ACTION_MODE_VELOCITY, np.zeros(12, dtype=np.float32), "shape"),
+        (ACTION_MODE_JOINT_POSITION, np.zeros(3, dtype=np.float32), "shape"),
+        (ACTION_MODE_RESIDUAL_BASELINE, np.zeros(3, dtype=np.float32), "shape"),
+        (ACTION_MODE_VELOCITY, np.array([np.nan, 0.0, 0.0], dtype=np.float32), "finite"),
+        (
+            ACTION_MODE_JOINT_POSITION,
+            np.array([np.nan, 0.9, -1.8] * 4, dtype=np.float32),
+            "finite",
+        ),
+        (ACTION_MODE_RESIDUAL_BASELINE, np.full(12, np.nan, dtype=np.float32), "finite"),
+    ],
+)
+def test_env_rejects_invalid_actions_before_state_advances(mode, bad_action, message):
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=mode))
     try:
-        env.reset(seed=123)
-        with pytest.raises(ValueError, match="finite"):
-            env.step(np.array([np.nan, 0.0, 0.0], dtype=np.float32))
+        observation, _info = env.reset(seed=123)
+        command_before = observation["command"].copy()
+        previous_action_before = observation["previous_action"].copy()
+
+        with pytest.raises(ValueError, match=message):
+            env.step(bad_action)
+
         assert env.step_count == 0
+        np.testing.assert_allclose(env._command, command_before)
+        np.testing.assert_allclose(env._previous_action, previous_action_before)
     finally:
         env.close()
 
