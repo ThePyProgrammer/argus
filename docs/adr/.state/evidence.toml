@@ -1,0 +1,19 @@
+default_expiry_days = 180
+l0_expiry_days = 60
+created = "2026-04-30"
+
+[evidence]
+"0001" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/research/ARCHITECTURE.md"] }
+"0002" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", "README.md"] }
+"0003" = { level = "L1", sources = ["README.md", ".planning/PROJECT.md"] }
+"0004" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", "README.md"] }
+"0005" = { level = "L1", sources = [".planning/PROJECT.md", "README.md", "frontend/package.json", "pyproject.toml"] }
+"0006" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/research/ARCHITECTURE.md", ".planning/research/FEATURES.md"] }
+"0007" = { level = "L1", sources = [".planning/REQUIREMENTS.md", ".planning/research/ARCHITECTURE.md"] }
+"0008" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/research/STACK.md", ".planning/research/PITFALLS.md"] }
+"0009" = { level = "L1", sources = [".planning/REQUIREMENTS.md", ".planning/research/ARCHITECTURE.md"] }
+"0010" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", ".planning/research/PITFALLS.md"] }
+"0011" = { level = "L1", sources = [".planning/REQUIREMENTS.md", ".planning/research/STACK.md", "pyproject.toml"] }
+"0012" = { level = "L1", sources = [".planning/REQUIREMENTS.md", ".planning/research/PITFALLS.md"] }
+"0013" = { level = "L1", sources = [".planning/REQUIREMENTS.md", ".planning/research/PITFALLS.md", "README.md"] }
+"0014" = { level = "L1", sources = [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", "frontend/package.json"] }

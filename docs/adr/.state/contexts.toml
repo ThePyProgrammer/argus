@@ -1,0 +1,24 @@
+[contexts.simulation]
+name = "Simulation"
+description = "MuJoCo scene, robot bridge, ground-truth poses, sensor frames, and locomotion control."
+adrs = ["0002", "0003"]
+
+[contexts.coordination]
+name = "Coordination"
+description = "Multi-robot orchestration, exploration, map merging, in-process transport, and runtime control."
+adrs = ["0003", "0004"]
+
+[contexts.perception]
+name = "Perception"
+description = "Detector, lifter, tracker, semantic map, OBB geometry, model lifecycle, and detection metrics."
+adrs = ["0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013"]
+
+[contexts.web]
+name = "Web C2"
+description = "FastAPI REST/WebSocket backend and React/Three.js/Zustand/React Flow frontend."
+adrs = ["0005", "0010", "0014"]
+
+[contexts.governance]
+name = "Architecture Governance"
+description = "ADR process and architecture documentation lifecycle."
+adrs = ["0001"]

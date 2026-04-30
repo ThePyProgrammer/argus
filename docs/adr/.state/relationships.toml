@@ -1,0 +1,24 @@
+[nodes]
+"0001" = { title = "Use Architecture Decision Records", status = "Accepted" }
+"0002" = { title = "Use MuJoCo CPU Simulation as the Platform Boundary", status = "Accepted" }
+"0003" = { title = "Use Ground-Truth World Poses to Remove Map Alignment as a Variable", status = "Accepted" }
+"0004" = { title = "Use In-Process Transport for Local Coordination", status = "Accepted" }
+"0005" = { title = "Use Browser-Based Command and Control with WebSocket Streaming", status = "Accepted" }
+"0006" = { title = "Use Protocol and Registry Pattern for Pluggable Backends", status = "Accepted" }
+"0007" = { title = "Split 2D Detection from 3D Lifting", status = "Accepted" }
+"0008" = { title = "Isolate Heavy and Crashy Backends in Subprocesses", status = "Accepted" }
+"0009" = { title = "Use Newest-Wins Per-Robot Workers for Perception", status = "Accepted" }
+"0010" = { title = "Use Canonical Server-Owned OBB Wire Format", status = "Accepted" }
+"0011" = { title = "Use CPU-Viable Model Tiers and Pinned Offline Checkpoints", status = "Accepted" }
+"0012" = { title = "Forbid Fake mAP and Use MuJoCo Ground-Truth Metrics", status = "Accepted" }
+"0013" = { title = "Use Server-Owned Geometry and a Single Projection Path", status = "Accepted" }
+"0014" = { title = "Use React Flow Typed DAG for Pipeline Editing", status = "Accepted" }
+
+[edges]
+"0002" = ["0003", "0011", "0012"]
+"0003" = ["0004", "0012", "0013"]
+"0005" = ["0010", "0014"]
+"0006" = ["0007", "0008", "0014"]
+"0007" = ["0009", "0010", "0013", "0014"]
+"0008" = ["0011"]
+"0010" = ["0013"]

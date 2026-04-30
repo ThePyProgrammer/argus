@@ -1,0 +1,9 @@
+mode = "lightweight"
+
+[requirements]
+accepted_adr_for_major_architecture_change = true
+update_architecture_doc_on_boundary_change = true
+
+[review]
+audit_on_request = true
+fitness_functions_required = false
