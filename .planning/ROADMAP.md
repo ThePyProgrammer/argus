@@ -154,7 +154,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
-| 3. locomotion-metrics-instrumentation | 4/5 | Gaps found | - |
+| 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
 
@@ -174,4 +174,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 3 has one gap-closure plan ready. Continue with `/gsd-execute-phase 3 --gaps-only` for `locomotion-metrics-instrumentation`.
+Phase 3 is complete and verified. Continue with `/gsd-discuss-phase 4` for `evaluation-runner-and-regression`.

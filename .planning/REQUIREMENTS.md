@@ -25,10 +25,10 @@ Each requirement maps to exactly one roadmap phase.
 
 ### LOC-METRICS — Locomotion Metrics
 
-- [ ] **LOC-METRICS-01**: Evaluation captures command tracking error for forward velocity, lateral velocity, and yaw rate.
-- [ ] **LOC-METRICS-02**: Evaluation captures stability metrics: fall rate, roll/pitch bounds, base height deviation, and distance before failure.
-- [ ] **LOC-METRICS-03**: Evaluation captures control-quality metrics: action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation.
-- [ ] **LOC-METRICS-04**: Evaluation captures terrain/contact proxies: foot slip, foot clearance, contact timing/duty factor, and scenario success rate.
+- [x] **LOC-METRICS-01**: Evaluation captures command tracking error for forward velocity, lateral velocity, and yaw rate. Validated in Phase 3.
+- [x] **LOC-METRICS-02**: Evaluation captures stability metrics: fall rate, roll/pitch bounds, base height deviation, and distance before failure. Validated in Phase 3.
+- [x] **LOC-METRICS-03**: Evaluation captures control-quality metrics: action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation. Validated in Phase 3.
+- [x] **LOC-METRICS-04**: Evaluation captures terrain/contact proxies: foot slip, foot clearance, contact timing/duty factor, and scenario success rate. Validated in Phase 3.
 - [ ] **LOC-METRICS-05**: Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds.
 
 ### LOC-EVAL — Repeatable Evaluation Runner
