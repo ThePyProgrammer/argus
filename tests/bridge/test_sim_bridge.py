@@ -4,6 +4,9 @@ Integration tests require MuJoCo and the Go2 model. Unit-level tests
 use mocks and can run anywhere.
 """
 
+import inspect
+import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -30,6 +33,19 @@ class TestMuJoCoBridgeUnit:
         bridge = MuJoCoBridge()
         assert not bridge.is_running
         assert bridge.step_count == 0
+
+    def test_step_signature_preserves_public_contract(self):
+        """MuJoCoBridge.step keeps the public action and SensorFrame contract."""
+        signature = inspect.signature(MuJoCoBridge.step)
+        assert str(signature) == "(self, action: numpy.ndarray | None = None) -> src.bridge.sensor_types.SensorFrame"
+        assert signature.return_annotation is SensorFrame
+
+    def test_init_creates_registered_analytical_trot_controller(self):
+        """Bridge owns one registered analytical_trot controller instance."""
+        bridge = MuJoCoBridge()
+        metadata = bridge._controller.compute({}, bridge._velocity_command(), 0.02).metadata
+        assert metadata["controller_id"] == "analytical_trot"
+        assert bridge._controller.__class__.__name__ == "AnalyticalTrotController"
 
     def test_init_custom_config(self):
         """Bridge accepts a custom config."""
@@ -63,6 +79,56 @@ class TestMuJoCoBridgeUnit:
         R = quat_to_rotation_matrix(q)
         assert abs(np.linalg.det(R) - 1.0) < 1e-10
         assert np.allclose(R @ R.T, np.eye(3), atol=1e-10)
+
+    def test_direct_action_step_validates_and_returns_sensor_frame(self, monkeypatch):
+        """Fake-started bridge writes direct actions via validation before stepping."""
+        bridge = MuJoCoBridge()
+        bridge._model = SimpleNamespace(opt=SimpleNamespace(timestep=0.002))
+        bridge._data = SimpleNamespace(ctrl=np.zeros(12), sensordata=np.zeros(6))
+        bridge._dt = 0.02
+        expected_frame = SensorFrame(
+            rgb=np.zeros((1, 1, 3), dtype=np.uint8),
+            depth=None,
+            ground_truth_pose=np.eye(4),
+            sim_time=0.0,
+        )
+        bridge._capture_frame = MagicMock(return_value=expected_frame)
+        mj_step = MagicMock()
+        monkeypatch.setitem(sys.modules, "mujoco", SimpleNamespace(mj_step=mj_step))
+
+        action = np.array([0.0, 0.9, -1.8] * 4, dtype=np.float64)
+        frame = bridge.step(action=action)
+
+        assert frame is expected_frame
+        assert isinstance(frame, SensorFrame)
+        assert np.allclose(bridge._data.ctrl, action)
+        mj_step.assert_called()
+
+    def test_velocity_step_uses_controller_dispatch_and_returns_sensor_frame(self, monkeypatch):
+        """Fake-started bridge with action=None writes registered controller target."""
+        bridge = MuJoCoBridge()
+        bridge._model = SimpleNamespace(opt=SimpleNamespace(timestep=0.002))
+        bridge._data = SimpleNamespace(ctrl=np.zeros(12), sensordata=np.zeros(6))
+        bridge._dt = 0.02
+        bridge.set_velocity(np.array([0.4, -0.1]), 0.2)
+        expected_frame = SensorFrame(
+            rgb=np.zeros((1, 1, 3), dtype=np.uint8),
+            depth=None,
+            ground_truth_pose=np.eye(4),
+            sim_time=0.0,
+        )
+        bridge._capture_frame = MagicMock(return_value=expected_frame)
+        mj_step = MagicMock()
+        monkeypatch.setitem(sys.modules, "mujoco", SimpleNamespace(mj_step=mj_step))
+
+        frame = bridge.step(action=None)
+
+        assert frame is expected_frame
+        assert isinstance(frame, SensorFrame)
+        assert bridge._data.ctrl.shape == (12,)
+        assert np.all(np.isfinite(bridge._data.ctrl))
+        assert not np.allclose(bridge._data.ctrl, np.zeros(12))
+        mj_step.assert_called()
 
 
 # ---------------------------------------------------------------------------
