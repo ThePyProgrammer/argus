@@ -5,6 +5,7 @@ Scene builder XML output is tested with the actual go2.xml model file.
 """
 
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
@@ -97,6 +98,41 @@ def test_build_two_robot_scene_spawn_positions():
     # robot_a base body should have pos containing "1 2 0.3" (approx)
     assert "1 2" in xml_str or "1.0 2.0" in xml_str
     assert "5 6" in xml_str or "5.0 6.0" in xml_str
+
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_two_robot_scene_patches_go2_actuators_to_position_controls():
+    xml_str = build_two_robot_scene("models/unitree_go2", {
+        "robot_a": (0.0, 0.0, 0.3),
+        "robot_b": (5.0, 0.0, 0.3),
+    })
+    root = ET.fromstring(xml_str)
+    generated_actuators = [
+        actuator
+        for actuator in root.findall("./actuator/*")
+        if actuator.attrib.get("name", "").startswith(("robot_a_", "robot_b_"))
+    ]
+
+    assert generated_actuators
+    assert all(actuator.tag == "position" for actuator in generated_actuators)
+    assert all("kp" in actuator.attrib for actuator in generated_actuators)
+    assert all("kv" in actuator.attrib for actuator in generated_actuators)
+    assert not root.findall("./actuator/motor")
+
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_multi_robot_scene_returns_assets_without_compiler_asset_dirs():
+    xml_str, assets = build_multi_robot_scene(
+        Go2Platform(),
+        {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)},
+    )
+    root = ET.fromstring(xml_str)
+    compiler = root.find("compiler")
+
+    assert compiler is not None
+    assert "meshdir" not in compiler.attrib
+    assert "texturedir" not in compiler.attrib
+    assert "base_0.obj" in assets
 
 
 # ---------- MockMultiRobotBridge tests ----------

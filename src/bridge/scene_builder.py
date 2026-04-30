@@ -21,7 +21,6 @@ from typing import Any
 
 from src.bridge.platforms.base import RobotPlatform
 from src.bridge.platforms.go2 import Go2Platform
-from src.locomotion.xml_patcher import patch_actuators_to_position
 
 
 # Attributes that contain names which must be prefixed
@@ -65,11 +64,9 @@ def _copy_required(root: ET.Element, tag: str) -> ET.Element:
     return copy.deepcopy(elem)
 
 
-def _absolutize_asset_dirs(compiler: ET.Element, model_path: Path) -> None:
-    for attr in ("meshdir", "texturedir"):
-        value = compiler.attrib.get(attr)
-        if value:
-            compiler.attrib[attr] = str((model_path / value).resolve())
+def _remove_compiler_asset_dirs(compiler: ET.Element) -> None:
+    compiler.attrib.pop("meshdir", None)
+    compiler.attrib.pop("texturedir", None)
 
 
 def build_multi_robot_scene(
@@ -94,7 +91,7 @@ def build_multi_robot_scene(
 
     if compiler_elem is not None:
         compiler = copy.deepcopy(compiler_elem)
-        _absolutize_asset_dirs(compiler, model_path)
+        _remove_compiler_asset_dirs(compiler)
         scene.append(compiler)
     if option_elem is not None:
         scene.append(copy.deepcopy(option_elem))

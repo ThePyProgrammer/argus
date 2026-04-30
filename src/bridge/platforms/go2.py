@@ -16,6 +16,7 @@ from src.bridge.platforms.types import (
 )
 from src.bridge.sensor_types import STANDING_QPOS, quat_to_rotation_matrix
 from src.locomotion.gait_controller import TrotGaitController
+from src.locomotion.xml_patcher import patch_actuators_to_position
 
 GO2_ACTUATOR_NAMES = (
     "FL_hip", "FL_thigh", "FL_calf",
@@ -69,7 +70,7 @@ class Go2Platform:
         return Path(self._metadata.model_dir) / self._metadata.model_xml
 
     def read_model_xml(self) -> str:
-        return self.model_xml_path().read_text()
+        return patch_actuators_to_position(str(self.model_xml_path()))
 
     def actuator_names(self) -> tuple[str, ...]:
         return GO2_ACTUATOR_NAMES
