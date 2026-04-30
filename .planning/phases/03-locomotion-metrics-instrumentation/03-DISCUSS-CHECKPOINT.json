@@ -1,0 +1,172 @@
+{
+  "phase": "03",
+  "phase_name": "locomotion-metrics-instrumentation",
+  "timestamp": "2026-04-30T00:00:00",
+  "areas_completed": ["Metric surfaces", "Failure thresholds", "Contact proxies", "Action quality"],
+  "areas_remaining": [],
+  "decisions": {
+    "Metric surfaces": [
+      {
+        "question": "How should Phase 3 expose locomotion metrics during ArgusGo2Env.step()?",
+        "answer": "Hybrid collector + info",
+        "options_presented": [
+          "Hybrid collector + info — env owns/reuses a metrics collector, emits compact per-step metrics in info, and keeps episode aggregates for Phase 4 exports.",
+          "Collector only — cleaner info, but downstream callers must pull metrics from a separate object.",
+          "Info only — simple immediate consumption, but episode aggregation/export prep gets duplicated later."
+        ]
+      },
+      {
+        "question": "What shape should the per-step metrics in info use?",
+        "answer": "Nested locomotion key",
+        "options_presented": [
+          "Nested locomotion key — info[\"locomotion_metrics\"] grouped by tracking, stability, action quality, and contact.",
+          "Flat top-level keys — simple for inspection but bloats info and risks collisions.",
+          "Collector handle only — minimal info but not self-contained per-step records."
+        ]
+      },
+      {
+        "question": "What should reset do to metric state?",
+        "answer": "Episode reset, keep baseline",
+        "options_presented": [
+          "Episode reset, keep baseline — clear current episode step buffers on reset, preserve explicit baseline/reference snapshots.",
+          "Clear everything — simpler but loses baseline/cross-episode diagnostics.",
+          "Never reset automatically — useful for continuous monitoring, bad for benchmark episodes."
+        ]
+      },
+      {
+        "question": "Should Phase 3 include episode-level aggregate summaries now, or only raw per-step metrics for Phase 4 to aggregate?",
+        "answer": "Step + episode summary",
+        "options_presented": [
+          "Step + episode summary — collector exposes both per-step records and episode summary; Phase 4 exports without redefining metric math.",
+          "Raw steps only — smaller Phase 3, but Phase 4 decides aggregation semantics later.",
+          "Summary only — smallest surface, but loses debugging and JSONL detail."
+        ]
+      }
+    ],
+    "Failure thresholds": [
+      {
+        "question": "What should count as a locomotion failure in Phase 3?",
+        "answer": "Conservative fall gate",
+        "options_presented": [
+          "Conservative fall gate — terminate/fail on excessive roll/pitch, base height below threshold, or no meaningful progress after disturbance.",
+          "Only hard falls — fail only when base height/orientation clearly indicates a fall.",
+          "Scenario-specific gates — different thresholds per flat/slope/rough/push scenario."
+        ]
+      },
+      {
+        "question": "Should failure thresholds terminate the episode immediately, or only mark metrics while the episode continues?",
+        "answer": "Terminate on failure",
+        "options_presented": [
+          "Terminate on failure — set terminated=True when failure thresholds trip; Phase 4 can count failures and distance-before-failure cleanly.",
+          "Mark only — keep stepping and report failure flags in metrics.",
+          "Configurable — default terminate, but allow opt-out for debugging."
+        ]
+      },
+      {
+        "question": "How should scenario success rate be defined for Phase 3?",
+        "answer": "Survive full episode",
+        "options_presented": [
+          "Survive full episode — success means no failure before truncation/max episode, with distance and tracking stats reported separately.",
+          "Scenario objective — success depends on scenario-specific objectives like commanded distance or push recovery.",
+          "Defer success rate — let Phase 4 define success during evaluation aggregation."
+        ]
+      },
+      {
+        "question": "Should roll/pitch/base-height thresholds be hardcoded project defaults or configurable through ArgusGo2EnvConfig?",
+        "answer": "Configurable defaults",
+        "options_presented": [
+          "Configurable defaults — project defaults live in a metrics config/dataclass, overridable through env config for benchmark tuning.",
+          "Hardcoded constants — simpler but threshold changes require code edits.",
+          "Per-scenario defaults — thresholds come from scenario specs."
+        ]
+      }
+    ],
+    "Contact proxies": [
+      {
+        "question": "How should Phase 3 handle foot/contact identity mapping for slip, clearance, timing, and duty factor?",
+        "answer": "Strict mapping required",
+        "options_presented": [
+          "Strict mapping required — build/validate explicit Go2 foot body/site/geom mapping and fail tests clearly if mapping cannot be resolved.",
+          "Best-effort mapping — try name heuristics and emit unavailable metrics if mapping fails.",
+          "Contact optional — expose contact metrics only when mapping exists."
+        ]
+      },
+      {
+        "question": "How should foot slip be reported?",
+        "answer": "Contact-frame velocity",
+        "options_presented": [
+          "Contact-frame velocity — measure foot world XY velocity while that foot is in contact, with per-foot and aggregate slip summaries.",
+          "Displacement per contact — track XY displacement from contact start to lift-off.",
+          "Binary slip flag — only report whether slip exceeded a threshold."
+        ]
+      },
+      {
+        "question": "How should foot clearance be measured?",
+        "answer": "Swing min/max height",
+        "options_presented": [
+          "Swing min/max height — report per-foot swing-phase min/max clearance relative to terrain/floor estimate, with episode aggregates.",
+          "Foot height only — report raw foot z height each step.",
+          "Threshold pass rate — report percent of swing steps above a clearance threshold."
+        ]
+      },
+      {
+        "question": "How should contact timing and duty factor be represented?",
+        "answer": "Per-foot phases + aggregates",
+        "options_presented": [
+          "Per-foot phases + aggregates — per-foot contact boolean/timing history, duty factor per foot, and aggregate gait symmetry/timing episode summaries.",
+          "Aggregate only — only expose episode-level duty factor and contact timing summaries.",
+          "Raw contacts only — expose raw MuJoCo contact-derived flags and let Phase 4 aggregate."
+        ]
+      }
+    ],
+    "Action quality": [
+      {
+        "question": "How should action smoothness be measured for the current controller/action stack?",
+        "answer": "Delta + jerk proxy",
+        "options_presented": [
+          "Delta + jerk proxy — track action delta norm per step and second-difference/jerk proxy, with per-step and episode aggregate values.",
+          "Delta only — measure change from previous 12-joint target only.",
+          "Command smoothness — measure high-level velocity command changes instead of joint-target changes."
+        ]
+      },
+      {
+        "question": "How should effort/energy be proxied given the stack uses position servos, not torque control?",
+        "answer": "Position-servo proxy",
+        "options_presented": [
+          "Position-servo proxy — use control-target movement, joint velocity, and optionally actuator ctrl magnitude as an effort proxy, clearly labeled as non-torque energy.",
+          "Ctrl magnitude only — cheap but misleading if interpreted as physical energy.",
+          "Defer effort metric — avoid questionable energy claims until torque/dynamics data exists."
+        ]
+      },
+      {
+        "question": "How should joint-limit violations be counted?",
+        "answer": "Target and state violations",
+        "options_presented": [
+          "Target and state violations — count commanded target outside configured joint limits and observed qpos outside limits/tolerance, grouped per joint and episode.",
+          "Target only — catches controller output issues before physics.",
+          "State only — measures actual robot state violations but may hide unsafe commands."
+        ]
+      },
+      {
+        "question": "How should actuator saturation be interpreted for position actuators?",
+        "answer": "Near-limit proxy",
+        "options_presented": [
+          "Near-limit proxy — treat targets near joint/action bounds and repeated clipping as saturation proxy, clearly labeled as position-servo saturation.",
+          "Ctrlrange only — use MuJoCo actuator ctrlrange if present.",
+          "Skip saturation — avoid ambiguous metric now."
+        ]
+      }
+    ]
+  },
+  "deferred_ideas": [],
+  "canonical_refs": [
+    ".planning/ROADMAP.md §Phase 3",
+    ".planning/REQUIREMENTS.md §LOC-METRICS",
+    ".planning/PROJECT.md §Current Milestone / Key Decisions",
+    ".planning/STATE.md §Accumulated Context",
+    ".planning/phases/02-controller-plugin-baseline/02-CONTEXT.md",
+    "docs/adr/0018-use-reproducible-gymnasium-style-locomotion-benchmark-harness.md",
+    "docs/adr/0019-benchmark-locomotion-before-adding-new-controller-families.md",
+    "outputs/locomotion-rd-systems.md"
+  ]
+}

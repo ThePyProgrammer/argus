@@ -100,7 +100,21 @@ Cross-cutting constraints:
   3. Control-quality metrics include action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation or equivalent position-servo proxy.
   4. Terrain/contact metrics include foot slip, foot clearance, contact timing/duty factor, and per-scenario success rate.
   5. Per-step and per-episode metric values are available through `info` or a metrics collector without tying them to one specific controller implementation.
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+**Wave 1**
+- [ ] 03-01-PLAN.md — Add core locomotion metrics collector for command tracking, stability, and action-quality metrics.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 03-02-PLAN.md — Add strict Go2 foot mapping and contact/terrain proxy metrics.
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 03-03-PLAN.md — Wire metrics collector into `ArgusGo2Env` reset/step, nested info payloads, and failure termination.
+
+**Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 03-04-PLAN.md — Harden Phase 3 validation coverage and run Nyquist quick/full checks.
+
 **Research flag**: standard
 
 ### Phase 4: evaluation-runner-and-regression
@@ -137,7 +151,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
-| 3. locomotion-metrics-instrumentation | 0/TBD | Not started | - |
+| 3. locomotion-metrics-instrumentation | 0/4 | Ready to execute | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
 
@@ -157,4 +171,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 2 completed 2026-04-30. Continue with `/gsd-discuss-phase 3` for `locomotion-metrics-instrumentation`.
+Phase 3 planned 2026-04-30. Continue with `/gsd-execute-phase 3` for `locomotion-metrics-instrumentation`.
