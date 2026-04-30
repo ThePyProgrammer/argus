@@ -106,6 +106,18 @@ def test_multi_bridge_step_public_contract_is_dict_of_sensor_frames():
     assert signature.return_annotation == dict[str, SensorFrame]
 
 
+def test_multi_bridge_stop_before_start_is_safe():
+    """Cleanup should be safe around failed or skipped startup."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
+
+    bridge.stop()
+
+    assert not bridge.is_running
+    assert bridge.step_count == 0
+
+
 def test_multi_bridge_initializes_one_controller_per_robot_id():
     """Each configured robot owns a distinct registered controller instance."""
     from src.bridge.multi_bridge import MultiRobotBridge
@@ -131,6 +143,103 @@ def test_multi_bridge_step_before_start_still_raises_not_started():
 
     with pytest.raises(RuntimeError, match="not started"):
         bridge.step()
+
+
+def test_multi_bridge_set_velocity_rejects_unknown_robot_id():
+    """Unknown command targets must fail instead of disappearing at step()."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
+
+    with pytest.raises(KeyError, match="Unknown robot_id 'robot_c'"):
+        bridge.set_velocity("robot_c", np.array([0.3, 0.0]), 0.0)
+
+    assert set(bridge._velocities) == {"robot_a", "robot_b"}
+
+
+def test_multi_bridge_set_velocity_validates_command_values():
+    """Malformed velocity commands are rejected at the public bridge boundary."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
+
+    with pytest.raises(ValueError, match=r"shape-\(2,\)"):
+        bridge.set_velocity("robot_a", np.array([0.3, 0.0, 0.1]), 0.0)
+    with pytest.raises(ValueError, match="finite"):
+        bridge.set_velocity("robot_a", np.array([np.nan, 0.0]), 0.0)
+    with pytest.raises(ValueError, match="finite"):
+        bridge.set_velocity("robot_a", np.array([0.0, 0.0]), np.inf)
+
+
+def test_multi_bridge_start_resets_per_robot_controllers(monkeypatch):
+    """Restarted simulations must begin each controller from its reset gait phase."""
+    from src.bridge.multi_bridge import MultiRobotBridge
+
+    reset_calls: list[str] = []
+
+    class FakeController:
+        def __init__(self, robot_id: str) -> None:
+            self.robot_id = robot_id
+
+        def reset(self, seed: int | None = None) -> None:
+            del seed
+            reset_calls.append(self.robot_id)
+
+        def compute(self, observation, command, dt):
+            del observation, command, dt
+            from src.locomotion.controllers import ControllerResult
+
+            return ControllerResult(action=np.zeros(12), metadata={"controller_id": self.robot_id})
+
+    class FakeModel:
+        opt = types.SimpleNamespace(timestep=0.002)
+        nq = 40
+        njnt = 2
+        ncam = 2
+        jnt_bodyid = np.array([0, 1])
+        jnt_type = np.array([0, 0])
+        jnt_qposadr = np.array([0, 19])
+
+    class FakeData:
+        qpos = np.zeros(40)
+        ctrl = np.zeros(24)
+
+    name_ids = {
+        "robot_a_base": 0,
+        "robot_b_base": 1,
+        "robot_a_cam": 0,
+        "robot_b_cam": 1,
+    }
+    for offset, suffix in enumerate(("FL_hip", "FL_thigh", "FL_calf", "FR_hip", "FR_thigh", "FR_calf", "RL_hip", "RL_thigh", "RL_calf", "RR_hip", "RR_thigh", "RR_calf")):
+        name_ids[f"robot_a_{suffix}"] = offset
+        name_ids[f"robot_b_{suffix}"] = 12 + offset
+
+    fake_mujoco = types.SimpleNamespace(
+        MjModel=types.SimpleNamespace(from_xml_string=lambda *args, **kwargs: FakeModel()),
+        MjData=lambda model: FakeData(),
+        Renderer=lambda *args, **kwargs: types.SimpleNamespace(close=lambda: None),
+        mj_name2id=lambda model, obj, name: name_ids.get(name, -1),
+        mj_step=lambda model, data: None,
+        mjtObj=types.SimpleNamespace(mjOBJ_BODY=0, mjOBJ_ACTUATOR=1, mjOBJ_CAMERA=2),
+        viewer=types.SimpleNamespace(launch_passive=lambda model, data: None),
+    )
+    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
+    monkeypatch.setitem(sys.modules, "mujoco.viewer", fake_mujoco.viewer)
+    monkeypatch.setattr(
+        "src.bridge.multi_bridge.build_two_robot_scene",
+        lambda model_dir, spawn_positions: "<mujoco/>",
+    )
+
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b"), boot_phase_steps=0))
+    bridge._controllers = {
+        "robot_a": FakeController("robot_a"),
+        "robot_b": FakeController("robot_b"),
+    }
+    bridge._capture_frame = lambda robot_id: _sensor_frame_at(1.0 if robot_id == "robot_a" else 2.0)
+
+    bridge.start()
+
+    assert reset_calls == ["robot_a", "robot_b"]
 
 
 def test_multi_bridge_step_writes_controller_targets_by_robot_ctrl_indices(monkeypatch):

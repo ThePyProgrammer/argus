@@ -14,7 +14,7 @@ class MuJoCoEnvConfig:
     Attributes:
         model_path: Path to the MuJoCo XML model file.
         resolution: Render resolution as (width, height).
-        camera_name: Camera name for rendering. Use -1 for free camera.
+        camera_name: Fixed camera name or id for rendering and pose extraction.
         sim_steps_per_frame: Number of physics steps per sensor frame.
             Higher = more stable physics but slower frame rate.
         target_step_hz: Target sensor frame rate in Hz.

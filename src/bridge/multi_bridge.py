@@ -49,6 +49,7 @@ class MultiRobotBridge:
         self._data: Any = None
         self._renderers: dict[str, Any] = {}
         self._overview_renderer: Any = None
+        self._viewer_handle: Any = None
         self._step_count: int = 0
         self._dt: float = 0.0
 
@@ -159,6 +160,8 @@ class MultiRobotBridge:
         # Set initial standing pose and heading for both robots
         import math
         n_robots = len(self._config.robot_ids)
+        for controller in self._controllers.values():
+            controller.reset()
         for i, robot_id in enumerate(self._config.robot_ids):
             qstart = self._qpos_starts[robot_id]
             # qpos layout: [x, y, z, qw, qx, qy, qz, joint1..joint12]
@@ -295,7 +298,15 @@ class MultiRobotBridge:
             linear: (2,) array [vx, vy].
             angular: Angular velocity (positive = turn left).
         """
-        self._velocities[robot_id] = (np.asarray(linear, dtype=np.float64), float(angular))
+        if robot_id not in self._config.robot_ids:
+            raise KeyError(f"Unknown robot_id '{robot_id}'. Available: {self._config.robot_ids}")
+        vector = np.asarray(linear, dtype=np.float64)
+        if vector.shape != (2,) or not np.all(np.isfinite(vector)):
+            raise ValueError(f"linear velocity must be a finite shape-(2,) vector, got {vector.shape}")
+        angular_value = float(angular)
+        if not np.isfinite(angular_value):
+            raise ValueError("angular velocity must be finite")
+        self._velocities[robot_id] = (vector.copy(), angular_value)
 
     def get_frame(self, robot_id: str) -> SensorFrame:
         """Return the last captured frame for the specified robot.

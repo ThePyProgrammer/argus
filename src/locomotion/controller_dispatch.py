@@ -82,7 +82,14 @@ def apply_controller_target(
     if ctrl_indices is None:
         data.ctrl[:] = validated
     else:
-        for i, act_id in enumerate(ctrl_indices):
+        indices = [int(idx) for idx in ctrl_indices]
+        if len(set(indices)) != len(indices):
+            raise ValueError("ctrl_indices must not contain duplicates.")
+        ctrl_size = int(data.ctrl.shape[0])
+        bad_indices = [idx for idx in indices if idx < 0 or idx >= ctrl_size]
+        if bad_indices:
+            raise ValueError(f"ctrl_indices out of range for data.ctrl size {ctrl_size}: {bad_indices}")
+        for i, act_id in enumerate(indices):
             data.ctrl[act_id] = validated[i]
     return validated
 

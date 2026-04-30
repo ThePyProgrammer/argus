@@ -21,8 +21,7 @@ from src.locomotion.controller_dispatch import (
     compute_controller_action,
 )
 from src.locomotion.controllers import ControllerRegistry, LocomotionCommand
-from src.locomotion.gait_params import GaitParams
-from src.locomotion.xml_patcher import patch_actuators_to_position, patch_actuators_to_position_with_floor
+from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +93,13 @@ class MuJoCoBridge:
                 if f.is_file():
                     assets[f.name] = f.read_bytes()
 
+        try:
+            return self._start_loaded_model(mujoco, patched_xml, assets)
+        except Exception:
+            self.stop()
+            raise
+
+    def _start_loaded_model(self, mujoco: Any, patched_xml: str, assets: dict[str, bytes]) -> SensorFrame:
         self._model = mujoco.MjModel.from_xml_string(patched_xml, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
@@ -132,8 +138,12 @@ class MuJoCoBridge:
         cam_name = self._config.camera_name
         if isinstance(cam_name, str):
             self._cam_id = _mj.mj_name2id(self._model, _mj.mjtObj.mjOBJ_CAMERA, cam_name)
+            if self._cam_id < 0:
+                raise ValueError(f"Camera '{cam_name}' not found in MuJoCo model")
         else:
             self._cam_id = int(cam_name)
+            if self._cam_id < 0 or self._cam_id >= self._model.ncam:
+                raise ValueError(f"Camera id {self._cam_id} is out of range for {self._model.ncam} fixed cameras")
 
         self._step_count = 0
         return self._capture_frame()
@@ -225,7 +235,7 @@ class MuJoCoBridge:
         """Render RGB + depth and extract ground-truth pose."""
         import mujoco
 
-        self._renderer.update_scene(self._data, camera=self._config.camera_name)
+        self._renderer.update_scene(self._data, camera=self._cam_id)
 
         # RGB
         rgb = self._renderer.render().copy()  # (H, W, 3) uint8

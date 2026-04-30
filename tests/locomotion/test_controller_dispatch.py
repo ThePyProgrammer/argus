@@ -130,6 +130,26 @@ def test_apply_controller_target_rejects_wrong_ctrl_indices_count_without_mutati
     np.testing.assert_allclose(fake_data.ctrl, before)
 
 
+@pytest.mark.parametrize(
+    "bad_indices, message",
+    [
+        ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20], "out of range"),
+        ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1], "out of range"),
+        ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10], "duplicates"),
+    ],
+)
+def test_apply_controller_target_rejects_bad_ctrl_indices_without_mutating_ctrl(
+    bad_indices: list[int], message: str
+) -> None:
+    fake_data = FakeData(size=20)
+    before = fake_data.ctrl.copy()
+
+    with pytest.raises(ValueError, match=message):
+        apply_controller_target(fake_data, np.arange(12, dtype=np.float64), ctrl_indices=bad_indices)
+
+    np.testing.assert_allclose(fake_data.ctrl, before)
+
+
 def test_dispatch_controller_computes_validates_applies_and_preserves_metadata() -> None:
     controller = FakeController()
     fake_data = FakeData()

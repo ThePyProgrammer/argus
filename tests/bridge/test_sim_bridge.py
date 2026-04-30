@@ -139,6 +139,62 @@ class TestMuJoCoBridgeUnit:
         assert "SensorFrame" in str(signature)
         assert bridge._controller.compute({}, bridge._velocity_command(), 0.02).metadata["controller_id"] == "analytical_trot"
 
+    def test_start_rejects_unknown_camera_name_before_capture(self, monkeypatch, tmp_path):
+        """Invalid camera config must fail before Python negative indexing can select a pose."""
+        bridge = self._fake_started_bridge_for_camera(monkeypatch, tmp_path, camera_name="missing_cam")
+
+        with pytest.raises(ValueError, match="Camera 'missing_cam' not found"):
+            bridge.start()
+
+        bridge._capture_frame.assert_not_called()
+        assert not bridge.is_running
+        assert bridge._renderer is None
+
+    def test_start_rejects_free_camera_id_before_capture(self, monkeypatch, tmp_path):
+        """Free-camera rendering has no matching SensorFrame pose extraction contract."""
+        bridge = self._fake_started_bridge_for_camera(monkeypatch, tmp_path, camera_name=-1)
+
+        with pytest.raises(ValueError, match="Camera id -1 is out of range"):
+            bridge.start()
+
+        bridge._capture_frame.assert_not_called()
+        assert not bridge.is_running
+        assert bridge._renderer is None
+
+    def _fake_started_bridge_for_camera(self, monkeypatch, tmp_path, camera_name):
+        model_path = tmp_path / "scene.xml"
+        go2_path = tmp_path / "go2.xml"
+        model_path.write_text("<mujoco/>")
+        go2_path.write_text("<mujoco/>")
+        config = MuJoCoEnvConfig(model_path=str(model_path), camera_name=camera_name)
+        bridge = MuJoCoBridge(config)
+
+        class FakeModel:
+            nq = 0
+            ncam = 1
+            opt = SimpleNamespace(timestep=0.002)
+
+        class FakeData:
+            qpos = np.zeros(0)
+            ctrl = np.zeros(12)
+            sensordata = np.zeros(0)
+
+        fake_mujoco = SimpleNamespace(
+            MjModel=SimpleNamespace(from_xml_string=MagicMock(return_value=FakeModel())),
+            MjData=MagicMock(return_value=FakeData()),
+            Renderer=MagicMock(),
+            mj_name2id=MagicMock(return_value=-1),
+            mj_step=MagicMock(),
+            mjtObj=SimpleNamespace(mjOBJ_SENSOR=0, mjOBJ_CAMERA=1),
+        )
+        monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
+        monkeypatch.setattr(
+            "src.bridge.sim_bridge.patch_actuators_to_position_with_floor",
+            lambda _: "<mujoco/>",
+        )
+        bridge._capture_frame = MagicMock()
+        return bridge
+
 
 # ---------------------------------------------------------------------------
 # Integration tests (require MuJoCo + Go2 model)
