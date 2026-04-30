@@ -81,7 +81,7 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
       switch (msg.type) {
         case 'robot_list': {
           const payload = msg.payload as RobotListPayload;
-          store.setRobotList(payload.robots);
+          store.setRobotList(payload.robots, payload.platforms ?? {});
           break;
         }
         case 'pose_update': {
