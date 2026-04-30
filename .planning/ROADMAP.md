@@ -115,4 +115,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-After roadmap approval, start with `/gsd-plan-phase 1` for `locomotion-env-contract`.
+Roadmap approved 2026-04-30. Start with `/gsd-plan-phase 1` for `locomotion-env-contract`.

@@ -79,7 +79,7 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 **Shipped:** v3.0 Pluggable Perception & 3D Object Detection (2026-04-30)
 
-**Active:** v4.0 Benchmarkable Locomotion Environment planning complete; roadmap pending approval.
+**Active:** v4.0 Benchmarkable Locomotion Environment roadmap approved; Phase 1 ready to plan.
 
 **Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, and Zustand.
 

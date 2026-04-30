@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: planning
-stopped_at: roadmap drafted, pending approval (2026-04-30)
+status: ready_to_plan
+stopped_at: roadmap approved; ready to plan Phase 1 (2026-04-30)
 last_updated: "2026-04-30"
 last_activity: 2026-04-30
 progress:
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 Phase: Not started
 Plan: Not started
-Status: Roadmap drafted, pending approval
+Status: Roadmap approved; ready to plan Phase 1
 Last activity: 2026-04-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -69,9 +69,8 @@ No v4.0 execution metrics yet.
 
 ### Pending Todos
 
-- Approve v4.0 roadmap.
-- Start `/gsd-plan-phase 1` for `locomotion-env-contract` after approval.
-- Commit planning docs if the roadmap is approved and the workflow proceeds with `commit_docs: true`.
+- Start `/gsd-plan-phase 1` for `locomotion-env-contract`.
+- Commit planning docs if requested; `commit_docs` is true, but no commit has been created yet.
 
 ### Blockers/Concerns
 
@@ -94,6 +93,6 @@ No v4.0 execution metrics yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — v4.0 roadmap drafted
-Stopped at: roadmap approval gate
+Last activity: 2026-04-30 — v4.0 roadmap approved by user
+Stopped at: ready to plan Phase 1 (`locomotion-env-contract`)
 Resume file: None
