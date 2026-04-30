@@ -104,16 +104,16 @@ Cross-cutting constraints:
 Plans:
 
 **Wave 1**
-- [ ] 03-01-PLAN.md — Add core locomotion metrics collector for command tracking, stability, and action-quality metrics.
+- [x] 03-01-PLAN.md — Add core locomotion metrics collector for command tracking, stability, and action-quality metrics.
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 03-02-PLAN.md — Add strict Go2 foot mapping and contact/terrain proxy metrics.
+- [x] 03-02-PLAN.md — Add strict Go2 foot mapping and contact/terrain proxy metrics.
 
 **Wave 3 *(blocked on Wave 2 completion)***
-- [ ] 03-03-PLAN.md — Wire metrics collector into `ArgusGo2Env` reset/step, nested info payloads, and failure termination.
+- [x] 03-03-PLAN.md — Wire metrics collector into `ArgusGo2Env` reset/step, nested info payloads, and failure termination.
 
 **Wave 4 *(blocked on Wave 3 completion)***
-- [ ] 03-04-PLAN.md — Harden Phase 3 validation coverage and run Nyquist quick/full checks.
+- [x] 03-04-PLAN.md — Harden Phase 3 validation coverage and run Nyquist quick/full checks.
 
 **Research flag**: standard
 
