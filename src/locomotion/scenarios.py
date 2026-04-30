@@ -1,8 +1,12 @@
 """Named locomotion scenarios and deterministic reset sampling."""
 
 from dataclasses import dataclass
+from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import numpy as np
+
+from src.locomotion.xml_patcher import patch_actuators_to_position
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,39 @@ def list_scenarios() -> list[str]:
     return sorted(SCENARIOS.keys())
 
 
+def build_scenario_xml(model_dir: str, sample: ScenarioSample) -> tuple[str, dict[str, bytes]]:
+    """Return MJCF XML string plus mesh asset bytes for the sampled scenario."""
+    model_path = Path(model_dir)
+    go2_xml_path = model_path / "go2.xml"
+    if not go2_xml_path.exists():
+        raise FileNotFoundError(f"Go2 model not found: {go2_xml_path}")
+
+    patched_xml = patch_actuators_to_position(str(go2_xml_path))
+    root = ET.fromstring(patched_xml)
+    compiler = root.find("compiler")
+    if compiler is not None:
+        compiler.attrib.pop("meshdir", None)
+        compiler.attrib.pop("texturedir", None)
+
+    asset = root.find("asset")
+    if asset is None:
+        asset = ET.SubElement(root, "asset")
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        worldbody = ET.SubElement(root, "worldbody")
+
+    _upsert_benchmark_floor(worldbody, sample)
+    terrain_kind = str(sample.terrain_parameters.get("terrain_kind", "plane"))
+    if terrain_kind == "slope":
+        _add_slope_marker(worldbody, sample)
+    elif terrain_kind == "heightfield":
+        _add_rough_heightfield(asset, worldbody, sample)
+    _ensure_light(worldbody)
+    _ensure_visual_settings(root)
+
+    return ET.tostring(root, encoding="unicode"), _load_asset_bytes(model_path / "assets")
+
+
 def sample_scenario(
     scenario_id: str,
     rng: np.random.Generator,
@@ -92,6 +129,87 @@ def sample_scenario(
         command_schedule=command_schedule,
         disturbance_schedule=disturbance_schedule,
     )
+
+
+def _upsert_benchmark_floor(worldbody: ET.Element, sample: ScenarioSample) -> None:
+    friction = float(sample.terrain_parameters.get("friction_coefficient", 1.0))
+    for geom in worldbody.findall("geom"):
+        if geom.get("type") == "plane" or geom.get("name") in {"floor", "benchmark_floor"}:
+            worldbody.remove(geom)
+    ET.SubElement(
+        worldbody,
+        "geom",
+        name="benchmark_floor",
+        type="plane",
+        size="50 50 0.05",
+        condim="6",
+        friction=f"{friction:g} 0.005 0.0001",
+    )
+
+
+def _add_slope_marker(worldbody: ET.Element, sample: ScenarioSample) -> None:
+    slope = float(sample.terrain_parameters.get("slope_radians", 0.0))
+    ET.SubElement(
+        worldbody,
+        "geom",
+        name="slope_benchmark_marker",
+        type="box",
+        size="4 4 0.05",
+        pos="0 0 -0.04",
+        euler=f"0 {slope:g} 0",
+        rgba="0.35 0.35 0.35 1",
+    )
+
+
+def _add_rough_heightfield(asset: ET.Element, worldbody: ET.Element, sample: ScenarioSample) -> None:
+    size = int(sample.terrain_parameters.get("heightfield_size", 16))
+    bounded_size = int(np.clip(size, 4, 64))
+    amplitude = float(sample.terrain_parameters.get("roughness_amplitude", 0.02))
+    ET.SubElement(
+        asset,
+        "hfield",
+        name="rough_heightfield",
+        nrow=str(bounded_size),
+        ncol=str(bounded_size),
+        size=f"5 5 {max(amplitude, 0.02):g} 0.02",
+    )
+    ET.SubElement(
+        worldbody,
+        "geom",
+        name="rough_heightfield_geom",
+        type="hfield",
+        hfield="rough_heightfield",
+        friction="1 0.005 0.0001",
+    )
+
+
+def _ensure_light(worldbody: ET.Element) -> None:
+    if not any(child.tag == "light" for child in worldbody):
+        ET.SubElement(worldbody, "light", pos="0 0 3", dir="0 0 -1", directional="true")
+
+
+def _ensure_visual_settings(root: ET.Element) -> None:
+    visual = root.find("visual")
+    if visual is None:
+        visual = ET.SubElement(root, "visual")
+    map_elem = visual.find("map")
+    if map_elem is None:
+        map_elem = ET.SubElement(visual, "map")
+    map_elem.set("znear", "0.01")
+    map_elem.set("zfar", "50")
+    statistic = root.find("statistic")
+    if statistic is None:
+        statistic = ET.SubElement(root, "statistic")
+    statistic.set("extent", "2")
+
+
+def _load_asset_bytes(asset_dir: Path) -> dict[str, bytes]:
+    assets: dict[str, bytes] = {}
+    if asset_dir.exists():
+        for asset_path in asset_dir.iterdir():
+            if asset_path.is_file():
+                assets[asset_path.name] = asset_path.read_bytes()
+    return assets
 
 
 def _sample_spawn_pose(rng: np.random.Generator) -> tuple[float, float, float, float]:

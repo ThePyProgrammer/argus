@@ -1,10 +1,13 @@
 """Scenario catalog tests for the Argus Go2 locomotion environment."""
 
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from src.locomotion.env import ArgusGo2Env, ArgusGo2EnvConfig
-from src.locomotion.scenarios import SCENARIOS, list_scenarios, sample_scenario
+from src.locomotion.scenarios import SCENARIOS, build_scenario_xml, list_scenarios, sample_scenario
 
 
 REQUIRED_SCENARIOS = {
@@ -14,6 +17,8 @@ REQUIRED_SCENARIOS = {
     "rough_heightfield",
     "push_disturbance",
 }
+MODEL_DIR = Path(__file__).parent.parent.parent / "models" / "unitree_go2"
+GO2_XML = MODEL_DIR / "go2.xml"
 
 
 def test_scenario_catalog_contains_required_named_scenarios():
@@ -109,3 +114,65 @@ def test_env_info_returns_defensive_metadata_copies():
     assert step_info["sampled_parameters"]["friction_coefficient"] == 1.0
     assert step_info["command_schedule"][0]["vx"] == 0.0
     assert step_info["disturbance_schedule"][0]["force_x"] != 999.0
+
+
+@pytest.mark.parametrize("scenario_id", sorted(REQUIRED_SCENARIOS))
+def test_build_scenario_xml_returns_parseable_xml_and_assets_for_required_scenarios(scenario_id):
+    sample = sample_scenario(scenario_id, np.random.default_rng(123))
+
+    xml, assets = build_scenario_xml(str(MODEL_DIR), sample)
+
+    root = ET.fromstring(xml)
+    assert root.tag == "mujoco"
+    assert isinstance(assets, dict)
+    assert all(isinstance(name, str) and isinstance(value, bytes) for name, value in assets.items())
+
+
+def test_build_scenario_xml_does_not_modify_go2_xml_on_disk():
+    sample = sample_scenario("rough_heightfield", np.random.default_rng(123))
+    before = GO2_XML.read_text()
+
+    _xml, _assets = build_scenario_xml(str(MODEL_DIR), sample)
+
+    after = GO2_XML.read_text()
+    assert before == after, "go2.xml was modified on disk"
+
+
+def test_low_friction_scenario_xml_has_benchmark_floor_friction_starting_with_0_35():
+    sample = sample_scenario("low_friction", np.random.default_rng(123))
+
+    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+    floor = root.find("./worldbody/geom[@name='benchmark_floor']")
+
+    assert floor is not None
+    assert floor.get("friction", "").startswith("0.35")
+
+
+def test_slope_scenario_xml_contains_slope_named_marker():
+    sample = sample_scenario("slope", np.random.default_rng(123))
+
+    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+    named_elements = [elem.get("name", "") for elem in root.iter()]
+
+    assert any("slope" in name for name in named_elements)
+
+
+def test_rough_heightfield_scenario_xml_contains_bounded_heightfield_marker():
+    sample = sample_scenario("rough_heightfield", np.random.default_rng(123), heightfield_size=128)
+
+    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+    hfield = root.find("./asset/hfield[@name='rough_heightfield']")
+    geom = root.find("./worldbody/geom[@hfield='rough_heightfield']")
+
+    assert sample.terrain_parameters["heightfield_size"] <= 64
+    assert hfield is not None
+    assert geom is not None
+
+
+def test_push_disturbance_is_runtime_metadata_not_xml_force_encoding():
+    sample = sample_scenario("push_disturbance", np.random.default_rng(123))
+
+    xml = build_scenario_xml(str(MODEL_DIR), sample)[0]
+
+    assert sample.disturbance_schedule
+    assert "force_x" not in xml
