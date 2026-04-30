@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
+from src.locomotion.controllers import ControllerResult
 from src.locomotion.env import ArgusGo2Env, ArgusGo2EnvConfig
 from src.locomotion.scenarios import list_scenarios
 
@@ -72,7 +73,18 @@ def test_default_config_uses_flat_ground_velocity_command():
 
     assert config.scenario_id == "flat_ground"
     assert config.action_mode == "velocity_command"
+    assert config.controller_id == "analytical_trot"
     assert config.model_dir is None
+
+
+def test_unknown_controller_id_fails_during_env_construction():
+    """Unknown controller ids must not silently fall back to the default baseline."""
+    with pytest.raises(ValueError) as exc_info:
+        ArgusGo2Env(ArgusGo2EnvConfig(controller_id="does_not_exist"))
+
+    message = str(exc_info.value)
+    assert "Unknown locomotion controller" in message
+    assert "Available:" in message
 
 
 def test_default_model_dir_resolves_from_package_independent_of_cwd():
@@ -110,11 +122,22 @@ def test_reset_returns_observation_and_info():
     assert info["seed"] == 123
     assert info["scenario_id"] == "flat_ground"
     assert info["action_mode"] == "velocity_command"
+    assert info["controller_id"] == "analytical_trot"
     assert "sampled_parameters" in info
     assert "command_schedule" in info
     assert "disturbance_schedule" in info
     assert info["step_count"] == 0
     assert "sim_time" in info
+    controller_metadata = info["controller_metadata"]
+    assert controller_metadata["controller_id"] == "analytical_trot"
+    assert controller_metadata["display_name"] == "Analytical Trot"
+    assert controller_metadata["family"] == "analytical"
+    assert controller_metadata["action_mode"] == "joint_position"
+    assert controller_metadata["deterministic"] is True
+    assert isinstance(controller_metadata["parameter_hash"], str)
+    assert controller_metadata["parameter_summary"]
+    assert controller_metadata["capabilities"]
+    assert controller_metadata["available"] is True
 
 
 def test_step_returns_gymnasium_five_tuple():
@@ -136,6 +159,8 @@ def test_step_returns_gymnasium_five_tuple():
     assert info["seed"] == 123
     assert info["scenario_id"] == "flat_ground"
     assert info["action_mode"] == "velocity_command"
+    assert info["controller_id"] == "analytical_trot"
+    assert "controller_metadata" not in info
     assert info["step_count"] == 1
 
 
@@ -239,8 +264,51 @@ def test_step_decodes_action_writes_ctrl_and_calls_mj_step_configured_count():
     decode_action_mock.assert_called_once()
     np.testing.assert_allclose(fake_data.ctrl.copy(), expected_ctrl)
     assert mj_step.call_count == env.config.sim_steps_per_frame
+    assert info["controller_id"] == "analytical_trot"
+    assert info["action_mode"] == "joint_position"
     assert info["sim_time"] == pytest.approx(fake_data.time)
     np.testing.assert_allclose(obs["qpos"], fake_data.qpos.astype(np.float32))
+
+
+def test_velocity_command_step_dispatches_controller_preserving_yaw_rate_and_writes_before_mj_step():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(sim_steps_per_frame=2))
+    fake_data = _FakeData()
+    env._model = _FakeModel()
+    env._data = fake_data
+    env._scenario_sample = None
+    expected_ctrl = np.linspace(0.2, 0.4, 12, dtype=np.float64)
+    action = np.array([0.25, -0.1, 0.35], dtype=np.float32)
+    calls: list[str] = []
+
+    def dispatch_controller(_controller, observation, command, dt, data=None, ctrl_indices=None):
+        assert observation["command"].shape == (3,)
+        assert command.vx == pytest.approx(0.25)
+        assert command.vy == pytest.approx(-0.1)
+        assert command.yaw_rate == pytest.approx(0.35)
+        assert command.metadata["controller_id"] == "analytical_trot"
+        assert dt == pytest.approx(env._dt)
+        assert data is fake_data
+        assert ctrl_indices is None
+        data.ctrl[:] = expected_ctrl
+        calls.append("dispatch")
+        return ControllerResult(action=expected_ctrl, metadata={"source": "test"})
+
+    def mj_step(_model, data):
+        calls.append("mj_step")
+        np.testing.assert_allclose(data.ctrl.copy(), expected_ctrl)
+        data.time += 0.002
+
+    with patch("src.locomotion.env.dispatch_controller", side_effect=dispatch_controller):
+        with patch.dict("sys.modules", {"mujoco": SimpleNamespace(mj_step=mj_step)}):
+            obs, _reward, _terminated, _truncated, info = env.step(action)
+
+    assert calls == ["dispatch", "mj_step", "mj_step"]
+    np.testing.assert_allclose(fake_data.ctrl.copy(), expected_ctrl)
+    np.testing.assert_allclose(obs["command"], action)
+    np.testing.assert_allclose(obs["previous_action"], expected_ctrl.astype(np.float32))
+    assert info["controller_id"] == "analytical_trot"
+    assert info["action_mode"] == "velocity_command"
+    assert "controller_metadata" not in info
 
 
 def test_push_disturbance_applies_xfrc_applied_deterministically_then_clears():
