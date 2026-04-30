@@ -105,12 +105,8 @@ class MultiRobotBridge:
 
         # Discover per-robot indices via mj_name2id
         for robot_id in self._config.robot_ids:
-            # Freejoint: named "{robot_id}_base" body has a freejoint
-            # The freejoint is discovered via the joint named after the body
-            # In go2.xml the freejoint has no name, but we prefixed it.
-            # Actually, freejoints in go2.xml use <freejoint/> without a name.
-            # We need to find the body and then its freejoint's qpos address.
-            body_name = f"{robot_id}_base"
+            # The root body name is platform-specific and prefixed by scene_builder.
+            body_name = f"{robot_id}_{self._platform.root_body_name()}"
             body_id = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, body_name)
             if body_id < 0:
                 raise RuntimeError(f"Body '{body_name}' not found in model")
@@ -214,9 +210,11 @@ class MultiRobotBridge:
             raise RuntimeError("Bridge not started -- call start() first")
 
         # Apply platform controller outputs for each robot
+        applied_commands: dict[str, RobotCommand] = {}
         for robot_id in self._config.robot_ids:
             status = self.get_runtime_status(robot_id)
             command = RobotCommand.stop() if status.disabled else self._commands[robot_id]
+            applied_commands[robot_id] = command
             state = self._platform.extract_state(
                 self._model,
                 self._data,
@@ -265,7 +263,7 @@ class MultiRobotBridge:
             status = self._platform.runtime_status(
                 rid,
                 state,
-                self._commands[rid],
+                applied_commands.get(rid, self._commands[rid]),
                 self._controllers[rid].health(),
                 collision_count=summary["collision_count"],
                 near_miss_count=summary["near_miss_count"],
