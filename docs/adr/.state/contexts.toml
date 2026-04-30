@@ -1,7 +1,7 @@
 [contexts.simulation]
 name = "Simulation"
-description = "MuJoCo scene, robot bridge, ground-truth poses, sensor frames, and locomotion control."
-adrs = ["0002", "0003"]
+description = "MuJoCo scene, robot bridge, ground-truth poses, sensor frames, locomotion control, robot platform abstraction, and simulation evaluation."
+adrs = ["0002", "0003", "0015", "0016", "0017"]
 
 [contexts.coordination]
 name = "Coordination"

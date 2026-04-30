@@ -73,3 +73,6 @@ Examples:
 | [0012](0012-forbid-fake-map-and-use-mujoco-ground-truth-metrics.md) | Forbid Fake mAP and Use MuJoCo Ground-Truth Metrics | Accepted | Testing Strategy |
 | [0013](0013-use-server-owned-geometry-and-single-projection-path.md) | Use Server-Owned Geometry and a Single Projection Path | Accepted | Data Model |
 | [0014](0014-use-react-flow-typed-dag-for-pipeline-editing.md) | Use React Flow Typed DAG for Pipeline Editing | Accepted | Architecture Pattern |
+| [0015](0015-introduce-robot-platform-abstraction.md) | Introduce Robot Platform Abstraction | Proposed | Architecture Pattern |
+| [0016](0016-use-mujoco-first-for-agibot-x2-simulation.md) | Use MuJoCo First for AGIBOT X2 Simulation | Proposed | Technology Choice |
+| [0017](0017-treat-x2-locomotion-as-external-walking-policy-boundary.md) | Treat X2 Locomotion as External Walking Policy Boundary | Proposed | API Design |
