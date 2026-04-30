@@ -1,6 +1,7 @@
 """Gymnasium-style benchmark environment for Unitree Go2 locomotion."""
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +9,9 @@ import gymnasium
 import numpy as np
 from src.locomotion.actions import ACTION_MODE_VELOCITY, build_action_space, decode_action
 from src.locomotion.gait_controller import TrotGaitController
+from src.locomotion.gait_params import GaitParams
 from src.locomotion.observations import build_observation_space, extract_observation
-from src.locomotion.scenarios import ScenarioSample, sample_scenario
-from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
+from src.locomotion.scenarios import ScenarioSample, build_scenario_xml, sample_scenario
 
 
 @dataclass
@@ -50,7 +51,9 @@ class ArgusGo2Env(gymnasium.Env):
         self._scenario_sample: ScenarioSample | None = None
         self._model: Any = None
         self._data: Any = None
+        self._renderer: Any = None
         self._dt = 0.002 * self.config.sim_steps_per_frame
+        self._active_push: dict[str, float] | None = None
         self._gait = TrotGaitController()
 
     def reset(
@@ -72,11 +75,11 @@ class ArgusGo2Env(gymnasium.Env):
             dtype=np.float32,
         )
         self._previous_action = np.zeros(12, dtype=np.float32)
+        self._active_push = None
         self._gait = TrotGaitController()
 
-        if options and options.get("load_model", False):
-            self._ensure_model_loaded()
-            self._reset_mujoco_state()
+        self._try_initialize_mujoco()
+        self._reset_mujoco_state()
 
         observation = extract_observation(self._data, self._command, self._previous_action)
         return observation, self._info()
@@ -100,8 +103,8 @@ class ArgusGo2Env(gymnasium.Env):
         if self._data is not None:
             import mujoco
 
-            if self._data.ctrl.shape[0] >= self._previous_action.shape[0]:
-                self._data.ctrl[: self._previous_action.shape[0]] = self._previous_action
+            self._data.ctrl[:] = self._previous_action
+            self._apply_push_disturbance()
             for _ in range(self.config.sim_steps_per_frame):
                 mujoco.mj_step(self._model, self._data)
 
@@ -115,34 +118,40 @@ class ArgusGo2Env(gymnasium.Env):
 
     def close(self) -> None:
         """Release MuJoCo handles owned by the environment."""
+        if self._renderer is not None and hasattr(self._renderer, "close"):
+            self._renderer.close()
+        self._renderer = None
         self._model = None
         self._data = None
+        self._step_count = 0
 
     @property
     def step_count(self) -> int:
         """Number of successful environment steps since the last reset."""
         return self._step_count
 
-    def _ensure_model_loaded(self) -> None:
+    def _try_initialize_mujoco(self) -> None:
         if self._model is not None and self._data is not None:
             return
-
-        import mujoco
+        if self._data is not None:
+            return
+        try:
+            import mujoco
+        except ImportError:
+            self._model = None
+            self._data = None
+            return
 
         model_dir = Path(self.config.model_dir)
-        go2_xml_path = model_dir / "go2.xml"
-        if not go2_xml_path.exists():
-            raise FileNotFoundError(f"MuJoCo model not found: {go2_xml_path}")
+        if not (model_dir / "go2.xml").exists():
+            self._model = None
+            self._data = None
+            return
+        if self._scenario_sample is None:
+            return
 
-        patched_xml = patch_actuators_to_position_with_floor(str(go2_xml_path))
-        asset_dir = model_dir / "assets"
-        assets: dict[str, bytes] = {}
-        if asset_dir.exists():
-            for asset_path in asset_dir.iterdir():
-                if asset_path.is_file():
-                    assets[asset_path.name] = asset_path.read_bytes()
-
-        self._model = mujoco.MjModel.from_xml_string(patched_xml, assets)
+        xml, assets = build_scenario_xml(self.config.model_dir, self._scenario_sample)
+        self._model = mujoco.MjModel.from_xml_string(xml, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = float(self._model.opt.timestep) * self.config.sim_steps_per_frame
 
@@ -150,12 +159,56 @@ class ArgusGo2Env(gymnasium.Env):
         if self._model is None or self._data is None:
             return
 
-        import mujoco
+        try:
+            import mujoco
+        except ImportError:
+            mujoco = None
 
-        mujoco.mj_resetData(self._model, self._data)
+        if mujoco is not None and self._is_real_mujoco_model():
+            mujoco.mj_resetData(self._model, self._data)
+        sample = self._scenario_sample
+        if sample is not None and self._model.nq >= 3:
+            self._data.qpos[:3] = sample.spawn_pose[:3]
+        if sample is not None and self._model.nq >= 7:
+            yaw = sample.spawn_pose[3]
+            self._data.qpos[3:7] = (math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2))
         if self._model.nq >= 19:
-            self._data.qpos[7:19] = self._previous_action
-        mujoco.mj_forward(self._model, self._data)
+            standing = GaitParams()
+            self._data.qpos[7:19] = [standing.standing_hip, standing.standing_thigh, standing.standing_calf] * 4
+        if hasattr(self._data, "qvel"):
+            self._data.qvel[:] = 0.0
+        if hasattr(self._data, "ctrl"):
+            self._data.ctrl[:] = 0.0
+        if hasattr(self._data, "xfrc_applied"):
+            self._data.xfrc_applied[:] = 0.0
+        if mujoco is not None and self._is_real_mujoco_model():
+            mujoco.mj_forward(self._model, self._data)
+
+    def _is_real_mujoco_model(self) -> bool:
+        return self._model.__class__.__module__.startswith("mujoco")
+
+    def _apply_push_disturbance(self) -> None:
+        if self._data is None or not hasattr(self._data, "xfrc_applied"):
+            return
+        self._data.xfrc_applied[:] = 0.0
+        self._active_push = None
+        sample = self._scenario_sample
+        if sample is None:
+            return
+        sim_time = self._current_sim_time()
+        for push in sample.disturbance_schedule:
+            start = float(push["time"])
+            end = start + float(push["duration"])
+            if start <= sim_time + 1e-12 < end:
+                force = np.array([push["force_x"], push["force_y"], push["force_z"]], dtype=np.float64)
+                self._data.xfrc_applied[0, :3] = force
+                self._active_push = dict(push)
+                return
+
+    def _current_sim_time(self) -> float:
+        if self._data is not None and hasattr(self._data, "time") and float(self._data.time) > 0.0:
+            return float(self._data.time)
+        return self._step_count * self._dt
 
     def _info(self) -> dict[str, Any]:
         sample = self._scenario_sample
@@ -164,9 +217,10 @@ class ArgusGo2Env(gymnasium.Env):
             "scenario_id": sample.scenario_id if sample is not None else self.config.scenario_id,
             "action_mode": self.config.action_mode,
             "step_count": self._step_count,
-            "sim_time": self._step_count * self._dt,
+            "sim_time": self._current_sim_time(),
             "spawn_pose": sample.spawn_pose if sample is not None else None,
             "sampled_parameters": dict(sample.terrain_parameters) if sample is not None else {},
             "command_schedule": tuple(dict(item) for item in sample.command_schedule) if sample is not None else (),
             "disturbance_schedule": tuple(dict(item) for item in sample.disturbance_schedule) if sample is not None else (),
+            "active_push": dict(self._active_push) if self._active_push is not None else None,
         }

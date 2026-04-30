@@ -212,7 +212,7 @@ def test_push_disturbance_applies_xfrc_applied_deterministically_then_clears():
     schedule = env._scenario_sample.disturbance_schedule
     active_time = schedule[0]["time"]
     force = np.array([schedule[0]["force_x"], schedule[0]["force_y"], schedule[0]["force_z"]])
-    env._step_count = int(active_time / env._dt)
+    env._step_count = math.ceil(active_time / env._dt)
 
     with patch.dict("sys.modules", {"mujoco": SimpleNamespace(mj_step=lambda _model, data: None)}):
         _obs, _reward, _terminated, _truncated, active_info = env.step(
