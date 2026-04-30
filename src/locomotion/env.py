@@ -89,6 +89,8 @@ class ArgusGo2Env(gymnasium.Env):
         action: np.ndarray,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         """Apply a mode-specific action and return the Gymnasium five-tuple."""
+        if self.config.action_mode != ACTION_MODE_VELOCITY:
+            self._command = self._command_at_time(self._current_sim_time())
         ctrl = decode_action(
             action,
             self.config.action_mode,
@@ -224,6 +226,18 @@ class ArgusGo2Env(gymnasium.Env):
                 self._data.xfrc_applied[0, :3] = force
                 self._active_push = dict(push)
                 return
+
+    def _command_at_time(self, sim_time: float) -> np.ndarray:
+        sample = self._scenario_sample
+        if sample is None or not sample.command_schedule:
+            return self._command
+        active = sample.command_schedule[0]
+        for command in sample.command_schedule:
+            if float(command["time"]) <= sim_time + 1e-12:
+                active = command
+            else:
+                break
+        return np.array([active["vx"], active["vy"], active["omega"]], dtype=np.float32)
 
     def _current_sim_time(self) -> float:
         if self._data is not None and hasattr(self._data, "time") and float(self._data.time) > 0.0:

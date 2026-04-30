@@ -80,6 +80,20 @@ def test_env_residual_baseline_config_selects_twelve_value_action_space():
         env.close()
 
 
+def test_joint_position_step_applies_scheduled_command_after_start_time():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(action_mode=ACTION_MODE_JOINT_POSITION))
+    try:
+        obs, _info = env.reset(seed=123)
+        second = env._scenario_sample.command_schedule[1]
+        env._step_count = int(np.ceil(float(second["time"]) / env._dt))
+
+        obs, _reward, _terminated, _truncated, _info = env.step(VALID_ENV_ACTIONS[ACTION_MODE_JOINT_POSITION])
+    finally:
+        env.close()
+
+    np.testing.assert_allclose(obs["command"], [second["vx"], second["vy"], second["omega"]])
+
+
 @pytest.mark.parametrize(
     ("mode", "bad_action", "message"),
     [
