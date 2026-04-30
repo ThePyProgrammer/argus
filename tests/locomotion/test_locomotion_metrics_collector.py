@@ -113,7 +113,23 @@ def test_records_stability_failure_and_distance_before_failure():
 
 def test_records_action_quality_metrics():
     collector = LocomotionMetricsCollector()
-    action_target = np.array([1.0472, 3.4907, -0.83776] * 4, dtype=np.float64)
+    action_target = np.array(
+        [
+            1.0472,
+            3.4907,
+            -0.83776,
+            1.0472,
+            3.4907,
+            -0.83776,
+            1.0472,
+            4.5379,
+            -0.83776,
+            1.0472,
+            4.5379,
+            -0.83776,
+        ],
+        dtype=np.float64,
+    )
     previous = np.array([0.0, 0.9, -1.8] * 4, dtype=np.float64)
     previous_previous = previous - 0.05
     joint_qpos = action_target + 0.01
