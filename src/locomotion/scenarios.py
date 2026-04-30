@@ -22,7 +22,7 @@ class ScenarioSpec:
 class ScenarioSample:
     scenario_id: str
     spawn_pose: tuple[float, float, float, float]
-    terrain_parameters: dict[str, float | int | str]
+    terrain_parameters: dict[str, float | int | str | tuple[float, ...]]
     command_schedule: tuple[dict[str, float], ...]
     disturbance_schedule: tuple[dict[str, float], ...]
 
@@ -87,14 +87,15 @@ def build_scenario_xml(model_dir: str, sample: ScenarioSample) -> tuple[str, dic
 
     _upsert_benchmark_floor(worldbody, sample)
     terrain_kind = str(sample.terrain_parameters.get("terrain_kind", "plane"))
+    assets = _load_asset_bytes(model_path / "assets")
     if terrain_kind == "slope":
         _add_slope_marker(worldbody, sample)
     elif terrain_kind == "heightfield":
-        _add_rough_heightfield(asset, worldbody, sample)
+        _add_rough_heightfield(asset, worldbody, sample, assets)
     _ensure_light(worldbody)
     _ensure_visual_settings(root)
 
-    return ET.tostring(root, encoding="unicode"), _load_asset_bytes(model_path / "assets")
+    return ET.tostring(root, encoding="unicode"), assets
 
 
 def sample_scenario(
@@ -161,10 +162,20 @@ def _add_slope_marker(worldbody: ET.Element, sample: ScenarioSample) -> None:
     )
 
 
-def _add_rough_heightfield(asset: ET.Element, worldbody: ET.Element, sample: ScenarioSample) -> None:
+def _add_rough_heightfield(
+    asset: ET.Element,
+    worldbody: ET.Element,
+    sample: ScenarioSample,
+    assets: dict[str, bytes],
+) -> None:
     size = int(sample.terrain_parameters.get("heightfield_size", 16))
     bounded_size = int(np.clip(size, 4, 64))
     amplitude = float(sample.terrain_parameters.get("roughness_amplitude", 0.02))
+    heightfield_data = sample.terrain_parameters.get("heightfield_data")
+    if heightfield_data is None:
+        raise ValueError("rough_heightfield sample is missing heightfield_data")
+    heights = np.asarray(heightfield_data, dtype=np.float32).reshape((bounded_size, bounded_size))
+    del assets
     ET.SubElement(
         asset,
         "hfield",
@@ -239,7 +250,7 @@ def _sample_terrain_parameters(
     scenario_id: str,
     rng: np.random.Generator,
     heightfield_size: int,
-) -> dict[str, float | int | str]:
+) -> dict[str, float | int | str | tuple[float, ...]]:
     if scenario_id == "low_friction":
         return {
             "terrain_kind": "plane",
@@ -258,12 +269,16 @@ def _sample_terrain_parameters(
 
     if scenario_id == "rough_heightfield":
         bounded_size = int(np.clip(heightfield_size, 4, 64))
+        amplitude = float(rng.uniform(0.015, 0.05))
+        heights = rng.normal(0.0, amplitude, size=(bounded_size, bounded_size)).astype(np.float32)
+        heights -= np.mean(heights, dtype=np.float32)
         return {
             "terrain_kind": "heightfield",
             "friction_coefficient": 1.0,
             "slope_radians": 0.0,
             "heightfield_size": bounded_size,
-            "roughness_amplitude": float(rng.uniform(0.015, 0.05)),
+            "roughness_amplitude": amplitude,
+            "heightfield_data": tuple(float(value) for value in heights.ravel()),
         }
 
     return {

@@ -160,13 +160,27 @@ def test_slope_scenario_xml_contains_slope_named_marker():
 def test_rough_heightfield_scenario_xml_contains_bounded_heightfield_marker():
     sample = sample_scenario("rough_heightfield", np.random.default_rng(123), heightfield_size=128)
 
-    root = ET.fromstring(build_scenario_xml(str(MODEL_DIR), sample)[0])
+    xml, _assets = build_scenario_xml(str(MODEL_DIR), sample)
+    root = ET.fromstring(xml)
     hfield = root.find("./asset/hfield[@name='rough_heightfield']")
     geom = root.find("./worldbody/geom[@hfield='rough_heightfield']")
 
     assert sample.terrain_parameters["heightfield_size"] <= 64
     assert hfield is not None
     assert geom is not None
+
+
+def test_rough_heightfield_sample_contains_nonflat_deterministic_heights():
+    first = sample_scenario("rough_heightfield", np.random.default_rng(123), heightfield_size=16)
+    second = sample_scenario("rough_heightfield", np.random.default_rng(123), heightfield_size=16)
+
+    heights = np.asarray(first.terrain_parameters["heightfield_data"], dtype=np.float32)
+    assert heights.shape == (first.terrain_parameters["heightfield_size"] ** 2,)
+    assert np.ptp(heights) > 0.0
+    np.testing.assert_allclose(
+        first.terrain_parameters["heightfield_data"],
+        second.terrain_parameters["heightfield_data"],
+    )
 
 
 def test_push_disturbance_is_runtime_metadata_not_xml_force_encoding():

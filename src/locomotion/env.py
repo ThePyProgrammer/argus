@@ -152,8 +152,24 @@ class ArgusGo2Env(gymnasium.Env):
 
         xml, assets = build_scenario_xml(self.config.model_dir, self._scenario_sample)
         self._model = mujoco.MjModel.from_xml_string(xml, assets)
+        self._load_heightfield_data()
         self._data = mujoco.MjData(self._model)
         self._dt = float(self._model.opt.timestep) * self.config.sim_steps_per_frame
+
+    def _load_heightfield_data(self) -> None:
+        sample = self._scenario_sample
+        if self._model is None or sample is None:
+            return
+        heightfield_data = sample.terrain_parameters.get("heightfield_data")
+        if heightfield_data is None or not hasattr(self._model, "hfield_data"):
+            return
+        heights = np.asarray(heightfield_data, dtype=np.float64)
+        if heights.size != self._model.hfield_data.size:
+            raise ValueError(
+                f"rough heightfield size mismatch: {heights.size} samples for "
+                f"{self._model.hfield_data.size} model cells"
+            )
+        self._model.hfield_data[:] = heights
 
     def _reset_mujoco_state(self) -> None:
         if self._model is None or self._data is None:
