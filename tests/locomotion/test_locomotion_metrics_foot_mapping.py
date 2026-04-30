@@ -83,6 +83,7 @@ def _record_contact_step(
 
 
 def test_resolves_go2_foot_geom_mapping():
+    """LOC-METRICS-04: D-09 requires strict canonical FL/FR/RL/RR foot mapping."""
     _skip_if_mujoco_python_unsupported()
     import mujoco
 
@@ -114,6 +115,7 @@ def test_duplicate_foot_geom_id_raises(monkeypatch):
 
 
 def test_no_substring_heuristic_fallback(monkeypatch):
+    """D-09/T-03-04: strict mapping rejects substring heuristics."""
     fake = _FakeMujoco({"front_left_foot": 1, "FR": 2, "RL": 3, "RR": 4})
     monkeypatch.setitem(sys.modules, "mujoco", fake)
 
@@ -122,6 +124,7 @@ def test_no_substring_heuristic_fallback(monkeypatch):
 
 
 def test_records_contact_slip_clearance_and_duty_factor():
+    """LOC-METRICS-04: D-10 D-11 D-12 contact, slip, clearance, and duty summaries."""
     collector = LocomotionMetricsCollector()
     first_positions = {
         "FL": (0.0, 0.0, 0.05),
@@ -159,11 +162,14 @@ def test_records_contact_slip_clearance_and_duty_factor():
         "RR": True,
     }
     assert second.contact_terrain["contact_transition"]["RR"] == "touchdown"
+    # D-10 slip is world-frame XY velocity only while the foot is in contact.
     assert second.contact_terrain["foot_xy_velocity_when_contact"]["FL"] == pytest.approx(0.2)
     assert second.contact_terrain["foot_xy_velocity_when_contact"]["FR"] == 0.0
+    # D-11 clearance subtracts terrain height rather than hardcoding flat zero.
     assert second.contact_terrain["foot_clearance_m"]["FL"] == pytest.approx(0.03)
 
     summary = collector.episode_summary().contact_terrain
+    # D-12 summary exposes duty factor and aggregate timing balance.
     assert summary["duty_factor"] == pytest.approx({"FL": 1.0, "FR": 0.0, "RL": 0.0, "RR": 0.5})
     assert summary["slip_mean_m_per_s"]["FL"] == pytest.approx(0.1)
     assert summary["slip_max_m_per_s"]["FL"] == pytest.approx(0.2)
@@ -181,6 +187,7 @@ def test_terrain_height_helper_returns_zero_for_plane_scenarios():
 
 
 def test_terrain_height_helper_derives_slope_height_from_parameters():
+    """D-11: non-flat slope terrain height feeds clearance calculations."""
     slope = 0.2
     sample = _sample("slope", {"terrain_kind": "slope", "slope_radians": slope})
 
@@ -191,6 +198,7 @@ def test_terrain_height_helper_derives_slope_height_from_parameters():
 
 
 def test_terrain_height_helper_samples_rough_heightfield_data():
+    """D-11: rough heightfield data is sampled instead of returning flat clearance."""
     sample = _sample(
         "rough_heightfield",
         {
@@ -205,3 +213,20 @@ def test_terrain_height_helper_samples_rough_heightfield_data():
     assert terrain_height_at(sample, 0.0, 0.0) == pytest.approx(0.4)
     assert terrain_height_at(sample, 2.0, 2.0) == pytest.approx(0.8)
     assert terrain_height_at(sample, 0.0, 0.0) != 0.0
+
+
+def test_contact_terrain_rejects_incomplete_foot_inputs():
+    """T-03-04: malformed contact payloads cannot silently corrupt foot metrics."""
+    collector = LocomotionMetricsCollector()
+    positions = {"FL": (0.0, 0.0, 0.0), "FR": (0.0, 0.0, 0.0), "RL": (0.0, 0.0, 0.0)}
+    contacts = {"FL": True, "FR": False, "RL": False, "RR": False}
+
+    with pytest.raises(ValueError, match="Missing foot position for RR"):
+        _record_contact_step(collector, foot_positions_world=positions, foot_contacts=contacts)
+
+    with pytest.raises(ValueError, match="Missing foot contact for RR"):
+        _record_contact_step(
+            collector,
+            foot_positions_world={**positions, "RR": (0.0, 0.0, 0.0)},
+            foot_contacts={"FL": True, "FR": False, "RL": False},
+        )
