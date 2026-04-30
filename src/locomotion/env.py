@@ -10,6 +10,7 @@ from gymnasium import spaces
 
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.observations import build_observation_space, extract_observation
+from src.locomotion.scenarios import ScenarioSample, sample_scenario
 from src.locomotion.xml_patcher import patch_actuators_to_position_with_floor
 
 
@@ -52,6 +53,8 @@ class ArgusGo2Env(gymnasium.Env):
         self._previous_action = np.zeros(12, dtype=np.float32)
         self._step_count = 0
         self._seed: int | None = None
+        self._last_seed: int | None = None
+        self._scenario_sample: ScenarioSample | None = None
         self._model: Any = None
         self._data: Any = None
         self._dt = 0.002 * self.config.sim_steps_per_frame
@@ -66,8 +69,15 @@ class ArgusGo2Env(gymnasium.Env):
         """Reset the episode and return an observation plus reproducibility info."""
         super().reset(seed=seed)
         self._seed = seed
+        self._last_seed = seed
+        self._scenario_sample = sample_scenario(self.config.scenario_id, self.np_random,
+                                                heightfield_size=self.config.heightfield_size)
         self._step_count = 0
-        self._command = np.zeros(3, dtype=np.float32)
+        first_command = self._scenario_sample.command_schedule[0]
+        self._command = np.array(
+            [first_command["vx"], first_command["vy"], first_command["omega"]],
+            dtype=np.float32,
+        )
         self._previous_action = np.zeros(12, dtype=np.float32)
         self._gait = TrotGaitController()
 
@@ -154,13 +164,15 @@ class ArgusGo2Env(gymnasium.Env):
         mujoco.mj_forward(self._model, self._data)
 
     def _info(self) -> dict[str, Any]:
+        sample = self._scenario_sample
         return {
-            "seed": self._seed,
-            "scenario_id": self.config.scenario_id,
+            "seed": self._last_seed,
+            "scenario_id": sample.scenario_id if sample is not None else self.config.scenario_id,
             "action_mode": self.config.action_mode,
             "step_count": self._step_count,
             "sim_time": self._step_count * self._dt,
-            "sampled_parameters": {},
-            "command_schedule": [],
-            "disturbance_schedule": [],
+            "spawn_pose": sample.spawn_pose if sample is not None else None,
+            "sampled_parameters": sample.terrain_parameters if sample is not None else {},
+            "command_schedule": sample.command_schedule if sample is not None else (),
+            "disturbance_schedule": sample.disturbance_schedule if sample is not None else (),
         }
