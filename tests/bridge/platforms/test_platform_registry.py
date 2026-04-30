@@ -89,6 +89,8 @@ def isolated_platform_registry():
     clear_platform_registry()
     yield
     clear_platform_registry()
+    ensure_platform_registered("go2", platforms.Go2Platform)
+    ensure_platform_registered("agibot_x2", platforms.AgibotX2Platform)
 
 
 def test_package_namespace_exports_registry_functions():

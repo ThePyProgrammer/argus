@@ -14,6 +14,7 @@ heavy init (coordinator / bridge / scene loading).
 import subprocess
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 
 class _FakePlatformMetadata:
@@ -130,6 +131,76 @@ def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
     assert captured["robot_ids"] == robot_ids
     assert captured["spawn_height"] == platform_metadata.spawn_height
     assert captured["platform_metadata"] == {rid: platform_wire for rid in robot_ids}
+
+
+def test_web_mode_registers_builtin_slam_backends_before_robot_creation(monkeypatch):
+    """Web mode should have the default ICP backend registered before RobotInstance.create."""
+    import src.main as main_module
+    from src.slam.registry import SLAMRegistry
+
+    SLAMRegistry._clear()
+    captured = {}
+    robot_ids = ["robot_a"]
+    platform_metadata = _FakePlatformMetadata()
+
+    def fake_create_app(robot_ids_arg, **kwargs):
+        return SimpleNamespace(state=SimpleNamespace()), SimpleNamespace()
+
+    def fake_robot_create(**kwargs):
+        captured["backends_at_robot_create"] = list(SLAMRegistry._backends)
+        return SimpleNamespace(**kwargs)
+
+    monkeypatch.setattr(main_module, "generate_robot_ids", lambda n: robot_ids)
+    monkeypatch.setattr(
+        main_module,
+        "generate_spawn_positions",
+        lambda ids, scene, *, spawn_height: {rid: (0.0, 0.0, spawn_height) for rid in ids},
+    )
+    monkeypatch.setattr(
+        main_module,
+        "create_platform",
+        lambda name, **kwargs: SimpleNamespace(metadata=platform_metadata),
+    )
+    monkeypatch.setattr(
+        main_module,
+        "MultiRobotConfig",
+        lambda **kwargs: SimpleNamespace(**kwargs, resolution=(640, 480)),
+    )
+    monkeypatch.setattr(main_module, "MultiRobotBridge", _FakeBridge)
+    monkeypatch.setattr(
+        main_module.CameraIntrinsics,
+        "from_fov",
+        staticmethod(lambda width, height: SimpleNamespace(width=width, height=height)),
+    )
+    monkeypatch.setattr(main_module.RobotInstance, "create", staticmethod(fake_robot_create))
+    monkeypatch.setattr(main_module, "Coordinator", _FakeCoordinator)
+    monkeypatch.setattr(main_module, "configure_mcp", lambda coordinator, robot_ids: None)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.subprocess, "run", lambda *args, **kwargs: None)
+
+    uvicorn_stub = SimpleNamespace(run=MagicMock())
+    monkeypatch.setitem(sys.modules, "uvicorn", uvicorn_stub)
+
+    args = SimpleNamespace(
+        scene="flat",
+        num_robots=1,
+        multi_boot_steps=0,
+        explore_rescan_distance=2.0,
+        octomap_resolution=0.1,
+        multi_max_steps=0,
+        static=False,
+        port=8000,
+    )
+
+    try:
+        main_module.run_web_mode(args)
+    finally:
+        SLAMRegistry._clear()
+        from src.slam.backends import register_builtin_backends
+
+        register_builtin_backends()
+
+    assert "icp" in captured["backends_at_robot_create"]
 
 
 def test_labeled_eval_set_flag_raises_not_implemented(tmp_path):

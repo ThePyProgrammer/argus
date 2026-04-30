@@ -386,6 +386,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
     Starts the multi-robot simulation in a background thread and serves
     the React frontend via FastAPI.
     """
+    from src.slam.backends import register_builtin_backends
+
+    register_builtin_backends()
+
     # Phase 6 DET-METRICS-03: lazy-imported so ``src.main`` stays importable
     # (and ``--labeled-eval-set`` can raise its NotImplementedError) in
     # environments that lack uvicorn.

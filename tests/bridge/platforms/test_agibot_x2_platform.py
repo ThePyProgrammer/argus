@@ -59,12 +59,13 @@ def test_x2_parses_actuator_names_from_xml(tmp_path):
 
 
 def test_x2_missing_asset_fails_with_clear_path(tmp_path):
-    platform = AgibotX2Platform(model_dir=str(tmp_path / "missing"))
+    missing_dir = tmp_path / "missing"
+    platform = AgibotX2Platform(model_dir=str(missing_dir))
 
     try:
         platform.read_model_xml()
     except FileNotFoundError as exc:
-        assert "x2_ultra.xml" in str(exc)
+        assert str(exc) == f"AGIBOT X2 MuJoCo model not found: {missing_dir / 'x2_ultra.xml'}"
         assert "models/agibot_x2" not in str(exc)
     else:
         raise AssertionError("missing X2 asset did not raise FileNotFoundError")

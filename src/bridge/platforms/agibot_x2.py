@@ -60,7 +60,7 @@ class AgibotX2Platform:
         try:
             return path.read_text()
         except FileNotFoundError as exc:
-            raise FileNotFoundError(f"AGIBOT X2 model XML not found: {path}") from exc
+            raise FileNotFoundError(f"AGIBOT X2 MuJoCo model not found: {path}") from exc
 
     def actuator_names(self) -> tuple[str, ...]:
         if self._actuator_names_cache is not None:
