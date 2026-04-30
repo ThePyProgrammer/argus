@@ -14,12 +14,6 @@ X2_MODEL_DIR = Path("models/agibot_x2")
 X2_XML = X2_MODEL_DIR / "x2_ultra.xml"
 ENABLE_SMOKE = os.environ.get("ARGUS_X2_ENABLE_ASSET_SMOKE") == "1"
 
-if pytest.mark._config is not None:
-    pytest.mark._config.addinivalue_line(
-        "markers",
-        "x2_asset: tests requiring licensed local AGIBOT X2 MuJoCo assets",
-    )
-
 pytestmark = pytest.mark.x2_asset
 
 
@@ -77,9 +71,14 @@ def test_two_x2_robots_start_step_and_keep_independent_status():
         frames = bridge.step()
         assert set(frames) == {"robot_a", "robot_b"}
 
+        robot_a_status = bridge.get_runtime_status("robot_a").to_wire()
+        robot_b_status = bridge.get_runtime_status("robot_b").to_wire()
         allowed_states = {"standing", "walking", "fallen", "disabled"}
-        assert bridge.get_runtime_status("robot_a").to_wire()["state"] in allowed_states
-        assert bridge.get_runtime_status("robot_b").to_wire()["state"] in allowed_states
+        assert robot_a_status["state"] in allowed_states
+        assert robot_b_status["state"] in allowed_states
+        assert robot_a_status["last_command"]["mode"] == "velocity"
+        assert robot_a_status["last_command"]["linear"] == [0.1, 0.0]
+        assert robot_b_status["last_command"]["mode"] == "stand"
     finally:
         bridge.stop()
 
@@ -100,7 +99,22 @@ def test_five_x2_robots_build_unique_command_channels():
     )
     bridge = MultiRobotBridge(config)
 
+    commands = {
+        "robot_a": ([0.1, 0.0], 0.1),
+        "robot_b": ([0.2, -0.1], -0.2),
+        "robot_c": ([-0.1, 0.3], 0.3),
+        "robot_d": ([0.0, -0.2], -0.4),
+    }
+
     assert bridge.robot_ids == robot_ids
-    for robot_id in robot_ids:
-        bridge.set_velocity(robot_id, np.zeros(2, dtype=np.float64), 0.0)
-        assert bridge.get_runtime_status(robot_id).last_command.to_wire()["mode"] == "velocity"
+    for robot_id, (linear, yaw_rate) in commands.items():
+        bridge.set_velocity(robot_id, np.array(linear, dtype=np.float64), yaw_rate)
+
+    for robot_id, (linear, yaw_rate) in commands.items():
+        command_wire = bridge.get_runtime_status(robot_id).last_command.to_wire()
+        assert command_wire["mode"] == "velocity"
+        assert command_wire["linear"] == linear
+        assert command_wire["yaw_rate"] == yaw_rate
+
+    robot_e_command = bridge.get_runtime_status("robot_e").last_command.to_wire()
+    assert robot_e_command["mode"] == "stand"
