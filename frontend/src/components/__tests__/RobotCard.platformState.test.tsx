@@ -44,4 +44,17 @@ describe('RobotCard platform runtime state', () => {
     expect(screen.getByText('Collisions: 1')).toBeTruthy();
     expect(screen.getByText('Near misses: 2')).toBeTruthy();
   });
+
+  it('surfaces degraded controller health instead of ok', () => {
+    render(<RobotCard robot={robot({
+      controllerHealth: {
+        policy_loaded: true,
+        nan_guard_ok: false,
+        message: 'invalid output',
+      },
+    })} />);
+
+    expect(screen.queryByText('Controller: ok')).toBeNull();
+    expect(screen.getByText('Controller: invalid output')).toBeTruthy();
+  });
 });

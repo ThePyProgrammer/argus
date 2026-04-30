@@ -6,6 +6,31 @@ interface RobotCardProps {
   robot: RobotInfo;
 }
 
+const CONTROLLER_HEALTH_BOOLEAN_KEYS = [
+  'policy_loaded',
+  'action_shape_valid',
+  'nan_guard_ok',
+] as const;
+
+function controllerHealthLabel(controllerHealth: RobotInfo['controllerHealth']): string {
+  if (controllerHealth?.policy_loaded === false) {
+    return 'no policy';
+  }
+
+  const message = controllerHealth?.message;
+  const hasKnownFailure = CONTROLLER_HEALTH_BOOLEAN_KEYS.some(
+    (key) => controllerHealth?.[key] === false,
+  );
+
+  if (hasKnownFailure) {
+    return typeof message === 'string' && message.trim() !== '' && message !== 'ok'
+      ? message
+      : 'degraded';
+  }
+
+  return 'ok';
+}
+
 export default function RobotCard({ robot }: RobotCardProps) {
   const color = robotColor(robot.colorIndex);
   const placingRobot = useControlStore((s) => s.placingRobot);
@@ -76,7 +101,7 @@ export default function RobotCard({ robot }: RobotCardProps) {
         fontSize: '11px', color: '#aaa',
       }}>
         <span>
-          Controller: {robot.controllerHealth?.policy_loaded === false ? 'no policy' : 'ok'}
+          Controller: {controllerHealthLabel(robot.controllerHealth)}
         </span>
         <span>Near misses: {robot.nearMissCount}</span>
       </div>
