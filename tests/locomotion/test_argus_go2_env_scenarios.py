@@ -85,6 +85,27 @@ def test_env_reset_selects_scenario_by_config_name(scenario_id):
 
     assert info["seed"] == 123
     assert info["scenario_id"] == scenario_id
-    assert info["sampled_parameters"] == info["sampled_parameters"]
+    assert isinstance(info["sampled_parameters"], dict)
+    assert {"terrain_kind", "friction_coefficient", "slope_radians", "heightfield_size"}.issubset(
+        info["sampled_parameters"],
+    )
     assert "command_schedule" in info
     assert "disturbance_schedule" in info
+
+
+def test_env_info_returns_defensive_metadata_copies():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(scenario_id="push_disturbance"))
+    try:
+        _obs, reset_info = env.reset(seed=123)
+        reset_info["sampled_parameters"]["friction_coefficient"] = 999.0
+        reset_info["command_schedule"][0]["vx"] = 999.0
+        reset_info["disturbance_schedule"][0]["force_x"] = 999.0
+        _obs, _reward, _terminated, _truncated, step_info = env.step(
+            np.array([0.1, 0.0, 0.0], dtype=np.float32),
+        )
+    finally:
+        env.close()
+
+    assert step_info["sampled_parameters"]["friction_coefficient"] == 1.0
+    assert step_info["command_schedule"][0]["vx"] == 0.0
+    assert step_info["disturbance_schedule"][0]["force_x"] != 999.0

@@ -172,7 +172,7 @@ class ArgusGo2Env(gymnasium.Env):
             "step_count": self._step_count,
             "sim_time": self._step_count * self._dt,
             "spawn_pose": sample.spawn_pose if sample is not None else None,
-            "sampled_parameters": sample.terrain_parameters if sample is not None else {},
-            "command_schedule": sample.command_schedule if sample is not None else (),
-            "disturbance_schedule": sample.disturbance_schedule if sample is not None else (),
+            "sampled_parameters": dict(sample.terrain_parameters) if sample is not None else {},
+            "command_schedule": tuple(dict(item) for item in sample.command_schedule) if sample is not None else (),
+            "disturbance_schedule": tuple(dict(item) for item in sample.disturbance_schedule) if sample is not None else (),
         }

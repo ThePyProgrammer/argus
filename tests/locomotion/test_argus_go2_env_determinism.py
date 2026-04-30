@@ -52,7 +52,7 @@ def test_step_info_preserves_reset_sample_metadata_until_next_reset():
     env = ArgusGo2Env(ArgusGo2EnvConfig(scenario_id="push_disturbance"))
     try:
         _obs, reset_info = env.reset(seed=123)
-        _obs, _reward, _terminated, _truncated, step_info = env.step(env.action_space.sample())
+        _obs, _reward, _terminated, _truncated, step_info = env.step([0.1, 0.0, 0.0])
     finally:
         env.close()
 
