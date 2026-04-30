@@ -21,6 +21,7 @@ from typing import Any
 
 from src.bridge.platforms.base import RobotPlatform
 from src.bridge.platforms.go2 import Go2Platform
+from src.locomotion.xml_patcher import patch_actuators_to_position
 
 
 # Attributes that contain names which must be prefixed

@@ -5,14 +5,22 @@ Scene builder XML output is tested with the actual go2.xml model file.
 """
 
 from pathlib import Path
+import sys
+import types
 import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
 
+from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.multi_robot_config import MultiRobotConfig
 from src.bridge.platforms.go2 import Go2Platform
-from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_scene
+import src.bridge.scene_builder as scene_builder
+from src.bridge.scene_builder import (
+    build_multi_robot_scene,
+    build_two_robot_office_scene,
+    build_two_robot_scene,
+)
 from src.bridge.sensor_types import SensorFrame
 
 
@@ -133,6 +141,83 @@ def test_build_multi_robot_scene_returns_assets_without_compiler_asset_dirs():
     assert "meshdir" not in compiler.attrib
     assert "texturedir" not in compiler.attrib
     assert "base_0.obj" in assets
+
+
+def test_build_two_robot_office_scene_patches_go2_actuators_to_position(tmp_path, monkeypatch):
+    """Office scene builder keeps Go2 actuators runtime-ready as position controls."""
+    scene_data_dir = tmp_path / "scenes"
+    scene_data_dir.mkdir()
+    (scene_data_dir / "scene_office1.xml").write_text(
+        """
+        <mujoco model="office">
+          <compiler meshdir="scene_office1/office_split" texturedir="scene_office1/textures"/>
+          <worldbody/>
+          <asset/>
+        </mujoco>
+        """,
+        encoding="utf-8",
+    )
+    model_dir = tmp_path / "go2"
+    model_dir.mkdir()
+    (model_dir / "go2.xml").write_text(
+        """
+        <mujoco model="go2">
+          <worldbody>
+            <body name="base">
+              <freejoint/>
+              <joint name="FL_hip_joint"/>
+            </body>
+          </worldbody>
+          <actuator>
+            <motor class="hip" name="FL_hip" joint="FL_hip_joint" ctrlrange="-1 1"/>
+          </actuator>
+        </mujoco>
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(scene_builder, "_find_dimos_scene_data", lambda: scene_data_dir)
+
+    xml_str, _assets = build_two_robot_office_scene(
+        str(model_dir), {"robot_a": (0.0, 0.0, 0.3)}
+    )
+
+    root = ET.fromstring(xml_str)
+    actuator = root.find("./actuator/position[@name='robot_a_FL_hip']")
+    assert actuator is not None
+    assert actuator.attrib["joint"] == "robot_a_FL_hip_joint"
+    assert actuator.attrib["kp"] == "80"
+    assert actuator.attrib["kv"] == "4"
+    assert "ctrlrange" not in actuator.attrib
+
+
+# ---------- MultiRobotBridge tests ----------
+
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_multi_robot_bridge_flat_scene_loads_generated_assets(monkeypatch):
+    """Flat bridge runtime passes generated mesh assets into MuJoCo XML loading."""
+    captured = {}
+
+    class FakeModel:
+        njnt = 0
+        opt = types.SimpleNamespace(timestep=0.002)
+
+        @staticmethod
+        def from_xml_string(xml_str, assets=None):
+            captured["xml_str"] = xml_str
+            captured["assets"] = assets
+            raise RuntimeError("stop after XML load")
+
+    fake_mujoco = types.SimpleNamespace(MjModel=FakeModel)
+    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
+
+    bridge = MultiRobotBridge(MultiRobotConfig(scene="flat"))
+    with pytest.raises(RuntimeError, match="stop after XML load"):
+        bridge.start()
+
+    assert captured["xml_str"]
+    assert captured["assets"]
+    assert "base_0.obj" in captured["assets"]
 
 
 # ---------- MockMultiRobotBridge tests ----------

@@ -13,7 +13,8 @@ import numpy as np
 
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
 from src.bridge.multi_robot_config import MultiRobotConfig
-from src.bridge.scene_builder import build_two_robot_office_scene, build_two_robot_scene
+from src.bridge.platforms.go2 import Go2Platform
+from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_office_scene
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.gait_params import GaitParams
 
@@ -99,11 +100,11 @@ class MultiRobotBridge:
             )
             self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
         else:
-            xml_str = build_two_robot_scene(
-                self._config.model_dir,
+            xml_str, assets = build_multi_robot_scene(
+                Go2Platform(model_dir=self._config.model_dir),
                 self._config.spawn_positions,
             )
-            self._model = mujoco.MjModel.from_xml_string(xml_str)
+            self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
 
