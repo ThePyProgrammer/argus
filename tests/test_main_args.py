@@ -17,8 +17,10 @@ from types import SimpleNamespace
 
 
 class _FakePlatformMetadata:
+    spawn_height = 0.73
+
     def to_wire(self):
-        return {"name": "agibot_x2", "display_name": "AGIBOT X2 Ultra"}
+        return {"name": "fake_go2", "display_name": "Fake GO2 Test Platform"}
 
 
 class _FakeBridge:
@@ -61,24 +63,31 @@ class _FakeCoordinator:
 
 
 def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
-    """Production startup should wire bridge platform metadata into WS app setup."""
+    """Production startup should wire selected platform metadata into WS app setup."""
     import src.main as main_module
 
     captured = {}
     robot_ids = ["robot_a", "robot_b"]
-    platform_wire = _FakePlatformMetadata().to_wire()
+    platform_metadata = _FakePlatformMetadata()
+    platform_wire = platform_metadata.to_wire()
 
     def fake_create_app(robot_ids_arg, **kwargs):
         captured["robot_ids"] = robot_ids_arg
         captured["platform_metadata"] = kwargs.get("platform_metadata")
         return SimpleNamespace(state=SimpleNamespace()), SimpleNamespace()
 
+    def fake_generate_spawn_positions(ids, scene, *, spawn_height):
+        captured["spawn_height"] = spawn_height
+        return {rid: (0.0, 0.0, spawn_height) for rid in ids}
+
     monkeypatch.setattr(main_module, "generate_robot_ids", lambda n: robot_ids)
-    monkeypatch.setattr(
-        main_module,
-        "generate_spawn_positions",
-        lambda ids, scene: {rid: (0.0, 0.0, 0.0) for rid in ids},
-    )
+    monkeypatch.setattr(main_module, "generate_spawn_positions", fake_generate_spawn_positions)
+    def fake_create_platform(name, **kwargs):
+        captured["platform_name"] = name
+        captured["platform_config"] = kwargs
+        return SimpleNamespace(metadata=platform_metadata)
+
+    monkeypatch.setattr(main_module, "create_platform", fake_create_platform)
     monkeypatch.setattr(
         main_module,
         "MultiRobotConfig",
@@ -116,7 +125,10 @@ def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
 
     main_module.run_web_mode(args)
 
+    assert captured["platform_name"] == "go2"
+    assert captured["platform_config"] == {}
     assert captured["robot_ids"] == robot_ids
+    assert captured["spawn_height"] == platform_metadata.spawn_height
     assert captured["platform_metadata"] == {rid: platform_wire for rid in robot_ids}
 
 
