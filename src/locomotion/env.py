@@ -1,5 +1,6 @@
 """Gymnasium-style benchmark environment for Unitree Go2 locomotion."""
 
+import copy
 from dataclasses import dataclass
 import math
 from pathlib import Path
@@ -12,6 +13,12 @@ from src.locomotion.controller_dispatch import command_from_velocity, dispatch_c
 from src.locomotion.controllers import ControllerRegistry
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.gait_params import GaitParams
+from src.locomotion.metrics import (
+    Go2FootMapping,
+    LocomotionMetricsCollector,
+    LocomotionMetricsConfig,
+    foot_contact_payload_from_mujoco,
+)
 from src.locomotion.observations import build_observation_space, extract_observation
 from src.locomotion.scenarios import ScenarioSample, build_scenario_xml, sample_scenario
 
@@ -26,6 +33,7 @@ class ArgusGo2EnvConfig:
     max_episode_steps: int = 500
     render_mode: str | None = None
     heightfield_size: int = 16
+    metrics_config: LocomotionMetricsConfig | None = None
 
 
 class ArgusGo2Env(gymnasium.Env):
@@ -60,6 +68,10 @@ class ArgusGo2Env(gymnasium.Env):
         self._controller = ControllerRegistry.create(self.config.controller_id)
         self._controller_metadata = self._metadata_for_controller(self.config.controller_id)
         self._gait = TrotGaitController()
+        self._metrics = LocomotionMetricsCollector(self.config.metrics_config)
+        self._last_locomotion_metrics_summary: dict[str, Any] | None = None
+        self._foot_mapping: Go2FootMapping | None = None
+        self._previous_previous_action = np.zeros(12, dtype=np.float32)
 
     def reset(
         self,
@@ -84,12 +96,17 @@ class ArgusGo2Env(gymnasium.Env):
             dtype=np.float32,
         )
         self._previous_action = np.zeros(12, dtype=np.float32)
+        self._previous_previous_action = np.zeros(12, dtype=np.float32)
         self._active_push = None
+        self._foot_mapping = None
         self._controller.reset(seed=seed)
         self._gait = TrotGaitController()
 
         self._try_initialize_mujoco()
+        if self._model is not None and self._is_real_mujoco_model():
+            self._foot_mapping = Go2FootMapping.from_mujoco_model(self._model)
         self._reset_mujoco_state()
+        self._metrics.reset_episode()
 
         observation = extract_observation(self._data, self._command, self._previous_action)
         return observation, self._info()
@@ -99,6 +116,9 @@ class ArgusGo2Env(gymnasium.Env):
         action: np.ndarray,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         """Apply a mode-specific action and return the Gymnasium five-tuple."""
+        previous_action = self._previous_action.copy()
+        previous_previous_action = self._previous_previous_action.copy()
+        pose_before = self._base_pose_snapshot()
         command = self._command
         if self.config.action_mode != ACTION_MODE_VELOCITY:
             command = self._command_at_time(self._current_sim_time())
@@ -127,7 +147,9 @@ class ArgusGo2Env(gymnasium.Env):
                 command,
             )
             self._command = command
-        self._previous_action = ctrl.astype(np.float32)
+        action_target = np.asarray(ctrl, dtype=np.float32).reshape(12).copy()
+        self._previous_previous_action = previous_action
+        self._previous_action = action_target
 
         if self._data is not None:
             import mujoco
@@ -138,12 +160,26 @@ class ArgusGo2Env(gymnasium.Env):
             for _ in range(self.config.sim_steps_per_frame):
                 mujoco.mj_step(self._model, self._data)
 
+        pose_after = self._base_pose_snapshot()
         self._step_count += 1
+        metrics_step = self._record_locomotion_metrics(
+            desired_command=self._command,
+            pose_before=pose_before,
+            pose_after=pose_after,
+            action_target=action_target,
+            previous_action_target=previous_action,
+            previous_previous_action_target=previous_previous_action,
+        )
         observation = extract_observation(self._data, self._command, self._previous_action)
         reward = 0.0
-        terminated = False
+        terminated = metrics_step.failure_reason is not None
         truncated = self._step_count >= self.config.max_episode_steps
         info = self._info()
+        info["locomotion_metrics"] = self._metrics.latest_info_payload()
+        if terminated or truncated:
+            summary = self._locomotion_summary_payload()
+            self._last_locomotion_metrics_summary = copy.deepcopy(summary)
+            info["locomotion_metrics_summary"] = summary
         return observation, reward, terminated, truncated, info
 
     def close(self) -> None:
@@ -159,6 +195,13 @@ class ArgusGo2Env(gymnasium.Env):
     def step_count(self) -> int:
         """Number of successful environment steps since the last reset."""
         return self._step_count
+
+    @property
+    def last_locomotion_metrics_summary(self) -> dict[str, Any] | None:
+        """Latest completed locomotion metrics summary, defensively copied."""
+        if self._last_locomotion_metrics_summary is None:
+            return None
+        return copy.deepcopy(self._last_locomotion_metrics_summary)
 
     def _resolved_model_dir(self) -> Path:
         if self.config.model_dir is not None:
@@ -278,6 +321,111 @@ class ArgusGo2Env(gymnasium.Env):
             else:
                 break
         return np.array([active["vx"], active["vy"], active["omega"]], dtype=np.float32)
+
+    def _base_pose_snapshot(self) -> tuple[np.ndarray, float, float]:
+        if self._data is None:
+            return np.zeros(2, dtype=np.float64), 0.0, self._current_sim_time()
+        qpos = np.asarray(self._data.qpos, dtype=np.float64)
+        xy = np.zeros(2, dtype=np.float64)
+        if qpos.size >= 2:
+            xy = qpos[:2].copy()
+        yaw = self._yaw_from_qpos(qpos)
+        return xy, yaw, self._current_sim_time()
+
+    def _record_locomotion_metrics(
+        self,
+        *,
+        desired_command: np.ndarray,
+        pose_before: tuple[np.ndarray, float, float],
+        pose_after: tuple[np.ndarray, float, float],
+        action_target: np.ndarray,
+        previous_action_target: np.ndarray,
+        previous_previous_action_target: np.ndarray,
+    ):
+        qpos = self._qpos_snapshot()
+        qvel = self._qvel_snapshot()
+        dt = max(float(pose_after[2] - pose_before[2]), self._dt)
+        delta_xy = pose_after[0] - pose_before[0]
+        measured = np.array(
+            [
+                float(delta_xy[0] / dt),
+                float(delta_xy[1] / dt),
+                float(self._wrapped_angle(pose_after[1] - pose_before[1]) / dt),
+            ],
+            dtype=np.float64,
+        )
+        roll, pitch = self._roll_pitch_from_qpos(qpos)
+        contact_payload = self._contact_payload()
+        return self._metrics.record_step(
+            desired_command=np.asarray(desired_command, dtype=np.float64).copy(),
+            measured_base_velocity=measured,
+            roll_rad=roll,
+            pitch_rad=pitch,
+            base_height_m=float(qpos[2]) if qpos.size > 2 else 0.0,
+            base_xy_position=pose_after[0],
+            action_target=action_target,
+            previous_action_target=previous_action_target,
+            previous_previous_action_target=previous_previous_action_target,
+            joint_qpos=qpos[7:19] if qpos.size >= 19 else np.zeros(12, dtype=np.float64),
+            joint_qvel=qvel[6:18] if qvel.size >= 18 else np.zeros(12, dtype=np.float64),
+            dt=dt,
+            **contact_payload,
+        )
+
+    def _contact_payload(self) -> dict[str, Any]:
+        if self._data is None or self._foot_mapping is None:
+            return {"contact_terrain_payload": {}}
+        return foot_contact_payload_from_mujoco(self._foot_mapping, self._data, self._scenario_sample)
+
+    def _qpos_snapshot(self) -> np.ndarray:
+        qpos = np.zeros(19, dtype=np.float64)
+        if self._data is not None and hasattr(self._data, "qpos"):
+            source = np.asarray(self._data.qpos, dtype=np.float64).reshape(-1)
+            qpos[: min(source.size, qpos.size)] = source[: qpos.size]
+        return qpos
+
+    def _qvel_snapshot(self) -> np.ndarray:
+        qvel = np.zeros(18, dtype=np.float64)
+        if self._data is not None and hasattr(self._data, "qvel"):
+            source = np.asarray(self._data.qvel, dtype=np.float64).reshape(-1)
+            qvel[: min(source.size, qvel.size)] = source[: qvel.size]
+        return qvel
+
+    def _yaw_from_qpos(self, qpos: np.ndarray) -> float:
+        if qpos.size < 7:
+            return 0.0
+        w, x, y, z = [float(value) for value in qpos[3:7]]
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        return float(math.atan2(siny_cosp, cosy_cosp))
+
+    def _roll_pitch_from_qpos(self, qpos: np.ndarray) -> tuple[float, float]:
+        if qpos.size < 7:
+            return 0.0, 0.0
+        w, x, y, z = [float(value) for value in qpos[3:7]]
+        sinr_cosp = 2.0 * (w * x + y * z)
+        cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+        sinp = 2.0 * (w * y - z * x)
+        pitch = math.copysign(math.pi / 2.0, sinp) if abs(sinp) >= 1.0 else math.asin(sinp)
+        return float(roll), float(pitch)
+
+    def _locomotion_summary_payload(self) -> dict[str, Any]:
+        summary = self._metrics.episode_summary()
+        payload = {
+            "command_tracking": dict(summary.command_tracking),
+            "stability": dict(summary.stability),
+            "action_quality": dict(summary.action_quality),
+            "contact_terrain": dict(summary.contact_terrain),
+            "success": bool(summary.success),
+            "failure_reason": summary.failure_reason,
+            "step_count": int(summary.step_count),
+        }
+        payload["stability"]["success"] = bool(summary.success)
+        return payload
+
+    def _wrapped_angle(self, angle: float) -> float:
+        return float((angle + math.pi) % (2.0 * math.pi) - math.pi)
 
     def _current_sim_time(self) -> float:
         if self._data is not None and hasattr(self._data, "time") and float(self._data.time) > 0.0:
