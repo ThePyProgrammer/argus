@@ -245,6 +245,7 @@ def test_reset_rebuilds_mujoco_model_for_new_randomized_terrain_sample():
         built_samples.append(sample)
         return "<mujoco/>", {}
 
+    foot_geom_ids = {"FL": 0, "FR": 1, "RL": 2, "RR": 3}
     fake_mujoco = SimpleNamespace(
         MjModel=SimpleNamespace(
             from_xml_string=MagicMock(
@@ -252,6 +253,8 @@ def test_reset_rebuilds_mujoco_model_for_new_randomized_terrain_sample():
             )
         ),
         MjData=MagicMock(side_effect=lambda _model: _FakeData()),
+        mjtObj=SimpleNamespace(mjOBJ_GEOM=object()),
+        mj_name2id=lambda _model, _obj_type, name: foot_geom_ids.get(name, -1),
         mj_resetData=lambda _model, _data: None,
         mj_forward=lambda _model, _data: None,
     )
