@@ -125,6 +125,8 @@ web = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
+    { name = "pytest-asyncio" },
     { name = "pytest-timeout" },
 ]
 
@@ -157,7 +159,11 @@ requires-dist = [
 provides-extras = ["perception", "teleop", "web", "dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest-timeout", specifier = ">=2.4.0" }]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+]
 
 [[package]]
 name = "attrs"
