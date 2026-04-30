@@ -32,7 +32,27 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Reusing the same seed reproduces robot spawn pose, terrain parameters, command schedule, and disturbance timing; changing the seed changes randomized scenario elements where applicable.
   4. Action modes for velocity command, joint-position target, and residual-over-baseline control are selected through environment config while preserving one environment API.
   5. Existing non-Gym simulation/web paths still boot, so the benchmark wrapper does not break the C2 runtime.
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+
+**Wave 1**
+- [ ] 01-01-PLAN.md — Add Gymnasium dependency, `ArgusGo2Env` contract, observation helpers, and LOC-ENV-01 tests.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 01-02-PLAN.md — Add named scenario catalog and deterministic reset metadata for LOC-ENV-02/03.
+- [ ] 01-03-PLAN.md — Add action-mode spaces and safe decoding helpers for LOC-ENV-04.
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 01-04-PLAN.md — Wire scenario/action helpers into the environment API.
+
+**Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 01-05-PLAN.md — Add scenario MJCF generation, MuJoCo reset lifecycle, and bridge regression verification.
+
+Cross-cutting constraints:
+- Preserve the existing non-Gym simulation/web paths while adding the benchmark wrapper.
+- Keep reset/step metadata reproducible: seed, scenario id, sampled parameters, command schedule, disturbance schedule, and action mode.
+- Validate actions/scenario inputs before mutating MuJoCo state.
+
 **Research flag**: standard
 
 ### Phase 2: controller-plugin-baseline
@@ -93,7 +113,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. locomotion-env-contract | 0/TBD | Not started | - |
+| 1. locomotion-env-contract | 0/5 | Planned | - |
 | 2. controller-plugin-baseline | 0/TBD | Not started | - |
 | 3. locomotion-metrics-instrumentation | 0/TBD | Not started | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
@@ -115,4 +135,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Roadmap approved 2026-04-30. Start with `/gsd-plan-phase 1` for `locomotion-env-contract`.
+Roadmap approved 2026-04-30. Start with `/gsd-execute-phase 1` for `locomotion-env-contract`.

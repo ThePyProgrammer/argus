@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: ready_to_plan
-stopped_at: roadmap approved; ready to plan Phase 1 (2026-04-30)
+status: ready_to_execute
+stopped_at: Phase 1 planned; ready to execute locomotion-env-contract (2026-04-30)
 last_updated: "2026-04-30"
 last_activity: 2026-04-30
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 ## Current Position
 
-Phase: Not started
-Plan: Not started
-Status: Roadmap approved; ready to plan Phase 1
+Phase: 1 — locomotion-env-contract
+Plan: Ready to execute (5 plans, 4 waves)
+Status: Phase 1 planned; ready to execute
 Last activity: 2026-04-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -69,7 +69,7 @@ No v4.0 execution metrics yet.
 
 ### Pending Todos
 
-- Start `/gsd-plan-phase 1` for `locomotion-env-contract`.
+- Start `/gsd-execute-phase 1` for `locomotion-env-contract`.
 - Commit planning docs if requested; `commit_docs` is true, but no commit has been created yet.
 
 ### Blockers/Concerns
