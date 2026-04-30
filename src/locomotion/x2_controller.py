@@ -75,6 +75,15 @@ class X2PolicyController:
             return self.default_qpos.copy()
 
         clipped = np.clip(raw, self.lower, self.upper).astype(np.float64, copy=False)
+        if not np.isfinite(clipped).all():
+            self._health = ControllerHealth(
+                policy_loaded=True,
+                action_shape_valid=True,
+                nan_guard_ok=False,
+                message="controller_invalid_output",
+            )
+            return self.default_qpos.copy()
+
         clipped_count = int(np.count_nonzero(clipped != raw))
         self._health = ControllerHealth(
             policy_loaded=True,
@@ -128,10 +137,14 @@ class X2PolicyController:
         arr = np.asarray(value, dtype=np.float64)
         if arr.shape != (self.actuator_count,):
             raise ValueError(f"{label} must have shape ({self.actuator_count},), got {arr.shape}")
+        if not np.isfinite(arr).all():
+            raise ValueError(f"{label} must contain only finite values")
         return arr.copy()
 
     def _bounds_or_raise(self, value: np.ndarray, label: str) -> np.ndarray:
         arr = np.asarray(value, dtype=np.float64)
         if arr.shape != (self.actuator_count,):
             raise ValueError(f"{label} must have shape ({self.actuator_count},), got {arr.shape}")
+        if not np.isfinite(arr).all():
+            raise ValueError(f"{label} must contain only finite values")
         return arr.copy()
