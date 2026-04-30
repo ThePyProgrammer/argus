@@ -5,13 +5,13 @@ milestone_name: Benchmarkable Locomotion Environment
 status: executing
 stopped_at: null
 last_updated: "2026-04-30T14:41:46.789Z"
-last_activity: 2026-04-30 -- Phase 03 wave 1 complete
+last_activity: 2026-04-30 -- Phase 03 wave 2 complete
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 87
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 ## Current Position
 
 Phase: 03 (locomotion-metrics-instrumentation) — EXECUTING
-Plan: 1 of 4 complete
+Plan: 2 of 4 complete
 Status: Executing Phase 03
-Last activity: 2026-04-30 -- Phase 03 wave 1 complete
+Last activity: 2026-04-30 -- Phase 03 wave 2 complete
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
