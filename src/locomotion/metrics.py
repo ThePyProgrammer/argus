@@ -278,6 +278,8 @@ class LocomotionMetricsCollector:
         dt: float,
     ) -> tuple[dict[str, Any], str | None]:
         distance = float(np.linalg.norm(xy))
+        desired_translational_speed = float(np.linalg.norm(desired_command[:2]))
+        progress_check_active = desired_translational_speed >= self.config.min_progress_command_speed_m_per_s
         failure_reason: str | None = None
         if abs(roll) > self.config.max_abs_roll_rad:
             failure_reason = "roll_limit"
@@ -285,7 +287,7 @@ class LocomotionMetricsCollector:
             failure_reason = "pitch_limit"
         elif height < self.config.min_base_height_m:
             failure_reason = "base_height_low"
-        elif self._progress_stalled(desired_command, distance, dt):
+        elif self._progress_stalled(progress_check_active, distance, dt):
             failure_reason = "progress_stalled"
 
         return {
@@ -294,16 +296,18 @@ class LocomotionMetricsCollector:
             "base_height_m": height,
             "base_height_deviation_m": height - self.config.nominal_base_height_m,
             "distance_xy_m": distance,
+            "progress_check_active": progress_check_active,
             "failure_reason": failure_reason,
         }, failure_reason
 
-    def _progress_stalled(self, desired_command: np.ndarray, current_distance: float, dt: float) -> bool:
-        desired_translational_speed = float(np.linalg.norm(desired_command[:2]))
-        if desired_translational_speed < self.config.min_progress_command_speed_m_per_s:
+    def _progress_stalled(self, progress_check_active: bool, current_distance: float, dt: float) -> bool:
+        if not progress_check_active:
             return False
         if len(self._steps) < self.config.progress_window_steps:
             return False
         window = list(self._steps)[-self.config.progress_window_steps :]
+        if not all(bool(step.stability.get("progress_check_active")) for step in window):
+            return False
         start_distance = float(window[0].stability["distance_xy_m"])
         elapsed = max(float(len(window)) * dt, dt)
         return (current_distance - start_distance) / elapsed < self.config.min_progress_m_per_s

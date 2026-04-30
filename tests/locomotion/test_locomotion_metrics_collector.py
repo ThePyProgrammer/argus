@@ -198,6 +198,45 @@ def test_nonzero_translational_command_still_progress_stalls_when_stationary():
     assert summary.failure_reason == "progress_stalled"
 
 
+def test_progress_stall_does_not_reuse_zero_command_history_after_transition():
+    config = LocomotionMetricsConfig(
+        progress_window_steps=3,
+        min_progress_m_per_s=0.001,
+        min_progress_command_speed_m_per_s=0.05,
+    )
+    collector = LocomotionMetricsCollector(config)
+
+    zero_command_steps = [
+        _record_step(
+            collector,
+            desired_command=(0.0, 0.0, 0.0),
+            base_xy_position=(0.0, 0.0),
+        )
+        for _ in range(config.progress_window_steps + 1)
+    ]
+    assert all(step.failure_reason is None for step in zero_command_steps)
+
+    first_nonzero_step = _record_step(
+        collector,
+        desired_command=(0.2, 0.0, 0.0),
+        base_xy_position=(0.0, 0.0),
+    )
+    assert first_nonzero_step.failure_reason is None
+
+    subsequent_nonzero_steps = [
+        _record_step(
+            collector,
+            desired_command=(0.2, 0.0, 0.0),
+            base_xy_position=(0.0, 0.0),
+        )
+        for _ in range(config.progress_window_steps + 1)
+    ]
+    assert any(step.failure_reason == "progress_stalled" for step in subsequent_nonzero_steps)
+    summary = collector.episode_summary()
+    assert summary.success is False
+    assert summary.failure_reason == "progress_stalled"
+
+
 def test_records_action_quality_metrics():
     """LOC-METRICS-03: D-13 D-14 D-15 D-16 action-quality proxy metrics."""
     collector = LocomotionMetricsCollector()
