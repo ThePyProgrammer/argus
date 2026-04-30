@@ -657,3 +657,68 @@ class TestCoordinatorMergeProtocol:
         # Verify last_merged_voxels is accessible (used by viz pipeline)
         voxels = coordinator._merger.last_merged_voxels
         assert isinstance(voxels, np.ndarray)
+
+
+class TestCoordinatorPlatformRuntimeState:
+    def test_command_handler_forwards_velocity_command_to_bridge(self):
+        from src.coordination.coordinator import Coordinator
+        from src.bridge.multi_robot_config import MultiRobotConfig
+
+        config = MultiRobotConfig(boot_phase_steps=0)
+        mock_bridge = MagicMock()
+        mock_bridge.robot_ids = ("robot_a",)
+        robots = {"robot_a": MagicMock()}
+        coordinator = Coordinator(mock_bridge, robots, config)
+
+        coordinator.handle_command({
+            "action": "velocity",
+            "robot_id": "robot_a",
+            "linear": [0.2, 0.0],
+            "yaw_rate": 0.1,
+        })
+
+        args = mock_bridge.set_command.call_args[0]
+        assert args[0] == "robot_a"
+        assert args[1].to_wire() == {
+            "mode": "velocity",
+            "linear": [0.2, 0.0],
+            "yaw_rate": 0.1,
+            "waypoint": None,
+        }
+
+    def test_disabled_robot_gets_stop_command_in_run_loop(self):
+        from src.coordination.coordinator import Coordinator
+        from src.coordination.robot_instance import RobotInstance
+        from src.bridge.multi_robot_config import MultiRobotConfig
+        from src.bridge.platforms.types import RobotRuntimeState, RobotRuntimeStatus
+
+        config = MultiRobotConfig(boot_phase_steps=999)
+        mock_bridge = MagicMock()
+        mock_bridge.robot_ids = ("robot_a",)
+        frames = {"robot_a": _make_sensor_frame([0, 0, 0.3])}
+        mock_bridge.start.return_value = frames
+        mock_bridge.step.return_value = frames
+        mock_bridge.get_runtime_status.return_value = RobotRuntimeStatus(state=RobotRuntimeState.DISABLED)
+
+        robot = MagicMock(spec=RobotInstance)
+        robot.robot_id = "robot_a"
+        robot.slam = _MockSLAM()
+        robot.octomap = _MockOctoMap()
+        robot.spawn_transform = np.eye(4)
+        robot.publisher = MagicMock()
+        robot.exploration = MagicMock()
+        robot.exploration.step_once.return_value = (
+            np.array([1.0, 0.0]),
+            0.2,
+            StepMetrics(frontiers=5, coverage=0.0, terminated=False, voxels=100, rescan_triggered=False),
+        )
+
+        coordinator = Coordinator(mock_bridge, {"robot_a": robot}, config)
+
+        with patch.object(coordinator, "_setup_subscriptions"), \
+             patch.object(coordinator, "_teardown_subscriptions"), \
+             patch.object(coordinator, "_merge_occupancy_maps"):
+            coordinator.run(max_steps=1)
+
+        mock_bridge.stop_robot.assert_called_once_with("robot_a")
+        robot.exploration.step_once.assert_not_called()

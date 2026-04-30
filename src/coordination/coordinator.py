@@ -26,6 +26,7 @@ import numpy as np
 
 from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.sensor_types import SensorFrame
+from src.bridge.platforms.types import RobotCommand
 from src.coordination.robot_instance import RobotInstance, RobotMapMessage
 from src.bridge.multi_robot_config import MultiRobotConfig
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
@@ -61,6 +62,8 @@ class RobotVizData:
     coverage_pct: float
     detections_3d: Detections3D | None
     scene_description: dict | None
+    platform: dict | None = None
+    runtime_status: dict | None = None
     tracking_status: str = "ok"
     body_yaw: float = 0.0
 
@@ -389,6 +392,28 @@ class Coordinator:
                 else:
                     self._config.step_delay = (1.0 / value) * 0.01  # small delay for slow-mo
                 logger.info("Command received: set_speed %.1f (delay=%.3fs)", value, self._config.step_delay)
+        elif action == "velocity":
+            robot_id = command.get("robot_id")
+            if robot_id and robot_id in self._robots and hasattr(self._bridge, "set_command"):
+                linear = command.get("linear", [0.0, 0.0])
+                yaw_rate = command.get("yaw_rate", 0.0)
+                self._bridge.set_command(robot_id, RobotCommand.velocity(linear, yaw_rate))
+                logger.info("Command received: velocity %s linear=%s yaw=%.3f", robot_id, linear, yaw_rate)
+        elif action == "stand":
+            robot_id = command.get("robot_id")
+            if robot_id and robot_id in self._robots and hasattr(self._bridge, "set_command"):
+                self._bridge.set_command(robot_id, RobotCommand.stand())
+                logger.info("Command received: stand %s", robot_id)
+        elif action == "stop_robot":
+            robot_id = command.get("robot_id")
+            if robot_id and robot_id in self._robots and hasattr(self._bridge, "stop_robot"):
+                self._bridge.stop_robot(robot_id)
+                logger.info("Command received: stop_robot %s", robot_id)
+        elif action == "recover_robot":
+            robot_id = command.get("robot_id")
+            if robot_id and robot_id in self._robots and hasattr(self._bridge, "recover_robot"):
+                self._bridge.recover_robot(robot_id)
+                logger.info("Command received: recover_robot %s", robot_id)
         elif action == "send_to":
             robot_id = command.get("robot_id")
             target = command.get("target")
@@ -515,6 +540,13 @@ class Coordinator:
             for rid in robot_ids:
                 robot = self._robots[rid]
                 frame = frames[rid]
+
+                if hasattr(self._bridge, "get_runtime_status"):
+                    runtime_status = self._bridge.get_runtime_status(rid)
+                    if getattr(runtime_status, "disabled", False) is True:
+                        if hasattr(self._bridge, "stop_robot"):
+                            self._bridge.stop_robot(rid)
+                        continue
 
                 try:
                     # Build score function if partitioned
@@ -740,6 +772,17 @@ class Coordinator:
             if hasattr(self._bridge, 'get_body_yaw'):
                 body_yaw = self._bridge.get_body_yaw(rid)
 
+            platform_payload = None
+            if hasattr(self._bridge, "platform_metadata"):
+                platform_metadata = self._bridge.platform_metadata
+                if hasattr(platform_metadata, "to_wire"):
+                    platform_payload = platform_metadata.to_wire()
+            runtime_payload = None
+            if hasattr(self._bridge, "get_runtime_status"):
+                runtime_status = self._bridge.get_runtime_status(rid)
+                if hasattr(runtime_status, "to_wire"):
+                    runtime_payload = runtime_status.to_wire()
+
             robot_data[rid] = RobotVizData(
                 frame=frames[rid],
                 local_voxels=robot.get_occupied_voxels(),
@@ -750,6 +793,8 @@ class Coordinator:
                 coverage_pct=robot.exploration.last_coverage,
                 detections_3d=detections_3d,
                 scene_description=scene_desc,
+                platform=platform_payload,
+                runtime_status=runtime_payload,
                 tracking_status=getattr(robot.exploration, "last_tracking_status", "ok"),
                 body_yaw=body_yaw,
             )
