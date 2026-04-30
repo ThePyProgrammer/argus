@@ -51,6 +51,9 @@ def test_reset_returns_observation_and_info():
     assert info["seed"] == 123
     assert info["scenario_id"] == "flat_ground"
     assert info["action_mode"] == "velocity_command"
+    assert "sampled_parameters" in info
+    assert "command_schedule" in info
+    assert "disturbance_schedule" in info
     assert info["step_count"] == 0
     assert "sim_time" in info
 

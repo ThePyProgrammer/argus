@@ -6,8 +6,7 @@ from typing import Any
 
 import gymnasium
 import numpy as np
-from gymnasium import spaces
-
+from src.locomotion.actions import ACTION_MODE_VELOCITY, build_action_space, decode_action
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.observations import build_observation_space, extract_observation
 from src.locomotion.scenarios import ScenarioSample, sample_scenario
@@ -38,14 +37,8 @@ class ArgusGo2Env(gymnasium.Env):
             raise ValueError("max_episode_steps must be >= 1")
         if self.config.heightfield_size > 64:
             raise ValueError("heightfield_size must be <= 64")
-        if self.config.action_mode != "velocity_command":
-            raise ValueError("Only velocity_command action_mode is supported in LOC-ENV-01")
 
-        self.action_space = spaces.Box(
-            low=np.array([-1.0, -1.0, -3.0], dtype=np.float32),
-            high=np.array([1.0, 1.0, 3.0], dtype=np.float32),
-            dtype=np.float32,
-        )
+        self.action_space = build_action_space(self.config.action_mode)
         self.observation_space = build_observation_space()
         self.render_mode = self.config.render_mode
 
@@ -92,13 +85,17 @@ class ArgusGo2Env(gymnasium.Env):
         self,
         action: np.ndarray,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
-        """Apply a velocity command and return the Gymnasium five-tuple."""
-        velocity_action = self._validate_velocity_action(action)
-        self._command = velocity_action
-        vx, vy, omega = (float(value) for value in velocity_action)
-        self._previous_action = self._gait.compute(vx, vy, omega, self._dt).astype(
-            np.float32,
+        """Apply a mode-specific action and return the Gymnasium five-tuple."""
+        ctrl = decode_action(
+            action,
+            self.config.action_mode,
+            self._gait,
+            self._dt,
+            self._command,
         )
+        if self.config.action_mode == ACTION_MODE_VELOCITY:
+            self._command = np.asarray(action, dtype=np.float32).copy()
+        self._previous_action = ctrl.astype(np.float32)
 
         if self._data is not None:
             import mujoco
@@ -121,13 +118,10 @@ class ArgusGo2Env(gymnasium.Env):
         self._model = None
         self._data = None
 
-    def _validate_velocity_action(self, action: np.ndarray) -> np.ndarray:
-        values = np.asarray(action, dtype=np.float32)
-        if values.shape != (3,):
-            raise ValueError("velocity_command action must have shape (3,)")
-        if not np.all(np.isfinite(values)):
-            raise ValueError("velocity_command action must contain only finite values")
-        return values.copy()
+    @property
+    def step_count(self) -> int:
+        """Number of successful environment steps since the last reset."""
+        return self._step_count
 
     def _ensure_model_loaded(self) -> None:
         if self._model is not None and self._data is not None:
