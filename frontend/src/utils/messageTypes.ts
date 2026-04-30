@@ -24,8 +24,40 @@ export interface WSMessage {
   payload: unknown;
 }
 
+export interface PlatformMetadata {
+  name: string;
+  display_name: string;
+  model_dir?: string;
+  model_xml?: string;
+  actuator_count?: number;
+  command_modes?: string[];
+  footprint_radius?: number;
+  dimensions?: [number, number, number];
+  max_linear_speed?: number;
+  max_yaw_rate?: number;
+  marker_asset?: string | null;
+  spawn_height?: number;
+}
+
+export interface RobotRuntimeStatusPayload {
+  state: 'standing' | 'walking' | 'fallen' | 'recovering' | 'disabled';
+  fall_reason: string;
+  disabled: boolean;
+  last_command?: {
+    mode: string;
+    linear: number[];
+    yaw_rate: number;
+    waypoint: number[] | null;
+  };
+  command_tracking?: Record<string, unknown>;
+  controller_health?: Record<string, unknown>;
+  collision_count?: number;
+  near_miss_count?: number;
+}
+
 export interface RobotListPayload {
   robots: string[];
+  platforms?: Record<string, PlatformMetadata>;
 }
 
 export interface PoseUpdatePayload {
@@ -67,7 +99,13 @@ export interface StatsPayload {
   elapsed: number;
   robots: Record<
     string,
-    { coverage_pct: number; voxel_count: number; action: string }
+    {
+      coverage_pct: number;
+      voxel_count: number;
+      action: string;
+      platform?: PlatformMetadata | null;
+      runtime_status?: RobotRuntimeStatusPayload | null;
+    }
   >;
   slam_metrics?: Record<string, SlamMetrics>;
   baseline?: Record<string, SlamMetrics> | null;

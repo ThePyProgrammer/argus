@@ -6,6 +6,32 @@ interface RobotCardProps {
   robot: RobotInfo;
 }
 
+const CONTROLLER_HEALTH_BOOLEAN_KEYS = [
+  'policy_loaded',
+  'action_shape_valid',
+  'nan_guard_ok',
+] as const;
+
+function controllerHealthLabel(controllerHealth: RobotInfo['controllerHealth']): string {
+  if (controllerHealth?.policy_loaded === false) {
+    return 'no policy';
+  }
+
+  const message = controllerHealth?.message;
+  const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+  const hasKnownFailure = CONTROLLER_HEALTH_BOOLEAN_KEYS.some(
+    (key) => controllerHealth?.[key] === false,
+  );
+
+  if (hasKnownFailure) {
+    return trimmedMessage !== '' && trimmedMessage !== 'ok'
+      ? trimmedMessage
+      : 'degraded';
+  }
+
+  return 'ok';
+}
+
 export default function RobotCard({ robot }: RobotCardProps) {
   const color = robotColor(robot.colorIndex);
   const placingRobot = useControlStore((s) => s.placingRobot);
@@ -52,6 +78,36 @@ export default function RobotCard({ robot }: RobotCardProps) {
         >
           {robot.action}
         </span>
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: '6px',
+        fontSize: '11px', color: '#9ca3af',
+      }}>
+        <span>{robot.platformMetadata?.display_name ?? robot.platform}</span>
+        <span style={{
+          color: robot.disabled ? '#ff6b6b' : '#8fd18f',
+          textTransform: 'capitalize',
+          fontWeight: 600,
+        }}>
+          {robot.runtimeState}
+        </span>
+      </div>
+      {robot.fallReason !== 'none' && (
+        <div style={{ marginTop: '4px', fontSize: '11px', color: '#ffb86b' }}>
+          Fall: {robot.fallReason}
+        </div>
+      )}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: '4px',
+        fontSize: '11px', color: '#aaa',
+      }}>
+        <span>
+          Controller: {controllerHealthLabel(robot.controllerHealth)}
+        </span>
+        <span>Near misses: {robot.nearMissCount}</span>
+      </div>
+      <div style={{ marginTop: '4px', fontSize: '11px', color: robot.collisionCount > 0 ? '#ff6b6b' : '#777' }}>
+        Collisions: {robot.collisionCount}
       </div>
       <div
         style={{

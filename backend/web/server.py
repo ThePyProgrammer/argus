@@ -30,6 +30,7 @@ def create_app(
     slam_reset_cb: Callable[[], None] | None = None,
     mcp_endpoint: Callable | None = None,
     cloud_config_fns: dict[str, Callable] | None = None,
+    platform_metadata: dict[str, dict] | None = None,
 ) -> tuple[FastAPI, WebStreamingViz]:
     """Configure and return the FastAPI app.
 
@@ -42,6 +43,7 @@ def create_app(
         mcp_endpoint: Optional MCP endpoint handler to register at /mcp.
         cloud_config_fns: Optional dict with 'get', 'set', 'configs' callables
             for cloud configuration. Injected to avoid importing from src/.
+        platform_metadata: Optional per-robot platform metadata for WebSocket clients.
 
     Returns:
         Tuple of (FastAPI app, WebStreamingViz instance).
@@ -51,6 +53,7 @@ def create_app(
     app.state.command_callback = command_cb
     app.state.slam_reset_callback = slam_reset_cb
     app.state.robot_ids = robot_ids
+    app.state.platform_metadata = platform_metadata or {}
     app.state.cloud_config_fns = cloud_config_fns
 
     # SLAM backend selection state
@@ -223,7 +226,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         # Send robot list on connect
         await websocket.send_json({
             "type": "robot_list",
-            "payload": {"robots": state.robot_ids},
+            "payload": {
+                "robots": state.robot_ids,
+                "platforms": getattr(state, "platform_metadata", {}),
+            },
         })
         # Send available cloud configs if configured
         if state.cloud_config_fns is not None:

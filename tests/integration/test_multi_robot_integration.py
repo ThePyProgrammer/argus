@@ -92,4 +92,4 @@ def test_merged_voxels_from_both_robots(multi_robot_setup):
     # Run enough steps for both robots to produce voxels
     result = coordinator.run(max_steps=30)
     # The merged count should exist (may be 0 if mock doesn't produce real depth)
-    assert "merged_voxel_count" in result
+    assert hasattr(result, "merged_voxel_count")

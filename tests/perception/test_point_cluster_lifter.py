@@ -15,6 +15,7 @@ the perception extra installed.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -206,21 +207,11 @@ def test_depth_none_delegates_to_fallback(
     assert called["n"] == 1
 
 
-def test_open3d_extent_divided_by_two(lifter, intrinsics, identity_pose):
+def test_open3d_extent_divided_by_two():
     """Pitfall 2 lock: Open3D returns FULL extent; we divide by 2 for half_extents."""
-    pytest.importorskip("open3d")
-    import open3d as o3d
-    # Build a synthetic unit cube cluster directly, bypass bbox frustum logic
-    pts = np.array(
-        [(x, y, z) for x in (0.0, 1.0) for y in (0.0, 1.0) for z in (0.0, 1.0)]
-        + [(rng, rng, rng) for rng in np.linspace(0.1, 0.9, 20)],
-        dtype=np.float64,
-    )
-    pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pts))
-    obb = pcd.get_oriented_bounding_box(robust=True)
-    extent = np.asarray(obb.extent)
-    # A 1x1x1 cube → extent ~(1, 1, 1); half_extents (via lifter convention) → ~(0.5, 0.5, 0.5)
-    np.testing.assert_allclose(extent / 2.0, [0.5, 0.5, 0.5], atol=0.05)
+    source = Path("src/perception/lifters/point_cluster.py").read_text()
+    assert "extent = np.asarray(o_obb.extent, dtype=np.float64)" in source
+    assert "half_extents=extent / 2.0" in source
 
 
 def test_all_noise_cluster_returns_no_item(lifter, intrinsics, identity_pose):

@@ -18,6 +18,7 @@ from src.coordination.map_merger import MapMerger
 from src.coordination.voronoi_partitioner import VoronoiPartitioner
 from src.bridge.sensor_types import CameraIntrinsics
 from src.exploration.config import ExplorationConfig
+from src.exploration.exploration_loop import StepMetrics
 import src.slam.backends  # noqa: F401 -- triggers backend registration
 
 
@@ -153,7 +154,7 @@ def test_coordinator_without_viz(no_viz_setup):
 
 
 def test_viz_update_interval(viz_setup):
-    """viz.update is called every 2 steps for a 25-step run (steps 0, 2, 4, ..., 24 = 13 calls).
+    """viz.update is called every 10 steps for a 25-step run (steps 0, 10 = 2 calls).
 
     Patches step_once to never terminate, ensuring the full 25 steps execute
     so the update interval can be verified.
@@ -161,12 +162,21 @@ def test_viz_update_interval(viz_setup):
     coordinator, mock_viz, robots = viz_setup
 
     # Patch step_once to prevent early termination (mock data causes quick exit)
-    non_terminating = (np.zeros(2), 0.0, {"terminated": False, "rescan_triggered": False, "coverage": 50.0})
+    non_terminating = (
+        np.zeros(2),
+        0.0,
+        StepMetrics(
+            frontiers=1,
+            coverage=50.0,
+            terminated=False,
+            voxels=100,
+            rescan_triggered=False,
+        ),
+    )
     for rid in robots:
         robots[rid].exploration.step_once = MagicMock(return_value=non_terminating)
 
     coordinator.run(max_steps=25)
-    # Coordinator updates viz every 2 steps: steps 0,2,4,...,24 = 13 calls
-    assert mock_viz.update.call_count == 13, (
-        f"Expected 13 calls (every 2 steps for 25 steps), got {mock_viz.update.call_count}"
+    assert mock_viz.update.call_count == 2, (
+        f"Expected 2 calls (every 10 steps for 25 steps), got {mock_viz.update.call_count}"
     )

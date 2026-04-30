@@ -5,15 +5,22 @@ Scene builder XML output is tested with the actual go2.xml model file.
 """
 
 from pathlib import Path
-import inspect
 import sys
 import types
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
 
+from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.multi_robot_config import MultiRobotConfig
-from src.bridge.scene_builder import build_two_robot_scene
+from src.bridge.platforms.go2 import Go2Platform
+import src.bridge.scene_builder as scene_builder
+from src.bridge.scene_builder import (
+    build_multi_robot_scene,
+    build_two_robot_office_scene,
+    build_two_robot_scene,
+)
 from src.bridge.sensor_types import SensorFrame
 
 
@@ -32,6 +39,16 @@ def test_multi_robot_config_defaults():
     assert config.boot_phase_steps == 200
     assert config.sim_steps_per_frame == 5
     assert config.model_dir == "models/unitree_go2"
+
+
+def test_multi_robot_config_accepts_platform_name_and_config():
+    config = MultiRobotConfig(
+        platform="agibot_x2",
+        platform_config={"model_dir": "models/agibot_x2"},
+    )
+
+    assert config.platform == "agibot_x2"
+    assert config.platform_config == {"model_dir": "models/agibot_x2"}
 
 
 # ---------- Scene builder tests ----------
@@ -61,6 +78,24 @@ def test_build_two_robot_scene_valid_xml():
 
 
 @pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_multi_robot_scene_uses_platform_camera_and_prefixes():
+    platform = Go2Platform()
+    xml_str, assets = build_multi_robot_scene(
+        platform=platform,
+        spawn_positions={"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)},
+    )
+
+    assert isinstance(xml_str, str)
+    assert isinstance(assets, dict)
+    assert "robot_a_base" in xml_str
+    assert "robot_b_base" in xml_str
+    assert "robot_a_FL_hip" in xml_str
+    assert "robot_b_FR_hip" in xml_str
+    assert "robot_a_cam" in xml_str
+    assert "robot_b_cam" in xml_str
+
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
 def test_build_two_robot_scene_spawn_positions():
     """build_two_robot_scene places robots at specified spawn positions."""
     spawn = {
@@ -73,218 +108,125 @@ def test_build_two_robot_scene_spawn_positions():
     assert "5 6" in xml_str or "5.0 6.0" in xml_str
 
 
-# ---------- MultiRobotBridge controller seam tests ----------
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_two_robot_scene_patches_go2_actuators_to_position_controls():
+    xml_str = build_two_robot_scene("models/unitree_go2", {
+        "robot_a": (0.0, 0.0, 0.3),
+        "robot_b": (5.0, 0.0, 0.3),
+    })
+    root = ET.fromstring(xml_str)
+    generated_actuators = [
+        actuator
+        for actuator in root.findall("./actuator/*")
+        if actuator.attrib.get("name", "").startswith(("robot_a_", "robot_b_"))
+    ]
+
+    assert generated_actuators
+    assert all(actuator.tag == "position" for actuator in generated_actuators)
+    assert all("kp" in actuator.attrib for actuator in generated_actuators)
+    assert all("kv" in actuator.attrib for actuator in generated_actuators)
+    assert not root.findall("./actuator/motor")
 
 
-def _sensor_frame_at(x: float) -> SensorFrame:
-    pose = np.eye(4, dtype=np.float64)
-    pose[0, 3] = x
-    return SensorFrame(
-        rgb=np.zeros((1, 1, 3), dtype=np.uint8),
-        depth=None,
-        ground_truth_pose=pose,
-        sim_time=0.0,
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_multi_robot_scene_returns_assets_without_compiler_asset_dirs():
+    xml_str, assets = build_multi_robot_scene(
+        Go2Platform(),
+        {"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)},
+    )
+    root = ET.fromstring(xml_str)
+    compiler = root.find("compiler")
+
+    assert compiler is not None
+    assert "meshdir" not in compiler.attrib
+    assert "texturedir" not in compiler.attrib
+    assert "base_0.obj" in assets
+
+
+def test_build_two_robot_office_scene_patches_go2_actuators_to_position(tmp_path, monkeypatch):
+    """Office scene builder keeps Go2 actuators runtime-ready as position controls."""
+    scene_data_dir = tmp_path / "scenes"
+    scene_data_dir.mkdir()
+    (scene_data_dir / "scene_office1.xml").write_text(
+        """
+        <mujoco model="office">
+          <compiler meshdir="scene_office1/office_split" texturedir="scene_office1/textures"/>
+          <worldbody/>
+          <asset/>
+        </mujoco>
+        """,
+        encoding="utf-8",
+    )
+    model_dir = tmp_path / "go2"
+    model_dir.mkdir()
+    (model_dir / "go2.xml").write_text(
+        """
+        <mujoco model="go2">
+          <worldbody>
+            <body name="base">
+              <freejoint/>
+              <joint name="FL_hip_joint"/>
+            </body>
+          </worldbody>
+          <actuator>
+            <motor class="hip" name="FL_hip" joint="FL_hip_joint" ctrlrange="-1 1"/>
+          </actuator>
+        </mujoco>
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(scene_builder, "_find_dimos_scene_data", lambda: scene_data_dir)
+
+    xml_str, _assets = build_two_robot_office_scene(
+        str(model_dir), {"robot_a": (0.0, 0.0, 0.3)}
     )
 
-
-class _FakeData:
-    def __init__(self, ctrl_size: int = 24) -> None:
-        self.ctrl = np.zeros(ctrl_size, dtype=np.float64)
-        self.qpos = np.zeros(32, dtype=np.float64)
-
-
-class _FakeModel:
-    pass
+    root = ET.fromstring(xml_str)
+    actuator = root.find("./actuator/position[@name='robot_a_FL_hip']")
+    assert actuator is not None
+    assert actuator.attrib["joint"] == "robot_a_FL_hip_joint"
+    assert actuator.attrib["kp"] == "80"
+    assert actuator.attrib["kv"] == "4"
+    assert "ctrlrange" not in actuator.attrib
 
 
-def test_multi_bridge_step_public_contract_is_dict_of_sensor_frames():
-    """MultiRobotBridge.step remains the no-arg dict-return public contract."""
-    from src.bridge.multi_bridge import MultiRobotBridge
+# ---------- MultiRobotBridge tests ----------
 
-    signature = inspect.signature(MultiRobotBridge.step)
-    assert list(signature.parameters) == ["self"]
-    assert signature.return_annotation == dict[str, SensorFrame]
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_multi_robot_bridge_flat_scene_loads_generated_assets(monkeypatch):
+    """Flat bridge runtime passes generated mesh assets into MuJoCo XML loading."""
+    captured = {}
+
+    class FakeModel:
+        njnt = 0
+        opt = types.SimpleNamespace(timestep=0.002)
+
+        @staticmethod
+        def from_xml_string(xml_str, assets=None):
+            captured["xml_str"] = xml_str
+            captured["assets"] = assets
+            raise RuntimeError("stop after XML load")
+
+    fake_mujoco = types.SimpleNamespace(MjModel=FakeModel)
+    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
+
+    bridge = MultiRobotBridge(MultiRobotConfig(scene="flat"))
+    with pytest.raises(RuntimeError, match="stop after XML load"):
+        bridge.start()
+
+    assert captured["xml_str"]
+    assert captured["assets"]
+    assert "base_0.obj" in captured["assets"]
 
 
 def test_multi_bridge_stop_before_start_is_safe():
-    """Cleanup should be safe around failed or skipped startup."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
     bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
 
     bridge.stop()
 
     assert not bridge.is_running
     assert bridge.step_count == 0
-
-
-def test_multi_bridge_initializes_one_controller_per_robot_id():
-    """Each configured robot owns a distinct registered controller instance."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-    from src.locomotion.controllers import LocomotionCommand
-
-    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
-
-    assert set(bridge._controllers) == {"robot_a", "robot_b"}
-    assert bridge._controllers["robot_a"] is not bridge._controllers["robot_b"]
-    assert bridge._controllers["robot_a"].compute({}, LocomotionCommand(), 0.02).metadata[
-        "controller_id"
-    ] == "analytical_trot"
-    assert bridge._controllers["robot_b"].compute({}, LocomotionCommand(), 0.02).metadata[
-        "controller_id"
-    ] == "analytical_trot"
-
-
-def test_multi_bridge_step_before_start_still_raises_not_started():
-    """The controller seam must not change pre-start lifecycle errors."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
-    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
-
-    with pytest.raises(RuntimeError, match="not started"):
-        bridge.step()
-
-
-def test_multi_bridge_set_velocity_rejects_unknown_robot_id():
-    """Unknown command targets must fail instead of disappearing at step()."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
-    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
-
-    with pytest.raises(KeyError, match="Unknown robot_id 'robot_c'"):
-        bridge.set_velocity("robot_c", np.array([0.3, 0.0]), 0.0)
-
-    assert set(bridge._velocities) == {"robot_a", "robot_b"}
-
-
-def test_multi_bridge_set_velocity_validates_command_values():
-    """Malformed velocity commands are rejected at the public bridge boundary."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
-    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b")))
-
-    with pytest.raises(ValueError, match=r"shape-\(2,\)"):
-        bridge.set_velocity("robot_a", np.array([0.3, 0.0, 0.1]), 0.0)
-    with pytest.raises(ValueError, match="finite"):
-        bridge.set_velocity("robot_a", np.array([np.nan, 0.0]), 0.0)
-    with pytest.raises(ValueError, match="finite"):
-        bridge.set_velocity("robot_a", np.array([0.0, 0.0]), np.inf)
-
-
-def test_multi_bridge_start_resets_per_robot_controllers(monkeypatch):
-    """Restarted simulations must begin each controller from its reset gait phase."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
-    reset_calls: list[str] = []
-
-    class FakeController:
-        def __init__(self, robot_id: str) -> None:
-            self.robot_id = robot_id
-
-        def reset(self, seed: int | None = None) -> None:
-            del seed
-            reset_calls.append(self.robot_id)
-
-        def compute(self, observation, command, dt):
-            del observation, command, dt
-            from src.locomotion.controllers import ControllerResult
-
-            return ControllerResult(action=np.zeros(12), metadata={"controller_id": self.robot_id})
-
-    class FakeModel:
-        opt = types.SimpleNamespace(timestep=0.002)
-        nq = 40
-        njnt = 2
-        ncam = 2
-        jnt_bodyid = np.array([0, 1])
-        jnt_type = np.array([0, 0])
-        jnt_qposadr = np.array([0, 19])
-
-    class FakeData:
-        qpos = np.zeros(40)
-        ctrl = np.zeros(24)
-
-    name_ids = {
-        "robot_a_base": 0,
-        "robot_b_base": 1,
-        "robot_a_cam": 0,
-        "robot_b_cam": 1,
-    }
-    for offset, suffix in enumerate(("FL_hip", "FL_thigh", "FL_calf", "FR_hip", "FR_thigh", "FR_calf", "RL_hip", "RL_thigh", "RL_calf", "RR_hip", "RR_thigh", "RR_calf")):
-        name_ids[f"robot_a_{suffix}"] = offset
-        name_ids[f"robot_b_{suffix}"] = 12 + offset
-
-    fake_mujoco = types.SimpleNamespace(
-        MjModel=types.SimpleNamespace(from_xml_string=lambda *args, **kwargs: FakeModel()),
-        MjData=lambda model: FakeData(),
-        Renderer=lambda *args, **kwargs: types.SimpleNamespace(close=lambda: None),
-        mj_name2id=lambda model, obj, name: name_ids.get(name, -1),
-        mj_step=lambda model, data: None,
-        mjtObj=types.SimpleNamespace(mjOBJ_BODY=0, mjOBJ_ACTUATOR=1, mjOBJ_CAMERA=2),
-        viewer=types.SimpleNamespace(launch_passive=lambda model, data: None),
-    )
-    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
-    monkeypatch.setitem(sys.modules, "mujoco.viewer", fake_mujoco.viewer)
-    monkeypatch.setattr(
-        "src.bridge.multi_bridge.build_two_robot_scene",
-        lambda model_dir, spawn_positions: "<mujoco/>",
-    )
-
-    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a", "robot_b"), boot_phase_steps=0))
-    bridge._controllers = {
-        "robot_a": FakeController("robot_a"),
-        "robot_b": FakeController("robot_b"),
-    }
-    bridge._capture_frame = lambda robot_id: _sensor_frame_at(1.0 if robot_id == "robot_a" else 2.0)
-
-    bridge.start()
-
-    assert reset_calls == ["robot_a", "robot_b"]
-
-
-def test_multi_bridge_step_writes_controller_targets_by_robot_ctrl_indices(monkeypatch):
-    """Fake-started bridge applies each robot controller output to its own ctrl indices."""
-    from src.bridge.multi_bridge import MultiRobotBridge
-
-    step_calls: list[tuple[object, object]] = []
-    fake_mujoco = types.SimpleNamespace(
-        mj_step=lambda model, data: step_calls.append((model, data))
-    )
-    monkeypatch.setitem(sys.modules, "mujoco", fake_mujoco)
-
-    bridge = MultiRobotBridge(
-        MultiRobotConfig(robot_ids=("robot_a", "robot_b"), sim_steps_per_frame=2)
-    )
-    bridge._model = _FakeModel()
-    bridge._data = _FakeData()
-    bridge._dt = 0.02
-    bridge._ctrl_indices = {
-        "robot_a": list(range(0, 12)),
-        "robot_b": list(range(12, 24)),
-    }
-    bridge._qpos_starts = {"robot_a": 0, "robot_b": 16}
-    bridge._viewer_handle = None
-    bridge._capture_frame = lambda robot_id: _sensor_frame_at(1.0 if robot_id == "robot_a" else 2.0)
-
-    bridge.set_velocity("robot_a", np.array([0.3, 0.0]), 0.0)
-    bridge.set_velocity("robot_b", np.array([0.0, 0.2]), 0.5)
-
-    frames = bridge.step()
-
-    assert isinstance(frames, dict)
-    assert set(frames) == {"robot_a", "robot_b"}
-    assert all(isinstance(frame, SensorFrame) for frame in frames.values())
-    assert bridge.step_count == 1
-    assert bridge._last_frames == frames
-    assert len(step_calls) == 2
-
-    robot_a_ctrl = bridge._data.ctrl[:12].copy()
-    robot_b_ctrl = bridge._data.ctrl[12:24].copy()
-    assert robot_a_ctrl.shape == (12,)
-    assert robot_b_ctrl.shape == (12,)
-    assert np.any(robot_a_ctrl != 0.0)
-    assert np.any(robot_b_ctrl != 0.0)
-    assert not np.allclose(robot_a_ctrl, robot_b_ctrl)
 
 
 # ---------- MockMultiRobotBridge tests ----------

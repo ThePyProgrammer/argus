@@ -8,8 +8,8 @@ Contract (CONTEXT.md D-10):
   warn  at delta_mb > 200 MB over 100 measured inferences post-warmup
   fail  at delta_mb > 400 MB over 100 measured inferences post-warmup
 
-Parametrized over DetectorRegistry.list_backends() so Phase 5 backends
-(RT-DETRv2, OWLv2, BoxeR) auto-join without test changes.
+Legacy YOLOv11-only smoke coverage. The newer integration RSS test owns
+multi-backend coverage and keeps resource-backed backends in explicit lanes.
 """
 
 from __future__ import annotations
@@ -47,14 +47,13 @@ pytestmark = pytest.mark.skipif(
 
 
 def _iter_available_backends() -> list[str]:
-    """Registry is populated by side-effect imports. Trigger them here so
-    pytest collection sees the full backend list."""
     try:
         import src.perception.backends  # noqa: F401
+        from src.perception.registry import DetectorRegistry
     except Exception:
         return []
-    from src.perception.registry import DetectorRegistry
-    return [e["name"] for e in DetectorRegistry.list_backends() if e.get("available")]
+    entries = {e["name"]: e for e in DetectorRegistry.list_backends()}
+    return ["yolov11"] if entries.get("yolov11", {}).get("available") else []
 
 
 @pytest.fixture(scope="module")
@@ -70,6 +69,7 @@ def fixture_frame():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(180)
 @pytest.mark.parametrize("backend_name", _iter_available_backends())
 def test_rss_growth_bounded(backend_name, fixture_frame):
     """D-09/D-10: warn@200MB, fail@400MB over N_WARMUP + N_MEASURED inferences."""

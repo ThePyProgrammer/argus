@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { Detection3DEnvelope, Detection3DItem } from '../utils/messageTypes';
+import type {
+  Detection3DEnvelope,
+  Detection3DItem,
+  PlatformMetadata,
+  RobotRuntimeStatusPayload,
+} from '../utils/messageTypes';
 
 // Re-export so consumers can `import type { Detection3DEnvelope } from '../stores/robotStore'`
 export type { Detection3DEnvelope, Detection3DItem };
@@ -21,6 +26,14 @@ export interface RobotInfo {
   sceneObjects: string[];
   trackingStatus: string; // "ok" | "lost" | "initializing" | "relocalizing"
   bodyYaw: number; // MuJoCo body heading in radians
+  platform: string;
+  platformMetadata: PlatformMetadata | null;
+  runtimeState: string;
+  fallReason: string;
+  disabled: boolean;
+  controllerHealth: Record<string, unknown> | null;
+  collisionCount: number;
+  nearMissCount: number;
 }
 
 export interface RobotStoreState {
@@ -32,7 +45,7 @@ export interface RobotStoreState {
   mergeCount: number;
   elapsed: number;
 
-  setRobotList: (ids: string[]) => void;
+  setRobotList: (ids: string[], platforms?: Record<string, PlatformMetadata>) => void;
   updatePose: (
     robotId: string,
     position: [number, number, number],
@@ -46,7 +59,13 @@ export interface RobotStoreState {
     elapsed: number;
     robots: Record<
       string,
-      { coverage_pct: number; voxel_count: number; action: string }
+      {
+        coverage_pct: number;
+        voxel_count: number;
+        action: string;
+        platform?: PlatformMetadata | null;
+        runtime_status?: RobotRuntimeStatusPayload | null;
+      }
     >;
   }) => void;
   appendCloudDelta: (positions: number[][], colors?: number[][]) => void;
@@ -72,10 +91,11 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
   mergeCount: 0,
   elapsed: 0,
 
-  setRobotList: (ids: string[]) => {
+  setRobotList: (ids: string[], platforms: Record<string, PlatformMetadata> = {}) => {
     const robots = new Map<string, RobotInfo>();
     ids.forEach((id, index) => {
       const existing = get().robots.get(id);
+      const platformMetadata = platforms[id] ?? existing?.platformMetadata ?? null;
       robots.set(id, {
         id,
         colorIndex: index,
@@ -93,6 +113,14 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
         sceneObjects: existing?.sceneObjects ?? [],
         trackingStatus: existing?.trackingStatus ?? 'ok',
         bodyYaw: existing?.bodyYaw ?? 0,
+        platform: platformMetadata?.name ?? existing?.platform ?? 'go2',
+        platformMetadata,
+        runtimeState: existing?.runtimeState ?? 'standing',
+        fallReason: existing?.fallReason ?? 'none',
+        disabled: existing?.disabled ?? false,
+        controllerHealth: existing?.controllerHealth ?? null,
+        collisionCount: existing?.collisionCount ?? 0,
+        nearMissCount: existing?.nearMissCount ?? 0,
       });
     });
     set({ robots });
@@ -124,11 +152,21 @@ export const useRobotStore = create<RobotStoreState>((set, get) => ({
     for (const [robotId, robotStats] of Object.entries(stats.robots)) {
       const robot = robots.get(robotId);
       if (robot) {
+        const runtime = robotStats.runtime_status ?? null;
+        const platformMetadata = robotStats.platform ?? robot.platformMetadata;
         robots.set(robotId, {
           ...robot,
           coveragePct: robotStats.coverage_pct,
           voxelCount: robotStats.voxel_count,
           action: robotStats.action,
+          platform: platformMetadata?.name ?? robot.platform,
+          platformMetadata,
+          runtimeState: runtime?.state ?? robot.runtimeState,
+          fallReason: runtime?.fall_reason ?? robot.fallReason,
+          disabled: runtime?.disabled ?? robot.disabled,
+          controllerHealth: runtime?.controller_health ?? robot.controllerHealth,
+          collisionCount: runtime?.collision_count ?? robot.collisionCount,
+          nearMissCount: runtime?.near_miss_count ?? robot.nearMissCount,
         });
       }
     }

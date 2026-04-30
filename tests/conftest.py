@@ -12,6 +12,48 @@ from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.exploration.config import ExplorationConfig
 
 
+def _reload_modules(module_names: tuple[str, ...]) -> None:
+    import importlib
+
+    for module_name in module_names:
+        module = importlib.import_module(module_name)
+        importlib.reload(module)
+
+
+def _restore_builtin_registries() -> None:
+    from src.coordination.merge_registry import MergeRegistry
+    from src.perception.registry import Detection3DRegistry, DetectorRegistry
+    from src.slam.backends import register_builtin_backends
+
+    register_builtin_backends()
+
+    if not {"icp_union", "pgo_open3d", "pgo_gtsam"} <= MergeRegistry._strategies.keys():
+        _reload_modules((
+            "src.coordination.merge_strategies.icp_union",
+            "src.coordination.merge_strategies.pgo_open3d",
+            "src.coordination.merge_strategies.pgo_gtsam",
+        ))
+
+    if not {"yolov11", "rtdetrv2", "boxer"} <= DetectorRegistry._backends.keys():
+        _reload_modules((
+            "src.perception.backends.yolov11_backend",
+            "src.perception.backends.rtdetrv2_backend",
+            "src.perception.backends.boxer_backend",
+        ))
+
+    if not {"median_depth", "point_cluster"} <= Detection3DRegistry._backends.keys():
+        _reload_modules((
+            "src.perception.lifters.median_depth",
+            "src.perception.lifters.point_cluster",
+        ))
+
+
+@pytest.hookimpl(hookwrapper=True, trylast=True)
+def pytest_runtest_teardown(item, nextitem):
+    yield
+    _restore_builtin_registries()
+
+
 @pytest.fixture
 def mock_sensor_frame() -> SensorFrame:
     """Return a SensorFrame with random 64x64 RGB, 64x64 depth, identity pose."""
@@ -225,8 +267,8 @@ class MockMultiRobotBridge:
         pose = np.eye(4)
         pose[:3, 3] = self._positions[robot_id]
         return SensorFrame(
-            rgb=np.zeros((240, 320, 3), dtype=np.uint8),
-            depth=np.full((240, 320), 2.0, dtype=np.float32),
+            rgb=np.zeros((64, 64, 3), dtype=np.uint8),
+            depth=np.full((64, 64), 2.0, dtype=np.float32),
             ground_truth_pose=pose,
             sim_time=self._step_count * 0.02,
         )

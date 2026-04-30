@@ -33,37 +33,57 @@ import time
 from pathlib import Path
 
 import numpy as np
-import rerun as rr
+try:
+    import rerun as rr
+except ImportError:  # pragma: no cover - optional visualization dependency
+    rr = None
 # Phase 6 DET-METRICS-03: uvicorn is imported lazily inside ``run_web_mode``
 # so ``src.main`` can be imported (and ``--labeled-eval-set`` can raise its
 # NotImplementedError) in environments that lack the web-server deps.
 
-from backend.web.server import create_app
 from src.bridge.cloud_config import CLOUD_CONFIGS, get_active_config, set_active_config
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.multi_bridge import MultiRobotBridge
 from src.bridge.multi_robot_config import MultiRobotConfig
+from src.bridge.platforms import create_platform
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.bridge.sim_bridge import MuJoCoBridge
 from src.control.random_walk import RandomWalkController
 from src.control.waypoint_runner import WaypointRunner
-from src.coordination.coordinator import Coordinator
-from src.coordination.robot_instance import RobotInstance
 from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
 from src.exploration.config import ExplorationConfig
 from src.exploration.exploration_loop import ExplorationLoop
 from src.mcp.server import configure as configure_mcp, mcp_endpoint
-from src.metrics.drift_metrics import compute_drift_metrics
-from src.metrics.ground_truth import GroundTruthCollector
-from src.slam.octomap_builder import OctoMapBuilder
 from src.slam.registry import SLAMRegistry
-import src.slam.backends  # noqa: F401 -- triggers backend registration
-import src.perception.backends  # noqa: F401 -- triggers perception backend registration
-import src.perception.lifters  # noqa: F401 -- triggers perception 3D-lifter registration
-from src.viz.multi_robot_viz import MultiRobotVisualizer
-from src.viz.rerun_viz import RerunVisualizer
 
 logger = logging.getLogger(__name__)
+
+
+class _RobotInstanceProxy:
+    """Lazy module-level seam for tests without importing heavy robot deps."""
+
+    @staticmethod
+    def create(*args, **kwargs):
+        from src.coordination.robot_instance import RobotInstance as _RobotInstance
+
+        return _RobotInstance.create(*args, **kwargs)
+
+
+RobotInstance = _RobotInstanceProxy
+
+
+def Coordinator(*args, **kwargs):
+    """Lazy module-level seam for coordinator construction."""
+    from src.coordination.coordinator import Coordinator as _Coordinator
+
+    return _Coordinator(*args, **kwargs)
+
+
+def create_app(*args, **kwargs):
+    """Lazy module-level seam for FastAPI app creation."""
+    from backend.web.server import create_app as _create_app
+
+    return _create_app(*args, **kwargs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -146,6 +166,22 @@ def parse_args() -> argparse.Namespace:
         help="Web server port (default: 8000)",
     )
     parser.add_argument(
+        "--platform",
+        choices=["go2", "agibot_x2"],
+        default="go2",
+        help="Robot platform (default: go2)",
+    )
+    parser.add_argument(
+        "--x2-model-dir",
+        default="models/agibot_x2",
+        help="AGIBOT X2 model directory (default: models/agibot_x2)",
+    )
+    parser.add_argument(
+        "--x2-controller",
+        default=None,
+        help="AGIBOT X2 controller path (default: None)",
+    )
+    parser.add_argument(
         "--labeled-eval-set",
         dest="labeled_eval_set",
         default=None,
@@ -155,6 +191,17 @@ def parse_args() -> argparse.Namespace:
              "NotImplementedError per DET-METRICS-03 / CONTEXT D-10.",
     )
     return parser.parse_args()
+
+
+def _platform_config_from_args(args: argparse.Namespace) -> dict:
+    """Build platform-specific configuration from parsed CLI args."""
+    if getattr(args, "platform", "go2") != "agibot_x2":
+        return {}
+
+    config = {"model_dir": getattr(args, "x2_model_dir", "models/agibot_x2")}
+    if getattr(args, "x2_controller", None):
+        config["controller_path"] = args.x2_controller
+    return config
 
 
 def create_controller(mode: str) -> WaypointRunner | RandomWalkController:
@@ -187,6 +234,8 @@ def create_controller(mode: str) -> WaypointRunner | RandomWalkController:
 
 def run_explore_mode(args: argparse.Namespace) -> None:
     """Run autonomous frontier-based exploration."""
+    from src.slam.octomap_builder import OctoMapBuilder
+
     config = MuJoCoEnvConfig()
     bridge = MuJoCoBridge(config)
 
@@ -240,16 +289,27 @@ def run_explore_mode(args: argparse.Namespace) -> None:
 
 def run_multi_mode(args: argparse.Namespace) -> None:
     """Run two-robot coordinated exploration with map merging."""
+    from src.viz.multi_robot_viz import MultiRobotVisualizer
+
     scene = args.scene
     n_robots = args.num_robots
     robot_ids = generate_robot_ids(n_robots)
-    spawn_positions = generate_spawn_positions(robot_ids, scene)
+    platform_name = getattr(args, "platform", "go2")
+    platform_config = _platform_config_from_args(args)
+    platform_probe = create_platform(platform_name, **platform_config)
+    spawn_positions = generate_spawn_positions(
+        robot_ids,
+        scene,
+        spawn_height=platform_probe.metadata.spawn_height,
+    )
 
     config = MultiRobotConfig(
         robot_ids=robot_ids,
         spawn_positions=spawn_positions,
         boot_phase_steps=args.multi_boot_steps,
         scene=scene,
+        platform=platform_name,
+        platform_config=platform_config,
     )
     bridge = MultiRobotBridge(config)
 
@@ -314,7 +374,8 @@ def run_multi_mode(args: argparse.Namespace) -> None:
     bridge.stop()
 
     # Clean shutdown of Rerun to avoid gRPC segfault on exit
-    rr.disconnect()
+    if rr is not None:
+        rr.disconnect()
     time.sleep(0.5)
     print("Done.")
 
@@ -325,6 +386,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
     Starts the multi-robot simulation in a background thread and serves
     the React frontend via FastAPI.
     """
+    from src.slam.backends import register_builtin_backends
+
+    register_builtin_backends()
+
     # Phase 6 DET-METRICS-03: lazy-imported so ``src.main`` stays importable
     # (and ``--labeled-eval-set`` can raise its NotImplementedError) in
     # environments that lack uvicorn.
@@ -333,14 +398,23 @@ def run_web_mode(args: argparse.Namespace) -> None:
     scene = args.scene
     n_robots = args.num_robots
     robot_ids = generate_robot_ids(n_robots)
-    spawn_positions = generate_spawn_positions(robot_ids, scene)
+    platform_name = getattr(args, "platform", "go2")
+    platform_config = _platform_config_from_args(args)
+    platform_probe = create_platform(platform_name, **platform_config)
+    spawn_positions = generate_spawn_positions(
+        robot_ids,
+        scene,
+        spawn_height=platform_probe.metadata.spawn_height,
+    )
 
     config_kwargs = {
         "robot_ids": robot_ids,
         "spawn_positions": spawn_positions,
         "boot_phase_steps": args.multi_boot_steps,
         "scene": scene,
-        }
+        "platform": platform_name,
+        "platform_config": platform_config,
+    }
     config = MultiRobotConfig(**config_kwargs)
     bridge = MultiRobotBridge(config)
 
@@ -377,9 +451,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
 
     configure_mcp(coordinator, list(config.robot_ids))
 
+    platform_metadata = {
+        rid: platform_probe.metadata.to_wire()
+        for rid in config.robot_ids
+    }
+
     app, streaming_viz = create_app(
         list(config.robot_ids),
         command_cb=coordinator.handle_command,
+        platform_metadata=platform_metadata,
         slam_reset_cb=_reset_slam,
         mcp_endpoint=mcp_endpoint,
         cloud_config_fns={
@@ -450,7 +530,11 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         if rid in config.robot_ids
                     }
                 elif config.scene != "flat":
-                    config.spawn_positions = generate_spawn_positions(config.robot_ids, config.scene)
+                    config.spawn_positions = generate_spawn_positions(
+                        config.robot_ids,
+                        config.scene,
+                        spawn_height=platform_probe.metadata.spawn_height,
+                    )
                 logger.info("Spawn positions: %s", config.spawn_positions)
 
                 # Read pending config: pipeline graph config takes priority over individual selections
@@ -727,6 +811,12 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Initialize components
     # ------------------------------------------------------------------
+    import src.slam.backends  # noqa: F401 -- triggers backend registration
+    from src.metrics.drift_metrics import compute_drift_metrics
+    from src.metrics.ground_truth import GroundTruthCollector
+    from src.slam.octomap_builder import OctoMapBuilder
+    from src.viz.rerun_viz import RerunVisualizer
+
     config = MuJoCoEnvConfig()
     bridge = MuJoCoBridge(config)
 

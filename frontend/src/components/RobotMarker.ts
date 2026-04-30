@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import type { PlatformMetadata } from '../utils/messageTypes';
 import { OKABE_ITO } from '../utils/palette';
 
 /** Tracking status colors for robot markers (SLAM tracking state). */
@@ -23,8 +24,9 @@ export class RobotMarkerManager {
   private templateModel: THREE.Group | null = null;
   private modelLoaded = false;
   private modelFailed = false;
-  private pendingUpdates: Map<string, { position: [number, number, number]; colorIndex: number }> = new Map();
+  private pendingUpdates: Map<string, { position: [number, number, number]; colorIndex: number; platformMetadata?: PlatformMetadata | null }> = new Map();
   private fallbackGeometry: THREE.SphereGeometry;
+  private fallbackMarkerKeys: Map<string, string> = new Map();
 
   constructor(scene: THREE.Object3D) {
     this.scene = scene;
@@ -53,9 +55,9 @@ export class RobotMarkerManager {
         console.warn('[RobotMarker] Go2 GLB not available, using sphere fallback');
         this.modelFailed = true;
 
-        // Create sphere fallbacks for pending robots
+        // Create fallback markers for pending robots
         for (const [robotId, update] of this.pendingUpdates) {
-          this.createSphereMarker(robotId, update.position, update.colorIndex);
+          this.createFallbackMarker(robotId, update.position, update.colorIndex, update.platformMetadata);
         }
         this.pendingUpdates.clear();
       },
@@ -92,10 +94,46 @@ export class RobotMarkerManager {
     this.markers.set(robotId, clone);
   }
 
-  private createSphereMarker(
+  private getFallbackMarkerKey(platformMetadata?: PlatformMetadata | null): string {
+    if (platformMetadata?.name !== 'agibot_x2') {
+      return 'sphere';
+    }
+
+    const radius = platformMetadata.footprint_radius ?? 0.15;
+    const height = platformMetadata.dimensions?.[2] ?? radius * 2;
+    return `agibot_x2:${radius}:${height}`;
+  }
+
+  private disposeMarkerObject(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const material of materials) {
+          material.dispose();
+        }
+        if (mesh.geometry && mesh.geometry !== this.fallbackGeometry) {
+          mesh.geometry.dispose();
+        }
+      }
+    });
+  }
+
+  private removeMarker(robotId: string): void {
+    const obj = this.markers.get(robotId);
+    if (!obj) return;
+
+    this.disposeMarkerObject(obj);
+    this.scene.remove(obj);
+    this.markers.delete(robotId);
+    this.fallbackMarkerKeys.delete(robotId);
+  }
+
+  private createFallbackMarker(
     robotId: string,
     position: [number, number, number],
     colorIndex: number,
+    platformMetadata?: PlatformMetadata | null,
   ): void {
     const color = new THREE.Color(OKABE_ITO[colorIndex % 8]);
     const material = new THREE.MeshStandardMaterial({
@@ -103,11 +141,20 @@ export class RobotMarkerManager {
       emissive: color,
       emissiveIntensity: 0.3,
     });
-    const mesh = new THREE.Mesh(this.fallbackGeometry, material);
+    const dims = platformMetadata?.dimensions;
+    const radius = platformMetadata?.footprint_radius ?? 0.15;
+    const height = dims?.[2] ?? radius * 2;
+    const fallbackKey = this.getFallbackMarkerKey(platformMetadata);
+    const capsuleRadius = radius * 0.45;
+    const geometry = fallbackKey.startsWith('agibot_x2:')
+      ? new THREE.CapsuleGeometry(capsuleRadius, Math.max(0.1, height - capsuleRadius * 2), 8, 16).rotateX(Math.PI / 2)
+      : this.fallbackGeometry;
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `robot-marker-${robotId}`;
     mesh.position.set(position[0], position[1], position[2]);
     this.scene.add(mesh);
     this.markers.set(robotId, mesh);
+    this.fallbackMarkerKeys.set(robotId, fallbackKey);
   }
 
   /**
@@ -119,6 +166,7 @@ export class RobotMarkerManager {
    * @param rotation Optional 9-element flat 3x3 cam_xmat (row-major)
    * @param trackingStatus SLAM tracking state
    * @param bodyYaw MuJoCo body heading in radians (Z-axis rotation)
+   * @param platformMetadata Optional robot platform metadata for fallback rendering
    */
   updateRobot(
     robotId: string,
@@ -127,27 +175,38 @@ export class RobotMarkerManager {
     rotation?: number[],
     trackingStatus?: string,
     bodyYaw?: number,
+    platformMetadata?: PlatformMetadata | null,
   ): void {
     const existing = this.markers.get(robotId);
 
     if (existing) {
-      existing.position.set(position[0], position[1], position[2]);
+      let marker = existing;
+      const fallbackKey = this.fallbackMarkerKeys.get(robotId);
+      const nextFallbackKey = this.getFallbackMarkerKey(platformMetadata);
+
+      if (fallbackKey && fallbackKey !== nextFallbackKey) {
+        this.removeMarker(robotId);
+        this.createFallbackMarker(robotId, position, colorIndex, platformMetadata);
+        marker = this.markers.get(robotId) ?? existing;
+      }
+
+      marker.position.set(position[0], position[1], position[2]);
 
       // Use MuJoCo body yaw directly for robot heading
       if (bodyYaw !== undefined) {
-        existing.rotation.set(0, 0, bodyYaw);
+        marker.rotation.set(0, 0, bodyYaw);
       } else if (rotation && rotation.length === 9) {
         // Fallback: derive yaw from camera rotation matrix
         const lookX = -rotation[6];
         const lookY = -rotation[7];
         const yaw = Math.atan2(lookY, lookX) + Math.PI / 2;
-        existing.rotation.set(0, 0, yaw);
+        marker.rotation.set(0, 0, yaw);
       }
 
       // Tint robot marker by SLAM tracking status
       if (trackingStatus) {
         const statusColor = new THREE.Color(STATUS_COLORS[trackingStatus] ?? 0x00cc00);
-        existing.traverse((child) => {
+        marker.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
             mat.color.copy(statusColor);
@@ -160,7 +219,7 @@ export class RobotMarkerManager {
 
     // Model still loading — queue the update
     if (!this.modelLoaded && !this.modelFailed) {
-      this.pendingUpdates.set(robotId, { position, colorIndex });
+      this.pendingUpdates.set(robotId, { position, colorIndex, platformMetadata });
       return;
     }
 
@@ -168,7 +227,7 @@ export class RobotMarkerManager {
     if (this.modelLoaded && this.templateModel) {
       this.createMeshMarker(robotId, position, colorIndex);
     } else {
-      this.createSphereMarker(robotId, position, colorIndex);
+      this.createFallbackMarker(robotId, position, colorIndex, platformMetadata);
     }
   }
 
@@ -185,16 +244,11 @@ export class RobotMarkerManager {
   /** Release GPU resources for all markers. */
   dispose(): void {
     for (const obj of this.markers.values()) {
-      obj.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          const mesh = child as THREE.Mesh;
-          if (mesh.material) (mesh.material as THREE.Material).dispose();
-          if (mesh.geometry) mesh.geometry.dispose();
-        }
-      });
+      this.disposeMarkerObject(obj);
       this.scene.remove(obj);
     }
     this.markers.clear();
+    this.fallbackMarkerKeys.clear();
     this.fallbackGeometry.dispose();
   }
 }
