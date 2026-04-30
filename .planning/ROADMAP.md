@@ -65,7 +65,29 @@ Cross-cutting constraints:
   3. Placeholder adapters for residual policy, direct policy, MPC, and WBC can be registered/discovered without editing MuJoCo bridge internals; unavailable implementations fail explicitly at selection time, not mid-run.
   4. Single-robot and multi-robot bridge paths share the same controller/action abstraction where practical, with no duplicated evaluation-specific control loop.
   5. Controller selection metadata is emitted into environment/evaluation info so downstream metrics know which controller produced each action.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+
+**Wave 1**
+- [ ] 02-01-PLAN.md — Add locomotion controller protocol, registry, analytical baseline adapter, unavailable future-controller placeholders, and Wave 0 protocol/registry tests.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 02-02-PLAN.md — Add shared controller dispatch and validated control-target application helpers with fake-data tests.
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 02-03-PLAN.md — Wire `ArgusGo2Env` to registered controller selection and reset/step metadata attribution.
+- [ ] 02-04-PLAN.md — Refactor `MuJoCoBridge` internals to use the registered analytical controller seam while preserving `SensorFrame` returns.
+- [ ] 02-05-PLAN.md — Refactor `MultiRobotBridge` internals to use per-robot registered analytical controllers while preserving `dict[str, SensorFrame]` returns.
+
+**Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 02-06-PLAN.md — Run final Phase 2 test hardening and cross-plan coverage assertions for decisions, requirements, threats, and deferred boundaries.
+
+Cross-cutting constraints:
+- Implement all locked decisions D-01 through D-15 from `02-CONTEXT.md` exactly; do not implement deferred RL/direct/MPC/WBC/ROS/hardware/frontend selection work.
+- Validate controller ids and controller outputs before any MuJoCo `data.ctrl` mutation.
+- Preserve existing bridge public lifecycles and return contracts.
+- Emit controller metadata sufficient for downstream metrics/evaluation attribution.
+
 **Research flag**: standard
 
 ### Phase 3: locomotion-metrics-instrumentation
@@ -114,7 +136,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
-| 2. controller-plugin-baseline | 0/TBD | Not started | - |
+| 2. controller-plugin-baseline | 0/6 | Not started | - |
 | 3. locomotion-metrics-instrumentation | 0/TBD | Not started | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
@@ -135,4 +157,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 1 completed 2026-04-30. Continue with `/gsd-discuss-phase 2` for `controller-plugin-baseline`.
+Phase 2 planned 2026-04-30. Continue with `/gsd-execute-phase 2` for `controller-plugin-baseline`.

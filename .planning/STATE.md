@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: ready_to_plan
-stopped_at: Phase 2 context gathered; ready to plan controller-plugin-baseline (2026-04-30)
+status: ready_to_execute
+stopped_at: Phase 2 planned; ready to execute controller-plugin-baseline (2026-04-30)
 last_updated: "2026-04-30"
 last_activity: 2026-04-30
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 5
+  total_plans: 11
   completed_plans: 5
   percent: 20
 ---
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 ## Current Position
 
 Phase: 2 — controller-plugin-baseline
-Plan: Ready to plan
-Status: Phase 1 complete; Phase 2 context gathered
+Plan: 6 plans ready to execute
+Status: Phase 2 planned; ready to execute
 Last activity: 2026-04-30
 
 Progress: [██░░░░░░░░] 20%
@@ -69,7 +69,7 @@ No v4.0 execution metrics yet.
 
 ### Pending Todos
 
-- Start `/gsd-plan-phase 2` for `controller-plugin-baseline`.
+- Start `/gsd-execute-phase 2` for `controller-plugin-baseline`.
 - Address advisory code-review warning if desired: `ArgusGo2Env` advertises `rgb_array` render mode without implementing `render()`.
 
 ### Blockers/Concerns
@@ -93,6 +93,6 @@ No v4.0 execution metrics yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — Phase 1 completed and verified; Phase 2 context gathered
-Stopped at: ready to plan Phase 2 (`controller-plugin-baseline`)
-Resume file: .planning/phases/02-controller-plugin-baseline/02-CONTEXT.md
+Last activity: 2026-04-30 — Phase 2 planned and verified; ready to execute
+Stopped at: ready to execute Phase 2 (`controller-plugin-baseline`)
+Resume file: .planning/phases/02-controller-plugin-baseline/02-01-PLAN.md
