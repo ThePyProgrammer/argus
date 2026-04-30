@@ -16,6 +16,8 @@
 "0015" = { title = "Introduce Robot Platform Abstraction", status = "Proposed" }
 "0016" = { title = "Use MuJoCo First for AGIBOT X2 Simulation", status = "Proposed" }
 "0017" = { title = "Treat X2 Locomotion as External Walking Policy Boundary", status = "Proposed" }
+"0018" = { title = "Use Reproducible Gymnasium-Style Locomotion Benchmark Harness", status = "Proposed" }
+"0019" = { title = "Benchmark Locomotion Before Adding New Controller Families", status = "Proposed" }
 
 [edges]
 "0002" = ["0003", "0011", "0012", "0016"]
@@ -27,3 +29,5 @@
 "0010" = ["0013"]
 "0015" = ["0016", "0017"]
 "0016" = ["0017"]
+"0017" = ["0018", "0019"]
+"0018" = ["0019"]

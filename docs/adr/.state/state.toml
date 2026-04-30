@@ -1,7 +1,8 @@
 adr_directory = "docs/adr"
 project_root = "/home/prannayag/pragnition/robotics/argus"
 last_adr_created = "2026-04-30"
-last_adr_number = 17
+last_advice_process = "2026-04-30"
+last_adr_number = 19
 
 [paths]
 architecture = "docs/ARCHITECTURE.md"
