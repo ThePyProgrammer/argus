@@ -129,6 +129,75 @@ def test_records_stability_failure_and_distance_before_failure():
     assert no_failure_summary.stability["fall_rate"] == 0.0
 
 
+def test_zero_command_stationary_steps_do_not_progress_stall():
+    config = LocomotionMetricsConfig(
+        progress_window_steps=3,
+        min_progress_m_per_s=0.001,
+        min_progress_command_speed_m_per_s=0.05,
+    )
+    collector = LocomotionMetricsCollector(config)
+
+    steps = [
+        _record_step(
+            collector,
+            desired_command=(0.0, 0.0, 0.0),
+            base_xy_position=(0.0, 0.0),
+        )
+        for _ in range(config.progress_window_steps + 3)
+    ]
+
+    assert all(step.failure_reason is None for step in steps)
+    summary = collector.episode_summary()
+    assert summary.success is True
+    assert summary.failure_reason is None
+
+
+def test_yaw_only_stationary_steps_do_not_progress_stall():
+    config = LocomotionMetricsConfig(
+        progress_window_steps=3,
+        min_progress_m_per_s=0.001,
+        min_progress_command_speed_m_per_s=0.05,
+    )
+    collector = LocomotionMetricsCollector(config)
+
+    steps = [
+        _record_step(
+            collector,
+            desired_command=(0.0, 0.0, 0.8),
+            base_xy_position=(0.0, 0.0),
+        )
+        for _ in range(config.progress_window_steps + 3)
+    ]
+
+    assert all(step.failure_reason is None for step in steps)
+    summary = collector.episode_summary()
+    assert summary.success is True
+    assert summary.failure_reason is None
+
+
+def test_nonzero_translational_command_still_progress_stalls_when_stationary():
+    config = LocomotionMetricsConfig(
+        progress_window_steps=3,
+        min_progress_m_per_s=0.001,
+        min_progress_command_speed_m_per_s=0.05,
+    )
+    collector = LocomotionMetricsCollector(config)
+
+    steps = [
+        _record_step(
+            collector,
+            desired_command=(0.2, 0.0, 0.0),
+            base_xy_position=(0.0, 0.0),
+        )
+        for _ in range(config.progress_window_steps + 3)
+    ]
+
+    assert any(step.failure_reason == "progress_stalled" for step in steps[config.progress_window_steps :])
+    summary = collector.episode_summary()
+    assert summary.success is False
+    assert summary.failure_reason == "progress_stalled"
+
+
 def test_records_action_quality_metrics():
     """LOC-METRICS-03: D-13 D-14 D-15 D-16 action-quality proxy metrics."""
     collector = LocomotionMetricsCollector()

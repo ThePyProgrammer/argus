@@ -168,6 +168,39 @@ def test_terminal_or_truncated_step_contains_episode_summary():
     assert info["locomotion_metrics_summary"]["failure_reason"] is None
 
 
+def test_zero_command_standing_does_not_terminate_progress_stalled():
+    config = ArgusGo2EnvConfig(
+        sim_steps_per_frame=1,
+        max_episode_steps=20,
+        metrics_config=LocomotionMetricsConfig(
+            progress_window_steps=3,
+            min_progress_m_per_s=0.001,
+            min_progress_command_speed_m_per_s=0.05,
+        ),
+    )
+    env, data = _make_env(config)
+    action = np.zeros(3, dtype=np.float32)
+
+    def dispatch_controller(_controller, _observation, _command, _dt, data=None, ctrl_indices=None):
+        return ControllerResult(action=np.zeros(12, dtype=np.float64), metadata={"source": "test"})
+
+    def mj_step(_model, fake_data):
+        fake_data.time += 0.002
+
+    try:
+        with patch("src.locomotion.env.dispatch_controller", side_effect=dispatch_controller):
+            for _ in range(config.metrics_config.progress_window_steps + 3):
+                _obs, _reward, terminated, truncated, info = _step_once(env, action, mj_step)
+                assert terminated is False
+                assert truncated is False
+                assert info["locomotion_metrics"]["stability"]["failure_reason"] != "progress_stalled"
+            np.testing.assert_allclose(data.qpos[0:2], [0.0, 0.0])
+            assert data.qpos[2] == pytest.approx(0.30)
+            assert env.last_locomotion_metrics_summary is None
+    finally:
+        env.close()
+
+
 def test_reset_starts_fresh_episode_metrics_without_clearing_baseline():
     """D-03: reset starts fresh active buffer while preserving captured baseline."""
     env = ArgusGo2Env(ArgusGo2EnvConfig(sim_steps_per_frame=1))
