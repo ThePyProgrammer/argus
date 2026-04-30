@@ -90,6 +90,22 @@ def test_policy_rejects_non_finite_lower_bounds(tmp_path):
         X2PolicyController(actuator_count=4, policy_path=policy_path)
 
 
+def test_policy_rejects_lower_bounds_greater_than_upper_bounds(tmp_path):
+    policy_path = tmp_path / "policy.npz"
+    obs_dim = 3 + 3 + 4 + 4
+    np.savez(
+        policy_path,
+        weights=np.ones((obs_dim, 4), dtype=np.float64),
+        bias=np.zeros(4, dtype=np.float64),
+        lower=np.array([-1.0, 2.0, -1.0, -1.0], dtype=np.float64),
+        upper=np.full(4, 1.0, dtype=np.float64),
+        default_qpos=np.zeros(4, dtype=np.float64),
+    )
+
+    with pytest.raises(ValueError, match="lower bounds must be less than or equal to upper bounds"):
+        X2PolicyController(actuator_count=4, policy_path=policy_path)
+
+
 def test_policy_rejects_non_finite_default_qpos(tmp_path):
     policy_path = tmp_path / "policy.npz"
     obs_dim = 3 + 3 + 4 + 4

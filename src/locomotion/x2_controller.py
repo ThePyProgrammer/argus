@@ -109,6 +109,9 @@ class X2PolicyController:
             self.lower = self._bounds_or_raise(policy["lower"], "lower") if "lower" in policy else self.lower
             self.upper = self._bounds_or_raise(policy["upper"], "upper") if "upper" in policy else self.upper
 
+        if np.any(self.lower > self.upper):
+            raise ValueError("lower bounds must be less than or equal to upper bounds")
+
         if weights.ndim != 2 or weights.shape[1] != self.actuator_count:
             self._policy_loaded = False
             self._health = ControllerHealth(
