@@ -29,6 +29,10 @@ class AgibotX2Platform:
         expected_actuator_count: int = 31,
     ) -> None:
         self._controller_path = controller_path
+        self._xml_root_cache: ET.Element | None = None
+        self._actuator_names_cache: tuple[str, ...] | None = None
+        self._initial_joint_qpos_cache: np.ndarray | None = None
+        self._root_body_name_cache: str | None = None
         self._metadata = RobotPlatformMetadata(
             name="agibot_x2",
             display_name="AGIBOT X2 Ultra",
@@ -59,6 +63,9 @@ class AgibotX2Platform:
             raise FileNotFoundError(f"AGIBOT X2 model XML not found: {path}") from exc
 
     def actuator_names(self) -> tuple[str, ...]:
+        if self._actuator_names_cache is not None:
+            return self._actuator_names_cache
+
         root = self._xml_root()
         actuator = root.find("actuator")
         names: tuple[str, ...]
@@ -73,21 +80,29 @@ class AgibotX2Platform:
             raise ValueError(
                 f"expected {self._metadata.actuator_count} AGIBOT X2 actuators, found {len(names)} in {self.model_xml_path()}"
             )
+        self._actuator_names_cache = names
         return names
 
     def initial_joint_qpos(self) -> np.ndarray:
+        if self._initial_joint_qpos_cache is not None:
+            return self._initial_joint_qpos_cache.copy()
+
         root = self._xml_root()
         key = root.find("keyframe/key")
         if key is None or "qpos" not in key.attrib:
-            return np.zeros(self._metadata.actuator_count, dtype=np.float64)
-
-        qpos = np.fromstring(key.attrib["qpos"], sep=" ", dtype=np.float64)
-        joint_qpos = qpos[7:7 + self._metadata.actuator_count]
-        if joint_qpos.shape != (self._metadata.actuator_count,):
-            return np.zeros(self._metadata.actuator_count, dtype=np.float64)
+            joint_qpos = np.zeros(self._metadata.actuator_count, dtype=np.float64)
+        else:
+            qpos = np.fromstring(key.attrib["qpos"], sep=" ", dtype=np.float64)
+            joint_qpos = qpos[7:7 + self._metadata.actuator_count]
+            if joint_qpos.shape != (self._metadata.actuator_count,):
+                joint_qpos = np.zeros(self._metadata.actuator_count, dtype=np.float64)
+        self._initial_joint_qpos_cache = joint_qpos.copy()
         return joint_qpos.copy()
 
     def root_body_name(self) -> str:
+        if self._root_body_name_cache is not None:
+            return self._root_body_name_cache
+
         root = self._xml_root()
         body = root.find("worldbody/body")
         if body is None:
@@ -95,6 +110,7 @@ class AgibotX2Platform:
         name = body.attrib.get("name")
         if not name:
             raise ValueError(f"AGIBOT X2 root body is unnamed in {self.model_xml_path()}")
+        self._root_body_name_cache = name
         return name
 
     def camera_spec(self, robot_id: str) -> dict[str, str]:
@@ -113,19 +129,33 @@ class AgibotX2Platform:
             default_qpos=self.initial_joint_qpos(),
         )
 
+    def _qvel_start_for_qpos(self, model: Any, qpos_start: int) -> int:
+        if model is None or not hasattr(model, "jnt_qposadr") or not hasattr(model, "jnt_dofadr"):
+            return qpos_start
+
+        qpos_addresses = np.asarray(model.jnt_qposadr)
+        matches = np.flatnonzero(qpos_addresses == qpos_start)
+        if matches.size == 0:
+            return qpos_start
+
+        dof_addresses = np.asarray(model.jnt_dofadr)
+        joint_id = int(matches[0])
+        if joint_id >= dof_addresses.size:
+            return qpos_start
+        return int(dof_addresses[joint_id])
+
     def extract_state(self, model: Any, data: Any, qpos_start: int, sim_time: float) -> RobotState:
-        _ = model
         actuator_count = len(self.actuator_names())
         pose = np.eye(4, dtype=np.float64)
         pose[:3, 3] = np.asarray(data.qpos[qpos_start:qpos_start + 3], dtype=np.float64)
         quat = np.asarray(data.qpos[qpos_start + 3:qpos_start + 7], dtype=np.float64)
         pose[:3, :3] = quat_to_rotation_matrix(quat)
-        qvel_start = qpos_start + 6
+        qvel_start = self._qvel_start_for_qpos(model, qpos_start)
         return self._state_from_arrays(
             base_pose=pose,
-            base_velocity=np.asarray(data.qvel[qpos_start:qpos_start + 3], dtype=np.float64),
+            base_velocity=np.asarray(data.qvel[qvel_start:qvel_start + 3], dtype=np.float64),
             joint_positions=np.asarray(data.qpos[qpos_start + 7:qpos_start + 7 + actuator_count], dtype=np.float64),
-            joint_velocities=np.asarray(data.qvel[qvel_start:qvel_start + actuator_count], dtype=np.float64),
+            joint_velocities=np.asarray(data.qvel[qvel_start + 6:qvel_start + 6 + actuator_count], dtype=np.float64),
             orientation_quat=quat,
             sim_time=sim_time,
         )
@@ -213,4 +243,6 @@ class AgibotX2Platform:
         )
 
     def _xml_root(self) -> ET.Element:
-        return ET.fromstring(self.read_model_xml())
+        if self._xml_root_cache is None:
+            self._xml_root_cache = ET.fromstring(self.read_model_xml())
+        return self._xml_root_cache

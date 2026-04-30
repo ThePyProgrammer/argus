@@ -70,6 +70,45 @@ def test_x2_missing_asset_fails_with_clear_path(tmp_path):
         raise AssertionError("missing X2 asset did not raise FileNotFoundError")
 
 
+def test_x2_extract_state_uses_model_dof_address_for_nonzero_qpos_start(tmp_path):
+    model_dir = _write_fixture_model(tmp_path)
+    platform = AgibotX2Platform(model_dir=str(model_dir), expected_actuator_count=3)
+    qpos_start = 10
+    model = type(
+        "FakeModel",
+        (),
+        {
+            "jnt_qposadr": np.array([0, qpos_start]),
+            "jnt_dofadr": np.array([0, 9]),
+        },
+    )()
+    qpos = np.zeros(20, dtype=np.float64)
+    qpos[qpos_start:qpos_start + 7] = [0.0, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0]
+    qpos[qpos_start + 7:qpos_start + 10] = [0.1, 0.2, 0.3]
+    qvel = np.arange(30, dtype=np.float64)
+    data = type("FakeData", (), {"qpos": qpos, "qvel": qvel})()
+
+    state = platform.extract_state(model, data, qpos_start=qpos_start, sim_time=1.25)
+
+    np.testing.assert_allclose(state.base_velocity, [9.0, 10.0, 11.0])
+    np.testing.assert_allclose(state.joint_velocities, [15.0, 16.0, 17.0])
+
+
+def test_x2_extract_state_uses_cached_actuator_count_without_rereading_xml(tmp_path):
+    model_dir = _write_fixture_model(tmp_path)
+    platform = AgibotX2Platform(model_dir=str(model_dir), expected_actuator_count=3)
+    assert platform.actuator_names() == ("left_hip_pitch", "right_hip_pitch", "left_knee")
+    (model_dir / "x2_ultra.xml").unlink()
+    qpos = np.array([0.0, 0.0, 0.85, 1.0, 0.0, 0.0, 0.0, 0.1, 0.2, 0.3], dtype=np.float64)
+    qvel = np.array([0.4, 0.5, 0.6, 0.0, 0.0, 0.0, 1.1, 1.2, 1.3], dtype=np.float64)
+    data = type("FakeData", (), {"qpos": qpos, "qvel": qvel})()
+
+    state = platform.extract_state(model=None, data=data, qpos_start=0, sim_time=2.0)
+
+    np.testing.assert_allclose(state.base_velocity, [0.4, 0.5, 0.6])
+    np.testing.assert_allclose(state.joint_velocities, [1.1, 1.2, 1.3])
+
+
 def test_x2_runtime_status_detects_base_height_fall(tmp_path):
     model_dir = _write_fixture_model(tmp_path)
     platform = AgibotX2Platform(model_dir=str(model_dir), expected_actuator_count=3)
