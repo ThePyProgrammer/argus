@@ -2,7 +2,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from src.bridge import platforms
+from src.bridge.platforms import registry
 from src.bridge.platforms.base import RobotController
 from src.bridge.platforms.registry import (
     clear_platform_registry,
@@ -79,8 +82,19 @@ class _Platform:
         return RobotRuntimeStatus(last_command=last_command, controller_health=controller_health)
 
 
-def setup_function():
+@pytest.fixture(autouse=True)
+def isolated_platform_registry():
     clear_platform_registry()
+    yield
+    clear_platform_registry()
+
+
+def test_package_namespace_exports_registry_functions():
+    assert platforms.clear_platform_registry is registry.clear_platform_registry
+    assert platforms.create_platform is registry.create_platform
+    assert platforms.list_platforms is registry.list_platforms
+    assert platforms.register_platform is registry.register_platform
+
 
 
 def test_register_and_create_platform():
