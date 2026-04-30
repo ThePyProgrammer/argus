@@ -15,7 +15,12 @@ import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix, IMUReading
-from src.locomotion.gait_controller import TrotGaitController
+from src.locomotion.controller_dispatch import (
+    apply_controller_target,
+    command_from_velocity,
+    compute_controller_action,
+)
+from src.locomotion.controllers import ControllerRegistry, LocomotionCommand
 from src.locomotion.gait_params import GaitParams
 from src.locomotion.xml_patcher import patch_actuators_to_position, patch_actuators_to_position_with_floor
 
@@ -50,8 +55,8 @@ class MuJoCoBridge:
         self._angular_vel: float = 0.0
         # Camera ID (added programmatically)
         self._cam_id: int = -1
-        # Trot gait controller for locomotion
-        self._gait = TrotGaitController()
+        # Registered analytical controller for locomotion
+        self._controller = ControllerRegistry.create("analytical_trot")
         # IMU sensor addresses (populated in start() if sensors exist)
         self._has_imu: bool = False
         self._accel_adr: int = 0
@@ -111,9 +116,11 @@ class MuJoCoBridge:
             self._data.qpos[7:19] = STANDING_QPOS
 
         # Settle the robot (let it land on ground)
-        standing = self._gait.compute(0.0, 0.0, 0.0, 0.0)
+        self._controller.reset()
+        standing_command = command_from_velocity(np.zeros(2), 0.0)
+        standing = compute_controller_action(self._controller, {}, standing_command, 0.0)
         for _ in range(200):
-            self._data.ctrl[:] = standing
+            apply_controller_target(self._data, standing.action)
             mujoco.mj_step(self._model, self._data)
 
         # Create offscreen renderer
@@ -147,11 +154,11 @@ class MuJoCoBridge:
             raise RuntimeError("Bridge not started -- call start() first")
 
         if action is not None:
-            self._data.ctrl[:] = action
+            apply_controller_target(self._data, action)
         else:
-            # Convert velocity command to joint targets for a simple walk
+            # Convert velocity command to joint targets through the registered controller seam
             ctrl = self._velocity_to_ctrl()
-            self._data.ctrl[:] = ctrl
+            apply_controller_target(self._data, ctrl)
 
         # Step physics multiple times per frame, collecting IMU at each sub-step
         imu_readings: list[IMUReading] = []
@@ -194,17 +201,21 @@ class MuJoCoBridge:
         self._linear_vel = np.asarray(linear, dtype=np.float64)
         self._angular_vel = float(angular)
 
-    def _velocity_to_ctrl(self) -> np.ndarray:
-        """Convert buffered velocity to joint position targets.
+    def _velocity_command(self) -> LocomotionCommand:
+        """Build a typed command from buffered bridge velocities."""
+        return command_from_velocity(self._linear_vel, self._angular_vel)
 
-        Uses TrotGaitController for proper trot gait with position-controlled
-        actuators, producing actual locomotion via diagonal pair alternation
-        and differential stride turning.
+    def _velocity_to_ctrl(self) -> np.ndarray:
+        """Convert buffered velocity to validated joint position targets.
+
+        Uses the registered analytical_trot controller seam for proper trot gait
+        with position-controlled actuators, producing actual locomotion via
+        diagonal pair alternation and differential stride turning.
         """
         dt = self._dt  # self._dt already includes sim_steps_per_frame
-        vx = float(self._linear_vel[0]) if len(self._linear_vel) > 0 else 0.0
-        vy = float(self._linear_vel[1]) if len(self._linear_vel) > 1 else 0.0
-        return self._gait.compute(vx, vy, self._angular_vel, dt)
+        command = self._velocity_command()
+        result = compute_controller_action(self._controller, {}, command, dt)
+        return result.action
 
     # ------------------------------------------------------------------
     # Observation capture
