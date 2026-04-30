@@ -69,6 +69,7 @@ class ArgusGo2Env(gymnasium.Env):
         self._step_count = 0
         self._command = np.zeros(3, dtype=np.float32)
         self._previous_action = np.zeros(12, dtype=np.float32)
+        self._gait = TrotGaitController()
 
         if options and options.get("load_model", False):
             self._ensure_model_loaded()

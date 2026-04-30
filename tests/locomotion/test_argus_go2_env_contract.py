@@ -75,3 +75,18 @@ def test_step_returns_gymnasium_five_tuple():
     assert info["scenario_id"] == "flat_ground"
     assert info["action_mode"] == "velocity_command"
     assert info["step_count"] == 1
+
+
+def test_same_seed_reset_reproduces_first_nonzero_action():
+    _skip_if_mujoco_python_unsupported()
+    env = ArgusGo2Env()
+    action = np.array([0.2, 0.0, 0.0], dtype=np.float32)
+    try:
+        env.reset(seed=123)
+        first_obs, *_ = env.step(action)
+        env.reset(seed=123)
+        second_obs, *_ = env.step(action)
+    finally:
+        env.close()
+
+    np.testing.assert_allclose(first_obs["previous_action"], second_obs["previous_action"])
