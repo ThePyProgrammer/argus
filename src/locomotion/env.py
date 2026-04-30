@@ -8,6 +8,8 @@ from typing import Any
 import gymnasium
 import numpy as np
 from src.locomotion.actions import ACTION_MODE_VELOCITY, build_action_space, decode_action
+from src.locomotion.controller_dispatch import command_from_velocity, dispatch_controller
+from src.locomotion.controllers import ControllerRegistry
 from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.gait_params import GaitParams
 from src.locomotion.observations import build_observation_space, extract_observation
@@ -18,6 +20,7 @@ from src.locomotion.scenarios import ScenarioSample, build_scenario_xml, sample_
 class ArgusGo2EnvConfig:
     scenario_id: str = "flat_ground"
     action_mode: str = "velocity_command"
+    controller_id: str = "analytical_trot"
     model_dir: str | None = None
     sim_steps_per_frame: int = 10
     max_episode_steps: int = 500
@@ -54,6 +57,8 @@ class ArgusGo2Env(gymnasium.Env):
         self._renderer: Any = None
         self._dt = 0.002 * self.config.sim_steps_per_frame
         self._active_push: dict[str, float] | None = None
+        self._controller = ControllerRegistry.create(self.config.controller_id)
+        self._controller_metadata = self._metadata_for_controller(self.config.controller_id)
         self._gait = TrotGaitController()
 
     def reset(
@@ -80,6 +85,7 @@ class ArgusGo2Env(gymnasium.Env):
         )
         self._previous_action = np.zeros(12, dtype=np.float32)
         self._active_push = None
+        self._controller.reset(seed=seed)
         self._gait = TrotGaitController()
 
         self._try_initialize_mujoco()
@@ -96,23 +102,38 @@ class ArgusGo2Env(gymnasium.Env):
         command = self._command
         if self.config.action_mode != ACTION_MODE_VELOCITY:
             command = self._command_at_time(self._current_sim_time())
-        ctrl = decode_action(
-            action,
-            self.config.action_mode,
-            self._gait,
-            self._dt,
-            command,
-        )
         if self.config.action_mode == ACTION_MODE_VELOCITY:
-            self._command = np.asarray(action, dtype=np.float32).copy()
+            velocity_action = self._validate_velocity_action(action)
+            command_obj = command_from_velocity(
+                velocity_action[:2],
+                float(velocity_action[2]),
+                metadata={"controller_id": self.config.controller_id},
+            )
+            result = dispatch_controller(
+                self._controller,
+                extract_observation(self._data, self._command, self._previous_action),
+                command_obj,
+                self._dt,
+                data=self._data,
+            )
+            ctrl = result.action
+            self._command = velocity_action.copy()
         else:
+            ctrl = decode_action(
+                action,
+                self.config.action_mode,
+                self._gait,
+                self._dt,
+                command,
+            )
             self._command = command
         self._previous_action = ctrl.astype(np.float32)
 
         if self._data is not None:
             import mujoco
 
-            self._data.ctrl[:] = self._previous_action
+            if self.config.action_mode != ACTION_MODE_VELOCITY:
+                self._data.ctrl[:] = self._previous_action
             self._apply_push_disturbance()
             for _ in range(self.config.sim_steps_per_frame):
                 mujoco.mj_step(self._model, self._data)
@@ -143,6 +164,18 @@ class ArgusGo2Env(gymnasium.Env):
         if self.config.model_dir is not None:
             return Path(self.config.model_dir).expanduser().resolve()
         return Path(__file__).resolve().parents[2] / "models" / "unitree_go2"
+
+    def _validate_velocity_action(self, action: np.ndarray) -> np.ndarray:
+        vector = np.asarray(action, dtype=np.float32)
+        if vector.shape != (3,):
+            raise ValueError(f"Velocity command action must have shape (3,), got {vector.shape}")
+        if not np.all(np.isfinite(vector)):
+            raise ValueError("Velocity command action values must be finite")
+        low = self.action_space.low.astype(np.float32)
+        high = self.action_space.high.astype(np.float32)
+        if np.any(vector < low) or np.any(vector > high):
+            raise ValueError("Velocity command action values must be within the action space bounds")
+        return vector.copy()
 
     def _try_initialize_mujoco(self) -> None:
         if self._model is not None and self._data is not None:
@@ -251,12 +284,32 @@ class ArgusGo2Env(gymnasium.Env):
             return float(self._data.time)
         return self._step_count * self._dt
 
+    def _metadata_for_controller(self, controller_id: str) -> dict[str, Any]:
+        for entry in ControllerRegistry.list_controllers():
+            if entry["name"] == controller_id:
+                return {
+                    "controller_id": entry["controller_id"],
+                    "display_name": entry["display_name"],
+                    "family": entry["family"],
+                    "action_mode": entry["action_mode"],
+                    "deterministic": entry["deterministic"],
+                    "parameter_hash": entry["parameter_hash"],
+                    "parameter_summary": dict(entry["parameter_summary"]),
+                    "capabilities": dict(entry["capabilities"]),
+                    "available": entry["available"],
+                }
+        raise ValueError(
+            f"Unknown locomotion controller '{controller_id}'. "
+            f"Available: {[entry['name'] for entry in ControllerRegistry.list_controllers()]}"
+        )
+
     def _info(self) -> dict[str, Any]:
         sample = self._scenario_sample
-        return {
+        info = {
             "seed": self._last_seed,
             "scenario_id": sample.scenario_id if sample is not None else self.config.scenario_id,
             "action_mode": self.config.action_mode,
+            "controller_id": self.config.controller_id,
             "step_count": self._step_count,
             "sim_time": self._current_sim_time(),
             "spawn_pose": sample.spawn_pose if sample is not None else None,
@@ -265,3 +318,6 @@ class ArgusGo2Env(gymnasium.Env):
             "disturbance_schedule": tuple(dict(item) for item in sample.disturbance_schedule) if sample is not None else (),
             "active_push": dict(self._active_push) if self._active_push is not None else None,
         }
+        if self._step_count == 0:
+            info["controller_metadata"] = dict(self._controller_metadata)
+        return info
