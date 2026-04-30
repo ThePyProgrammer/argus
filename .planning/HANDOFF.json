@@ -1,0 +1,94 @@
+{
+  "created_at": "2026-04-30T00:00:00Z",
+  "workflow": "gsd-pause-work",
+  "worktree": "/home/prannayag/pragnition/robotics/argus/.worktrees/agibot-x2-adaptation",
+  "branch": "agibot-x2-adaptation",
+  "status": "paused_after_task_10",
+  "latest_approved_commit": "546b156 fix: wire platform metadata into web app",
+  "plan_reference": "/home/prannayag/pragnition/robotics/argus/docs/superpowers/plans/2026-04-30-agibot-x2-adaptation-design.md",
+  "note": "The original plan file path was not present in this worktree during pause; resume from the session handoff and git history.",
+  "completed_tasks": [
+    {
+      "task": 1,
+      "title": "Platform data contracts",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 2,
+      "title": "Platform registry",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 3,
+      "title": "Go2 platform wrapper",
+      "status": "completed_and_reviewed",
+      "latest_commit": "3e68c82 fix: harden Go2 platform wrapper"
+    },
+    {
+      "task": 4,
+      "title": "X2 walking-controller boundary",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 5,
+      "title": "AGIBOT X2 platform",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 6,
+      "title": "Generic collision and near-miss state",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 7,
+      "title": "Generic scene builder and config platform selection",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 8,
+      "title": "Refactor MultiRobotBridge through RobotPlatform",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 9,
+      "title": "Coordinator generic commands and disabled-robot isolation",
+      "status": "completed_and_reviewed"
+    },
+    {
+      "task": 10,
+      "title": "Backend platform metadata and runtime status stream",
+      "status": "completed_and_reviewed",
+      "commits": [
+        "6480611 feat: stream robot platform runtime state",
+        "546b156 fix: wire platform metadata into web app"
+      ]
+    }
+  ],
+  "pending_tasks": [
+    {
+      "task": 11,
+      "title": "Frontend store and message contracts",
+      "status": "not_started"
+    },
+    {
+      "task": 12,
+      "title": "Remaining AGIBOT X2 adaptation plan tasks",
+      "status": "not_started_or_unverified"
+    }
+  ],
+  "current_work": {
+    "last_user_command": "/gsd-pause-work",
+    "handoff_artifacts_written": true,
+    "wip_commit_requested": true,
+    "modified_before_handoff": [
+      ".planning/STATE.md"
+    ]
+  },
+  "resume_instructions": [
+    "Stay in the existing worktree; do not create a new worktree.",
+    "Continue using superpowers:subagent-driven-development.",
+    "Start with Task 11: Frontend store and message contracts, unless the recovered plan says otherwise.",
+    "For each task, dispatch a fresh implementer subagent, run spec-compliance review, run code-quality review, fix all review issues, and commit atomically.",
+    "Use uv run pytest for backend tests. For frontend changes, start the dev server and verify in browser before declaring completion."
+  ]
+}
