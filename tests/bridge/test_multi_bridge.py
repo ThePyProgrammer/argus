@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 
 from src.bridge.multi_robot_config import MultiRobotConfig
-from src.bridge.scene_builder import build_two_robot_scene
+from src.bridge.platforms.go2 import Go2Platform
+from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_scene
 from src.bridge.sensor_types import SensorFrame
 
 
@@ -29,6 +30,16 @@ def test_multi_robot_config_defaults():
     assert config.boot_phase_steps == 200
     assert config.sim_steps_per_frame == 5
     assert config.model_dir == "models/unitree_go2"
+
+
+def test_multi_robot_config_accepts_platform_name_and_config():
+    config = MultiRobotConfig(
+        platform="agibot_x2",
+        platform_config={"model_dir": "models/agibot_x2"},
+    )
+
+    assert config.platform == "agibot_x2"
+    assert config.platform_config == {"model_dir": "models/agibot_x2"}
 
 
 # ---------- Scene builder tests ----------
@@ -53,6 +64,24 @@ def test_build_two_robot_scene_valid_xml():
     assert "robot_a_FL_hip" in xml_str
     assert "robot_b_FR_hip" in xml_str
     # Should have cameras
+    assert "robot_a_cam" in xml_str
+    assert "robot_b_cam" in xml_str
+
+
+@pytest.mark.skipif(not _HAS_MODEL, reason="go2.xml model file not found")
+def test_build_multi_robot_scene_uses_platform_camera_and_prefixes():
+    platform = Go2Platform()
+    xml_str, assets = build_multi_robot_scene(
+        platform=platform,
+        spawn_positions={"robot_a": (0.0, 0.0, 0.3), "robot_b": (5.0, 0.0, 0.3)},
+    )
+
+    assert isinstance(xml_str, str)
+    assert isinstance(assets, dict)
+    assert "robot_a_base" in xml_str
+    assert "robot_b_base" in xml_str
+    assert "robot_a_FL_hip" in xml_str
+    assert "robot_b_FR_hip" in xml_str
     assert "robot_a_cam" in xml_str
     assert "robot_b_cam" in xml_str
 

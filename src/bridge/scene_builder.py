@@ -19,6 +19,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from src.bridge.platforms.base import RobotPlatform
+from src.bridge.platforms.go2 import Go2Platform
 from src.locomotion.xml_patcher import patch_actuators_to_position
 
 
@@ -43,65 +45,69 @@ def _prefix_element(elem: ET.Element, prefix: str) -> None:
         _prefix_element(child, prefix)
 
 
-def build_two_robot_scene(
-    model_dir: str,
+def _collect_assets(model_path: Path) -> dict[str, bytes]:
+    """Collect robot model assets from conventional MuJoCo asset directories."""
+    assets: dict[str, bytes] = {}
+    for dirname in ("assets", "meshes"):
+        asset_dir = model_path / dirname
+        if not asset_dir.exists():
+            continue
+        for path in asset_dir.iterdir():
+            if path.is_file() and path.name not in assets:
+                assets[path.name] = path.read_bytes()
+    return assets
+
+
+def _copy_required(root: ET.Element, tag: str) -> ET.Element:
+    elem = root.find(tag)
+    if elem is None:
+        raise ValueError(f"robot model XML is missing required <{tag}> section")
+    return copy.deepcopy(elem)
+
+
+def _absolutize_asset_dirs(compiler: ET.Element, model_path: Path) -> None:
+    for attr in ("meshdir", "texturedir"):
+        value = compiler.attrib.get(attr)
+        if value:
+            compiler.attrib[attr] = str((model_path / value).resolve())
+
+
+def build_multi_robot_scene(
+    platform: RobotPlatform,
     spawn_positions: dict[str, tuple[float, float, float]],
-) -> str:
-    """Build a MuJoCo XML scene containing N Go2 robots.
+) -> tuple[str, dict[str, bytes]]:
+    """Build a generic MuJoCo XML scene using robot platform metadata."""
+    model_path = Path(platform.metadata.model_dir)
+    robot_root = ET.fromstring(platform.read_model_xml())
 
-    Reads go2.xml from model_dir, duplicates the robot body and actuators
-    with per-robot prefixes, and inserts them into a scene with floor
-    and lighting.
-
-    Args:
-        model_dir: Path to directory containing go2.xml and assets/.
-        spawn_positions: Mapping from robot_id to (x, y, z) world position.
-
-    Returns:
-        Combined MuJoCo XML as a string.
-    """
-    model_path = Path(model_dir)
-    # Patch actuators to position-controlled servos before building scene
-    patched_xml = patch_actuators_to_position(str(model_path / "go2.xml"))
-    go2_root = ET.fromstring(patched_xml)
-
-    # Extract sections from patched go2.xml
-    compiler_elem = go2_root.find("compiler")
-    option_elem = go2_root.find("option")
-    default_elem = go2_root.find("default")
-    asset_elem = go2_root.find("asset")
-    worldbody_elem = go2_root.find("worldbody")
-    actuator_elem = go2_root.find("actuator")
-
-    # The robot body is the first <body> child of <worldbody>
+    compiler_elem = robot_root.find("compiler")
+    option_elem = robot_root.find("option")
+    default_elem = robot_root.find("default")
+    asset_elem = robot_root.find("asset")
+    worldbody_elem = _copy_required(robot_root, "worldbody")
+    actuator_elem = _copy_required(robot_root, "actuator")
     robot_body = worldbody_elem.find("body")
+    if robot_body is None:
+        raise ValueError("robot model XML is missing required root body")
 
-    # Build the combined scene root
-    scene = ET.Element("mujoco", model="go2_two_robot_scene")
+    scene = ET.Element("mujoco", model=f"{platform.metadata.name}_multi_robot_scene")
 
-    # Compiler: update meshdir to be relative to model_dir
-    comp = copy.deepcopy(compiler_elem)
-    # meshdir in go2.xml is "assets", make it relative to model_dir
-    comp.attrib["meshdir"] = str(model_path / "assets")
-    scene.append(comp)
-
-    # Option
+    if compiler_elem is not None:
+        compiler = copy.deepcopy(compiler_elem)
+        _absolutize_asset_dirs(compiler, model_path)
+        scene.append(compiler)
     if option_elem is not None:
         scene.append(copy.deepcopy(option_elem))
-
-    # Default -- do NOT prefix default classes, they are shared
     if default_elem is not None:
         scene.append(copy.deepcopy(default_elem))
 
-    # Visual (from scene template)
     visual = ET.SubElement(scene, "visual")
     ET.SubElement(visual, "headlight", diffuse="0.6 0.6 0.6", ambient="0.3 0.3 0.3", specular="0 0 0")
     ET.SubElement(visual, "rgba", haze="0.15 0.25 0.35 1")
     ET.SubElement(visual, "global", azimuth="-130", elevation="-20")
+    ET.SubElement(visual, "map", znear="0.01", zfar="100")
 
-    # Asset: merge go2 assets + scene assets
-    merged_asset = copy.deepcopy(asset_elem)
-    # Add scene textures and materials
+    merged_asset = copy.deepcopy(asset_elem) if asset_elem is not None else ET.Element("asset")
     ET.SubElement(merged_asset, "texture", type="skybox", builtin="gradient",
                   rgb1="0.3 0.5 0.7", rgb2="0 0 0", width="512", height="3072")
     ET.SubElement(merged_asset, "texture", type="2d", name="groundplane",
@@ -111,59 +117,41 @@ def build_two_robot_scene(
     ET.SubElement(merged_asset, "material", name="groundplane",
                   texture="groundplane", texuniform="true",
                   texrepeat="5 5", reflectance="0.2")
-    # Wall textures for ORB feature extraction (ORB-SLAM3 needs visual texture on surfaces)
-    ET.SubElement(merged_asset, "texture", type="2d", name="wall_checker",
-                  builtin="checker",
-                  rgb1="0.8 0.7 0.6", rgb2="0.6 0.5 0.4",
-                  width="512", height="512")
-    ET.SubElement(merged_asset, "material", name="wall_checker",
-                  texture="wall_checker", texrepeat="4 4", texuniform="true")
-    ET.SubElement(merged_asset, "texture", type="2d", name="wall_gradient",
-                  builtin="gradient",
-                  rgb1="0.9 0.85 0.8", rgb2="0.7 0.65 0.6",
-                  width="512", height="512")
-    ET.SubElement(merged_asset, "material", name="wall_gradient",
-                  texture="wall_gradient", texrepeat="2 2", texuniform="true")
     scene.append(merged_asset)
 
-    # Worldbody: floor + light + N robot bodies
     wb = ET.SubElement(scene, "worldbody")
     ET.SubElement(wb, "light", pos="0 0 3", dir="0 0 -1", directional="true")
     ET.SubElement(wb, "geom", name="floor", size="100 100 0.05", type="plane",
                   material="groundplane")
-    # Boundary walls with textures for ORB feature extraction
-    ET.SubElement(wb, "geom", name="wall_north", type="box",
-                  size="10 0.1 2", pos="0 10 1", material="wall_checker")
-    ET.SubElement(wb, "geom", name="wall_south", type="box",
-                  size="10 0.1 2", pos="0 -10 1", material="wall_gradient")
-    ET.SubElement(wb, "geom", name="wall_east", type="box",
-                  size="0.1 10 2", pos="10 0 1", material="wall_checker")
-    ET.SubElement(wb, "geom", name="wall_west", type="box",
-                  size="0.1 10 2", pos="-10 0 1", material="wall_gradient")
 
-    # Create N robot bodies from spawn_positions
     for robot_id, (sx, sy, sz) in spawn_positions.items():
-        prefix = f"{robot_id}_"
         body = copy.deepcopy(robot_body)
-        _prefix_element(body, prefix)
+        _prefix_element(body, f"{robot_id}_")
         body.attrib["pos"] = f"{sx} {sy} {sz}"
-        ET.SubElement(body, "camera", name=f"{robot_id}_cam",
-                      pos="0.4 0 0.05", xyaxes="0 -1 0 0 0 1", fovy="70")
+        ET.SubElement(body, "camera", **platform.camera_spec(robot_id))
         wb.append(body)
 
-    # Actuators: duplicate with prefixes for each robot
     act_section = ET.SubElement(scene, "actuator")
     for robot_id in spawn_positions:
         prefix = f"{robot_id}_"
-        for motor in actuator_elem:
-            new_motor = copy.deepcopy(motor)
+        for actuator in actuator_elem:
+            new_actuator = copy.deepcopy(actuator)
             for attr in ("name", "joint", "tendon", "site"):
-                if attr in new_motor.attrib:
-                    new_motor.attrib[attr] = prefix + new_motor.attrib[attr]
-            # Do NOT prefix "class" on actuators -- they reference shared defaults
-            act_section.append(new_motor)
+                if attr in new_actuator.attrib:
+                    new_actuator.attrib[attr] = prefix + new_actuator.attrib[attr]
+            act_section.append(new_actuator)
 
-    return ET.tostring(scene, encoding="unicode")
+    return ET.tostring(scene, encoding="unicode"), _collect_assets(model_path)
+
+
+def build_two_robot_scene(
+    model_dir: str,
+    spawn_positions: dict[str, tuple[float, float, float]],
+) -> str:
+    """Build a MuJoCo XML scene containing N Go2 robots."""
+    platform = Go2Platform(model_dir=model_dir)
+    xml_str, _assets = build_multi_robot_scene(platform, spawn_positions)
+    return xml_str
 
 
 def _find_dimos_scene_data() -> Path:

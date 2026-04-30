@@ -33,6 +33,7 @@ def generate_robot_ids(n: int) -> tuple[str, ...]:
 def generate_spawn_positions(
     robot_ids: tuple[str, ...],
     scene: str = "office",
+    spawn_height: float = 0.3,
 ) -> dict[str, tuple[float, float, float]]:
     """Generate spread-out spawn positions for N robots.
 
@@ -42,6 +43,7 @@ def generate_spawn_positions(
     Args:
         robot_ids: Tuple of robot ID strings.
         scene: "office" or "flat".
+        spawn_height: Z height for every generated spawn position.
 
     Returns:
         Dict mapping robot_id to (x, y, z) spawn position.
@@ -52,7 +54,7 @@ def generate_spawn_positions(
         # Line formation, 5m apart
         positions = {}
         for i, rid in enumerate(robot_ids):
-            positions[rid] = (i * 5.0, 0.0, 0.3)
+            positions[rid] = (i * 5.0, 0.0, float(spawn_height))
         return positions
 
     # Office: greedy farthest-point sampling from curated positions
@@ -81,5 +83,5 @@ def generate_spawn_positions(
 
     positions = {}
     for rid, pos in zip(robot_ids, selected):
-        positions[rid] = (pos[0], pos[1], 0.3)
+        positions[rid] = (pos[0], pos[1], float(spawn_height))
     return positions

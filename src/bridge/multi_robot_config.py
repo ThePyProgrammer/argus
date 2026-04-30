@@ -35,3 +35,5 @@ class MultiRobotConfig:
     boot_phase_steps: int = 200
     scene: str = "flat"
     step_delay: float = 0.0  # seconds to sleep between steps (0 = full speed)
+    platform: str = "go2"
+    platform_config: dict = field(default_factory=dict)
