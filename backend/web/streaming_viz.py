@@ -496,10 +496,13 @@ class WebStreamingViz:
         elapsed = time.monotonic() - self._start_time
         robots = {}
         for rid, data in robot_data.items():
+            runtime_status = data.get("runtime_status")
             robots[rid] = {
                 "coverage_pct": data.get("coverage_pct", 0.0),
                 "voxel_count": len(data.get("local_voxels", [])),
-                "action": "exploring",
+                "action": runtime_status.get("state", "exploring") if runtime_status else "exploring",
+                "platform": data.get("platform"),
+                "runtime_status": runtime_status,
             }
         # Build SLAM metrics from tracker
         metrics_payload = self._metrics_tracker.get_stats_payload()

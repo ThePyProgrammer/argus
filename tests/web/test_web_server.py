@@ -24,6 +24,19 @@ class TestWebSocketServer:
             assert data["type"] == "robot_list"
             assert data["payload"]["robots"] == ["robot_a", "robot_b"]
 
+    def test_ws_connect_receives_platform_metadata_when_configured(self):
+        platform_metadata = {
+            "robot_a": {"name": "agibot_x2", "display_name": "AGIBOT X2 Ultra"},
+            "robot_b": {"name": "agibot_x2", "display_name": "AGIBOT X2 Ultra"},
+        }
+        app, viz = create_app(["robot_a", "robot_b"], platform_metadata=platform_metadata)
+        client = TestClient(app)
+        with client.websocket_connect("/ws") as ws:
+            data = ws.receive_json()
+            assert data["type"] == "robot_list"
+            assert data["payload"]["robots"] == ["robot_a", "robot_b"]
+            assert data["payload"]["platforms"] == platform_metadata
+
     def test_command_handling(self):
         """Send command via WebSocket and verify callback invoked."""
         callback = MagicMock()
