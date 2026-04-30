@@ -100,7 +100,7 @@ Cross-cutting constraints:
   3. Control-quality metrics include action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation or equivalent position-servo proxy.
   4. Terrain/contact metrics include foot slip, foot clearance, contact timing/duty factor, and per-scenario success rate.
   5. Per-step and per-episode metric values are available through `info` or a metrics collector without tying them to one specific controller implementation.
-**Plans**: 4 plans
+**Plans**: 5 plans
 Plans:
 
 **Wave 1**
@@ -114,6 +114,9 @@ Plans:
 
 **Wave 4 *(blocked on Wave 3 completion)***
 - [x] 03-04-PLAN.md — Harden Phase 3 validation coverage and run Nyquist quick/full checks.
+
+**Wave 5 *(gap closure; blocked on Wave 4 completion)***
+- [ ] 03-05-PLAN.md — Gate progress-stall termination on non-trivial desired translational commands and add zero-command standing regressions.
 
 **Research flag**: standard
 
@@ -151,7 +154,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
-| 3. locomotion-metrics-instrumentation | 4/4 | Verification pending | - |
+| 3. locomotion-metrics-instrumentation | 4/5 | Gaps found | - |
 | 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
 
@@ -171,4 +174,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 3 planned 2026-04-30. Continue with `/gsd-execute-phase 3` for `locomotion-metrics-instrumentation`.
+Phase 3 has one gap-closure plan ready. Continue with `/gsd-execute-phase 3 --gaps-only` for `locomotion-metrics-instrumentation`.
