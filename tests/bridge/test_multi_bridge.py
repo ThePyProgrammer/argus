@@ -147,6 +147,7 @@ def test_multi_bridge_step_writes_controller_targets_by_robot_ctrl_indices(monke
         "robot_b": list(range(12, 24)),
     }
     bridge._qpos_starts = {"robot_a": 0, "robot_b": 16}
+    bridge._viewer_handle = None
     bridge._capture_frame = lambda robot_id: _sensor_frame_at(1.0 if robot_id == "robot_a" else 2.0)
 
     bridge.set_velocity("robot_a", np.array([0.3, 0.0]), 0.0)

@@ -14,8 +14,12 @@ import numpy as np
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix
 from src.bridge.multi_robot_config import MultiRobotConfig
 from src.bridge.scene_builder import build_two_robot_office_scene, build_two_robot_scene
-from src.locomotion.gait_controller import TrotGaitController
-from src.locomotion.gait_params import GaitParams
+from src.locomotion.controller_dispatch import (
+    apply_controller_target,
+    command_from_velocity,
+    compute_controller_action,
+)
+from src.locomotion.controllers import ControllerRegistry, LocomotionController
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +62,9 @@ class MultiRobotBridge:
             rid: (np.zeros(2), 0.0) for rid in self._config.robot_ids
         }
 
-        # Trot gait controllers (one per robot)
-        self._gaits: dict[str, TrotGaitController] = {
-            rid: TrotGaitController() for rid in self._config.robot_ids
+        # Registered analytical controllers (one stateful instance per robot)
+        self._controllers: dict[str, LocomotionController] = {
+            rid: ControllerRegistry.create("analytical_trot") for rid in self._config.robot_ids
         }
 
         # Last captured frames
@@ -165,10 +169,16 @@ class MultiRobotBridge:
             self._data.qpos[qstart + 5] = 0.0                 # qy
             self._data.qpos[qstart + 6] = math.sin(yaw / 2)   # qz
             self._data.qpos[qstart + 7 : qstart + 19] = STANDING_QPOS
-            # Set ctrl to standing via gait controller (zero velocity = standing)
-            standing = self._gaits[robot_id].compute(0.0, 0.0, 0.0, 0.0)
-            for i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = standing[i]
+            # Set ctrl to standing through this robot's registered controller.
+            command = command_from_velocity(np.zeros(2), 0.0)
+            standing = compute_controller_action(
+                self._controllers[robot_id], {}, command, 0.0
+            )
+            apply_controller_target(
+                self._data,
+                standing.action,
+                ctrl_indices=self._ctrl_indices[robot_id],
+            )
 
         # Settle physics
         for _ in range(self._config.boot_phase_steps):
@@ -215,8 +225,11 @@ class MultiRobotBridge:
         # Apply velocity-to-ctrl for each robot
         for robot_id in self._config.robot_ids:
             ctrl = self._velocity_to_ctrl(robot_id)
-            for i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = ctrl[i]
+            apply_controller_target(
+                self._data,
+                ctrl,
+                ctrl_indices=self._ctrl_indices[robot_id],
+            )
 
         # Step physics
         for _ in range(self._config.sim_steps_per_frame):
@@ -447,8 +460,8 @@ class MultiRobotBridge:
     def _velocity_to_ctrl(self, robot_id: str) -> np.ndarray:
         """Convert buffered velocity to 12-element joint position targets.
 
-        Uses TrotGaitController for proper trot gait with position-controlled
-        actuators, matching MuJoCoBridge._velocity_to_ctrl() behaviour.
+        Uses the per-robot registered analytical controller and shared dispatch
+        validation, matching MuJoCoBridge velocity defaulting semantics.
 
         Args:
             robot_id: Which robot's velocity buffer to read.
@@ -457,10 +470,11 @@ class MultiRobotBridge:
             (12,) float64 joint position targets.
         """
         linear, angular = self._velocities[robot_id]
-        dt = self._dt  # self._dt already includes sim_steps_per_frame
-        vx = float(linear[0]) if len(linear) > 0 else 0.0
-        vy = float(linear[1]) if len(linear) > 1 else 0.0
-        return self._gaits[robot_id].compute(vx, vy, angular, dt)
+        command = command_from_velocity(linear, angular)
+        result = compute_controller_action(
+            self._controllers[robot_id], {}, command, self._dt
+        )
+        return result.action
 
     # ------------------------------------------------------------------
     # Properties
