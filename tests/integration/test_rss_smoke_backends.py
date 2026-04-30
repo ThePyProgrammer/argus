@@ -93,6 +93,7 @@ RSS_GROWTH_CAP_BYTES = 200 * 1024 * 1024  # 200 MB
 INFERENCE_COUNT = 100
 
 
+@pytest.mark.timeout(180)
 @pytest.mark.parametrize(
     "backend_id",
     [

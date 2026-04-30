@@ -10,7 +10,7 @@ centered in corridors and maintain clearance from all obstacles.
 
 
 import numpy as np
-from scipy.ndimage import distance_transform_edt, label, binary_dilation
+from scipy.ndimage import distance_transform_edt, label
 
 
 def build_costmap(
@@ -31,13 +31,13 @@ def build_costmap(
         (H, W) float32 costmap. 0 = free, >0 = cost, 1e6 = impassable.
     """
     occupied = grid == 100  # CELL_OCCUPIED
+    if not np.any(occupied):
+        return np.zeros(grid.shape, dtype=np.float32)
 
     # Step 1: Binary inflation (hard lethal zone)
-    inflate_cells = max(1, int(robot_half_width / resolution))
-    struct = np.ones((2 * inflate_cells + 1, 2 * inflate_cells + 1), dtype=bool)
-    inflated = binary_dilation(occupied, structure=struct)
+    dist_to_occupied = distance_transform_edt(~occupied) * resolution
+    inflated = occupied | (dist_to_occupied <= robot_half_width)
 
-    # Cells that are inflated but not originally occupied are lethal
     costmap = np.zeros(grid.shape, dtype=np.float32)
     costmap[inflated] = 1e6  # impassable
 

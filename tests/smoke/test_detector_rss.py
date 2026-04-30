@@ -70,6 +70,7 @@ def fixture_frame():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(180)
 @pytest.mark.parametrize("backend_name", _iter_available_backends())
 def test_rss_growth_bounded(backend_name, fixture_frame):
     """D-09/D-10: warn@200MB, fail@400MB over N_WARMUP + N_MEASURED inferences."""

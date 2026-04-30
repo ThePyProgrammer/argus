@@ -24,11 +24,7 @@ class SemanticObject:
     """A persistent object in the semantic map."""
 
     fused_track_id: int
-    class_name: str
-    center: list[float]  # [x, y, z] world-frame
-    half_extents: list[float]  # [hx, hy, hz]
-    quaternion: list[float]  # [qx, qy, qz, qw] xyzw
-    score: float
+    wire_fields: dict[str, Any]
     last_seen: float  # sim_time of last observation
     ttl: float  # seconds before expiry
 
@@ -36,11 +32,7 @@ class SemanticObject:
         """Serialize to WS payload dict."""
         return {
             "fused_track_id": self.fused_track_id,
-            "class_name": self.class_name,
-            "center": self.center,
-            "half_extents": self.half_extents,
-            "quaternion": self.quaternion,
-            "score": self.score,
+            **self.wire_fields,
             "last_seen": self.last_seen,
             "ttl": self.ttl,
         }
@@ -57,21 +49,15 @@ class SemanticMap:
         """Refresh timestamps for matched fused entries; add new ones."""
         for fd in fused_detections:
             fid = fd["fused_track_id"]
+            wire_fields = {k: v for k, v in fd.items() if k != "fused_track_id"}
             if fid in self._objects:
                 obj = self._objects[fid]
-                obj.center = fd["center"]
-                obj.half_extents = fd["half_extents"]
-                obj.quaternion = fd["quaternion"]
-                obj.score = fd["score"]
+                obj.wire_fields = wire_fields
                 obj.last_seen = sim_time
             else:
                 self._objects[fid] = SemanticObject(
                     fused_track_id=fid,
-                    class_name=fd["class_name"],
-                    center=fd["center"],
-                    half_extents=fd["half_extents"],
-                    quaternion=fd["quaternion"],
-                    score=fd["score"],
+                    wire_fields=wire_fields,
                     last_seen=sim_time,
                     ttl=self._ttl,
                 )

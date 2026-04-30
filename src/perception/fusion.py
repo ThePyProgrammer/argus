@@ -110,22 +110,15 @@ class DetectionFusionManager:
                     if group[k][1].track_id is not None
                 ]
 
-                fused.append(
-                    {
-                        "fused_track_id": next(self._id_gen),
-                        "class_name": cls,
-                        "score": float(best_box.score),
-                        "center": [float(c) for c in np.asarray(best_box.center)],
-                        "half_extents": [
-                            float(h) for h in np.asarray(best_box.half_extents)
-                        ],
-                        "quaternion": [
-                            float(q) for q in np.asarray(best_box.quaternion)
-                        ],
-                        "robot_ids": contributing_rids,
-                        "source_track_ids": source_track_ids,
-                    }
-                )
+                entry = best_box.to_wire()
+                entry.update({
+                    "fused_track_id": next(self._id_gen),
+                    "class_name": cls,
+                    "score": float(best_box.score),
+                    "robot_ids": contributing_rids,
+                    "source_track_ids": source_track_ids,
+                })
+                fused.append(entry)
 
         return fused
 

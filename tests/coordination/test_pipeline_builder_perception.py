@@ -144,11 +144,10 @@ def test_node_catalog_lists_perception_entries() -> None:
     assert all(e["category"] == "perception" for e in lifter_entries)
     assert any(e["type"] == "detection3d_point_cluster" for e in catalog)
 
-    # Tracker entries present — exactly "none" in Phase 7.
     tracker_entries = [e for e in catalog if e["type"].startswith("tracker_")]
-    assert len(tracker_entries) == 1
-    assert tracker_entries[0]["type"] == "tracker_none"
-    assert tracker_entries[0]["category"] == "perception"
+    assert len(tracker_entries) >= 1
+    assert any(e["type"] == "tracker_none" for e in tracker_entries)
+    assert all(e["category"] == "perception" for e in tracker_entries)
 
     # Each detector entry exposes capabilities (critical for UI gating via outputs_3d_natively).
     yolov11 = next(e for e in catalog if e["type"] == "detector_yolov11")

@@ -22,6 +22,7 @@ in that case, and the fixture generator is the right place to fix it).
 
 from __future__ import annotations
 
+import importlib
 import sys
 import time
 from pathlib import Path
@@ -44,6 +45,10 @@ def _clean_registries():
 
     DetectorRegistry._clear()
     Detection3DRegistry._clear()
+    import src.perception.backends.yolov11_backend as _yolo
+    import src.perception.lifters.median_depth as _median
+    importlib.reload(_yolo)
+    importlib.reload(_median)
     yield
     DetectorRegistry._clear()
     Detection3DRegistry._clear()

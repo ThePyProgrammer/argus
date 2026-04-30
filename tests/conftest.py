@@ -267,8 +267,8 @@ class MockMultiRobotBridge:
         pose = np.eye(4)
         pose[:3, 3] = self._positions[robot_id]
         return SensorFrame(
-            rgb=np.zeros((240, 320, 3), dtype=np.uint8),
-            depth=np.full((240, 320), 2.0, dtype=np.float32),
+            rgb=np.zeros((64, 64, 3), dtype=np.uint8),
+            depth=np.full((64, 64), 2.0, dtype=np.float32),
             ground_truth_pose=pose,
             sim_time=self._step_count * 0.02,
         )

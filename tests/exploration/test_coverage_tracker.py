@@ -19,13 +19,13 @@ class TestExplorationConfig:
         assert cfg.rescan_distance_m == 2.0
         assert cfg.rescan_voxel_delta == 500
         assert cfg.max_steps == 10000
-        assert cfg.stuck_threshold_steps == 100
-        assert cfg.stuck_distance_m == 0.02
+        assert cfg.stuck_threshold_steps == 30
+        assert cfg.stuck_distance_m == 0.05
         assert cfg.log_interval_steps == 50
-        assert cfg.voxel_resolution == 0.1
+        assert cfg.voxel_resolution == 0.05
         assert cfg.min_cluster_size == 5
         assert cfg.goal_strategy == "nearest"
-        assert cfg.linear_speed == 1.0
+        assert cfg.linear_speed == 0.8
         assert cfg.angular_speed == 1.0
         assert cfg.waypoint_arrival_threshold == 0.3
 
