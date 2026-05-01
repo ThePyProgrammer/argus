@@ -143,6 +143,19 @@ def test_controller_registry_placeholder_controllers_are_discoverable_but_unavai
     assert entry["reason"] in message
 
 
+def test_residual_placeholder_advertises_public_residual_baseline_action_mode():
+    from src.locomotion.actions import available_action_modes
+    from src.locomotion.controllers import ControllerRegistry
+
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    action_mode = entries["residual_policy"]["capabilities"]["action_mode"]
+
+    assert action_mode == "residual_baseline"
+    assert action_mode in available_action_modes()
+    assert entries["residual_policy"]["available"] is False
+
+
+
 def test_controller_registry_phase2_requirement_and_decision_coverage_is_explicit():
     """Pin LOC-CTRL-01/02/03 plus D-05/D-06/D-07/D-08 in one registry seam check."""
     from src.locomotion.controllers import ControllerRegistry
