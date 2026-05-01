@@ -16,15 +16,22 @@ from src.locomotion.evaluation import (
 
 
 class _FakeEvaluationEnv:
-    def __init__(self, config, calls, *, success=True) -> None:
+    def __init__(self, config, calls, *, success=True, transition_commands=False) -> None:
         self.config = config
         self.calls = calls
         self.success = success
+        self.transition_commands = transition_commands
         self.calls.append(("construct", config))
         self._step_count = 0
 
     def reset(self, *, seed=None):
         self.calls.append(("reset", seed))
+        command_schedule = (
+            {"time": 0.0, "vx": 0.0, "vy": 0.0, "omega": 0.0},
+            {"time": 0.25, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+        ) if self.transition_commands else (
+            {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+        )
         info = {
             "seed": seed,
             "scenario_id": self.config.scenario_id,
@@ -32,9 +39,7 @@ class _FakeEvaluationEnv:
             "controller_id": self.config.controller_id,
             "step_count": 0,
             "sim_time": 0.0,
-            "command_schedule": (
-                {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
-            ),
+            "command_schedule": command_schedule,
             "sampled_parameters": {"terrain_kind": "plane"},
             "controller_metadata": {"controller_id": self.config.controller_id},
         }
@@ -43,16 +48,21 @@ class _FakeEvaluationEnv:
     def step(self, action):
         self.calls.append(("step", list(action)))
         self._step_count += 1
+        command_schedule = (
+            {"time": 0.0, "vx": 0.0, "vy": 0.0, "omega": 0.0},
+            {"time": 0.25, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+        ) if self.transition_commands else (
+            {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+        )
+        terminated = self._step_count >= (2 if self.transition_commands else 1)
         info = {
             "seed": 101,
             "scenario_id": self.config.scenario_id,
             "action_mode": self.config.action_mode,
             "controller_id": self.config.controller_id,
             "step_count": self._step_count,
-            "sim_time": 0.02,
-            "command_schedule": (
-                {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
-            ),
+            "sim_time": 0.30 if self.transition_commands else 0.02,
+            "command_schedule": command_schedule,
             "current_command": {"vx": 0.4, "vy": 0.0, "omega": 0.0, "source": "scenario_schedule"},
             "locomotion_metrics": {"command_tracking": {"tracking_error": 0.01}},
             "locomotion_metrics_summary": {
@@ -65,15 +75,15 @@ class _FakeEvaluationEnv:
                 "step_count": self._step_count,
             },
         }
-        return {"observation": 2}, 0.0, False, True, info
+        return {"observation": 2}, 0.0, False, terminated, info
 
     def close(self):
         self.calls.append(("close", self.config.controller_id))
 
 
-def _fake_env_factory(calls, *, success=True):
+def _fake_env_factory(calls, *, success=True, transition_commands=False):
     def factory(config):
-        return _FakeEvaluationEnv(config, calls, success=success)
+        return _FakeEvaluationEnv(config, calls, success=success, transition_commands=transition_commands)
 
     return factory
 
@@ -231,3 +241,25 @@ def test_locomotion_failure_returns_nonzero_after_rows_exist(tmp_path):
     assert result.exit_code == 1
     assert result.step_rows
     assert result.episode_rows[0]["summary"]["success"] is False
+
+
+def test_runner_uses_active_current_command_after_schedule_transition(tmp_path):
+    calls = []
+    result = run_evaluation_matrix(
+        EvaluationMatrix(
+            controllers=("analytical_trot",),
+            scenarios=("flat_ground",),
+            seeds=(101,),
+            max_episode_steps=5,
+        ),
+        EvaluationRunConfig(output_root=tmp_path),
+        env_factory=_fake_env_factory(calls, transition_commands=True),
+    )
+
+    assert result.exit_code == 0
+    assert ("step", [0.0, 0.0, 0.0]) in calls
+    assert ("step", [0.4, 0.0, 0.0]) in calls
+    row = result.step_rows[-1]
+    assert row["commanded_velocity"] == [0.4, 0.0, 0.0]
+    assert row["command_source"] == "scenario_schedule"
+    assert row["command_context"]["current_command"]["vx"] == 0.4
