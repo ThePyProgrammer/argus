@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: executing
+status: ready_to_plan
 stopped_at: v4.0 complete; ready for `/gsd-complete-milestone` or next milestone planning
 last_updated: "2026-05-01T13:44:03.094Z"
 last_activity: 2026-05-01 -- Phase 06 execution started
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
   completed_plans: 26
-  percent: 96
+  percent: 86
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 06 (repair-evaluation-runner-semantics) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 06
-Last activity: 2026-05-01 -- Phase 06 execution started
+Phase: 07
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-01
 
 Progress: [██████████] 100%
 
