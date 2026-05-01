@@ -88,6 +88,25 @@ def test_locomotion_rationale_link_and_current_method():
         assert unsupported_claim in guide
 
 
+def test_residual_policy_documentation_matches_registry_action_mode():
+    from src.locomotion.actions import available_action_modes
+    from src.locomotion.controllers import ControllerRegistry
+
+    guide = GUIDE.read_text(encoding="utf-8")
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    residual = entries["residual_policy"]
+    action_mode = residual["capabilities"]["action_mode"]
+
+    assert residual["available"] is False
+    assert action_mode == "residual_baseline"
+    assert action_mode in available_action_modes()
+    assert (
+        f"Controller id `residual_policy`; residual-over-baseline seam via `{action_mode}` action mode"
+        in guide
+    )
+
+
+
 def test_doc_guard_source_stays_content_only():
     source = Path(__file__).read_text(encoding="utf-8")
     comparison_literals = {SMOKE_COMMAND, "uv run", "eval-locomotion --controller"}
