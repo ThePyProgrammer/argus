@@ -263,3 +263,91 @@ def test_runner_uses_active_current_command_after_schedule_transition(tmp_path):
     assert row["commanded_velocity"] == [0.4, 0.0, 0.0]
     assert row["command_source"] == "scenario_schedule"
     assert row["command_context"]["current_command"]["vx"] == 0.4
+
+
+def test_runner_enforces_matrix_max_episode_steps_when_env_never_terminates(tmp_path):
+    calls = []
+
+    class NonTerminatingEnv:
+        def __init__(self, config) -> None:
+            self.config = config
+            self._step_count = 0
+            calls.append(("construct", config))
+
+        def reset(self, *, seed=None):
+            calls.append(("reset", seed))
+            return {"observation": 1}, {
+                "seed": seed,
+                "scenario_id": self.config.scenario_id,
+                "action_mode": self.config.action_mode,
+                "controller_id": self.config.controller_id,
+                "step_count": 0,
+                "sim_time": 0.0,
+                "current_command": {
+                    "vx": 0.4,
+                    "vy": 0.0,
+                    "omega": 0.0,
+                    "source": "scenario_schedule",
+                },
+                "command_schedule": (
+                    {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+                ),
+                "sampled_parameters": {"terrain_kind": "plane"},
+                "controller_metadata": {"controller_id": self.config.controller_id},
+            }
+
+        def step(self, action):
+            self._step_count += 1
+            calls.append(("step", list(action)))
+            if self._step_count > 3:
+                raise AssertionError("runner exceeded max_episode_steps")
+            info = {
+                "seed": 101,
+                "scenario_id": self.config.scenario_id,
+                "action_mode": self.config.action_mode,
+                "controller_id": self.config.controller_id,
+                "step_count": self._step_count,
+                "sim_time": self._step_count * 0.02,
+                "current_command": {
+                    "vx": 0.4,
+                    "vy": 0.0,
+                    "omega": 0.0,
+                    "source": "scenario_schedule",
+                },
+                "command_schedule": (
+                    {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+                ),
+                "locomotion_metrics": {"command_tracking": {"tracking_error": 0.01}},
+                "locomotion_metrics_summary": {
+                    "command_tracking": {"tracking_error_rmse": 0.01},
+                    "stability": {"distance_xy_m": 0.12},
+                    "action_quality": {},
+                    "contact_terrain": {},
+                    "success": True,
+                    "failure_reason": None,
+                    "step_count": self._step_count,
+                },
+            }
+            return {"observation": 2}, 0.0, False, False, info
+
+        def close(self):
+            calls.append(("close", self.config.controller_id))
+
+    result = run_evaluation_matrix(
+        EvaluationMatrix(
+            controllers=("analytical_trot",),
+            scenarios=("flat_ground",),
+            seeds=(101,),
+            action_mode="velocity_command",
+            max_episode_steps=3,
+        ),
+        EvaluationRunConfig(output_root=tmp_path),
+        env_factory=NonTerminatingEnv,
+    )
+
+    assert result.exit_code == 0
+    assert len([call for call in calls if call[0] == "step"]) == 3
+    assert len(result.step_rows) == 3
+    assert result.episode_rows[0]["step_count"] == 3
+    for artifact_name in ("manifest.json", "steps.jsonl", "episodes.csv", "summary.json", "comparison.md"):
+        assert (result.run_dir / artifact_name).exists()
