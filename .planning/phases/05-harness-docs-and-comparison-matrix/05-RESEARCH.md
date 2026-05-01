@@ -271,17 +271,15 @@ uv run argus eval-locomotion --from-run-dir outputs/locomotion-evals/<timestamp>
 | A3 | Documentation drift and README overloading are likely failure modes. | Common Pitfalls | Low; they guide verification strategy rather than implementation semantics. |
 | A4 | Exact-prose content tests are brittle. | Common Pitfalls | Low; this is testing practice guidance, not a project fact. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the guide mention the local `.venv/bin/pytest` script issue?**
-   - What we know: `/home/prannayag/pragnition/robotics/argus/.venv/bin/pytest` has a bad interpreter path, but `/home/prannayag/pragnition/robotics/argus/.venv/bin/python -m pytest` can import pytest 9.0.2. [VERIFIED: local environment probe]
-   - What's unclear: Whether this is a transient local environment issue or a repo setup issue. [ASSUMED]
-   - Recommendation: Use `.venv/bin/python -m pytest ...` for validation commands in plans, not direct `.venv/bin/pytest`. [VERIFIED: local environment probe]
+1. **RESOLVED: Should the guide mention the local `.venv/bin/pytest` script issue?**
+   - Resolution: Do not mention the local broken `.venv/bin/pytest` script in user-facing guide docs. That is a local validation concern, not harness onboarding content.
+   - Plan validation: Use `.venv/bin/python -m pytest ...` for plan verification commands only, not direct `.venv/bin/pytest`. [VERIFIED: local environment probe]
 
-2. **Should docs use exact metric field names or conceptual metric families first?**
-   - What we know: Phase 5 requires concise reward/metric definitions, and code exports concrete fields like `tracking_rmse`, `position_servo_effort_mean`, and `foot_slip_mean`. [VERIFIED: /home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md; VERIFIED: /home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py]
-   - What's unclear: The preferred balance between onboarding prose and exhaustive schema reference. [ASSUMED]
-   - Recommendation: Use metric families in the main guide and include artifact/field examples only where they help a new developer inspect outputs. [ASSUMED]
+2. **RESOLVED: Should docs use exact metric field names or conceptual metric families first?**
+   - Resolution: Use metric families in the main guide: command tracking, stability, action quality, and contact/terrain proxies.
+   - Concrete examples: Include artifact/field examples only where useful for a new developer inspecting outputs, such as `tracking_rmse`, `position_servo_effort_mean`, or `foot_slip_mean`; do not turn the guide into an exhaustive schema reference. [VERIFIED: /home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md; VERIFIED: /home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py]
 
 ## Environment Availability
 
