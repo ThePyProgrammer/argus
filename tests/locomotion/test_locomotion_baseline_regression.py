@@ -103,6 +103,58 @@ def _good_row(**overrides):
     return row
 
 
+class _StationaryCommandedEnv:
+    def __init__(self, config) -> None:
+        self.config = config
+        self._step_count = 0
+
+    def reset(self, *, seed=None):
+        return {"observation": 1}, {
+            "seed": seed,
+            "scenario_id": self.config.scenario_id,
+            "action_mode": self.config.action_mode,
+            "controller_id": self.config.controller_id,
+            "step_count": 0,
+            "sim_time": 0.0,
+            "command_schedule": ({"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},),
+            "current_command": {"vx": 0.4, "vy": 0.0, "omega": 0.0, "source": "scenario_schedule"},
+            "sampled_parameters": {"terrain_kind": "plane"},
+            "controller_metadata": {"controller_id": self.config.controller_id},
+        }
+
+    def step(self, action):
+        self._step_count += 1
+        return {"observation": 2}, 0.0, False, True, {
+            "seed": 101,
+            "scenario_id": self.config.scenario_id,
+            "action_mode": self.config.action_mode,
+            "controller_id": self.config.controller_id,
+            "step_count": self._step_count,
+            "sim_time": 0.02,
+            "command_schedule": ({"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},),
+            "current_command": {"vx": 0.4, "vy": 0.0, "omega": 0.0, "source": "scenario_schedule"},
+            "locomotion_metrics": {"command_tracking": {"tracking_error": 0.0}},
+            "locomotion_metrics_summary": {
+                "command_tracking": {"tracking_error_rmse": 0.0},
+                "stability": {
+                    "success": True,
+                    "distance_xy_m": 0.0,
+                    "base_height_min_m": 0.30,
+                    "roll_abs_max_rad": 0.0,
+                    "pitch_abs_max_rad": 0.0,
+                },
+                "action_quality": {},
+                "contact_terrain": {},
+                "success": True,
+                "failure_reason": "",
+                "step_count": self._step_count,
+            },
+        }
+
+    def close(self):
+        return None
+
+
 def test_threshold_helper_accepts_bounded_successful_rows():
     rows = (
         _good_row(run_id="r0001", seed=101),
@@ -134,6 +186,31 @@ def test_threshold_helper_rejects_zero_distance_for_translational_command():
         assert_analytical_flat_ground_thresholds([
             _good_row(commanded_velocity=[0.4, 0.0, 0.0], distance_xy_m=DISTANCE_XY_MIN_M - 0.001)
         ])
+
+
+def test_stationary_controller_fails_commanded_locomotion_baseline_gate(tmp_path):
+    result = run_evaluation_matrix(
+        EvaluationMatrix(
+            controllers=("analytical_trot",),
+            scenarios=("flat_ground",),
+            seeds=(101,),
+            action_mode="velocity_command",
+            max_episode_steps=5,
+        ),
+        EvaluationRunConfig(output_root=tmp_path, fail_on_locomotion_failure=True),
+        env_factory=_StationaryCommandedEnv,
+    )
+
+    assert result.exit_code == 0
+    row = result.episode_rows[0]
+    assert row["success"] is True
+    assert row["failure_reason"] == ""
+    assert json.loads(row["commanded_velocity"]) == [0.4, 0.0, 0.0]
+    assert row["command_source"] == "scenario_schedule"
+    assert row["distance_xy_m"] == 0.0
+    assert row["summary"]["stability"]["distance_xy_m"] == 0.0
+    with pytest.raises(AssertionError):
+        assert_analytical_flat_ground_thresholds(result.episode_rows)
 
 
 @pytest.mark.parametrize("missing_key", ["commanded_velocity", "command_source"])
