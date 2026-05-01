@@ -4,23 +4,24 @@
 
 ---
 
-A multi-robot perception pipeline manager that connects simulated quadrupeds in MuJoCo to a real-time browser dashboard with pluggable SLAM, autonomous exploration, 3D reconstruction, object detection, and live map merging. Argus watches everything at once — multiple robots, multiple cameras, multiple SLAM backends — and streams unified situational awareness to a single pane of glass.
+Argus is a simulation-native robotics research workbench for multi-robot autonomy. It connects MuJoCo robot swarms to a real-time browser command center and reproducible benchmark harnesses, with pluggable robot platforms, SLAM backends, perception pipelines, coordination strategies, and locomotion controllers. Argus watches everything at once — multiple robots, multiple cameras, multiple algorithms, multiple controller families — and turns the swarm into one coherent experimental system.
 
-The name references [Argus Panoptes](https://en.wikipedia.org/wiki/Argus_Panoptes) — the all-seeing giant of Greek mythology with a hundred eyes, only some of which slept at any given time. The rest kept watching. Argus the system does what Argus the giant embodied: it distributes perception across multiple vantage points and fuses them into a single, coherent picture of the world.
+The name references [Argus Panoptes](https://en.wikipedia.org/wiki/Argus_Panoptes) — the all-seeing giant of Greek mythology with a hundred eyes, only some of which slept at any given time. The rest kept watching. Argus the system does what Argus the giant embodied: it distributes perception, control, and evaluation across multiple vantage points and fuses them into a single, coherent picture of the world.
 
-Built on [DimOS](https://github.com/dimensionalOS/dimos). Inspired by the conviction that multi-robot perception is a systems integration problem before it is an algorithms problem.
+Started from [DimOS](https://github.com/dimensionalOS/dimos) scene and camera conventions. Inspired by the conviction that multi-robot autonomy is a systems integration problem before it is an algorithms problem.
 
-## Three Commands
+## Four Commands
 
-That's all you need.
+The core workflows fit on one screen.
 
 ```
 uv run argus --scene office           Start the simulation + dashboard
 uv run argus --scene office --static  Watch without moving
 uv run argus --control explore        Single-robot autonomous exploration
+uv run argus eval-locomotion          Run the locomotion smoke benchmark
 ```
 
-Open the browser. Watch robots explore an office. See their point clouds merge in real time. Click the ground to teleport them. Switch SLAM backends mid-run. Toggle between cloud, voxel, and mesh views. Everything streams over a single WebSocket.
+Open the browser. Watch robots explore an office. See their point clouds merge in real time. Click the ground to command them. Choose SLAM and perception backends, inspect metrics, toggle between cloud/voxel/mesh views, or run the same locomotion baseline through seeded benchmark scenarios. Everything streams over a single WebSocket or exports as machine-readable evaluation artifacts.
 
 ## Table of Contents
 
@@ -32,7 +33,9 @@ Open the browser. Watch robots explore an office. See their point clouds merge i
 - [The Exploration System](#the-exploration-system)
 - [The Coordination Layer](#the-coordination-layer)
 - [The Bridge Layer](#the-bridge-layer)
+- [The Platform Layer](#the-platform-layer)
 - [The Locomotion System](#the-locomotion-system)
+- [The Research Harness Pattern](#the-research-harness-pattern)
 - [The Perception Pipeline](#the-perception-pipeline)
 - [The Streaming Architecture](#the-streaming-architecture)
 - [The Frontend](#the-frontend)
@@ -92,7 +95,7 @@ This is not a shortcut. It is the [scientific method](https://en.wikipedia.org/w
 
 > *"Make the change easy, then make the easy change."* — Kent Beck
 
-Argus implements a [registry pattern](https://en.wikipedia.org/wiki/Service_locator_pattern) for SLAM backends, merge strategies, and exploration algorithms. A new SLAM backend is a Python class that satisfies a `@runtime_checkable Protocol` and registers itself with a single decorator:
+Argus implements a [registry pattern](https://en.wikipedia.org/wiki/Service_locator_pattern) for SLAM backends, merge strategies, perception backends, robot platforms, and locomotion controllers. A new SLAM backend is a Python class that satisfies a `@runtime_checkable Protocol` and registers itself with a single decorator:
 
 ```python
 @slam_backend("my-slam", display="My Custom SLAM")
@@ -102,7 +105,7 @@ class MySLAM:
     def reset(self) -> None: ...
 ```
 
-This is not over-engineering. It is a direct response to a specific research need: *the ability to swap algorithms mid-experiment without restarting the simulation*. The Argus dashboard exposes a dropdown that switches SLAM backends in real time. You can watch ICP's drift accumulate on the left while ORB-SLAM3's feature matching runs on the right. Same robots, same trajectory, different algorithms, live comparison.
+This is not over-engineering. It is a direct response to a specific research need: *the ability to compare algorithms without rewriting the runtime*. The Argus dashboard and CLI expose the same pattern at different layers: pick the backend, keep the robot/system boundary stable, and compare behavior under the same simulation assumptions. Same robots, same scenario, different algorithms, honest comparison.
 
 The registry pattern makes this possible because it decouples *discovery* from *instantiation*. Backends register at import time via decorator. The coordinator queries the registry at runtime. No conditional imports, no factory functions, no configuration files that fall out of sync with the code.
 
@@ -160,7 +163,12 @@ MuJoCo Simulation (5 physics steps/frame, 320x240 depth + RGB)
     |       +-- Trajectory history (downsampled to 500 points)
     |       +-- Camera frames (binary JPEG: RGB + turbo-colored depth)
     |       +-- Detections (class, confidence, bbox, 3D world position)
-    |       +-- SLAM metrics (coverage %, voxel count, merge count, drift)
+    |       +-- SLAM, perception, platform, and locomotion runtime metrics
+    |
+    +-- Locomotion Benchmark Harness
+    |       +-- Gymnasium-style ArgusGo2Env reset/step boundary
+    |       +-- Scenario catalog + deterministic seed control
+    |       +-- Controller registry + JSONL/CSV/Markdown exports
     |
     +-- MCP Server (/mcp, JSON-RPC 2.0)
             +-- get_status, get_detections, send_command, get_coverage
@@ -274,9 +282,15 @@ The replacement is a global topic registry: publishers and subscribers on the sa
 
 ### One Simulation, N Robots
 
-`MultiRobotBridge` loads N Unitree Go2 models into a shared MuJoCo scene. Joint indices, actuator IDs, and camera IDs are discovered dynamically via `mj_name2id()` using per-robot name prefixes. This means adding a third or fourth robot requires no code changes — just a larger spawn position list.
+`MultiRobotBridge` loads N robots into a shared MuJoCo scene through a `RobotPlatform` boundary. The default platform is Unitree Go2; AGIBOT X2 support lives behind the same platform interface for model assets, actuator mapping, camera specification, controller creation, runtime state, footprint, and failure detection.
 
 Each robot gets its own `mujoco.Renderer` for RGB/depth capture, but all robots share the same physics simulation. One `mj_step()` advances all robots simultaneously.
+
+## The Platform Layer
+
+Argus treats robot embodiment as a plugin seam, not a pile of bridge conditionals. `Go2Platform` preserves the existing quadruped path. `AgibotX2Platform` validates externally supplied X2 MuJoCo assets, discovers the expected actuator/sensor shape, exposes platform metadata, and delegates joint-level humanoid control to a replaceable walking-controller boundary.
+
+The coordinator and UI should speak in platform-neutral concepts: pose, footprint, command modes, runtime state, controller health, fall reason, collision count, and near misses. The swarm layer sends goals, planar velocities, yaw rates, stop, and recover commands. Raw joint control stays inside the platform/controller implementation. Go2 runs from committed assets; X2 requires licensed assets supplied via `--x2-model-dir`.
 
 ### Sensor Acquisition
 
@@ -290,19 +304,39 @@ Both `MuJoCoBridge` (single-robot) and `MultiRobotBridge` (multi-robot) satisfy 
 
 ## The Locomotion System
 
+### Benchmark Before Bragging
+
+Argus locomotion is deliberately benchmark-first. `ArgusGo2Env` wraps the Go2 MuJoCo path in a Gymnasium-style `reset(seed=...)` / `step(action)` contract with named scenarios, deterministic resets, action modes, controller metadata, and per-step/per-episode metrics.
+
+The default controller is still the analytical trot, but it now sits behind the same registry seam as future residual-policy, direct-policy, MPC, and WBC families. Unsupported families are explicit placeholders until the control infrastructure and evidence exist. No vibes-based robot-dog claims.
+
+Run the smoke benchmark:
+
+```bash
+uv run argus eval-locomotion --controller analytical_trot --scenario flat_ground --seed 101 --seed 202
+```
+
+Evaluation artifacts are written under `outputs/locomotion-evals/` as JSONL steps, CSV episodes, a machine-readable summary, a manifest with reproducibility metadata, and a Markdown comparison table.
+
 ### Raibert-Style Analytical Trot
 
-The gait controller produces 12 joint position targets (3 per leg: hip, thigh, calf) from a velocity command (vx, vy, omega). It is an analytical controller, not a learned policy — every output is a closed-form function of the inputs.
+The baseline gait controller produces 12 joint position targets (3 per leg: hip, thigh, calf) from a velocity command (vx, vy, omega). It is an analytical controller, not a learned policy — every output is a closed-form function of the inputs.
 
-**Phase structure:** Diagonal leg pairs (FL+RR vs FR+RL) are 180 degrees out of phase. While one pair is in stance (pushing the body forward), the other is in swing (repositioning for the next stance).
+**Phase structure:** Diagonal leg pairs (FL+RR vs FR+RL) are 180 degrees out of phase. While one pair is in stance, the other is in swing.
 
-**Swing phase:** Parabolic foot lift trajectory provides ground clearance. The leg repositions from behind the hip to in front of it, preparing for the next ground contact.
+**Why position control (not torque):** Position-controlled actuators are deterministic. Torque control requires a dynamics model, contact estimation, and careful tuning. For this milestone, deterministic baseline comparison beats premature control sophistication.
 
-**Stance phase:** The foot sweeps backward relative to the body, producing forward thrust. Stride length scales with commanded velocity.
+## The Research Harness Pattern
 
-**Turning:** Differential stride — inside legs take shorter steps, outside legs take longer steps. This produces smooth yaw rotation without sliding.
+Every serious Argus subsystem follows the same pattern:
 
-**Why position control (not torque):** Position-controlled actuators are deterministic. Given a joint angle target, the actuator drives to that angle regardless of external forces (within limits). Torque control requires a dynamics model, contact estimation, and careful tuning. For a research platform where locomotion is a means, not an end, position control is the right level of abstraction.
+1. Define a protocol boundary.
+2. Register implementations behind a small registry.
+3. Keep one deterministic baseline.
+4. Expose selection through the UI, CLI, or both.
+5. Measure behavior with scenario/seed metadata before claiming improvement.
+
+That pattern started with SLAM, expanded to perception and merge strategies, now governs locomotion controllers, and is becoming the robot-platform boundary for Go2, AGIBOT X2, and whatever comes next.
 
 ## The Perception Pipeline
 
@@ -368,13 +402,13 @@ Zustand stores with no boilerplate:
 
 ### 3D Scene
 
-Three.js with dynamic point cloud updates driven by the WebSocket delta protocol. Robot markers are tinted Go2 meshes loaded from GLB. Camera frustums are wireframe FOV cones. Trajectory trails fade from full opacity to transparent over 500 points.
+Three.js with dynamic point cloud updates driven by the WebSocket delta protocol. Robot markers use platform metadata and available GLB assets. Camera frustums are wireframe FOV cones. Trajectory trails fade from full opacity to transparent over 500 points.
 
-Click-to-navigate: click the ground plane to teleport a robot. The click position is unprojected from screen coordinates to world coordinates and sent to the coordinator as a `place_robot` command.
+Click-to-navigate: click the ground plane to send a robot to a waypoint. The click position is unprojected from screen coordinates to world coordinates and sent to the coordinator as a `send_to` command.
 
 ### Pipeline Editor
 
-A visual DAG editor (React Flow) for connecting SLAM, detection, and description nodes. Switch SLAM backends, change merge strategies, and tune parameters without restarting the simulation. The pipeline graph is rendered as a directed acyclic graph with interactive node inspectors.
+A visual DAG editor (React Flow) for connecting SLAM, detection, and description nodes. Select SLAM backends, change merge strategies, and tune parameters from the dashboard. The pipeline graph is rendered as a directed acyclic graph with interactive node inspectors.
 
 ## Key Design Decisions
 
@@ -386,14 +420,16 @@ A visual DAG editor (React Flow) for connecting SLAM, detection, and description
 | Union-OR map merging | Correct by construction when poses are ground-truth. Idempotent, commutative, associative. |
 | Voronoi partitioning (soft constraint) | Prevents thrashing without causing deadlock. Repartitions automatically on frontier exhaustion. |
 | pLCM replaced with in-process transport | All robots in same process. Serialization is waste. A function call is sufficient. |
-| Registry pattern for SLAM backends | Swap algorithms mid-run. No conditional imports. Lazy loading. Runtime contract verification. |
+| Registry pattern for research backends | Swap or compare implementations without runtime rewrites. No conditional imports. Lazy loading. Runtime contract verification. |
 | Delta protocol for cloud streaming | 90% bandwidth reduction. Full sync fallback every 10s. Transparent to frontend. |
 | Depth always uses znear/zfar formula | Auto-detect was broken. Hardcoded formula is correct. Don't be clever with depth buffers. |
 | No depth-based obstacle avoidance | Camera faces sideways (-Y), not forward (+X). Depth avoidance falsely triggers on walls. |
 | Curated office spawn positions | Random spawning placed robots outside the room. 12 tested positions guarantee indoor placement. |
-| Position-controlled gait (not torque) | Deterministic. No dynamics model needed. Locomotion is a means, not an end. |
+| Position-controlled analytical gait baseline | Deterministic comparator. Advanced RL/MPC/WBC controllers need the benchmark harness first. |
 | 2D frontier detection (not 3D) | 3D frontiers on wall edges caused false "fully explored" declarations in enclosed rooms. |
 | 500K point cap with progressive downsampling | Prevents OOM on long runs. Acceptable quality loss at this density. |
+| RobotPlatform boundary | Keeps Go2 and AGIBOT X2 assumptions out of shared MuJoCo orchestration. |
+| Benchmark before controller sophistication | Scenario/seed metrics come before RL, MPC, WBC, or hardware claims. |
 
 ## Quick Start
 
@@ -459,6 +495,9 @@ VITE_BACKEND_PORT=8001 cd frontend && npm run dev
 | `--octomap-resolution` | `0.1` | Voxel resolution in meters |
 | `--static` | off | Keep robots stationary (SLAM still runs) |
 | `--num-robots` | `2` | Number of robots |
+| `--platform` | `go2` | Robot platform: `go2` or `agibot_x2` |
+| `--x2-model-dir` | `models/agibot_x2` | AGIBOT X2 model directory |
+| `--x2-controller` | `None` | Optional AGIBOT X2 controller/policy path |
 
 ## Project Structure
 
@@ -467,6 +506,7 @@ argus/
 ├── src/                        # Python simulation & robotics code
 │   ├── main.py                 # Entry point for all modes
 │   ├── bridge/                 # MuJoCo bridge (single + multi-robot)
+│   │   ├── platforms/          # RobotPlatform, Go2, AGIBOT X2
 │   │   ├── multi_bridge.py     # N robots in shared MuJoCo scene
 │   │   ├── sim_bridge.py       # Single-robot bridge
 │   │   ├── sensor_types.py     # SensorFrame, CameraIntrinsics
@@ -488,7 +528,7 @@ argus/
 │   │   ├── voronoi_partitioner.py # Perpendicular bisector partitioning
 │   │   ├── map_merger.py       # Union-OR voxel fusion
 │   │   └── transport.py        # In-process pub/sub (replaced pLCM)
-│   ├── locomotion/             # Trot gait controller
+│   ├── locomotion/             # Controllers, Gym env, metrics, eval harness
 │   ├── perception/             # YOLO, VLM, 3D detection projection
 │   ├── control/                # Waypoint runner, random walk, teleop
 │   ├── mcp/                    # MCP server for Claude Code integration
@@ -508,6 +548,7 @@ argus/
 │   │   └── utils/              # Palette, message types
 │   └── public/                 # scene.glb, go2.glb, favicon.svg
 ├── models/unitree_go2/         # Go2 MJCF model + mesh assets
+├── models/                     # Optional external robot/backend assets live here
 ├── dimos/                      # DimOS framework (submodule)
 ├── scripts/                    # Scene conversion utilities
 └── tests/                      # pytest tests
@@ -560,7 +601,7 @@ python scripts/convert_scene_glb.py
 ## Intellectual Heritage
 
 - **[Argus Panoptes](https://en.wikipedia.org/wiki/Argus_Panoptes)** — the hundred-eyed giant; only some eyes slept at any time, the rest kept watching. The architectural metaphor for distributed multi-camera perception.
-- **[DimOS](https://github.com/dimensionalOS/dimos)** (Dimensional, 2024) — the robotics framework that defined the camera conventions, sensor abstractions, and scene data that Argus builds upon.
+- **[DimOS](https://github.com/dimensionalOS/dimos)** (Dimensional, 2024) — the robotics framework that supplied the original camera conventions, sensor abstractions, and scene data Argus started from.
 - **[MuJoCo](https://mujoco.org/)** (DeepMind, 2012) — physics-first simulation. Ground-truth poses for free. The controlled variable that makes coordination research tractable.
 - **[Open3D](http://www.open3d.org/)** (Zhou, Park & Koltun, 2018) — the point cloud processing library. ICP, voxel grids, statistical outlier removal. The workhorse behind every SLAM backend.
 - **[Frontier-Based Exploration](https://ieeexplore.ieee.org/document/613851)** (Yamauchi, 1997) — the insight that the boundary between known and unknown space is the most informative place to visit next. Still the foundation of autonomous exploration 30 years later.
