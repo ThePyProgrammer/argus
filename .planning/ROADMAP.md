@@ -160,7 +160,7 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 05-01-PLAN.md — Create the canonical harness guide, README command card, hard-boundary controller-family matrix, and Markdown content guards.
+- [x] 05-01-PLAN.md — Create the canonical harness guide, README command card, hard-boundary controller-family matrix, and Markdown content guards.
 
 **Research flag**: light
 
