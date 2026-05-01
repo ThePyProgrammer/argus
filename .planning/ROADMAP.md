@@ -156,11 +156,14 @@ Plans:
   2. A controller-family matrix states what is supported now versus deferred for analytical gait, residual RL, direct RL, MPC, WBC, ROS/hardware, and perception-conditioned locomotion.
   3. The documentation links `outputs/locomotion-rd-systems.md` as the rationale for v4 scope and accurately summarizes the current Argus method as analytical trot + MuJoCo position actuators.
   4. A new developer can run the flat-ground analytical baseline smoke benchmark from the guide without reading the implementation first.
-**Plans**: 1 plan
+**Plans**: 2 plans
 Plans:
 
 **Wave 1**
 - [x] 05-01-PLAN.md — Create the canonical harness guide, README command card, hard-boundary controller-family matrix, and Markdown content guards.
+
+**Wave 2 *(gap closure; blocked on Wave 1 completion)***
+- [ ] 05-02-PLAN.md — Align residual-policy placeholder action-mode metadata with the documented residual_baseline seam and add drift guards.
 
 **Research flag**: light
 
@@ -175,7 +178,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 0/4 | Planned | - |
-| 5. harness-docs-and-comparison-matrix | 0/1 | Planned | - |
+| 5. harness-docs-and-comparison-matrix | 1/2 | Gaps planned | - |
 
 ## Requirement Coverage
 
@@ -193,4 +196,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 5 is planned. Continue with `/gsd-execute-phase 05` for `harness-docs-and-comparison-matrix`.
+Phase 5 has a gap-closure plan. Continue with `/gsd-execute-phase 05 --gaps-only` for `harness-docs-and-comparison-matrix`.
