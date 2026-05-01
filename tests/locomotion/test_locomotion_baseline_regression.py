@@ -8,14 +8,27 @@ calibration context explicit when thresholds change.
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
 import pytest
+
+from src.locomotion.evaluation import EvaluationMatrix, EvaluationRunConfig, run_evaluation_matrix
 
 TRACKING_RMSE_MAX = 1.50
 DISTANCE_XY_MIN_M = 0.01
 BASE_HEIGHT_MIN_M = 0.15
 ROLL_ABS_MAX_RAD = 0.90
 PITCH_ABS_MAX_RAD = 0.90
+
+
+def _skip_if_mujoco_python_unsupported() -> None:
+    if not ((3, 10) <= sys.version_info < (3, 13)):
+        pytest.skip("MuJoCo integration requires Python >=3.10,<3.13 and mujoco installed")
+    try:
+        import mujoco  # noqa: F401
+    except ImportError:
+        pytest.skip("MuJoCo integration requires Python >=3.10,<3.13 and mujoco installed")
 
 
 def assert_analytical_flat_ground_thresholds(rows):
@@ -33,11 +46,12 @@ def assert_analytical_flat_ground_thresholds(rows):
 
         commanded_velocity = _coerce_commanded_velocity(row["commanded_velocity"])
         translational_speed = (commanded_velocity[0] ** 2 + commanded_velocity[1] ** 2) ** 0.5
+        summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
         tracking_rmse = _coerce_float(row, "tracking_rmse")
-        distance_xy_m = _coerce_float(row, "distance_xy_m")
-        base_height_min_m = _coerce_float(row, "base_height_min_m")
-        roll_abs_max_rad = _coerce_float(row, "roll_abs_max_rad")
-        pitch_abs_max_rad = _coerce_float(row, "pitch_abs_max_rad")
+        distance_xy_m = _coerce_metric(row, summary, "distance_xy_m", "stability", "distance_xy_m")
+        base_height_min_m = _coerce_metric(row, summary, "base_height_min_m", "stability", "min_base_height_m")
+        roll_abs_max_rad = _coerce_metric(row, summary, "roll_abs_max_rad", "stability", "max_abs_roll_rad")
+        pitch_abs_max_rad = _coerce_metric(row, summary, "pitch_abs_max_rad", "stability", "max_abs_pitch_rad")
 
         assert tracking_rmse <= TRACKING_RMSE_MAX, f"{label}: tracking_rmse {tracking_rmse} > {TRACKING_RMSE_MAX}"
         if translational_speed > 0.0:
@@ -67,6 +81,20 @@ def _coerce_commanded_velocity(value):
 def _coerce_float(row, key):
     assert key in row, f"{key} is required"
     return float(row[key])
+
+
+def _coerce_metric(row, summary, row_key, family, summary_key):
+    value = row.get(row_key)
+    if _is_missing_metric_value(value):
+        family_payload = summary.get(family, {}) if isinstance(summary, dict) else {}
+        if isinstance(family_payload, dict) and summary_key in family_payload:
+            value = family_payload[summary_key]
+    assert not _is_missing_metric_value(value), f"{row_key} is required"
+    return float(value)
+
+
+def _is_missing_metric_value(value):
+    return value in (None, "") or float(value) == 0.0
 
 
 def _good_row(**overrides):
@@ -143,3 +171,32 @@ def test_threshold_helper_rejects_missing_command_context(missing_key):
 def test_threshold_helper_rejects_stability_degradation(field, value):
     with pytest.raises(AssertionError):
         assert_analytical_flat_ground_thresholds([_good_row(**{field: value})])
+
+
+@pytest.mark.integration
+def test_analytical_trot_flat_ground_fixed_seed_regression(tmp_path):
+    """D-14/D-15: real MuJoCo smoke gate for analytical_trot flat_ground."""
+
+    _skip_if_mujoco_python_unsupported()
+    if not (Path("models/unitree_go2") / "go2.xml").exists():
+        pytest.skip("MuJoCo integration requires Python >=3.10,<3.13 and mujoco installed")
+
+    matrix = EvaluationMatrix(
+        controllers=("analytical_trot",),
+        scenarios=("flat_ground",),
+        seeds=(101, 202, 303),
+        action_mode="velocity_command",
+        max_episode_steps=25,
+    )
+    config = EvaluationRunConfig(
+        output_root=tmp_path,
+        fail_on_locomotion_failure=True,
+        verbose=False,
+    )
+
+    result = run_evaluation_matrix(matrix, config)
+
+    assert result.exit_code == 0
+    assert result.had_locomotion_failure is False
+    assert (result.run_dir / "summary.json").exists()
+    assert_analytical_flat_ground_thresholds(result.episode_rows)
