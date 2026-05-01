@@ -7,6 +7,8 @@ calibration context explicit when thresholds change.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 TRACKING_RMSE_MAX = 1.50
@@ -19,7 +21,52 @@ PITCH_ABS_MAX_RAD = 0.90
 def assert_analytical_flat_ground_thresholds(rows):
     """Assert robust threshold bounds for analytical_trot flat_ground episodes."""
 
-    raise NotImplementedError("threshold helper implementation follows the red tests")
+    materialized = list(rows)
+    assert materialized, "expected at least one analytical flat-ground episode row"
+    for index, row in enumerate(materialized):
+        label = row.get("run_id", f"row[{index}]")
+        assert row.get("success") is True, f"{label}: locomotion success must be true"
+        assert not row.get("failure_reason"), f"{label}: failure_reason must be empty"
+        assert "commanded_velocity" in row, f"{label}: commanded_velocity is required"
+        assert "command_source" in row, f"{label}: command_source is required"
+        assert row["command_source"], f"{label}: command_source must be non-empty"
+
+        commanded_velocity = _coerce_commanded_velocity(row["commanded_velocity"])
+        translational_speed = (commanded_velocity[0] ** 2 + commanded_velocity[1] ** 2) ** 0.5
+        tracking_rmse = _coerce_float(row, "tracking_rmse")
+        distance_xy_m = _coerce_float(row, "distance_xy_m")
+        base_height_min_m = _coerce_float(row, "base_height_min_m")
+        roll_abs_max_rad = _coerce_float(row, "roll_abs_max_rad")
+        pitch_abs_max_rad = _coerce_float(row, "pitch_abs_max_rad")
+
+        assert tracking_rmse <= TRACKING_RMSE_MAX, f"{label}: tracking_rmse {tracking_rmse} > {TRACKING_RMSE_MAX}"
+        if translational_speed > 0.0:
+            assert distance_xy_m >= DISTANCE_XY_MIN_M, (
+                f"{label}: distance_xy_m {distance_xy_m} < {DISTANCE_XY_MIN_M} "
+                f"for commanded_velocity={commanded_velocity}"
+            )
+        assert base_height_min_m >= BASE_HEIGHT_MIN_M, (
+            f"{label}: base_height_min_m {base_height_min_m} < {BASE_HEIGHT_MIN_M}"
+        )
+        assert roll_abs_max_rad <= ROLL_ABS_MAX_RAD, (
+            f"{label}: roll_abs_max_rad {roll_abs_max_rad} > {ROLL_ABS_MAX_RAD}"
+        )
+        assert pitch_abs_max_rad <= PITCH_ABS_MAX_RAD, (
+            f"{label}: pitch_abs_max_rad {pitch_abs_max_rad} > {PITCH_ABS_MAX_RAD}"
+        )
+
+
+def _coerce_commanded_velocity(value):
+    if isinstance(value, str):
+        value = json.loads(value)
+    assert isinstance(value, (list, tuple)), "commanded_velocity must be a sequence"
+    assert len(value) >= 3, "commanded_velocity must include vx, vy, and yaw rate"
+    return [float(value[0]), float(value[1]), float(value[2])]
+
+
+def _coerce_float(row, key):
+    assert key in row, f"{key} is required"
+    return float(row[key])
 
 
 def _good_row(**overrides):
