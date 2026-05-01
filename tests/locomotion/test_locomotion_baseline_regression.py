@@ -46,12 +46,11 @@ def assert_analytical_flat_ground_thresholds(rows):
 
         commanded_velocity = _coerce_commanded_velocity(row["commanded_velocity"])
         translational_speed = (commanded_velocity[0] ** 2 + commanded_velocity[1] ** 2) ** 0.5
-        summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
         tracking_rmse = _coerce_float(row, "tracking_rmse")
-        distance_xy_m = _coerce_metric(row, summary, "distance_xy_m", "stability", "distance_xy_m")
-        base_height_min_m = _coerce_metric(row, summary, "base_height_min_m", "stability", "min_base_height_m")
-        roll_abs_max_rad = _coerce_metric(row, summary, "roll_abs_max_rad", "stability", "max_abs_roll_rad")
-        pitch_abs_max_rad = _coerce_metric(row, summary, "pitch_abs_max_rad", "stability", "max_abs_pitch_rad")
+        distance_xy_m = _coerce_float(row, "distance_xy_m")
+        base_height_min_m = _coerce_float(row, "base_height_min_m")
+        roll_abs_max_rad = _coerce_float(row, "roll_abs_max_rad")
+        pitch_abs_max_rad = _coerce_float(row, "pitch_abs_max_rad")
 
         assert tracking_rmse <= TRACKING_RMSE_MAX, f"{label}: tracking_rmse {tracking_rmse} > {TRACKING_RMSE_MAX}"
         if translational_speed > 0.0:
@@ -81,20 +80,6 @@ def _coerce_commanded_velocity(value):
 def _coerce_float(row, key):
     assert key in row, f"{key} is required"
     return float(row[key])
-
-
-def _coerce_metric(row, summary, row_key, family, summary_key):
-    value = row.get(row_key)
-    if _is_missing_metric_value(value):
-        family_payload = summary.get(family, {}) if isinstance(summary, dict) else {}
-        if isinstance(family_payload, dict) and summary_key in family_payload:
-            value = family_payload[summary_key]
-    assert not _is_missing_metric_value(value), f"{row_key} is required"
-    return float(value)
-
-
-def _is_missing_metric_value(value):
-    return value in (None, "") or float(value) == 0.0
 
 
 def _good_row(**overrides):
@@ -171,6 +156,24 @@ def test_threshold_helper_rejects_missing_command_context(missing_key):
 def test_threshold_helper_rejects_stability_degradation(field, value):
     with pytest.raises(AssertionError):
         assert_analytical_flat_ground_thresholds([_good_row(**{field: value})])
+
+
+def test_threshold_helper_rejects_zeroed_flattened_csv_metrics_even_with_summary_fallback():
+    row = _good_row(
+        base_height_min_m=0.0,
+        roll_abs_max_rad=0.0,
+        pitch_abs_max_rad=0.0,
+        summary={
+            "stability": {
+                "min_base_height_m": 0.24,
+                "max_abs_roll_rad": 0.20,
+                "max_abs_pitch_rad": 0.25,
+            }
+        },
+    )
+
+    with pytest.raises(AssertionError):
+        assert_analytical_flat_ground_thresholds([row])
 
 
 @pytest.mark.integration

@@ -256,3 +256,54 @@ def test_csv_string_cells_are_formula_safe(tmp_path):
 
     # LOC-METRICS-05 / D-07 / T-04-04: formula-like string cells are prefixed.
     assert rows[0]["failure_reason"].startswith("'=cmd")
+
+
+def test_episode_export_maps_production_locomotion_summary_schema(tmp_path):
+    class ProductionSummaryEnv(_FakeExportEnv):
+        def step(self, action):
+            _observation, reward, terminated, truncated, info = super().step(action)
+            info["locomotion_metrics_summary"] = {
+                "command_tracking": {"tracking_error_rmse": 0.11, "distance_xy_m": 0.42},
+                "stability": {
+                    "min_base_height_m": 0.27,
+                    "max_base_height_deviation_m": 0.055,
+                    "max_abs_roll_rad": 0.12,
+                    "max_abs_pitch_rad": 0.13,
+                },
+                "action_quality": {
+                    "action_delta_norm_mean": 0.021,
+                    "position_servo_effort_proxy_mean": 0.082,
+                    "commanded_joint_limit_violation_count_total": 2,
+                    "position_target_saturation_proxy_total": 3,
+                },
+                "contact_terrain": {
+                    "slip_mean_m_per_s": {"FL": 0.01, "FR": 0.03, "RL": 0.05, "RR": 0.07},
+                    "clearance_min_m": {"FL": 0.02, "FR": 0.04, "RL": 0.06, "RR": 0.08},
+                    "duty_factor": {"FL": 0.4, "FR": 0.6, "RL": 0.5, "RR": 0.7},
+                },
+                "success": True,
+                "failure_reason": None,
+                "step_count": self._step_count,
+            }
+            return _observation, reward, terminated, truncated, info
+
+    result = run_evaluation_matrix(
+        _single_cell_matrix(),
+        EvaluationRunConfig(output_root=tmp_path),
+        env_factory=lambda config: ProductionSummaryEnv(config),
+    )
+
+    with (result.run_dir / "episodes.csv").open(newline="", encoding="utf-8") as fp:
+        row = next(csv.DictReader(fp))
+
+    assert float(row["base_height_min_m"]) == 0.27
+    assert float(row["base_height_max_deviation_m"]) == 0.055
+    assert float(row["roll_abs_max_rad"]) == 0.12
+    assert float(row["pitch_abs_max_rad"]) == 0.13
+    assert float(row["action_smoothness_mean"]) == 0.021
+    assert float(row["position_servo_effort_mean"]) == 0.082
+    assert float(row["joint_limit_violation_count"]) == 2.0
+    assert float(row["actuator_saturation_count"]) == 3.0
+    assert float(row["foot_slip_mean"]) == 0.04
+    assert float(row["foot_clearance_mean"]) == 0.05
+    assert float(row["duty_factor_mean"]) == 0.55

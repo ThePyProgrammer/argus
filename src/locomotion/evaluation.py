@@ -486,17 +486,37 @@ def _episode_csv_row(
             "step_count": _metric_value(payload, "step_count", default=0.0),
             "tracking_rmse": _metric_value(command_tracking, "tracking_error_rmse", default=0.0),
             "distance_xy_m": _metric_value(command_tracking, "distance_xy_m", default=0.0),
-            "base_height_min_m": _metric_value(stability, "base_height_min_m", default=0.0),
-            "base_height_max_deviation_m": _metric_value(stability, "base_height_max_deviation_m", default=0.0),
-            "roll_abs_max_rad": _metric_value(stability, "roll_abs_max_rad", default=0.0),
-            "pitch_abs_max_rad": _metric_value(stability, "pitch_abs_max_rad", default=0.0),
-            "action_smoothness_mean": _metric_value(action_quality, "action_smoothness_mean", default=0.0),
-            "position_servo_effort_mean": _metric_value(action_quality, "position_servo_effort_mean", default=0.0),
-            "joint_limit_violation_count": _metric_value(action_quality, "joint_limit_violation_count", default=0.0),
-            "actuator_saturation_count": _metric_value(action_quality, "actuator_saturation_count", default=0.0),
-            "foot_slip_mean": _metric_value(contact_terrain, "foot_slip_mean", default=0.0),
-            "foot_clearance_mean": _metric_value(contact_terrain, "foot_clearance_mean", default=0.0),
-            "duty_factor_mean": _metric_value(contact_terrain, "duty_factor_mean", default=0.0),
+            "base_height_min_m": _metric_alias(stability, "base_height_min_m", "min_base_height_m"),
+            "base_height_max_deviation_m": _metric_alias(
+                stability,
+                "base_height_max_deviation_m",
+                "max_base_height_deviation_m",
+            ),
+            "roll_abs_max_rad": _metric_alias(stability, "roll_abs_max_rad", "max_abs_roll_rad"),
+            "pitch_abs_max_rad": _metric_alias(stability, "pitch_abs_max_rad", "max_abs_pitch_rad"),
+            "action_smoothness_mean": _metric_alias(
+                action_quality,
+                "action_smoothness_mean",
+                "action_delta_norm_mean",
+            ),
+            "position_servo_effort_mean": _metric_alias(
+                action_quality,
+                "position_servo_effort_mean",
+                "position_servo_effort_proxy_mean",
+            ),
+            "joint_limit_violation_count": _metric_alias(
+                action_quality,
+                "joint_limit_violation_count",
+                "commanded_joint_limit_violation_count_total",
+            ),
+            "actuator_saturation_count": _metric_alias(
+                action_quality,
+                "actuator_saturation_count",
+                "position_target_saturation_proxy_total",
+            ),
+            "foot_slip_mean": _contact_metric_mean(contact_terrain, "foot_slip_mean", "slip_mean_m_per_s"),
+            "foot_clearance_mean": _contact_metric_mean(contact_terrain, "foot_clearance_mean", "clearance_min_m"),
+            "duty_factor_mean": _contact_metric_mean(contact_terrain, "duty_factor_mean", "duty_factor"),
         }
     )
     return row
@@ -507,6 +527,21 @@ def _metric_value(mapping: dict[str, Any], key: str, *, default: float) -> Any:
     if value is None:
         return default
     return _jsonable(value)
+
+
+def _metric_alias(mapping: dict[str, Any], *keys: str, default: float = 0.0) -> Any:
+    for key in keys:
+        if key in mapping and mapping[key] is not None:
+            return _jsonable(mapping[key])
+    return default
+
+
+def _contact_metric_mean(mapping: dict[str, Any], *keys: str, default: float = 0.0) -> Any:
+    value = _metric_alias(mapping, *keys, default=default)
+    if isinstance(value, dict):
+        numeric_values = [float(item) for item in value.values() if item is not None]
+        return sum(numeric_values) / len(numeric_values) if numeric_values else default
+    return value
 
 
 def _manifest_run_row(
