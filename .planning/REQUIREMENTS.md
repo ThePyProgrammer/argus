@@ -29,20 +29,20 @@ Each requirement maps to exactly one roadmap phase.
 - [x] **LOC-METRICS-02**: Evaluation captures stability metrics: fall rate, roll/pitch bounds, base height deviation, and distance before failure. Validated in Phase 3.
 - [x] **LOC-METRICS-03**: Evaluation captures control-quality metrics: action smoothness, joint-limit violations, energy/effort proxy, and actuator saturation. Validated in Phase 3.
 - [x] **LOC-METRICS-04**: Evaluation captures terrain/contact proxies: foot slip, foot clearance, contact timing/duty factor, and scenario success rate. Validated in Phase 3.
-- [ ] **LOC-METRICS-05**: Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds.
+- [x] **LOC-METRICS-05**: Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds. Validated in Phase 4.
 
 ### LOC-EVAL — Repeatable Evaluation Runner
 
-- [ ] **LOC-EVAL-01**: Developer can run a CLI evaluation command that executes a controller across a scenario matrix and fixed seed list.
-- [ ] **LOC-EVAL-02**: Evaluation produces an aggregate comparison table with per-controller mean, standard deviation, and failure counts.
-- [ ] **LOC-EVAL-03**: Evaluation stores enough metadata to reproduce a run: git commit, controller id, scenario id, seed, environment config, and action mode.
-- [ ] **LOC-EVAL-04**: Evaluation includes regression tests that prevent the analytical trot baseline from silently degrading on the flat-ground smoke scenario.
+- [x] **LOC-EVAL-01**: Developer can run a CLI evaluation command that executes a controller across a scenario matrix and fixed seed list. Validated in Phase 4.
+- [x] **LOC-EVAL-02**: Evaluation produces an aggregate comparison table with per-controller mean, standard deviation, and failure counts. Validated in Phase 4.
+- [x] **LOC-EVAL-03**: Evaluation stores enough metadata to reproduce a run: git commit, controller id, scenario id, seed, environment config, and action mode. Validated in Phase 4.
+- [x] **LOC-EVAL-04**: Evaluation includes regression tests that prevent the analytical trot baseline from silently degrading on the flat-ground smoke scenario. Validated in Phase 4.
 
 ### LOC-REPORT — Research Harness Documentation
 
-- [ ] **LOC-REPORT-01**: Developer can read a concise harness guide explaining observation space, action modes, reward/metric definitions, and scenario catalog.
-- [ ] **LOC-REPORT-02**: Developer can see an explicit comparison matrix explaining which controller families are supported now versus intentionally deferred.
-- [ ] **LOC-REPORT-03**: Developer can use the final report from `outputs/locomotion-rd-systems.md` as the rationale link for milestone scope.
+- [x] **LOC-REPORT-01**: Developer can read a concise harness guide explaining observation space, action modes, reward/metric definitions, and scenario catalog. Validated in Phase 5.
+- [x] **LOC-REPORT-02**: Developer can see an explicit comparison matrix explaining which controller families are supported now versus intentionally deferred. Validated in Phase 5.
+- [x] **LOC-REPORT-03**: Developer can use the final report from `outputs/locomotion-rd-systems.md` as the rationale link for milestone scope. Validated in Phase 5.
 
 ---
 

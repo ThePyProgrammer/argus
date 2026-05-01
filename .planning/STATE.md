@@ -5,7 +5,7 @@ milestone_name: Benchmarkable Locomotion Environment
 status: milestone_complete
 stopped_at: Phase 5 context gathered
 last_updated: "2026-05-01T08:02:50.068Z"
-last_activity: 2026-05-01 -- Phase 05 execution started
+last_activity: 2026-05-01 -- v4.0 milestone completed
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,19 +18,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-30)
+See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** Phase 05 — harness-docs-and-comparison-matrix
+**Current focus:** v4.0 Benchmarkable Locomotion Environment complete
 
 ## Current Position
 
 Phase: 05
-Plan: Not started
+Plan: 2 of 2
 Status: Milestone complete
-Last activity: 2026-05-01
+Last activity: 2026-05-01 -- Phase 05 verified passed and v4.0 completed
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -68,11 +68,12 @@ Regression gate: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_
 - 2026-04-13: v3.0 ROADMAP.md created — 8 phases, 42 requirements, 100% coverage
 - 2026-04-30: v4.0 milestone started — Benchmarkable Locomotion Environment, 5 phases, 20 requirements, 100% coverage
 - 2026-04-30: Phase 2 completed — controller protocol/registry, analytical trot adapter, unavailable future-controller placeholders, env/bridge controller seam, clean code review, and verification passed.
+- 2026-05-01: v4.0 milestone completed — locomotion benchmark env, controller seams, metrics, evaluation runner, docs, and comparison matrix verified.
 
 ### Pending Todos
 
-- Discuss and plan Phase 4: `evaluation-runner-and-regression`.
-- Address advisory code-review warning if desired: `ArgusGo2Env` advertises `rgb_array` render mode without implementing `render()`.
+- Address advisory Phase 5 code-review warnings if desired: `.planning/phases/05-harness-docs-and-comparison-matrix/05-REVIEW.md`.
+- Run `/gsd-complete-milestone` when ready to close v4.0 formally.
 
 ### Blockers/Concerns
 
@@ -94,6 +95,6 @@ Regression gate: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — Phase 3 verified complete; Phase 4 ready to discuss
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-harness-docs-and-comparison-matrix/05-CONTEXT.md
+Last activity: 2026-05-01 — Phase 05 verified passed and v4.0 milestone marked complete
+Stopped at: v4.0 complete; ready for `/gsd-complete-milestone` or next milestone planning
+Resume file: .planning/phases/05-harness-docs-and-comparison-matrix/05-VERIFICATION.md

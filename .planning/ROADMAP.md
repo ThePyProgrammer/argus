@@ -177,8 +177,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
-| 4. evaluation-runner-and-regression | 0/4 | Planned | - |
-| 5. harness-docs-and-comparison-matrix | 1/2 | Gaps planned | - |
+| 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
+| 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
 
 ## Requirement Coverage
 
@@ -196,4 +196,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 5 has a gap-closure plan. Continue with `/gsd-execute-phase 05 --gaps-only` for `harness-docs-and-comparison-matrix`.
+v4.0 Benchmarkable Locomotion Environment is complete. Run `/gsd-complete-milestone` or start the next milestone when ready.
