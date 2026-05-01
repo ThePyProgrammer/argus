@@ -40,7 +40,7 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - ✓ Named locomotion scenario catalog: flat ground, low friction, slope, rough heightfield, and push disturbance — v4.0 Phase 1
 - ✓ Controller plugin seam for analytical trot, residual policies, direct policies, and future MPC/WBC adapters — v4.0 Phase 2
 - ✓ Locomotion metrics suite for command tracking, stability, control quality, contact/terrain proxies, and failure rates — v4.0 Phase 3
-- ☐ Repeatable CLI evaluation runner with JSONL/CSV exports, aggregate comparison table, metadata, and baseline regression test (v4.0)
+- ✓ Repeatable CLI evaluation runner with JSONL/CSV exports, aggregate comparison table, metadata, and baseline regression test — v4.0 Phase 4
 - ☐ Harness guide and explicit controller-family comparison matrix grounded in the locomotion R&D report (v4.0)
 
 ### Out of Scope
@@ -79,7 +79,7 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 **Shipped:** v3.0 Pluggable Perception & 3D Object Detection (2026-04-30)
 
-**Active:** v4.0 Benchmarkable Locomotion Environment Phase 3 complete; Phase 4 evaluation runner and regression is next.
+**Active:** v4.0 Benchmarkable Locomotion Environment Phase 4 complete; Phase 5 harness docs and comparison matrix is next.
 
 **Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, and Zustand.
 
@@ -130,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 — v4.0 Phase 3 locomotion-metrics-instrumentation completed*
+*Last updated: 2026-05-01 — v4.0 Phase 4 evaluation-runner-and-regression completed*
