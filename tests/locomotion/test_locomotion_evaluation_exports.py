@@ -258,13 +258,14 @@ def test_csv_string_cells_are_formula_safe(tmp_path):
     assert rows[0]["failure_reason"].startswith("'=cmd")
 
 
-def test_episode_export_maps_production_locomotion_summary_schema(tmp_path):
+def test_episode_export_reads_distance_xy_m_from_stability_summary(tmp_path):
     class ProductionSummaryEnv(_FakeExportEnv):
         def step(self, action):
             _observation, reward, terminated, truncated, info = super().step(action)
             info["locomotion_metrics_summary"] = {
-                "command_tracking": {"tracking_error_rmse": 0.11, "distance_xy_m": 0.42},
+                "command_tracking": {"tracking_error_rmse": 0.11, "distance_xy_m": 0.0},
                 "stability": {
+                    "distance_xy_m": 0.42,
                     "min_base_height_m": 0.27,
                     "max_base_height_deviation_m": 0.055,
                     "max_abs_roll_rad": 0.12,
@@ -293,9 +294,12 @@ def test_episode_export_maps_production_locomotion_summary_schema(tmp_path):
         env_factory=lambda config: ProductionSummaryEnv(config),
     )
 
+    assert result.episode_rows[0]["distance_xy_m"] == 0.42
+
     with (result.run_dir / "episodes.csv").open(newline="", encoding="utf-8") as fp:
         row = next(csv.DictReader(fp))
 
+    assert float(row["distance_xy_m"]) == 0.42
     assert float(row["base_height_min_m"]) == 0.27
     assert float(row["base_height_max_deviation_m"]) == 0.055
     assert float(row["roll_abs_max_rad"]) == 0.12
@@ -307,3 +311,8 @@ def test_episode_export_maps_production_locomotion_summary_schema(tmp_path):
     assert float(row["foot_slip_mean"]) == 0.04
     assert float(row["foot_clearance_mean"]) == 0.05
     assert float(row["duty_factor_mean"]) == 0.55
+
+    summary = _read_json(result.run_dir / "summary.json")
+    assert summary["overall_by_controller"][0]["distance_xy_m_mean"] == 0.42
+    comparison = (result.run_dir / "comparison.md").read_text(encoding="utf-8")
+    assert "0.42" in comparison

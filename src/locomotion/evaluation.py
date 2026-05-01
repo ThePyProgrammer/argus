@@ -485,7 +485,7 @@ def _episode_csv_row(
             "failure_reason": payload.get("failure_reason") or "",
             "step_count": _metric_value(payload, "step_count", default=0.0),
             "tracking_rmse": _metric_value(command_tracking, "tracking_error_rmse", default=0.0),
-            "distance_xy_m": _metric_value(command_tracking, "distance_xy_m", default=0.0),
+            "distance_xy_m": _metric_alias(stability, "distance_xy_m", default=0.0),
             "base_height_min_m": _metric_alias(stability, "base_height_min_m", "min_base_height_m"),
             "base_height_max_deviation_m": _metric_alias(
                 stability,
