@@ -293,22 +293,19 @@ if root != candidate and root not in candidate.parents:
 
 All claims in this research were verified or cited — no user confirmation needed.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `current_command["time"]` mean schedule-entry start time or current sim time?**
    - What we know: The current command vector can be computed by `_command_at_time(self._current_sim_time())`. [VERIFIED: src/locomotion/env.py]
-   - What's unclear: The code has no existing public schema for `current_command`. [VERIFIED: src/locomotion/env.py]
-   - Recommendation: Include both `sim_time` at top level and `current_command["schedule_time"]` or `current_command["time"]` as the active schedule entry start time; tests should assert vector fidelity more strongly than timestamp naming. [VERIFIED: src/locomotion/env.py]
+   - Resolution: Phase 6 plans must expose top-level `sim_time` from the environment and treat `current_command` vector fidelity (`vx`, `vy`, `omega`) as the load-bearing invariant. If a schedule-entry time is exposed, name it explicitly as `schedule_time` rather than relying on ambiguous `time` semantics. [RESOLVED: .planning/ROADMAP.md; src/locomotion/env.py]
 
 2. **Can the real MuJoCo baseline smoke run in the current machine environment?**
    - What we know: Local probed Python is 3.14.4 and lacks `mujoco`/`gymnasium`, while project metadata requires Python `>=3.10,<3.13`. [VERIFIED: package-version probe; pyproject.toml]
-   - What's unclear: A project `.venv` may exist but was not used by the package-version probe. [ASSUMED]
-   - Recommendation: Planner should make pure fake-env tests the mandatory quick gate and real MuJoCo smoke conditional on supported Python/dependencies, matching existing test skip behavior. [VERIFIED: tests/locomotion/test_locomotion_baseline_regression.py]
+   - Resolution: Fake-env tests are mandatory quick gates for Phase 6 semantics. Real MuJoCo smoke remains conditional on supported Python/dependencies and must follow the existing skip behavior in the baseline regression tests. [RESOLVED: tests/locomotion/test_locomotion_baseline_regression.py; pyproject.toml]
 
 3. **Should Phase 6 modify non-default action-mode behavior?**
    - What we know: The milestone audit routes CLI action-mode mismatch to Phase 7, not Phase 6. [VERIFIED: .planning/ROADMAP.md; .planning/v4.0-MILESTONE-AUDIT.md]
-   - What's unclear: None for Phase 6 scope. [VERIFIED: .planning/ROADMAP.md]
-   - Recommendation: Do not fix `joint_position`/`residual_baseline` CLI action generation in Phase 6 except to avoid regressions; leave it for Phase 7. [VERIFIED: .planning/ROADMAP.md]
+   - Resolution: Phase 6 must not broaden `joint_position` or `residual_baseline` CLI semantics except to avoid regressions; Phase 7 owns action-mode support/rejection scope. [RESOLVED: .planning/ROADMAP.md; .planning/v4.0-MILESTONE-AUDIT.md]
 
 ## Environment Availability
 

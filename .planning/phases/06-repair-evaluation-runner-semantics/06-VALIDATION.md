@@ -40,9 +40,9 @@ created: 2026-05-01
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 06-01-01 | 01 | 1 | LOC-EVAL-01 | T-06-01 | Evaluator consumes env-provided current command without unsafe path or network behavior | unit + fake integration | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py -q` | yes | ⬜ pending |
 | 06-01-02 | 01 | 1 | LOC-EVAL-01 | T-06-01 | `ArgusGo2Env` exposes current command from simulation time using existing schedule semantics | unit/integration | `python -m pytest tests/locomotion -k current_command -q` | W0 | ⬜ pending |
-| 06-02-01 | 02 | 1 | LOC-METRICS-05, LOC-EVAL-02 | T-06-02 | Artifact writes remain contained and CSV formula-safe while preserving `stability.distance_xy_m` | artifact integration | `python -m pytest tests/locomotion/test_locomotion_evaluation_exports.py -q` | yes | ⬜ pending |
-| 06-03-01 | 03 | 2 | LOC-EVAL-04 | T-06-03 | Stationary command-ignoring controller fails commanded-locomotion baseline gate | unit + optional simulator smoke | `python -m pytest tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
-| 06-04-01 | 04 | 2 | LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 | T-06-04 | Phase gate runs deterministic quick suite without runtime LLM/network dependency | regression | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
+| 06-02-01 | 02 | 2 | LOC-METRICS-05, LOC-EVAL-02 | T-06-02 | Artifact writes remain contained and CSV formula-safe while preserving `stability.distance_xy_m` | artifact integration | `python -m pytest tests/locomotion/test_locomotion_evaluation_exports.py -q` | yes | ⬜ pending |
+| 06-03-01 | 03 | 3 | LOC-EVAL-04 | T-06-03 | Stationary command-ignoring controller fails commanded-locomotion baseline gate | unit + optional simulator smoke | `python -m pytest tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
+| 06-03-02 | 03 | 3 | LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 | T-06-12 | Phase gate runs deterministic quick suite without runtime LLM/network dependency | regression | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

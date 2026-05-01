@@ -179,9 +179,17 @@ Plans:
   2. `ArgusGo2Env` and/or evaluation info exposes enough current-command state for actions and exported command fields to match the running scenario.
   3. Real evaluation artifacts read `distance_xy_m` from the stability episode summary and preserve nonzero distance in CSV, summary, comparison, and threshold paths.
   4. Regression coverage proves nonzero scheduled commands drive real/fake evaluation actions and baseline checks cannot pass as stationary standing tests.
-**Plans**: 0 plans
+**Plans**: 3 plans
 Plans:
-- [ ] To be planned via `/gsd-plan-phase 6`.
+
+**Wave 1**
+- [ ] 06-01-PLAN.md — Emit and consume active `current_command` for evaluation actions and command export fields.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 06-02-PLAN.md — Flatten `distance_xy_m` from stability summaries and preserve it through artifacts and comparison output.
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 06-03-PLAN.md — Add stationary-controller baseline rejection and update Phase 6 Nyquist validation evidence.
 
 **Research flag**: standard
 
@@ -213,7 +221,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
-| 6. repair-evaluation-runner-semantics | 0/0 | Pending | — |
+| 6. repair-evaluation-runner-semantics | 0/3 | Pending | — |
 | 7. align-evaluation-action-mode-contract | 0/0 | Pending | — |
 
 ## Requirement Coverage
@@ -234,4 +242,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 ## Next Step
 
-Plan the first gap-closure phase with `/gsd-plan-phase 6`, then re-run `/gsd-audit-milestone` after Phases 6 and 7 are complete.
+Execute Phase 6 with `/gsd-execute-phase 6`, then plan Phase 7 with `/gsd-plan-phase 7`. Re-run `/gsd-audit-milestone` after Phases 6 and 7 are complete.
