@@ -134,7 +134,7 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 04-01-PLAN.md — Add evaluation matrix contracts, fail-fast validation, and fake-env runner loop.
+- [x] 04-01-PLAN.md — Add evaluation matrix contracts, fail-fast validation, and fake-env runner loop.
 
 **Wave 2 *(blocked on Wave 1 completion)***
 - [ ] 04-02-PLAN.md — Add JSONL/CSV/manifest/summary/Markdown exports and offline comparison regeneration.
