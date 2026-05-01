@@ -466,7 +466,7 @@ class _UnavailableControllerBase:
 
 @locomotion_controller(name="residual_policy", display="Residual Policy")
 class ResidualPolicyController(_UnavailableControllerBase):
-    CAPABILITIES = _placeholder_capabilities("residual_policy", "residual_joint_position")
+    CAPABILITIES = _placeholder_capabilities("residual_policy", "residual_baseline")
     UNAVAILABLE_REASON = RESIDUAL_POLICY_UNAVAILABLE_REASON
 
 
