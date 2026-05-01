@@ -11,7 +11,7 @@ import pytest
 
 from src.locomotion.controllers import ControllerResult
 from src.locomotion.env import ArgusGo2Env, ArgusGo2EnvConfig
-from src.locomotion.scenarios import list_scenarios
+from src.locomotion.scenarios import ScenarioSample, list_scenarios
 
 
 def _skip_if_mujoco_python_unsupported() -> None:
@@ -235,6 +235,31 @@ def test_step_advances_mujoco_sim_time_when_integration_available():
         assert info["sim_time"] > reset_info["sim_time"]
     finally:
         env.close()
+
+
+def test_argus_go2_env_info_exposes_current_command_from_schedule_transition():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(sim_steps_per_frame=5))
+    try:
+        env._scenario_sample = ScenarioSample(
+            scenario_id="flat_ground",
+            spawn_pose=(0.0, 0.0, 0.32, 0.0),
+            terrain_parameters={"terrain_kind": "plane"},
+            command_schedule=(
+                {"time": 0.0, "vx": 0.0, "vy": 0.0, "omega": 0.0},
+                {"time": 0.25, "vx": 0.4, "vy": -0.1, "omega": 0.2},
+            ),
+            disturbance_schedule=(),
+        )
+        env._dt = 0.05
+        env._step_count = 6
+        info = env._info()
+    finally:
+        env.close()
+
+    assert info["current_command"]["vx"] == pytest.approx(0.4)
+    assert info["current_command"]["vy"] == pytest.approx(-0.1)
+    assert info["current_command"]["omega"] == pytest.approx(0.2)
+    assert info["current_command"]["source"] == "scenario_schedule"
 
 
 def test_reset_rebuilds_mujoco_model_for_new_randomized_terrain_sample():
