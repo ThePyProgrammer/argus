@@ -143,7 +143,7 @@ Plans:
 - [x] 04-03-PLAN.md — Wire `argus eval-locomotion` CLI subcommand and saved-run regeneration mode.
 
 **Wave 4 *(blocked on Wave 3 completion)***
-- [ ] 04-04-PLAN.md — Add analytical flat-ground fixed-seed baseline regression gate.
+- [x] 04-04-PLAN.md — Add analytical flat-ground fixed-seed baseline regression gate.
 
 **Research flag**: standard
 
