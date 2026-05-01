@@ -140,7 +140,7 @@ Plans:
 - [x] 04-02-PLAN.md — Add JSONL/CSV/manifest/summary/Markdown exports and offline comparison regeneration.
 
 **Wave 3 *(blocked on Wave 2 completion)***
-- [ ] 04-03-PLAN.md — Wire `argus eval-locomotion` CLI subcommand and saved-run regeneration mode.
+- [x] 04-03-PLAN.md — Wire `argus eval-locomotion` CLI subcommand and saved-run regeneration mode.
 
 **Wave 4 *(blocked on Wave 3 completion)***
 - [ ] 04-04-PLAN.md — Add analytical flat-ground fixed-seed baseline regression gate.
