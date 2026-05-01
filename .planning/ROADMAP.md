@@ -189,7 +189,7 @@ Plans:
 - [x] 06-02-PLAN.md — Flatten `distance_xy_m` from stability summaries and preserve it through artifacts and comparison output.
 
 **Wave 3 *(blocked on Wave 2 completion)***
-- [ ] 06-03-PLAN.md — Add stationary-controller baseline rejection and update Phase 6 Nyquist validation evidence.
+- [x] 06-03-PLAN.md — Add stationary-controller baseline rejection and update Phase 6 Nyquist validation evidence.
 
 **Research flag**: standard
 
