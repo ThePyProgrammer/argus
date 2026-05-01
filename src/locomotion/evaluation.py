@@ -243,6 +243,9 @@ def run_evaluation_matrix(
             runner_step_count = 0
             while not (terminated or truncated):
                 action, source, initial_context = _action_from_command_context(latest_info)
+                executed_commanded_velocity = list(action)
+                executed_command_source = source
+                executed_command_context = dict(initial_context)
                 _observation, _reward, terminated, truncated, info = env.step(
                     np.asarray(action, dtype=np.float32)
                 )
@@ -250,13 +253,9 @@ def run_evaluation_matrix(
                 runner_step_count += 1
                 if runner_step_count >= int(cell["max_episode_steps"]):
                     truncated = True
-                commanded_velocity, command_source, command_context = _command_fields(
-                    latest_info,
-                    reset_info,
-                    default_action=action,
-                    default_source=source,
-                    default_context=initial_context,
-                )
+                commanded_velocity = executed_commanded_velocity
+                command_source = executed_command_source
+                command_context = executed_command_context
                 row = _base_row(cell)
                 row.update(
                     {

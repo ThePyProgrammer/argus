@@ -265,6 +265,34 @@ def test_runner_uses_active_current_command_after_schedule_transition(tmp_path):
     assert row["command_context"]["current_command"]["vx"] == 0.4
 
 
+def test_runner_records_each_step_commanded_velocity_from_executed_action(tmp_path):
+    calls = []
+    result = run_evaluation_matrix(
+        EvaluationMatrix(
+            controllers=("analytical_trot",),
+            scenarios=("flat_ground",),
+            seeds=(101,),
+            action_mode="velocity_command",
+            max_episode_steps=5,
+        ),
+        EvaluationRunConfig(output_root=tmp_path),
+        env_factory=_fake_env_factory(calls, transition_commands=True),
+    )
+
+    captured_actions = [call[1] for call in calls if call[0] == "step"]
+    assert captured_actions == [[0.0, 0.0, 0.0], [0.4, 0.0, 0.0]]
+    assert len(result.step_rows) == 2
+
+    row0 = result.step_rows[0]
+    assert row0["commanded_velocity"] == [0.0, 0.0, 0.0]
+    assert row0["command_source"] == "scenario_schedule"
+    assert row0["command_context"]["command_schedule"][0]["vx"] == 0.0
+
+    row1 = result.step_rows[1]
+    assert row1["commanded_velocity"] == [0.4, 0.0, 0.0]
+    assert row1["command_context"]["current_command"]["vx"] == 0.4
+
+
 def test_runner_enforces_matrix_max_episode_steps_when_env_never_terminates(tmp_path):
     calls = []
 

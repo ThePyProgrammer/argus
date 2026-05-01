@@ -359,6 +359,52 @@ def test_velocity_command_step_dispatches_controller_preserving_yaw_rate_and_wri
     assert "controller_metadata" not in info
 
 
+def test_velocity_command_step_dispatch_uses_schedule_current_command_after_transition():
+    env = ArgusGo2Env(ArgusGo2EnvConfig(sim_steps_per_frame=1))
+    fake_data = _FakeData()
+    env._model = _FakeModel()
+    env._data = fake_data
+    env._dt = 0.002
+    env._scenario_sample = ScenarioSample(
+        scenario_id="flat_ground",
+        spawn_pose=(0.0, 0.0, 0.32, 0.0),
+        terrain_parameters={"terrain_kind": "plane"},
+        command_schedule=(
+            {"time": 0.0, "vx": 0.0, "vy": 0.0, "omega": 0.0},
+            {"time": 0.002, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+        ),
+        disturbance_schedule=(),
+    )
+    dispatch_commands = []
+    expected_ctrl = np.linspace(0.1, 0.3, 12, dtype=np.float64)
+
+    def dispatch_controller(_controller, _observation, command, _dt, data=None, ctrl_indices=None):
+        dispatch_commands.append((command.vx, command.vy, command.yaw_rate))
+        assert data is fake_data
+        assert ctrl_indices is None
+        return ControllerResult(action=expected_ctrl, metadata={"source": "test"})
+
+    def mj_step(_model, data):
+        data.time += 0.002
+
+    try:
+        with patch("src.locomotion.env.dispatch_controller", side_effect=dispatch_controller):
+            with patch.dict("sys.modules", {"mujoco": SimpleNamespace(mj_step=mj_step)}):
+                _obs0, _reward0, _terminated0, _truncated0, info0 = env.step(
+                    np.array([0.0, 0.0, 0.0], dtype=np.float32)
+                )
+                obs1, _reward1, _terminated1, _truncated1, _info1 = env.step(
+                    np.array([0.4, 0.0, 0.0], dtype=np.float32)
+                )
+    finally:
+        env.close()
+
+    assert dispatch_commands[0] == pytest.approx((0.0, 0.0, 0.0))
+    assert info0["current_command"]["vx"] == pytest.approx(0.4)
+    assert dispatch_commands[1] == pytest.approx((0.4, 0.0, 0.0))
+    np.testing.assert_allclose(obs1["command"], [0.4, 0.0, 0.0])
+
+
 def test_push_disturbance_applies_xfrc_applied_deterministically_then_clears():
     env = ArgusGo2Env(ArgusGo2EnvConfig(scenario_id="push_disturbance", sim_steps_per_frame=1))
     fake_data = _FakeData()
