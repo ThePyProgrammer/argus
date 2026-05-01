@@ -183,10 +183,10 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 06-01-PLAN.md — Emit and consume active `current_command` for evaluation actions and command export fields.
+- [x] 06-01-PLAN.md — Emit and consume active `current_command` for evaluation actions and command export fields.
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 06-02-PLAN.md — Flatten `distance_xy_m` from stability summaries and preserve it through artifacts and comparison output.
+- [x] 06-02-PLAN.md — Flatten `distance_xy_m` from stability summaries and preserve it through artifacts and comparison output.
 
 **Wave 3 *(blocked on Wave 2 completion)***
 - [ ] 06-03-PLAN.md — Add stationary-controller baseline rejection and update Phase 6 Nyquist validation evidence.
