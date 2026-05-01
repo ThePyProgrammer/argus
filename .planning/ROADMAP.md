@@ -137,7 +137,7 @@ Plans:
 - [x] 04-01-PLAN.md — Add evaluation matrix contracts, fail-fast validation, and fake-env runner loop.
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 04-02-PLAN.md — Add JSONL/CSV/manifest/summary/Markdown exports and offline comparison regeneration.
+- [x] 04-02-PLAN.md — Add JSONL/CSV/manifest/summary/Markdown exports and offline comparison regeneration.
 
 **Wave 3 *(blocked on Wave 2 completion)***
 - [ ] 04-03-PLAN.md — Wire `argus eval-locomotion` CLI subcommand and saved-run regeneration mode.
