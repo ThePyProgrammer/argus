@@ -41,8 +41,8 @@ created: 2026-05-01
 | 06-01-01 | 01 | 1 | LOC-EVAL-01 | T-06-01 | Evaluator consumes env-provided current command without unsafe path or network behavior | unit + fake integration | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py -q` | yes | ⬜ pending |
 | 06-01-02 | 01 | 1 | LOC-EVAL-01 | T-06-01 | `ArgusGo2Env` exposes current command from simulation time using existing schedule semantics | unit/integration | `python -m pytest tests/locomotion -k current_command -q` | W0 | ⬜ pending |
 | 06-02-01 | 02 | 2 | LOC-METRICS-05, LOC-EVAL-02 | T-06-02 | Artifact writes remain contained and CSV formula-safe while preserving `stability.distance_xy_m` | artifact integration | `python -m pytest tests/locomotion/test_locomotion_evaluation_exports.py -q` | yes | ⬜ pending |
-| 06-03-01 | 03 | 3 | LOC-EVAL-04 | T-06-03 | Stationary command-ignoring controller fails commanded-locomotion baseline gate | unit + optional simulator smoke | `python -m pytest tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
-| 06-03-02 | 03 | 3 | LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 | T-06-12 | Phase gate runs deterministic quick suite without runtime LLM/network dependency | regression | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending |
+| 06-03-01 | 03 | 3 | LOC-EVAL-04 | T-06-03 | Stationary command-ignoring controller fails commanded-locomotion baseline gate | unit + optional simulator smoke | `python -m pytest tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending — blocked locally by unsupported Python 3.14 missing project dependency `gymnasium` |
+| 06-03-02 | 03 | 3 | LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 | T-06-12 | Phase gate runs deterministic quick suite without runtime LLM/network dependency | regression | `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | yes | ⬜ pending — blocked locally by unsupported Python 3.14 missing project dependency `gymnasium`; AI SDK grep clean |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -53,7 +53,7 @@ created: 2026-05-01
 - [ ] `tests/locomotion/test_locomotion_evaluation_runner.py` — add or tighten active-command transition fixture proving zero-at-reset then nonzero-after-transition drives fake env action.
 - [ ] `tests/locomotion/test_argus_go2_env_contract.py` or existing env test file — assert `ArgusGo2Env._info()` exposes `current_command` at reset and after schedule transition.
 - [ ] `tests/locomotion/test_locomotion_evaluation_exports.py` — add or tighten distance preservation fixture where `command_tracking` omits/zeroes distance and `stability.distance_xy_m` is nonzero.
-- [ ] `tests/locomotion/test_locomotion_baseline_regression.py` — add stationary-controller negative fixture for commanded-locomotion baseline failure.
+- [x] `tests/locomotion/test_locomotion_baseline_regression.py` — add stationary-controller negative fixture for commanded-locomotion baseline failure.
 
 ---
 
@@ -75,4 +75,11 @@ created: 2026-05-01
 - [ ] Feedback latency < 5 minutes for quick gate
 - [ ] `nyquist_compliant: true` set in frontmatter after Wave 0 verification passes
 
-**Approval:** pending
+## Automated Evidence Attempt — 2026-05-01
+
+- `python -m pytest tests/locomotion/test_locomotion_baseline_regression.py -q` — blocked during collection in this worktree because the active interpreter is Python 3.14 and lacks project dependency `gymnasium`; `pyproject.toml` requires Python `>=3.10,<3.13`.
+- `python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` — blocked during collection for the same unsupported interpreter/dependency condition.
+- `python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` — blocked during collection for the same unsupported interpreter/dependency condition.
+- `grep -R "claude_agent_sdk\|anthropic\|ClaudeSDKClient\|query(" src pyproject.toml tests 2>/dev/null` — no output; no runtime AI SDK dependency found.
+
+**Approval:** pending — automated gates must be rerun in a project-supported Python `>=3.10,<3.13` environment with dependencies installed before `nyquist_compliant` or Wave 0 completion can be marked true.
