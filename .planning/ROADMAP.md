@@ -130,7 +130,21 @@ Plans:
   3. Exported metadata includes git commit, controller id, scenario id, seed, environment config, action mode, and run timestamp.
   4. The aggregate comparison table can be generated from saved artifacts without re-running simulation.
   5. A regression test prevents the analytical trot baseline from silently degrading on the flat-ground smoke scenario.
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+**Wave 1**
+- [ ] 04-01-PLAN.md — Add evaluation matrix contracts, fail-fast validation, and fake-env runner loop.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 04-02-PLAN.md — Add JSONL/CSV/manifest/summary/Markdown exports and offline comparison regeneration.
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 04-03-PLAN.md — Wire `argus eval-locomotion` CLI subcommand and saved-run regeneration mode.
+
+**Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 04-04-PLAN.md — Add analytical flat-ground fixed-seed baseline regression gate.
+
 **Research flag**: standard
 
 ### Phase 5: harness-docs-and-comparison-matrix
@@ -155,7 +169,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. locomotion-env-contract | 5/5 | Complete | 2026-04-30 |
 | 2. controller-plugin-baseline | 6/6 | Complete | 2026-04-30 |
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
-| 4. evaluation-runner-and-regression | 0/TBD | Not started | - |
+| 4. evaluation-runner-and-regression | 0/4 | Planned | - |
 | 5. harness-docs-and-comparison-matrix | 0/TBD | Not started | - |
 
 ## Requirement Coverage
@@ -174,4 +188,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-Phase 3 is complete and verified. Continue with `/gsd-discuss-phase 4` for `evaluation-runner-and-regression`.
+Phase 4 is planned. Continue with `/gsd-execute-phase 4` for `evaluation-runner-and-regression`.

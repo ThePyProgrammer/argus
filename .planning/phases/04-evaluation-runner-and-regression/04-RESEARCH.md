@@ -343,22 +343,19 @@ def test_export_writes_manifest(tmp_path):
 | A3 | Validation interleaving, metadata bloat, reload reruns, and artifact-loss failure paths are likely implementation risks. | Common Pitfalls | Planner may over-index on tests for risks that are conventional rather than already observed in code. |
 | A4 | Regression thresholds should be calibrated from current multi-seed baseline distribution rather than chosen upfront in research. | Common Pitfalls / Open Questions | Planner must include calibration work before locking numeric bounds. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact numeric analytical-baseline thresholds**
    - What we know: The regression must assert no locomotion failure plus bounded tracking, stability, and distance metrics over about 2-3 fixed seeds. [VERIFIED: /home/prannayag/pragnition/robotics/argus/.planning/phases/04-evaluation-runner-and-regression/04-CONTEXT.md lines 34-37]
-   - What's unclear: Current baseline distribution for the selected smoke seeds was not executed during research. [ASSUMED]
-   - Recommendation: Add a Wave 0 calibration task that runs `analytical_trot`/`flat_ground` for chosen seeds and records threshold rationale in the regression test comment. [ASSUMED]
+   - RESOLVED: Exact numeric thresholds are calibrated during execution in Plan 04, Task 2 before final threshold assertions are locked. The task must run `analytical_trot`/`flat_ground` for seeds `(101, 202, 303)`, inspect the produced fixed-seed ranges, write an inline `# Observed fixed-seed ranges (101, 202, 303):` comment, and then set explicit tracking, distance, base-height, roll, and pitch bounds that reject locomotion failure, stationary behavior on translational command schedules, and stability degradation. Initial constants remain margin-based starting points only until that calibration task passes. [ASSUMED]
 
 2. **Optional matrix config-file format**
    - What we know: Repeated flags are primary; config-file support is optional for larger matrices. [VERIFIED: /home/prannayag/pragnition/robotics/argus/.planning/phases/04-evaluation-runner-and-regression/04-CONTEXT.md lines 16-19]
-   - What's unclear: No locked schema or dependency for YAML/TOML was provided. [VERIFIED: /home/prannayag/pragnition/robotics/argus/.planning/phases/04-evaluation-runner-and-regression/04-CONTEXT.md lines 40-42]
-   - Recommendation: Implement flags first; if config-file support is included, prefer JSON via stdlib unless user asks for YAML/TOML. [ASSUMED]
+   - RESOLVED: Repeated `--controller`, `--scenario`, and `--seed` flags are the primary interface per D-02. If config-file support is included, the format is stdlib JSON only with schema keys `controllers`, `scenarios`, `seeds`, `action_mode`, `max_episode_steps`, `sim_steps_per_frame`, and `heightfield_size`; YAML/TOML and new dependencies are out of scope unless explicitly requested later. [ASSUMED]
 
 3. **Pytest marker name for real MuJoCo regression**
    - What we know: Existing marker set includes `integration`, `unit`, `slow_boxer`, `network`, and `x2_asset`; default addopts only exclude slow_boxer/network. [VERIFIED: /home/prannayag/pragnition/robotics/argus/pytest.ini lines 1-17]
-   - What's unclear: Whether the baseline regression should run by default or be opt-in depends on actual runtime. [ASSUMED]
-   - Recommendation: Use `@pytest.mark.integration` first and keep the smoke max-steps/seed count small enough for the existing 30s timeout; add a dedicated marker only if runtime exceeds routine test expectations. [ASSUMED]
+   - RESOLVED: Use `@pytest.mark.integration` for the real MuJoCo analytical flat-ground regression. Keep the smoke matrix narrow enough for the existing pytest timeout; add a dedicated marker only if execution proves runtime is too slow during implementation. [ASSUMED]
 
 ## Environment Availability
 
