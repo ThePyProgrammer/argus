@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** Phase 06 — repair-evaluation-runner-semantics
+**Current focus:** Phase 07 — align-evaluation-action-mode-contract
 
 ## Current Position
 
@@ -35,7 +35,7 @@ Progress: [██████████] 100%
 ## Performance Metrics
 
 Phase 2 verification: controller-plugin-baseline passed with 5/5 must-haves verified.
-Regression gate: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` → 186 passed, 2 pre-existing pytest config warnings.
+Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` → 248 passed.
 
 **Historical reference:**
 
@@ -95,6 +95,6 @@ Regression gate: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_
 
 ## Session Continuity
 
-Last activity: 2026-05-01 — Phase 05 verified passed and v4.0 milestone marked complete
-Stopped at: v4.0 complete; ready for `/gsd-complete-milestone` or next milestone planning
-Resume file: .planning/phases/05-harness-docs-and-comparison-matrix/05-VERIFICATION.md
+Last activity: 2026-05-01 — Phase 06 verified passed; Phase 07 ready to plan
+Stopped at: Phase 07 ready to plan
+Resume file: .planning/phases/06-repair-evaluation-runner-semantics/06-VERIFICATION.md
