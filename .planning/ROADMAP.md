@@ -16,9 +16,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: locomotion-env-contract** - Gymnasium-style `ArgusGo2Env`, scenario catalog, seeded reset determinism, and action-mode contract — completed 2026-04-30
 - [x] **Phase 2: controller-plugin-baseline** - Locomotion controller protocol/registry, analytical trot baseline adapter, future-controller placeholders, and bridge abstraction alignment — completed 2026-04-30
-- [ ] **Phase 3: locomotion-metrics-instrumentation** - Command tracking, stability, action-quality, and terrain/contact metrics collected from simulation state
-- [ ] **Phase 4: evaluation-runner-and-regression** - CLI scenario/seed matrix runner, JSONL/CSV/summary exports, reproducibility metadata, and analytical-baseline regression test
-- [ ] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link
+- [x] **Phase 3: locomotion-metrics-instrumentation** - Command tracking, stability, action-quality, and terrain/contact metrics collected from simulation state — completed 2026-04-30
+- [x] **Phase 4: evaluation-runner-and-regression** - CLI scenario/seed matrix runner, JSONL/CSV/summary exports, reproducibility metadata, and analytical-baseline regression test — completed 2026-05-01
+- [x] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link — completed 2026-05-01
+- [ ] **Phase 6: repair-evaluation-runner-semantics** - Gap closure for scenario command selection, real distance export flattening, and baseline regression threshold semantics
+- [ ] **Phase 7: align-evaluation-action-mode-contract** - Gap closure for CLI action-mode support/rejection behavior and reproducible action-mode metadata
 
 ## Phase Details
 
@@ -167,10 +169,42 @@ Plans:
 
 **Research flag**: light
 
+### Phase 6: repair-evaluation-runner-semantics
+**Goal**: Close milestone audit gaps in real evaluation semantics so scenario command schedules, exported distance metrics, and analytical baseline thresholds measure actual locomotion behavior.
+**Depends on**: Phase 5
+**Requirements**: LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04
+**Gap Closure:** Closes command-schedule, distance-export, and baseline-regression gaps from `.planning/v4.0-MILESTONE-AUDIT.md`.
+**Success Criteria** (what must be TRUE):
+  1. Evaluation selects the command active at the current simulation time/current command instead of always using the first scenario command.
+  2. `ArgusGo2Env` and/or evaluation info exposes enough current-command state for actions and exported command fields to match the running scenario.
+  3. Real evaluation artifacts read `distance_xy_m` from the stability episode summary and preserve nonzero distance in CSV, summary, comparison, and threshold paths.
+  4. Regression coverage proves nonzero scheduled commands drive real/fake evaluation actions and baseline checks cannot pass as stationary standing tests.
+**Plans**: 0 plans
+Plans:
+- [ ] To be planned via `/gsd-plan-phase 6`.
+
+**Research flag**: standard
+
+### Phase 7: align-evaluation-action-mode-contract
+**Goal**: Close milestone audit gaps in CLI action-mode behavior so evaluation either emits valid actions for each supported mode or rejects unsupported modes before misleading runs/artifacts are produced.
+**Depends on**: Phase 6
+**Requirements**: LOC-ENV-04, LOC-EVAL-03
+**Gap Closure:** Closes CLI action-mode contract and metadata gaps from `.planning/v4.0-MILESTONE-AUDIT.md`.
+**Success Criteria** (what must be TRUE):
+  1. The evaluation runner contract for non-default action modes is explicit and enforced before environment stepping.
+  2. `velocity_command`, `joint_position`, and `residual_baseline` CLI paths either generate actions matching their env action spaces or fail fast with actionable errors.
+  3. Exported metadata records only action modes that were actually used for completed runs.
+  4. CLI help/docs match the implemented evaluation action-mode contract.
+**Plans**: 0 plans
+Plans:
+- [ ] To be planned via `/gsd-plan-phase 7`.
+
+**Research flag**: light
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -179,16 +213,20 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
+| 6. repair-evaluation-runner-semantics | 0/0 | Pending | — |
+| 7. align-evaluation-action-mode-contract | 0/0 | Pending | — |
 
 ## Requirement Coverage
 
 | Phase | Requirements |
 |-------|--------------|
-| Phase 1 | LOC-ENV-01, LOC-ENV-02, LOC-ENV-03, LOC-ENV-04 |
+| Phase 1 | LOC-ENV-01, LOC-ENV-02, LOC-ENV-03 |
 | Phase 2 | LOC-CTRL-01, LOC-CTRL-02, LOC-CTRL-03, LOC-CTRL-04 |
 | Phase 3 | LOC-METRICS-01, LOC-METRICS-02, LOC-METRICS-03, LOC-METRICS-04 |
-| Phase 4 | LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-03, LOC-EVAL-04 |
+| Phase 4 | — superseded by gap closure phases for LOC-METRICS-05 and LOC-EVAL-01..04 |
 | Phase 5 | LOC-REPORT-01, LOC-REPORT-02, LOC-REPORT-03 |
+| Phase 6 | LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 |
+| Phase 7 | LOC-ENV-04, LOC-EVAL-03 |
 
 **Coverage:** 20/20 active requirements mapped ✓
 **Orphans:** none
@@ -196,4 +234,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 ## Next Step
 
-v4.0 Benchmarkable Locomotion Environment is complete. Run `/gsd-complete-milestone` or start the next milestone when ready.
+Plan the first gap-closure phase with `/gsd-plan-phase 6`, then re-run `/gsd-audit-milestone` after Phases 6 and 7 are complete.
