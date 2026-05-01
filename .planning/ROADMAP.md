@@ -163,7 +163,7 @@ Plans:
 - [x] 05-01-PLAN.md — Create the canonical harness guide, README command card, hard-boundary controller-family matrix, and Markdown content guards.
 
 **Wave 2 *(gap closure; blocked on Wave 1 completion)***
-- [ ] 05-02-PLAN.md — Align residual-policy placeholder action-mode metadata with the documented residual_baseline seam and add drift guards.
+- [x] 05-02-PLAN.md — Align residual-policy placeholder action-mode metadata with the documented residual_baseline seam and add drift guards.
 
 **Research flag**: light
 
