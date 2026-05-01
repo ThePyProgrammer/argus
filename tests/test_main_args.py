@@ -203,6 +203,86 @@ def test_web_mode_registers_builtin_slam_backends_before_robot_creation(monkeypa
     assert "icp" in captured["backends_at_robot_create"]
 
 
+def test_eval_locomotion_parser_accepts_repeatable_matrix_flags(monkeypatch):
+    """LOC-EVAL-01 D-01 D-02: eval-locomotion is a dedicated CLI subcommand."""
+    import src.main as main_module
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "argus",
+            "eval-locomotion",
+            "--controller",
+            "analytical_trot",
+            "--scenario",
+            "flat_ground",
+            "--seed",
+            "101",
+            "--seed",
+            "202",
+        ],
+    )
+
+    args = main_module.parse_args()
+
+    assert args.command == "eval-locomotion"
+    assert args.controller == ["analytical_trot"]
+    assert args.scenario == ["flat_ground"]
+    assert args.seed == [101, 202]
+
+
+def test_eval_locomotion_help_lists_artifact_flags():
+    """LOC-EVAL-01 D-01 D-02 D-03: help is quiet and artifact-focused."""
+    proc = subprocess.run(
+        [
+            "/home/prannayag/pragnition/robotics/argus/.venv/bin/python",
+            "-m",
+            "src.main",
+            "eval-locomotion",
+            "--help",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    for expected in (
+        "eval-locomotion",
+        "--controller",
+        "--scenario",
+        "--seed",
+        "--matrix-config",
+        "--from-run-dir",
+        "--output-root",
+        "--verbose",
+    ):
+        assert expected in combined
+
+
+def test_eval_locomotion_is_not_a_control_choice():
+    """LOC-EVAL-01 D-01: offline evaluation is not a --control runtime mode."""
+    proc = subprocess.run(
+        [
+            "/home/prannayag/pragnition/robotics/argus/.venv/bin/python",
+            "-m",
+            "src.main",
+            "--help",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    control_lines = [line for line in combined.splitlines() if "--control" in line or "teleop" in line]
+    assert control_lines, combined
+    assert all("eval-locomotion" not in line for line in control_lines)
+
+
 def test_labeled_eval_set_flag_raises_not_implemented(tmp_path):
     """--labeled-eval-set <path> must raise NotImplementedError + exit non-zero."""
     dummy = tmp_path / "eval.json"
