@@ -408,16 +408,16 @@ def _base_row(cell: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_from_command_context(info: dict[str, Any]) -> tuple[list[float], str, dict[str, Any]]:
-    command_schedule = _serializable_sequence(info.get("command_schedule", ()))
-    if command_schedule:
-        first = command_schedule[0]
-        return _command_vector(first), "scenario_schedule", {"command_schedule": command_schedule}
     current_command = info.get("current_command")
+    command_schedule = _serializable_sequence(info.get("command_schedule", ()))
     if isinstance(current_command, dict):
         return _command_vector(current_command), str(current_command.get("source", "current_command")), {
             "current_command": dict(current_command),
-            "command_schedule": [],
+            "command_schedule": command_schedule,
         }
+    if command_schedule:
+        first = command_schedule[0]
+        return _command_vector(first), "scenario_schedule", {"command_schedule": command_schedule}
     return [0.0, 0.0, 0.0], "default_zero", {"command_schedule": []}
 
 

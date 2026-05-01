@@ -453,16 +453,25 @@ class ArgusGo2Env(gymnasium.Env):
 
     def _info(self) -> dict[str, Any]:
         sample = self._scenario_sample
+        sim_time = self._current_sim_time()
+        active_command = self._command_at_time(sim_time)
         info = {
             "seed": self._last_seed,
             "scenario_id": sample.scenario_id if sample is not None else self.config.scenario_id,
             "action_mode": self.config.action_mode,
             "controller_id": self.config.controller_id,
             "step_count": self._step_count,
-            "sim_time": self._current_sim_time(),
+            "sim_time": sim_time,
             "spawn_pose": sample.spawn_pose if sample is not None else None,
             "sampled_parameters": dict(sample.terrain_parameters) if sample is not None else {},
             "command_schedule": tuple(dict(item) for item in sample.command_schedule) if sample is not None else (),
+            "current_command": {
+                "time": float(sim_time),
+                "vx": float(active_command[0]),
+                "vy": float(active_command[1]),
+                "omega": float(active_command[2]),
+                "source": "scenario_schedule",
+            },
             "disturbance_schedule": tuple(dict(item) for item in sample.disturbance_schedule) if sample is not None else (),
             "active_push": dict(self._active_push) if self._active_push is not None else None,
         }
