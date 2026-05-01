@@ -299,16 +299,14 @@ manifest_runs.append(_manifest_run_row(...))
 | A1 | If `joint_position` and `residual_baseline` cannot be generated from an explicit supported evaluator policy in this phase, fail-fast rejection is acceptable. [ASSUMED] | Summary / Standard Stack | Planner may choose to implement safe 12-value action generation instead; user intent allows either valid actions or actionable errors. [VERIFIED: .planning/ROADMAP.md:201-205] |
 | A2 | No external official docs are needed because this phase is governed by existing project code and milestone audit evidence. [ASSUMED] | Sources | If planner wants to change Gymnasium behavior, official Gymnasium docs should be consulted first. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should Phase 7 support `joint_position` and `residual_baseline` in CLI runs, or explicitly reject them?**
-   - What we know: Success criteria allow either valid generated actions or fail-fast actionable errors for `velocity_command`, `joint_position`, and `residual_baseline`. [VERIFIED: .planning/ROADMAP.md:201-205]
-   - What's unclear: Whether the user prefers evaluator support via safe policy-generated 12-vectors, or rejection until real direct/residual policy artifacts exist. [ASSUMED]
-   - Recommendation: Plan fail-fast rejection for non-default modes unless a concrete source of 12-value actions is added with tests and docs in the same phase. [ASSUMED]
-2. **How should top-level manifest `action_mode` behave if validation fails before artifacts?**
-   - What we know: Current code writes manifest only after `validate_evaluation_matrix()` and after run-dir creation. [VERIFIED: src/locomotion/evaluation.py:214-218; src/locomotion/evaluation.py:307-309]
-   - What's unclear: Whether no artifacts or a rejected-run diagnostic artifact is desired for unsupported modes. [ASSUMED]
-   - Recommendation: Prefer no artifacts on preflight failure to satisfy “records only action modes actually used for completed runs.” [VERIFIED: .planning/ROADMAP.md:203-205]
+1. **RESOLVED: Phase 7 will support `velocity_command` only in `argus eval-locomotion` and fail fast for `joint_position`/`residual_baseline` until explicit action sources exist.**
+   - Resolution basis: Success criteria allow either valid generated actions or fail-fast actionable errors for `velocity_command`, `joint_position`, and `residual_baseline`; no concrete 12-value evaluator action source was found for non-default modes. [VERIFIED: .planning/ROADMAP.md:201-205; src/locomotion/evaluation.py:423-443]
+   - Planning consequence: `velocity_command` remains evaluator-runnable; `joint_position` and `residual_baseline` remain environment-supported seams but are rejected during evaluation matrix validation. [VERIFIED: src/locomotion/actions.py:71-87]
+2. **RESOLVED: Rejected action modes produce no artifacts; no diagnostic run directory is written.**
+   - Resolution basis: Current code writes manifest only after `validate_evaluation_matrix()` and after run-dir creation, so validation-time rejection can prevent misleading run directories entirely. [VERIFIED: src/locomotion/evaluation.py:214-218; src/locomotion/evaluation.py:307-309]
+   - Planning consequence: Top-level manifest `action_mode` may continue to describe completed validated runs because rejected modes never reach manifest creation. [VERIFIED: .planning/ROADMAP.md:203-205]
 
 ## Environment Availability
 

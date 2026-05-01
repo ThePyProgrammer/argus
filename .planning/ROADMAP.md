@@ -203,9 +203,12 @@ Plans:
   2. `velocity_command`, `joint_position`, and `residual_baseline` CLI paths either generate actions matching their env action spaces or fail fast with actionable errors.
   3. Exported metadata records only action modes that were actually used for completed runs.
   4. CLI help/docs match the implemented evaluation action-mode contract.
-**Plans**: 0 plans
+**Plans**: 2 plans
 Plans:
-- [ ] To be planned via `/gsd-plan-phase 7`.
+
+**Wave 1**
+- [ ] 07-01-PLAN.md — Add test-first evaluator action-mode validation, unsupported-mode rejection before side effects, and completed-run metadata guards.
+- [ ] 07-02-PLAN.md — Update eval-locomotion help and benchmark docs to distinguish evaluator-runnable modes from env-supported seams.
 
 **Research flag**: light
 
@@ -222,7 +225,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
 | 6. repair-evaluation-runner-semantics | 0/3 | Pending | — |
-| 7. align-evaluation-action-mode-contract | 0/0 | Pending | — |
+| 7. align-evaluation-action-mode-contract | 0/2 | Pending | — |
 
 ## Requirement Coverage
 
