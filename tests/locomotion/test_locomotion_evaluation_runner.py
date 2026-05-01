@@ -293,6 +293,87 @@ def test_runner_records_each_step_commanded_velocity_from_executed_action(tmp_pa
     assert row1["command_context"]["current_command"]["vx"] == 0.4
 
 
+def test_runner_synthesizes_failure_summary_when_matrix_cap_lacks_terminal_summary(tmp_path):
+    calls = []
+
+    class MissingSummaryEnv:
+        def __init__(self, config) -> None:
+            self.config = config
+            self._step_count = 0
+            calls.append(("construct", config))
+
+        def reset(self, *, seed=None):
+            calls.append(("reset", seed))
+            return {"observation": 1}, {
+                "seed": seed,
+                "scenario_id": self.config.scenario_id,
+                "action_mode": self.config.action_mode,
+                "controller_id": self.config.controller_id,
+                "step_count": 0,
+                "sim_time": 0.0,
+                "current_command": {
+                    "vx": 0.4,
+                    "vy": 0.0,
+                    "omega": 0.0,
+                    "source": "scenario_schedule",
+                },
+                "command_schedule": (
+                    {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+                ),
+                "sampled_parameters": {"terrain_kind": "plane"},
+                "controller_metadata": {"controller_id": self.config.controller_id},
+            }
+
+        def step(self, action):
+            self._step_count += 1
+            calls.append(("step", list(action)))
+            if self._step_count > 2:
+                raise AssertionError("runner exceeded max_episode_steps")
+            return {"observation": 2}, 0.0, False, False, {
+                "seed": 101,
+                "scenario_id": self.config.scenario_id,
+                "action_mode": self.config.action_mode,
+                "controller_id": self.config.controller_id,
+                "step_count": self._step_count,
+                "sim_time": self._step_count * 0.02,
+                "current_command": {
+                    "vx": 0.4,
+                    "vy": 0.0,
+                    "omega": 0.0,
+                    "source": "scenario_schedule",
+                },
+                "command_schedule": (
+                    {"time": 0.0, "vx": 0.4, "vy": 0.0, "omega": 0.0},
+                ),
+                "locomotion_metrics": {"command_tracking": {"tracking_error": 0.01}},
+            }
+
+        def close(self):
+            calls.append(("close", self.config.controller_id))
+
+    result = run_evaluation_matrix(
+        EvaluationMatrix(
+            controllers=("analytical_trot",),
+            scenarios=("flat_ground",),
+            seeds=(101,),
+            action_mode="velocity_command",
+            max_episode_steps=2,
+        ),
+        EvaluationRunConfig(output_root=tmp_path, fail_on_locomotion_failure=True),
+        env_factory=MissingSummaryEnv,
+    )
+
+    assert result.had_locomotion_failure is True
+    assert result.exit_code == 1
+    assert len([call for call in calls if call[0] == "step"]) == 2
+    summary = result.episode_rows[0]["summary"]
+    assert summary["success"] is False
+    assert summary["failure_reason"] == "max_episode_steps_exceeded"
+    assert summary["step_count"] == 2
+    assert result.episode_rows[0]["failure_reason"] == "max_episode_steps_exceeded"
+    assert result.episode_rows[0]["step_count"] == 2
+
+
 def test_runner_enforces_matrix_max_episode_steps_when_env_never_terminates(tmp_path):
     calls = []
 

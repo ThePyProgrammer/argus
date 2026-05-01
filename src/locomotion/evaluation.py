@@ -253,6 +253,16 @@ def run_evaluation_matrix(
                 runner_step_count += 1
                 if runner_step_count >= int(cell["max_episode_steps"]):
                     truncated = True
+                    if "locomotion_metrics_summary" not in latest_info:
+                        latest_info["locomotion_metrics_summary"] = {
+                            "command_tracking": {},
+                            "stability": {},
+                            "action_quality": {},
+                            "contact_terrain": {},
+                            "success": False,
+                            "failure_reason": "max_episode_steps_exceeded",
+                            "step_count": runner_step_count,
+                        }
                 commanded_velocity = executed_commanded_velocity
                 command_source = executed_command_source
                 command_context = executed_command_context
@@ -273,7 +283,7 @@ def run_evaluation_matrix(
             if summary is None:
                 summary = getattr(env, "last_locomotion_metrics_summary", None) or {}
             success = summary.get("success") if isinstance(summary, dict) else None
-            if success is False:
+            if success is not True:
                 had_locomotion_failure = True
             episode_row = _episode_csv_row(cell, summary, commanded_velocity, command_source)
             episode_row["summary"] = _jsonable(summary)
