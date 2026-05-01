@@ -1,29 +1,51 @@
 ---
 phase: 06-repair-evaluation-runner-semantics
-verified: 2026-05-01T10:31:40Z
+verified: 2026-05-01T12:11:26Z
 status: gaps_found
-score: 11/12 must-haves verified
+score: 13/15 must-haves verified
 overrides_applied: 0
+re_verification:
+  previous_status: gaps_found
+  previous_score: 11/12
+  gaps_closed:
+    - "The evaluation runner is safe and repeatable for scenario/seed matrices: run_evaluation_matrix now enforces cell['max_episode_steps'] with runner_step_count and a non-terminating-env regression proves bounded artifact writing."
+  gaps_remaining: []
+  regressions:
+    - "Exported step command fields do not always match the action that actually drove env.step(action) across command-schedule transitions."
 gaps:
-  - truth: "The evaluation runner is safe and repeatable for scenario/seed matrices."
-    status: partial
-    reason: "run_evaluation_matrix validates max_episode_steps and passes it into env config, but the runner loop never enforces the cap itself; a custom or broken env_factory that never terminates/truncates can hang indefinitely. This matches 06-REVIEW.md CR-01 and is in-scope for evaluation-runner semantics."
+  - truth: "Exported step command fields match the same active command vector used for env.step(action)."
+    status: failed
+    reason: "run_evaluation_matrix records command fields after env.step() from latest_info, so a schedule transition during the step can label the just-completed step with the next command rather than the action actually passed to env.step(action). A spot-check showed the first transition step called env.step([0.0, 0.0, 0.0]) but recorded commanded_velocity [0.4, 0.0, 0.0]."
     artifacts:
       - path: "src/locomotion/evaluation.py"
-        issue: "while not (terminated or truncated) loop has no independent max_episode_steps counter or truncation fallback."
+        issue: "Loop computes action/source from pre-step latest_info, but computes commanded_velocity/command_source/command_context from post-step latest_info before writing the row."
+      - path: "src/locomotion/env.py"
+        issue: "Velocity-command step dispatch uses the caller action directly while _info() reports schedule-derived current_command, so real env export labels can diverge from controller input at schedule boundaries."
       - path: "tests/locomotion/test_locomotion_evaluation_runner.py"
-        issue: "No regression test covers an env that ignores/exceeds the matrix step cap."
+        issue: "Transition regression asserts the final post-transition row only and does not catch the first-step action/export mismatch."
     missing:
-      - "Enforce cell['max_episode_steps'] inside run_evaluation_matrix independent of env behavior."
-      - "Add a fake-env regression proving the runner returns after max_episode_steps and writes artifacts."
+      - "Make the runner's step row record the command/action that drove that exact env.step(), or make ArgusGo2Env velocity-command execution and _info() report the same command for the step."
+      - "Add a regression that checks every captured env.step(action) has a matching exported step row commanded_velocity, including the transition-boundary first step."
+      - "Add real ArgusGo2Env/controller-path coverage or a focused fake dispatch test proving schedule-derived current_command does not drift from controller input."
+  - truth: "Regression coverage proves nonzero scheduled commands drive real/fake evaluation actions and baseline checks cannot pass as stationary standing tests."
+    status: partial
+    reason: "Fake-env runner coverage proves zero then nonzero actions and stationary baseline rejection exists, but the real ArgusGo2Env velocity-command path is not covered for schedule-transition controller dispatch. Existing review evidence identifies the real env can report schedule-derived current_command while dispatching the caller action for the just-completed step."
+    artifacts:
+      - path: "tests/locomotion/test_argus_go2_env_contract.py"
+        issue: "Current-command test calls _info() after manipulating time; it does not exercise ArgusGo2Env.step() controller dispatch under a schedule transition."
+      - path: "tests/locomotion/test_locomotion_evaluation_runner.py"
+        issue: "Fake transition test proves runner behavior but misses the mismatched first row and does not cover the real environment/controller path."
+    missing:
+      - "Add regression coverage for real or dispatch-patched ArgusGo2Env velocity-command step semantics across a command schedule transition."
+human_verification: []
 ---
 
 # Phase 6: repair-evaluation-runner-semantics Verification Report
 
 **Phase Goal:** Close milestone audit gaps in real evaluation semantics so scenario command schedules, exported distance metrics, and analytical baseline thresholds measure actual locomotion behavior.
-**Verified:** 2026-05-01T10:31:40Z
+**Verified:** 2026-05-01T12:11:26Z
 **Status:** gaps_found
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — after gap closure plan 06-04
 
 ## Goal Achievement
 
@@ -31,94 +53,100 @@ gaps:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Evaluation actions use the command active at the current simulation time, not `command_schedule[0]`. | VERIFIED | `src/locomotion/evaluation.py:410-421` checks `info.get("current_command")` before schedule fallback. Spot-check with `uv run python` showed fake transition env received step actions `[0.0, 0.0, 0.0]` then `[0.4, 0.0, 0.0]`. |
-| 2 | `ArgusGo2Env` exposes `current_command` at reset and every step for evaluator consumption. | VERIFIED | `src/locomotion/env.py:454-480` emits `current_command` from `_command_at_time(_current_sim_time())`; `uv run python -m pytest tests/locomotion/test_argus_go2_env_contract.py -k current_command -q` passed (`1 passed, 20 deselected`). |
-| 3 | Exported step command fields match the same active command vector used for `env.step(action)`. | VERIFIED | `src/locomotion/evaluation.py:243-267` derives action, then records command fields from latest info/current command; transition spot-check output showed step rows with `commanded_velocity: [0.4, 0.0, 0.0]`, `command_source: scenario_schedule`, and matching `command_context.current_command`. |
-| 4 | Real evaluation artifacts preserve `stability.distance_xy_m` instead of flattening distance from `command_tracking`. | VERIFIED | `src/locomotion/evaluation.py:474-489` reads `stability` and maps `distance_xy_m` from `_metric_alias(stability, "distance_xy_m", default=0.0)`. |
-| 5 | `episodes.csv`, `summary.json`, regenerated comparison output, and `result.episode_rows` report the same nonzero distance value. | VERIFIED | `tests/locomotion/test_locomotion_evaluation_exports.py:261-318` asserts `0.42` through result rows, CSV, summary JSON, and comparison Markdown; quick gate passed. |
-| 6 | CSV formula safety and output path containment remain intact while export semantics change. | VERIFIED | `_prepare_run_dir()` still rejects escaped paths at `src/locomotion/evaluation.py:384-397`; CSV writer still applies `_csv_safe` at `src/locomotion/evaluation.py:633-638`; export tests cover formula safety. |
-| 7 | A stationary or command-ignoring controller cannot pass commanded flat-ground baseline acceptance. | VERIFIED | `tests/locomotion/test_locomotion_baseline_regression.py:191-213` runs a stationary fake env through `run_evaluation_matrix` and asserts `assert_analytical_flat_ground_thresholds(result.episode_rows)` raises. |
-| 8 | The Phase 6 quick gate proves active commands, stability distance exports, and baseline threshold semantics together. | VERIFIED | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` passed (`29 passed in 6.66s`). |
-| 9 | Validation metadata records deterministic pytest evidence without claiming runtime AI dependency. | VERIFIED | No runtime AI SDK matches from grep over `src`, `pyproject.toml`, and `tests`; `06-VALIDATION.md` conservatively remains pending from earlier unsupported interpreter evidence instead of overclaiming green status. |
-| 10 | CLI evaluation can execute a controller across scenario matrix and fixed seed list. | VERIFIED | `validate_evaluation_matrix()` expands controllers/scenarios/seeds at `src/locomotion/evaluation.py:142-203`; fake-env runner test confirms execution and `uv` quick/full gates pass. |
-| 11 | Evaluation produces aggregate comparison table with per-controller mean, standard deviation, and failure counts. | VERIFIED | `src/locomotion/evaluation.py:666-690` computes `failure_count`, metric means, and stds; `comparison.md` generation is tested in export tests and quick gate passed. |
-| 12 | The evaluation runner is safe and repeatable for scenario/seed matrices. | FAILED | Review CR-01 is valid: `src/locomotion/evaluation.py:243` loops only on env `terminated`/`truncated` and does not independently enforce `cell["max_episode_steps"]`, so a broken/custom env can hang forever. |
+| 1 | Evaluation actions use the command active at the current simulation time/current command instead of always using `command_schedule[0]`. | VERIFIED | `src/locomotion/evaluation.py:414-425` checks `info.get("current_command")` before schedule fallback. Targeted runner regression passed and the spot-check captured calls `[0.0, 0.0, 0.0]` then `[0.4, 0.0, 0.0]`. |
+| 2 | `ArgusGo2Env` exposes enough current-command state at reset/step for evaluator consumption. | VERIFIED | `src/locomotion/env.py:454-480` emits `current_command` with `time`, `vx`, `vy`, `omega`, and `source`; `uv run python -m pytest tests/locomotion/test_argus_go2_env_contract.py -k current_command -q` passed (`1 passed`). |
+| 3 | Exported step command fields match the same active command vector used for `env.step(action)`. | FAILED | Spot-check demonstrated mismatch: calls were `[[0.0, 0.0, 0.0], [0.4, 0.0, 0.0]]`, but exported rows were `[(1, [0.4, 0.0, 0.0]), (2, [0.4, 0.0, 0.0])]`. `src/locomotion/evaluation.py:245-259` records command fields from post-step `latest_info`, not the pre-step action source. |
+| 4 | Real evaluation artifacts read `distance_xy_m` from the stability episode summary. | VERIFIED | `src/locomotion/evaluation.py:472-493` maps `distance_xy_m` from `stability` via `_metric_alias(stability, "distance_xy_m", default=0.0)`. |
+| 5 | `distance_xy_m` is preserved in result rows, `episodes.csv`, `summary.json`, comparison output, and threshold paths. | VERIFIED | `tests/locomotion/test_locomotion_evaluation_exports.py:261-318` asserts `0.42` through result rows, CSV, summary JSON, and comparison Markdown; targeted test passed. |
+| 6 | CSV formula safety and output path containment remain intact. | VERIFIED | `_prepare_run_dir()` still contains the resolved-root escape guard at `src/locomotion/evaluation.py:388-401`; CSV writer still applies `_csv_safe` at `src/locomotion/evaluation.py:637-642`. |
+| 7 | A stationary or command-ignoring controller cannot pass commanded flat-ground baseline acceptance. | VERIFIED | `tests/locomotion/test_locomotion_baseline_regression.py:191-213` routes a stationary env through `run_evaluation_matrix` and asserts `assert_analytical_flat_ground_thresholds(result.episode_rows)` raises. Targeted test passed. |
+| 8 | Regression coverage proves nonzero scheduled commands drive real/fake evaluation actions and baseline checks cannot pass as stationary standing tests. | FAILED | Fake-env and stationary-baseline tests pass, but real `ArgusGo2Env.step()` schedule-transition controller dispatch is not covered. `06-REVIEW.md` CR-01 identifies the real velocity-command path can report schedule `current_command` while dispatching a different caller action for the step. |
+| 9 | Validation metadata records deterministic pytest evidence without adding runtime AI dependency. | VERIFIED | `06-VALIDATION.md` conservatively does not overclaim older blocked local gates; `grep -R "claude_agent_sdk\|anthropic\|ClaudeSDKClient\|query(" /home/prannayag/pragnition/robotics/argus/src /home/prannayag/pragnition/robotics/argus/pyproject.toml /home/prannayag/pragnition/robotics/argus/tests` produced no output. |
+| 10 | CLI evaluation can execute a controller across a scenario matrix and fixed seed list. | VERIFIED | `src/main.py:93-148` defines `eval-locomotion`; `src/main.py:269-325` constructs `EvaluationMatrix` and calls `run_evaluation_matrix`. Matrix expansion is validated at `src/locomotion/evaluation.py:142-203`. |
+| 11 | Evaluation produces aggregate comparison tables with per-controller means, standard deviations, and failure counts. | VERIFIED | `src/locomotion/evaluation.py:670-694` computes `failure_count`, means, and stds; `write_comparison_artifacts()` writes `summary.json` and `comparison.md`. Export tests passed. |
+| 12 | The evaluation runner is safe and repeatable for scenario/seed matrices even when an env never terminates/truncates. | VERIFIED | Previous gap closed: `src/locomotion/evaluation.py:243-252` initializes/increments `runner_step_count` and forces `truncated = True` at `cell["max_episode_steps"]`. Non-terminating-env regression passed. |
+| 13 | `run_evaluation_matrix` enforces each validated cell `max_episode_steps` inside the runner loop independent of env behavior. | VERIFIED | `src/locomotion/evaluation.py:243-252`; targeted test `test_runner_enforces_matrix_max_episode_steps_when_env_never_terminates` passed. |
+| 14 | A fake non-terminating env regression returns after the matrix cap and still writes all five artifacts. | VERIFIED | `tests/locomotion/test_locomotion_evaluation_runner.py:268-353` asserts exactly 3 steps and existence of `manifest.json`, `steps.jsonl`, `episodes.csv`, `summary.json`, and `comparison.md`; targeted test passed. |
+| 15 | LOC-EVAL-01 is satisfied by bounded controller × scenario × seed execution rather than trusting env termination. | VERIFIED | Matrix validation plus runner-owned cap now bound custom env execution; `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py -q` passed (`12 passed`). |
 
-**Score:** 11/12 truths verified
+**Score:** 13/15 truths verified
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/locomotion/env.py` | Env-owned `current_command` info payload | VERIFIED | Exists, substantive, and wired to evaluator via info payload; current-command contract test passed. Advisory WR-01 notes a metrics attribution ambiguity, but it does not invalidate the phase must-have that `current_command` is exposed and consumed for evaluation actions. |
-| `src/locomotion/evaluation.py` | Active-command action generation, stability-sourced distance exports, aggregate comparison | PARTIAL | Active-command and distance semantics are implemented and tested. Blocking gap remains: runner loop lacks independent `max_episode_steps` enforcement. |
-| `tests/locomotion/test_argus_go2_env_contract.py` | Env contract regression for schedule-transition `current_command` | VERIFIED | `test_argus_go2_env_info_exposes_current_command_from_schedule_transition` exists and targeted pytest passed. |
-| `tests/locomotion/test_locomotion_evaluation_runner.py` | Fake-env regression for zero-to-nonzero schedule transition | PARTIAL | Transition regression exists and passes; missing regression for non-terminating env step-cap enforcement. |
-| `tests/locomotion/test_locomotion_evaluation_exports.py` | Artifact regression proving stability-sourced distance survives export layers | VERIFIED | Distance export test asserts result rows, CSV, summary JSON, and comparison Markdown. |
-| `tests/locomotion/test_locomotion_baseline_regression.py` | Stationary-controller negative regression for commanded baseline | VERIFIED | Stationary commanded fake env goes through `run_evaluation_matrix` and threshold helper rejects zero distance. |
-| `.planning/phases/06-repair-evaluation-runner-semantics/06-VALIDATION.md` | Phase validation evidence | WARNING | File exists and honestly records earlier blocked local evidence. It has not been updated to reflect the later post-merge `uv` gates provided in the prompt and rerun here. This is documentation staleness, not the blocking code gap. |
+| `src/locomotion/env.py` | Env-owned `current_command` info payload | PARTIAL | `_info()` emits schedule-derived `current_command`, but in velocity-command mode `step()` dispatches the caller action and then `_info()` may report the next schedule command. This can make real step metadata diverge from controller input at schedule boundaries. |
+| `src/locomotion/evaluation.py` | Active-command action generation, distance export, runner-owned cap | PARTIAL | Distance export and runner cap are implemented. Step row command fields are written from post-step info, creating action/export mismatches across transitions. |
+| `tests/locomotion/test_argus_go2_env_contract.py` | Env current-command regression | PARTIAL | `_info()` transition test exists and passes, but no test covers `ArgusGo2Env.step()` dispatch/metrics under a schedule transition. |
+| `tests/locomotion/test_locomotion_evaluation_runner.py` | Active-command fake-env and non-terminating-env regressions | PARTIAL | Non-terminating cap regression exists and passes. Transition test misses the first-row mismatch between captured action and exported `commanded_velocity`. |
+| `tests/locomotion/test_locomotion_evaluation_exports.py` | Stability-distance artifact regression | VERIFIED | Distance regression asserts result rows, CSV, summary JSON, and Markdown comparison. |
+| `tests/locomotion/test_locomotion_baseline_regression.py` | Stationary-controller negative regression | VERIFIED | Stationary commanded locomotion fixture routes through `run_evaluation_matrix` and threshold helper rejects zero distance. |
+| `.planning/phases/06-repair-evaluation-runner-semantics/06-VALIDATION.md` | Validation evidence record | WARNING | Still records older blocked local pytest evidence and `nyquist_compliant: false` despite later `uv run` green gates in 06-04 summary and this verification. Documentation stale, not the blocking code defect. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `src/locomotion/env.py` | `src/locomotion/evaluation.py` | `info['current_command']` | WIRED | `_info()` emits `current_command`; `_action_from_command_context()` and `_command_fields()` consume it. |
-| `tests/locomotion/test_locomotion_evaluation_runner.py` | `src/locomotion/evaluation.py` | `run_evaluation_matrix(... env_factory=...) captures env.step(action)` | WIRED | gsd-sdk missed this link, but manual read verifies `test_runner_uses_active_current_command_after_schedule_transition` calls `run_evaluation_matrix` with `_fake_env_factory(... transition_commands=True)` and asserts captured `step` calls. |
-| `src/locomotion/metrics.py` | `src/locomotion/evaluation.py` | `summary['stability']['distance_xy_m']` | WIRED | Evaluator flattens from `stability` at `src/locomotion/evaluation.py:488`. |
-| `src/locomotion/evaluation.py` | `summary.json` and `comparison.md` | `episode_rows` aggregation | WIRED | `write_comparison_artifacts()` aggregates episode rows and writes both artifacts. |
-| `src/locomotion/evaluation.py` | `tests/locomotion/test_locomotion_baseline_regression.py` | `run_evaluation_matrix` episode rows feed threshold helper | WIRED | `test_stationary_controller_fails_commanded_locomotion_baseline_gate` asserts rejected rows after `run_evaluation_matrix`. |
-| `tests/locomotion/test_locomotion_baseline_regression.py` | `06-VALIDATION.md` | quick gate command status evidence | PARTIAL | Test exists and quick gate passes under `uv`; validation document still contains pending/blocked rows from earlier unsupported interpreter run. |
+| `src/locomotion/env.py` | `src/locomotion/evaluation.py` | `info['current_command']` | WIRED | Env emits and evaluator consumes `current_command`. Semantics are incomplete at transition-boundary row labeling. |
+| `src/locomotion/evaluation.py` | `tests/locomotion/test_locomotion_evaluation_runner.py` | fake env captures `env.step(action)` | PARTIAL | Tests prove zero then nonzero calls and max-step cap, but do not assert per-row action/export equality for each step. |
+| `src/locomotion/metrics.py` | `src/locomotion/evaluation.py` | `summary['stability']['distance_xy_m']` | WIRED | Evaluator flattens from stability and export test confirms artifact propagation. |
+| `src/locomotion/evaluation.py` | `summary.json` and `comparison.md` | episode row aggregation | WIRED | `write_comparison_artifacts()` aggregates episode rows and writes both artifacts. |
+| `src/locomotion/evaluation.py` | `tests/locomotion/test_locomotion_baseline_regression.py` | episode rows feed threshold helper | WIRED | Stationary fake env and real fixed-seed smoke both route through `run_evaluation_matrix`. |
+| `src/main.py` | `src/locomotion/evaluation.py` | CLI `eval-locomotion` subcommand | WIRED | `run_eval_locomotion_mode()` constructs matrix/config and calls `run_evaluation_matrix`. |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |----------|---------------|--------|--------------------|--------|
-| `src/locomotion/evaluation.py` | `action`, `commanded_velocity`, `command_context` | `current_command` from env info, then schedule fallback | Yes | FLOWING |
-| `src/locomotion/env.py` | `current_command` | `_command_at_time(_current_sim_time())` over scenario sample schedule | Yes | FLOWING |
+| `src/locomotion/evaluation.py` | `action` | pre-step `latest_info.current_command`, fallback to schedule | Yes | FLOWING |
+| `src/locomotion/evaluation.py` | `commanded_velocity` in step rows | post-step `latest_info.current_command` | Not always same as action | HOLLOW at schedule transition boundary |
+| `src/locomotion/env.py` | `current_command` | `_command_at_time(_current_sim_time())` | Yes | FLOWING |
+| `src/locomotion/env.py` | controller command in velocity mode | caller `action` | Yes, but not necessarily same as `_info().current_command` | PARTIAL |
 | `src/locomotion/evaluation.py` | `distance_xy_m` | `locomotion_metrics_summary['stability']['distance_xy_m']` | Yes | FLOWING |
-| `src/locomotion/evaluation.py` | aggregate means/std/failure counts | `_coerce_episode_row()` then `_aggregate_groups()` over episode rows | Yes | FLOWING |
-| `src/locomotion/evaluation.py` | termination condition | env `terminated` / `truncated` only | No independent cap | HOLLOW for broken envs |
+| `src/locomotion/evaluation.py` | runner termination condition | env termination/truncation plus runner-owned `runner_step_count` cap | Yes | FLOWING |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Phase 6 quick gate | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | `29 passed in 6.66s` | PASS |
-| Current command env contract | `uv run python -m pytest tests/locomotion/test_argus_go2_env_contract.py -k current_command -q` | `1 passed, 20 deselected in 3.95s` | PASS |
-| Phase 6 full wave gate | `uv run python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` | `244 passed in 16.73s` | PASS |
-| Runtime AI SDK dependency absence | `grep -R "claude_agent_sdk\|anthropic\|ClaudeSDKClient\|query(" src pyproject.toml tests` | no output | PASS |
-| Transition command data flow | Inline `uv run python` fake-env spot-check | Calls included zero then nonzero actions; step rows reported nonzero current command | PASS |
+| Targeted Phase 6 regressions | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py::test_runner_enforces_matrix_max_episode_steps_when_env_never_terminates tests/locomotion/test_locomotion_evaluation_runner.py::test_runner_uses_active_current_command_after_schedule_transition tests/locomotion/test_locomotion_evaluation_exports.py::test_episode_export_reads_distance_xy_m_from_stability_summary tests/locomotion/test_locomotion_baseline_regression.py::test_stationary_controller_fails_commanded_locomotion_baseline_gate -q` | `4 passed in 3.88s` | PASS |
+| Phase 6 quick gate | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_locomotion_baseline_regression.py -q` | `30 passed in 4.97s` | PASS |
+| Current-command env contract | `uv run python -m pytest tests/locomotion/test_argus_go2_env_contract.py -k current_command -q` | `1 passed, 20 deselected in 3.80s` | PASS |
+| Runner module gate | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py -q` | `12 passed in 4.52s` | PASS |
+| Action/export transition spot-check | Inline `uv run python` fake-env script | Calls `[[0.0,0.0,0.0],[0.4,0.0,0.0]]`; rows `[(1,[0.4,0.0,0.0]),(2,[0.4,0.0,0.0])]` | FAIL |
+| Runtime AI SDK absence | `grep -R "claude_agent_sdk\|anthropic\|ClaudeSDKClient\|query(" /home/prannayag/pragnition/robotics/argus/src /home/prannayag/pragnition/robotics/argus/pyproject.toml /home/prannayag/pragnition/robotics/argus/tests` | no output | PASS |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|-------------|--------|----------|
-| LOC-METRICS-05 | 06-02, 06-03 | Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds. | SATISFIED | Artifact set includes `steps.jsonl`, `episodes.csv`, `summary.json`, `comparison.md`; export tests and quick gate passed; distance now sources from stability. |
-| LOC-EVAL-01 | 06-01, 06-03 | Developer can run a CLI evaluation command that executes a controller across a scenario matrix and fixed seed list. | BLOCKED | Matrix expansion and execution are implemented and tested, but CR-01 means the runner can hang forever if an env ignores/exceeds the step cap. This prevents full repeatable-runner goal achievement. |
-| LOC-EVAL-02 | 06-02, 06-03 | Evaluation produces an aggregate comparison table with per-controller mean, standard deviation, and failure counts. | SATISFIED | `_aggregate_groups()` computes means/stds/failure counts; comparison Markdown is generated and export tests passed. |
-| LOC-EVAL-04 | 06-01, 06-03 | Evaluation includes regression tests that prevent the analytical trot baseline from silently degrading on flat-ground smoke scenario. | SATISFIED | Stationary commanded-locomotion negative regression exists; fixed-seed real smoke remains in `test_analytical_trot_flat_ground_fixed_seed_regression`; quick/full gates passed in project virtualenv. |
+| LOC-METRICS-05 | 06-02, 06-03, 06-04 | Metrics are exported as JSONL/CSV plus a machine-readable summary suitable for comparing controllers across seeds. | SATISFIED | Artifact set is written; stability distance is preserved through result rows, CSV, summary JSON, and comparison Markdown; export regression passed. |
+| LOC-EVAL-01 | 06-01, 06-03, 06-04 | Developer can run a CLI evaluation command that executes a controller across a scenario matrix and fixed seed list. | SATISFIED | CLI is wired; matrix validation expands controller/scenario/seed cells; runner now enforces `max_episode_steps` independent of env behavior; runner tests passed. |
+| LOC-EVAL-02 | 06-02, 06-03, 06-04 | Evaluation produces an aggregate comparison table with per-controller mean, standard deviation, and failure counts. | SATISFIED | `_aggregate_groups()` computes means/std/failure counts and `comparison.md` is generated from saved rows. |
+| LOC-EVAL-04 | 06-01, 06-03, 06-04 | Evaluation includes regression tests that prevent analytical trot baseline from silently degrading on flat-ground smoke scenario. | PARTIAL | Stationary/no-op commanded baseline rejection exists and fixed-seed smoke remains. However, Phase 6's scheduled-command regression coverage does not prove the real `ArgusGo2Env` velocity-command controller path uses/export-labels the same active command at schedule transitions. |
 
-No orphaned Phase 6 requirements were found in `.planning/REQUIREMENTS.md`; Phase 6 maps exactly LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, and LOC-EVAL-04.
+No orphaned Phase 6 requirements were found in `/home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md`; Phase 6 maps exactly LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, and LOC-EVAL-04.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `src/locomotion/evaluation.py` | 243 | `while not (terminated or truncated)` without internal step cap | BLOCKER | A custom/broken env can hang evaluation indefinitely, blocking repeatable runner semantics. |
-| `.planning/phases/06-repair-evaluation-runner-semantics/06-VALIDATION.md` | 5-45 | Validation rows still pending/blocked despite later `uv` gate evidence | WARNING | Stale validation metadata; does not block code behavior, but should be updated before using validation document as milestone proof. |
-| `src/locomotion/env.py` | 140, 166 | Review WR-01: velocity-command metrics record desired command from raw action, not necessarily schedule command | WARNING | Advisory ambiguity. It can affect attribution around schedule transitions, but current Phase 6 must-haves for evaluator action/export semantics are covered by fake and integration gates. Consider addressing in a follow-up if scenario command must remain the metric source of truth inside `ArgusGo2Env.step()`. |
+| `src/locomotion/evaluation.py` | 245-259 | pre-step action, post-step command label | BLOCKER | Step artifacts can claim the command active after a transition rather than the action that drove the just-completed step. |
+| `src/locomotion/env.py` | 125-140, 454-480 | velocity action dispatch and schedule-derived info can describe different commands | BLOCKER | Real env/controller metrics and exported command labels can diverge at scheduled command transitions. |
+| `src/locomotion/evaluation.py` | 543-547 | `float(item)` over dict contact metrics without tolerant coercion | WARNING | Malformed saved/fake contact metrics can abort artifact writing. This is robustness debt from `06-REVIEW.md` WR-01, not the phase-goal blocker. |
+| `.planning/phases/06-repair-evaluation-runner-semantics/06-VALIDATION.md` | 5-85 | stale pending validation status | WARNING | Validation document does not reflect later green `uv run` evidence; summaries and this verification provide stronger current evidence. |
 
 ### Human Verification Required
 
-None. The relevant checks are deterministic code/test checks in the project virtualenv.
+None. The blocking gaps are deterministic code/data-flow defects with reproducible spot-check evidence.
 
 ### Gaps Summary
 
-Phase 6 fixed the headline audit semantics for active scheduled commands, stability-sourced distance export, and commanded-baseline threshold rejection. However, the code review's CR-01 is a real in-scope blocker: `run_evaluation_matrix` still trusts the environment to terminate/truncate and does not enforce the validated `max_episode_steps` cap. That makes LOC-EVAL-01 only partially satisfied because a repeatable evaluation runner must not hang indefinitely on a custom or broken `env_factory`.
+Plan 06-04 closed the previous blocker: evaluation matrix execution is now bounded by the validated per-cell `max_episode_steps`, and a non-terminating fake env proves artifacts are still written after forced truncation.
 
-The stale `06-VALIDATION.md` pending rows are a documentation warning. The stronger evidence is the project virtualenv gate from the prompt and this verification run, both green.
+Phase 6 still does not achieve the full goal. The remaining blocker is semantic, not existence-based: command fields can be exported from post-step `current_command` while the actual `env.step(action)` used the pre-step action. That means artifacts and tracking evidence may claim a nonzero scheduled command for a step that actually executed the previous zero command at the transition boundary. The current tests pass because they assert only that a later nonzero action occurs; they do not verify per-step equality between captured action and exported row fields, nor do they cover the real `ArgusGo2Env` velocity-command dispatch path across schedule transitions.
 
 ---
 
-_Verified: 2026-05-01T10:31:40Z_
+_Verified: 2026-05-01T12:11:26Z_
 _Verifier: Claude (gsd-verifier)_
