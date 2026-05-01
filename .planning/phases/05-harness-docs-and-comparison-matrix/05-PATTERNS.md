@@ -1,8 +1,9 @@
 # Phase 05: harness-docs-and-comparison-matrix - Pattern Map
 
 **Mapped:** 2026-05-01
-**Files analyzed:** 3 new/modified files
-**Analogs found:** 3 / 3
+**Updated:** 2026-05-01
+**Files analyzed:** 5 new/modified files
+**Analogs found:** 5 / 5
 
 ## File Classification
 
@@ -10,7 +11,9 @@
 |-------------------|------|-----------|----------------|---------------|
 | `docs/locomotion-benchmark.md` | documentation | request-response / file-I/O | `README.md` + `docs/adr/0018-use-reproducible-gymnasium-style-locomotion-benchmark-harness.md` | role-match |
 | `README.md` | documentation | request-response | `README.md` existing Locomotion System section | exact |
-| `tests/test_locomotion_benchmark_docs.py` | test | file-I/O | `tests/locomotion/test_locomotion_evaluation_exports.py` + `tests/test_main_args.py` | role-match |
+| `tests/test_locomotion_benchmark_docs.py` | test | file-I/O / metadata-read | `tests/locomotion/test_locomotion_evaluation_exports.py` + `tests/test_main_args.py` + `tests/locomotion/test_locomotion_controller_registry.py` | role-match |
+| `src/locomotion/controllers.py` | controller registry metadata | registry / typed metadata | existing placeholder controllers in `src/locomotion/controllers.py` | exact |
+| `tests/locomotion/test_locomotion_controller_registry.py` | test | registry metadata read | existing registry tests in `tests/locomotion/test_locomotion_controller_registry.py` | exact |
 
 ## Pattern Assignments
 
@@ -296,7 +299,7 @@ WBC_UNAVAILABLE_REASON = (
 ...
 @locomotion_controller(name="residual_policy", display="Residual Policy")
 class ResidualPolicyController(_UnavailableControllerBase):
-    CAPABILITIES = _placeholder_capabilities("residual_policy", "residual_joint_position")
+    CAPABILITIES = _placeholder_capabilities("residual_policy", "residual_baseline")
     UNAVAILABLE_REASON = RESIDUAL_POLICY_UNAVAILABLE_REASON
 
 @locomotion_controller(name="direct_policy", display="Direct Policy")
@@ -315,7 +318,7 @@ class WBCController(_UnavailableControllerBase):
     UNAVAILABLE_REASON = WBC_UNAVAILABLE_REASON
 ```
 
-**Validation/error handling pattern for factual docs**: keep guide content grounded in the source excerpts above. Do not invent command flags, scenario ids, artifact names, or controller statuses.
+**Validation/error handling pattern for factual docs**: keep guide content grounded in the source excerpts above. Do not invent command flags, scenario ids, artifact names, controller statuses, or action-mode strings. For the 05-02 gap closure, the residual-policy documentation must use the public `residual_baseline` seam and the controller metadata must match that vocabulary.
 
 ---
 
@@ -371,9 +374,9 @@ Evaluation artifacts are written under `outputs/locomotion-evals/` as JSONL step
 
 ---
 
-### `tests/test_locomotion_benchmark_docs.py` (test, file-I/O)
+### `tests/test_locomotion_benchmark_docs.py` (test, file-I/O / metadata-read)
 
-**Analog:** `tests/locomotion/test_locomotion_evaluation_exports.py` and `tests/test_main_args.py`
+**Analog:** `tests/locomotion/test_locomotion_evaluation_exports.py`, `tests/test_main_args.py`, and `tests/locomotion/test_locomotion_controller_registry.py`
 
 **Imports/pathlib file-read pattern** (`tests/locomotion/test_locomotion_evaluation_exports.py` lines 7-11):
 ```python
@@ -384,7 +387,7 @@ import json
 from pathlib import Path
 ```
 
-For the new doc-content test, copy the `Path` import pattern and use repository-root constants:
+For the doc-content test, copy the `Path` import pattern and use repository-root constants:
 ```python
 from pathlib import Path
 
@@ -455,7 +458,43 @@ assert "tracking_rmse ↓" in markdown
 assert "success_rate ↑" in markdown
 ```
 
-**Recommended new test skeleton:**
+**Registry metadata assertion pattern for 05-02 gap closure** (`tests/locomotion/test_locomotion_controller_registry.py`):
+```python
+from src.locomotion.actions import available_action_modes
+from src.locomotion.controllers import ControllerRegistry
+
+
+def test_residual_placeholder_advertises_public_residual_baseline_action_mode():
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    residual = entries["residual_policy"]
+    action_mode = residual["capabilities"]["action_mode"]
+
+    assert residual["available"] is False
+    assert action_mode == "residual_baseline"
+    assert action_mode in available_action_modes()
+```
+
+**Doc/metadata cross-check pattern for 05-02 gap closure** (`tests/test_locomotion_benchmark_docs.py`):
+```python
+def test_residual_policy_documentation_matches_registry_action_mode():
+    from src.locomotion.actions import available_action_modes
+    from src.locomotion.controllers import ControllerRegistry
+
+    guide = GUIDE.read_text(encoding="utf-8")
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    residual = entries["residual_policy"]
+    action_mode = residual["capabilities"]["action_mode"]
+
+    assert residual["available"] is False
+    assert action_mode == "residual_baseline"
+    assert action_mode in available_action_modes()
+    assert (
+        f"Controller id `residual_policy`; residual-over-baseline seam via "
+        f"`{action_mode}` action mode"
+    ) in guide
+```
+
+**Recommended content test skeleton:**
 ```python
 from pathlib import Path
 
@@ -501,15 +540,96 @@ def test_controller_family_matrix_required_content():
     assert "analytical_trot" in guide
 ```
 
-**Anti-pattern:** Do not use `subprocess.run`, `uv run`, or environment construction in these tests. Phase 5 tests are content guards only.
+**Anti-pattern:** Do not use `subprocess.run`, `uv run`, environment construction, `ArgusGo2Env`, or benchmark execution in these tests. Phase 5 tests are content/metadata guards only.
+
+---
+
+### `src/locomotion/controllers.py` (controller registry metadata, registry / typed metadata)
+
+**Analog:** existing placeholder controllers in `src/locomotion/controllers.py`
+
+**Unavailable placeholder pattern** (`src/locomotion/controllers.py` lines 54-69 and 446-488):
+```python
+RESIDUAL_POLICY_UNAVAILABLE_REASON = (
+    "Residual policy controllers require trained policy artifacts and are deferred "
+    "until a future RL milestone."
+)
+...
+class _UnavailableControllerBase:
+    ...
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        raise UnavailableControllerError(self.UNAVAILABLE_REASON)
+
+    @classmethod
+    def available(cls) -> tuple[bool, str | None]:
+        return False, cls.UNAVAILABLE_REASON
+```
+
+**Capability metadata pattern**:
+```python
+def _placeholder_capabilities(controller_id: str, action_mode: str) -> ControllerCapabilities:
+    return ControllerCapabilities(
+        controller_id=controller_id,
+        action_mode=action_mode,
+        supports_seeded_reset=True,
+        supports_batch_eval=False,
+        supports_action_smoothing=False,
+        supports_metrics=True,
+        notes="Unavailable placeholder for future controller family.",
+    )
+```
+
+**05-02 required residual seam classification:**
+```python
+@locomotion_controller(name="residual_policy", display="Residual Policy")
+class ResidualPolicyController(_UnavailableControllerBase):
+    CAPABILITIES = _placeholder_capabilities("residual_policy", "residual_baseline")
+    UNAVAILABLE_REASON = RESIDUAL_POLICY_UNAVAILABLE_REASON
+```
+
+**Planner guidance:** Change only the residual placeholder action-mode metadata from the stale `residual_joint_position` string to the public `residual_baseline` action mode. Do not make `residual_policy` available, do not change unavailable reasons, and do not add action modes.
+
+---
+
+### `tests/locomotion/test_locomotion_controller_registry.py` (test, registry metadata read)
+
+**Analog:** existing registry tests in the same file
+
+**Registry listing pattern:**
+```python
+entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+```
+
+**Unavailable placeholder assertion pattern:**
+```python
+assert entries["residual_policy"]["available"] is False
+assert entries["residual_policy"]["unavailable_reason"]
+```
+
+**05-02 required metadata drift guard:**
+```python
+from src.locomotion.actions import available_action_modes
+
+
+def test_residual_placeholder_advertises_public_residual_baseline_action_mode():
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    residual = entries["residual_policy"]
+    action_mode = residual["capabilities"]["action_mode"]
+
+    assert residual["available"] is False
+    assert action_mode == "residual_baseline"
+    assert action_mode in available_action_modes()
+```
+
+**Planner guidance:** Keep the test a metadata assertion. It should not construct controllers that are intentionally unavailable except where existing tests already assert fail-fast behavior.
 
 ## Shared Patterns
 
 ### Documentation truth source hierarchy
 **Source:** `05-CONTEXT.md` lines 63-72 and implementation files listed below  
-**Apply to:** `docs/locomotion-benchmark.md`, README command card, documentation tests
+**Apply to:** `docs/locomotion-benchmark.md`, README command card, documentation tests, 05-02 residual metadata drift guards
 
-Use these files as canonical sources before authoring prose:
+Use these files as canonical sources before authoring prose or metadata checks:
 - CLI command/flags: `src/main.py` lines 93-148 and 269-325.
 - Artifact names and summary/comparison generation: `src/locomotion/evaluation.py` lines 30-73, 294-345, 623-642, 693-739.
 - Gymnasium reset/step behavior: `src/locomotion/env.py` lines 76-183.
@@ -521,7 +641,7 @@ Use these files as canonical sources before authoring prose:
 
 ### Hard support/deferred controller boundary
 **Source:** `src/locomotion/controllers.py` lines 397-443 and 446-488  
-**Apply to:** controller-family matrix in `docs/locomotion-benchmark.md`
+**Apply to:** controller-family matrix in `docs/locomotion-benchmark.md`, `src/locomotion/controllers.py`, `tests/locomotion/test_locomotion_controller_registry.py`, `tests/test_locomotion_benchmark_docs.py`
 ```python
 @locomotion_controller(name="analytical_trot", display="Analytical Trot")
 class AnalyticalTrotController:
@@ -543,6 +663,18 @@ class _UnavailableControllerBase:
     def available(cls) -> tuple[bool, str | None]:
         return False, cls.UNAVAILABLE_REASON
 ```
+
+### Residual placeholder seam consistency
+**Source:** `05-VERIFICATION.md` lines 8-22 and `src/locomotion/actions.py` action-mode vocabulary  
+**Apply to:** `src/locomotion/controllers.py`, `tests/locomotion/test_locomotion_controller_registry.py`, `tests/test_locomotion_benchmark_docs.py`, residual RL row in `docs/locomotion-benchmark.md`
+
+The residual RL placeholder remains unavailable, but its public seam must be the environment action mode `residual_baseline`, not stale internal vocabulary. Use these invariants:
+
+- `ControllerRegistry.list_controllers()` includes `residual_policy`.
+- `entries["residual_policy"]["available"] is False`.
+- `entries["residual_policy"]["capabilities"]["action_mode"] == "residual_baseline"`.
+- `"residual_baseline" in available_action_modes()`.
+- Guide row includes: `Controller id `residual_policy`; residual-over-baseline seam via `residual_baseline` action mode`.
 
 ### Artifact generation and saved-run comparison
 **Source:** `src/locomotion/evaluation.py` lines 623-638 and 339-345  
@@ -585,17 +717,17 @@ assert "## By Controller and Scenario" in markdown
 assert "tracking_rmse ↓" in markdown
 assert "success_rate ↑" in markdown
 ```
-Adapt to `README.read_text()` and `GUIDE.read_text()`. Do not execute MuJoCo, the smoke command, or `argus eval-locomotion`.
+Adapt to `README.read_text()` and `GUIDE.read_text()`. Do not execute MuJoCo, the smoke command, or `argus eval-locomotion`. Metadata imports from `src.locomotion.controllers` and `src.locomotion.actions` are acceptable for the 05-02 doc/metadata drift guard because they do not construct the environment or run the benchmark.
 
 ## No Analog Found
 
 | File | Role | Data Flow | Reason |
 |------|------|-----------|--------|
-| None | n/a | n/a | All Phase 5 files have direct or role-match analogs in docs/tests. |
+| None | n/a | n/a | All Phase 5 files have direct or role-match analogs in docs/tests/registry metadata. |
 
 ## Metadata
 
 **Analog search scope:** `/home/prannayag/pragnition/robotics/argus/docs`, `/home/prannayag/pragnition/robotics/argus/README.md`, `/home/prannayag/pragnition/robotics/argus/tests`, `/home/prannayag/pragnition/robotics/argus/src/locomotion`, `/home/prannayag/pragnition/robotics/argus/src/main.py`  
-**Files scanned:** 18 listed/read surfaces plus phase context/research files  
+**Files scanned:** 20 listed/read surfaces plus phase context/research/verification files  
 **Project skills checked:** `.claude/skills/desloppify/SKILL.md` read; not applicable to docs/content-test mapping  
 **Pattern extraction date:** 2026-05-01
