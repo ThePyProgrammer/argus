@@ -89,6 +89,63 @@ def create_app(*args, **kwargs):
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Single-robot SLAM in MuJoCo")
+    subparsers = parser.add_subparsers(dest="command")
+    eval_parser = subparsers.add_parser(
+        "eval-locomotion",
+        help="Run offline locomotion controller/scenario/seed evaluations",
+    )
+    eval_parser.add_argument(
+        "--controller",
+        action="append",
+        default=None,
+        help="Controller id to evaluate; repeat for a matrix (default: analytical_trot)",
+    )
+    eval_parser.add_argument(
+        "--scenario",
+        action="append",
+        default=None,
+        help="Scenario id to evaluate; repeat for a matrix (default: flat_ground)",
+    )
+    eval_parser.add_argument(
+        "--seed",
+        action="append",
+        type=int,
+        default=None,
+        help="Seed to evaluate; repeat for a matrix (default: 101, 202)",
+    )
+    eval_parser.add_argument(
+        "--matrix-config",
+        default=None,
+        metavar="PATH",
+        help="Optional JSON matrix config; repeated CLI flags override matrix dimensions",
+    )
+    eval_parser.add_argument(
+        "--from-run-dir",
+        default=None,
+        metavar="PATH",
+        help="Regenerate summary.json and comparison.md from a saved run directory",
+    )
+    eval_parser.add_argument(
+        "--output-root",
+        default="outputs/locomotion-evals",
+        metavar="PATH",
+        help="Directory for timestamped evaluation artifacts (default: outputs/locomotion-evals)",
+    )
+    eval_parser.add_argument("--max-episode-steps", type=int, default=500)
+    eval_parser.add_argument("--sim-steps-per-frame", type=int, default=10)
+    eval_parser.add_argument("--heightfield-size", type=int, default=16)
+    eval_parser.add_argument("--action-mode", default="velocity_command")
+    eval_parser.add_argument("--max-matrix-runs", type=int, default=1000)
+    eval_parser.add_argument(
+        "--allow-locomotion-failures",
+        action="store_true",
+        help="Write artifacts but exit zero when evaluated locomotion failures occur",
+    )
+    eval_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print per-run progress and metric snippets",
+    )
     parser.add_argument(
         "--control",
         choices=["teleop", "waypoint", "random", "explore", "multi", "web"],
@@ -191,6 +248,81 @@ def parse_args() -> argparse.Namespace:
              "NotImplementedError per DET-METRICS-03 / CONTEXT D-10.",
     )
     return parser.parse_args()
+
+
+def _defaulted_eval_sequence(value, default):
+    """Return an explicitly repeated CLI sequence or the default tuple."""
+
+    return tuple(default if value is None else value)
+
+
+def _eval_artifact_paths(run_dir: Path) -> dict[str, Path]:
+    return {
+        "manifest": run_dir / "manifest.json",
+        "steps": run_dir / "steps.jsonl",
+        "episodes": run_dir / "episodes.csv",
+        "summary": run_dir / "summary.json",
+        "comparison": run_dir / "comparison.md",
+    }
+
+
+def run_eval_locomotion_mode(args: argparse.Namespace) -> int:
+    """Run the dedicated locomotion evaluation CLI branch with lazy imports."""
+
+    from src.locomotion.evaluation import (
+        EvaluationMatrix,
+        EvaluationRunConfig,
+        load_matrix_config,
+        regenerate_comparison,
+        run_evaluation_matrix,
+    )
+
+    if getattr(args, "from_run_dir", None):
+        run_dir = Path(args.from_run_dir)
+        regenerate_comparison(run_dir)
+        print(f"summary: {run_dir / 'summary.json'}")
+        print(f"comparison: {run_dir / 'comparison.md'}")
+        return 0
+
+    if getattr(args, "matrix_config", None):
+        matrix = load_matrix_config(Path(args.matrix_config))
+    else:
+        matrix = EvaluationMatrix()
+
+    matrix = EvaluationMatrix(
+        controllers=_defaulted_eval_sequence(args.controller, matrix.controllers),
+        scenarios=_defaulted_eval_sequence(args.scenario, matrix.scenarios),
+        seeds=_defaulted_eval_sequence(args.seed, matrix.seeds),
+        action_mode=args.action_mode,
+        max_episode_steps=args.max_episode_steps,
+        sim_steps_per_frame=args.sim_steps_per_frame,
+        heightfield_size=args.heightfield_size,
+    )
+    config = EvaluationRunConfig(
+        output_root=Path(args.output_root),
+        max_matrix_runs=args.max_matrix_runs,
+        fail_on_locomotion_failure=not args.allow_locomotion_failures,
+        verbose=args.verbose,
+        invocation_args=tuple(sys.argv[1:]),
+    )
+    result = run_evaluation_matrix(matrix, config=config)
+    paths = _eval_artifact_paths(result.run_dir)
+    print(f"run_dir: {result.run_dir}")
+    print(f"summary: {paths['summary']}")
+    print(f"comparison: {paths['comparison']}")
+    if args.verbose:
+        for row in result.episode_rows:
+            status = "ok" if row.get("success") else "failed"
+            print(
+                "run {run_id}: {controller_id}/{scenario_id}/seed={seed} {status}".format(
+                    status=status,
+                    **row,
+                )
+            )
+    comparison_path = paths["comparison"]
+    if comparison_path.exists():
+        print(comparison_path.read_text(encoding="utf-8"))
+    return result.exit_code
 
 
 def _platform_config_from_args(args: argparse.Namespace) -> dict:
@@ -787,6 +919,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
 def main() -> None:
     """Run the single-robot SLAM loop."""
     args = parse_args()
+
+    if getattr(args, "command", None) == "eval-locomotion":
+        sys.exit(run_eval_locomotion_mode(args))
 
     # DET-METRICS-03 / CONTEXT D-10: --labeled-eval-set is reserved for a
     # future milestone. Raising BEFORE any heavy init (coordinator / bridge /
