@@ -4,8 +4,8 @@ milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
 status: executing
 stopped_at: Phase 5 context gathered
-last_updated: "2026-05-01T07:01:30.660Z"
-last_activity: 2026-05-01 -- Phase 05 planning complete
+last_updated: "2026-05-01T07:09:30.346Z"
+last_activity: 2026-05-01 -- Phase 05 execution started
 progress:
   total_phases: 5
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-30)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** Phase 04 — evaluation-runner-and-regression
+**Current focus:** Phase 05 — harness-docs-and-comparison-matrix
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-01 -- Phase 05 planning complete
+Phase: 05 (harness-docs-and-comparison-matrix) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 05
+Last activity: 2026-05-01 -- Phase 05 execution started
 
 Progress: [█████████░] 94%
 

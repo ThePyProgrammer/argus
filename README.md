@@ -310,13 +310,15 @@ Argus locomotion is deliberately benchmark-first. `ArgusGo2Env` wraps the Go2 Mu
 
 The default controller is still the analytical trot, but it now sits behind the same registry seam as future residual-policy, direct-policy, MPC, and WBC families. Unsupported families are explicit placeholders until the control infrastructure and evidence exist. No vibes-based robot-dog claims.
 
+Read the canonical harness guide at [`docs/locomotion-benchmark.md`](docs/locomotion-benchmark.md).
+
 Run the smoke benchmark:
 
 ```bash
 uv run argus eval-locomotion --controller analytical_trot --scenario flat_ground --seed 101 --seed 202
 ```
 
-Evaluation artifacts are written under `outputs/locomotion-evals/` as JSONL steps, CSV episodes, a machine-readable summary, a manifest with reproducibility metadata, and a Markdown comparison table.
+Evaluation artifacts are written under `outputs/locomotion-evals/` as `manifest.json`, `steps.jsonl`, `episodes.csv`, `summary.json`, and `comparison.md`.
 
 ### Raibert-Style Analytical Trot
 
