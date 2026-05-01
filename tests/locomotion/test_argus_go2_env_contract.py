@@ -356,6 +356,10 @@ def test_velocity_command_step_dispatches_controller_preserving_yaw_rate_and_wri
     np.testing.assert_allclose(obs["previous_action"], expected_ctrl.astype(np.float32))
     assert info["controller_id"] == "analytical_trot"
     assert info["action_mode"] == "velocity_command"
+    assert info["executed_command"]["vx"] == pytest.approx(0.25)
+    assert info["executed_command"]["vy"] == pytest.approx(-0.1)
+    assert info["executed_command"]["omega"] == pytest.approx(0.35)
+    assert info["executed_command"]["source"] == "velocity_action"
     assert "controller_metadata" not in info
 
 

@@ -472,6 +472,13 @@ class ArgusGo2Env(gymnasium.Env):
                 "omega": float(active_command[2]),
                 "source": "scenario_schedule",
             },
+            "executed_command": {
+                "time": float(sim_time),
+                "vx": float(self._command[0]),
+                "vy": float(self._command[1]),
+                "omega": float(self._command[2]),
+                "source": "velocity_action" if self.config.action_mode == ACTION_MODE_VELOCITY else "scenario_schedule",
+            },
             "disturbance_schedule": tuple(dict(item) for item in sample.disturbance_schedule) if sample is not None else (),
             "active_push": dict(self._active_push) if self._active_push is not None else None,
         }
