@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: controller-plugin-baseline
-status: draft
+status: passed
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-30
+updated: 2026-05-03
 ---
 
 # Phase 2 — Validation Strategy
@@ -22,6 +23,7 @@ created: 2026-04-30
 | **Quick run command** | `python -m pytest tests/locomotion/test_locomotion_controller_registry.py tests/locomotion/test_locomotion_controller_protocol.py -q -x` |
 | **Full suite command** | `python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` |
 | **Estimated runtime** | Pure registry/protocol tests should run in under 30 seconds; full MuJoCo/Gymnasium suite requires a supported Python 3.10-3.12 project environment |
+| **Passed evidence** | `02-VERIFICATION.md` records the focused/full Phase 2 suite: `.venv/bin/python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` → `186 passed, 2 warnings in 9.92s` |
 
 ---
 
@@ -38,22 +40,24 @@ created: 2026-04-30
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 2-01-01 | 02-01 | 1 | LOC-CTRL-01, LOC-CTRL-02, LOC-CTRL-03 | T-2-01, T-2-02 | Unknown/unavailable controller ids fail deterministically before runtime control application | unit | `python -m pytest tests/locomotion/test_locomotion_controller_registry.py -q -x` | No - Wave 0 | pending |
-| 2-02-01 | 02-02 | 1 | LOC-CTRL-01, LOC-CTRL-02 | T-2-03 | Controller output is finite shape `(12,)` before any bridge/control sink consumes it | unit | `python -m pytest tests/locomotion/test_locomotion_controller_protocol.py -q -x` | No - Wave 0 | pending |
-| 2-03-01 | 02-03 | 2 | LOC-CTRL-01, LOC-CTRL-04 | T-2-03 | Shared dispatch validates finite target shape before applying controls | unit | `python -m pytest tests/locomotion/test_controller_dispatch.py -q -x` | No - Wave 0 | pending |
-| 2-04-01 | 02-04 | 3 | LOC-CTRL-04 | T-2-04 | Single-robot bridge public `step() -> SensorFrame` behavior is preserved while sourcing controls through the registered analytical baseline | regression | `python -m pytest tests/bridge/test_sim_bridge.py -q -x` | Existing | pending |
-| 2-05-01 | 02-05 | 3 | LOC-CTRL-04 | T-2-04 | Multi-robot bridge public `step() -> dict[str, SensorFrame]` behavior is preserved with one controller instance per robot | regression | `python -m pytest tests/bridge/test_multi_bridge.py -q -x` | Existing | pending |
-| 2-06-01 | 02-06 | 4 | LOC-CTRL-02, controller metadata decisions D-13/D-15 | T-2-05 | Reset info contains full controller metadata and step info contains compact controller attribution | regression | `python -m pytest tests/locomotion/test_argus_go2_env_contract.py -q -x` | Existing | pending |
+| 2-01-01 | 02-01 | 1 | LOC-CTRL-01, LOC-CTRL-02, LOC-CTRL-03 | T-2-01, T-2-02 | Unknown/unavailable controller ids fail deterministically before runtime control application | unit | `python -m pytest tests/locomotion/test_locomotion_controller_registry.py -q -x` | `tests/locomotion/test_locomotion_controller_registry.py` exists; verified in `02-VERIFICATION.md` | passed |
+| 2-02-01 | 02-02 | 1 | LOC-CTRL-01, LOC-CTRL-02 | T-2-03 | Controller output is finite shape `(12,)` before any bridge/control sink consumes it | unit | `python -m pytest tests/locomotion/test_locomotion_controller_protocol.py -q -x` | `tests/locomotion/test_locomotion_controller_protocol.py` exists; verified in `02-VERIFICATION.md` | passed |
+| 2-03-01 | 02-03 | 2 | LOC-CTRL-01, LOC-CTRL-04 | T-2-03 | Shared dispatch validates finite target shape before applying controls | unit | `python -m pytest tests/locomotion/test_controller_dispatch.py -q -x` | `tests/locomotion/test_controller_dispatch.py` exists; verified in `02-VERIFICATION.md` | passed |
+| 2-04-01 | 02-04 | 3 | LOC-CTRL-04 | T-2-04 | Single-robot bridge public `step() -> SensorFrame` behavior is preserved while sourcing controls through the registered analytical baseline | regression | `python -m pytest tests/bridge/test_sim_bridge.py -q -x` | Existing bridge test verified in `02-VERIFICATION.md` | passed |
+| 2-05-01 | 02-05 | 3 | LOC-CTRL-04 | T-2-04 | Multi-robot bridge public `step() -> dict[str, SensorFrame]` behavior is preserved with one controller instance per robot | regression | `python -m pytest tests/bridge/test_multi_bridge.py -q -x` | Existing bridge test verified in `02-VERIFICATION.md` | passed |
+| 2-06-01 | 02-06 | 4 | LOC-CTRL-02, controller metadata decisions D-13/D-15 | T-2-05 | Reset info contains full controller metadata and step info contains compact controller attribution | regression | `python -m pytest tests/locomotion/test_argus_go2_env_contract.py -q -x` | Existing env contract coverage verified in `02-VERIFICATION.md` | passed |
+
+Evidence basis: `02-VERIFICATION.md` verifies registry, protocol, dispatch, env contract, single-bridge, and multi-bridge coverage and reports `186 passed, 2 warnings in 9.92s`.
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `tests/locomotion/test_locomotion_controller_registry.py` — covers LOC-CTRL-01, LOC-CTRL-02, LOC-CTRL-03, default id, registry listing, capability metadata, unavailable placeholder reasons, and lazy import behavior.
-- [ ] `tests/locomotion/test_locomotion_controller_protocol.py` — covers `LocomotionCommand`, `ControllerResult`, protocol shape, deterministic reset isolation, and finite `(12,)` analytical baseline outputs.
-- [ ] `tests/locomotion/test_controller_dispatch.py` — covers shared target validation and single/multi control-sink application using fake data objects.
-- [ ] Extend `tests/locomotion/test_argus_go2_env_contract.py` — covers full reset metadata and compact per-step controller attribution.
-- [ ] Extend existing bridge tests only where needed to assert the controller seam preserves public return types.
+- [x] `tests/locomotion/test_locomotion_controller_registry.py` — covers LOC-CTRL-01, LOC-CTRL-02, LOC-CTRL-03, default id, registry listing, capability metadata, unavailable placeholder reasons, and lazy import behavior; verified in `02-VERIFICATION.md`.
+- [x] `tests/locomotion/test_locomotion_controller_protocol.py` — covers `LocomotionCommand`, `ControllerResult`, protocol shape, deterministic reset isolation, and finite `(12,)` analytical baseline outputs; verified in `02-VERIFICATION.md`.
+- [x] `tests/locomotion/test_controller_dispatch.py` — covers shared target validation and single/multi control-sink application using fake data objects; verified in `02-VERIFICATION.md`.
+- [x] Extend `tests/locomotion/test_argus_go2_env_contract.py` — covers full reset metadata and compact per-step controller attribution; verified in `02-VERIFICATION.md`.
+- [x] Extend existing bridge tests only where needed to assert the controller seam preserves public return types; `tests/bridge/test_sim_bridge.py` and `tests/bridge/test_multi_bridge.py` verified in `02-VERIFICATION.md`.
 
 ---
 
@@ -61,7 +65,7 @@ created: 2026-04-30
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Full MuJoCo/Gymnasium bridge smoke in this local shell | LOC-CTRL-02, LOC-CTRL-04 | Current shell uses Python 3.14.4 while the project supports Python `>=3.10,<3.13`, and this interpreter lacks `gymnasium` and `mujoco` | Use a supported project environment and run `python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` |
+| Full MuJoCo/Gymnasium bridge smoke in a supported local shell | LOC-CTRL-02, LOC-CTRL-04 | Optional local runtime smoke; `02-VERIFICATION.md` already records the supported project-environment full suite passing | Use a supported project environment and run `python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` if a fresh local smoke is desired. |
 
 ---
 
@@ -73,5 +77,6 @@ created: 2026-04-30
 - [x] No watch-mode flags.
 - [x] Feedback latency target documented for pure unit tests.
 - [x] `nyquist_compliant: true` set in frontmatter.
+- [x] `wave_0_complete: true` set in frontmatter based on `02-VERIFICATION.md` evidence.
 
-**Approval:** pending
+**Approval:** passed
