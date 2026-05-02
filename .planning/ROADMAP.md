@@ -211,7 +211,7 @@ Plans:
 - [x] 07-02-PLAN.md — Update eval-locomotion help and benchmark docs to distinguish evaluator-runnable modes from env-supported seams.
 
 **Wave 2 *(gap closure; blocked on Wave 1 completion)***
-- [ ] 07-03-PLAN.md — Preserve matrix-config scalar values unless CLI overrides are explicit, add CLI no-artifact regressions, and clean action-mode docs markup.
+- [x] 07-03-PLAN.md — Preserve matrix-config scalar values unless CLI overrides are explicit, add CLI no-artifact regressions, and clean action-mode docs markup.
 
 **Research flag**: light
 
