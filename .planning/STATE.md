@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
 status: milestone_complete
-stopped_at: Phase 07 ready to plan
-last_updated: "2026-05-02T07:08:11.765Z"
-last_activity: 2026-05-02 -- Phase 07 execution started
+stopped_at: v4.0 ready to complete
+last_updated: "2026-05-02T14:24:34Z"
+last_activity: 2026-05-02 -- Phase 07 verified passed; v4.0 milestone complete
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 30
-  completed_plans: 29
+  completed_plans: 30
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** Phase 07 — align-evaluation-action-mode-contract
+**Current focus:** v4.0 milestone complete — ready for formal closure
 
 ## Current Position
 
 Phase: 07
-Plan: Not started
+Plan: 3 of 3
 Status: Milestone complete
-Last activity: 2026-05-02
+Last activity: 2026-05-02 -- Phase 07 verified passed; v4.0 milestone complete
 
 Progress: [██████████] 100%
 
