@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: verifying
+status: milestone_complete
 stopped_at: Phase 09 audit-open gate passed
 last_updated: "2026-05-02T18:08:34.545Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 9
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 35
   completed_plans: 35
-  percent: 100
+  percent: 111
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 09 (milestone-closeout-hygiene) — EXECUTING
-Plan: 3 of 3 — audit-open gate passed
-Status: Phase complete — ready for verification
+Phase: 09
+Plan: Not started
+Status: Milestone complete
 Last activity: 2026-05-02
 
 Progress: [██████████] 100%
