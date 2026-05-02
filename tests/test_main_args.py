@@ -262,6 +262,28 @@ def test_eval_locomotion_help_lists_artifact_flags():
         assert expected in combined
 
 
+def test_eval_locomotion_help_lists_action_mode_contract():
+    """eval-locomotion help must distinguish runnable and deferred action modes."""
+    proc = subprocess.run(
+        [
+            "/home/prannayag/pragnition/robotics/argus/.venv/bin/python",
+            "-m",
+            "src.main",
+            "eval-locomotion",
+            "--help",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 0, combined
+    assert "--action-mode" in combined
+    assert "velocity_command is the evaluator-runnable mode" in combined
+    assert "joint_position and residual_baseline are env-supported seams" in combined
+
+
 def test_eval_locomotion_is_not_a_control_choice():
     """LOC-EVAL-01 D-01: offline evaluation is not a --control runtime mode."""
     proc = subprocess.run(

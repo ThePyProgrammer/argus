@@ -107,6 +107,17 @@ def test_residual_policy_documentation_matches_registry_action_mode():
 
 
 
+def test_locomotion_benchmark_guide_states_evaluator_action_mode_contract():
+    guide = GUIDE.read_text(encoding="utf-8")
+
+    assert "argus eval-locomotion currently runs `velocity_command`" in guide
+    assert "joint_position" in guide
+    assert "residual_baseline" in guide
+    assert "env-supported seams" in guide
+    assert "fail fast" in guide
+
+
+
 def test_doc_guard_source_stays_content_only():
     source = Path(__file__).read_text(encoding="utf-8")
     comparison_literals = {SMOKE_COMMAND, "uv run", "eval-locomotion --controller"}
