@@ -21,8 +21,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link — completed 2026-05-01
 - [x] **Phase 6: repair-evaluation-runner-semantics** - Gap closure for scenario command selection, real distance export flattening, and baseline regression threshold semantics — completed 2026-05-01
 - [x] **Phase 7: align-evaluation-action-mode-contract** - Gap closure for CLI action-mode support/rejection behavior and reproducible action-mode metadata — completed 2026-05-02
-- [ ] **Phase 8: locomotion-controller-seam-cleanup** - Cleanup for multi-robot controller seam consistency and future-controller action-mode metadata — planned
-- [ ] **Phase 9: milestone-closeout-hygiene** - Cleanup for validation metadata and pre-close artifact audit items before formal v4.0 archive — planned
+- [x] **Phase 8: locomotion-controller-seam-cleanup** - Cleanup for multi-robot controller seam consistency and future-controller action-mode metadata — completed 2026-05-02
+- [x] **Phase 9: milestone-closeout-hygiene** - Cleanup for validation metadata and pre-close artifact audit items before formal v4.0 archive — completed 2026-05-02
 
 ## Phase Details
 
@@ -273,7 +273,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. repair-evaluation-runner-semantics | 5/5 | Complete | 2026-05-01 |
 | 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
 | 8. locomotion-controller-seam-cleanup | 2/2 | Complete | 2026-05-02 |
-| 9. milestone-closeout-hygiene | 2/3 | Executing | - |
+| 9. milestone-closeout-hygiene | 3/3 | Complete | 2026-05-02 |
 
 ## Requirement Coverage
 
