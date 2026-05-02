@@ -131,12 +131,12 @@ def parse_args() -> argparse.Namespace:
         metavar="PATH",
         help="Directory for timestamped evaluation artifacts (default: outputs/locomotion-evals)",
     )
-    eval_parser.add_argument("--max-episode-steps", type=int, default=500)
-    eval_parser.add_argument("--sim-steps-per-frame", type=int, default=10)
-    eval_parser.add_argument("--heightfield-size", type=int, default=16)
+    eval_parser.add_argument("--max-episode-steps", type=int, default=None)
+    eval_parser.add_argument("--sim-steps-per-frame", type=int, default=None)
+    eval_parser.add_argument("--heightfield-size", type=int, default=None)
     eval_parser.add_argument(
         "--action-mode",
-        default="velocity_command",
+        default=None,
         help=(
             "Action mode for evaluation. velocity_command is the evaluator-runnable mode; "
             "joint_position and residual_baseline are env-supported seams that fail fast "
@@ -301,10 +301,10 @@ def run_eval_locomotion_mode(args: argparse.Namespace) -> int:
         controllers=_defaulted_eval_sequence(args.controller, matrix.controllers),
         scenarios=_defaulted_eval_sequence(args.scenario, matrix.scenarios),
         seeds=_defaulted_eval_sequence(args.seed, matrix.seeds),
-        action_mode=args.action_mode,
-        max_episode_steps=args.max_episode_steps,
-        sim_steps_per_frame=args.sim_steps_per_frame,
-        heightfield_size=args.heightfield_size,
+        action_mode=matrix.action_mode if args.action_mode is None else args.action_mode,
+        max_episode_steps=matrix.max_episode_steps if args.max_episode_steps is None else args.max_episode_steps,
+        sim_steps_per_frame=matrix.sim_steps_per_frame if args.sim_steps_per_frame is None else args.sim_steps_per_frame,
+        heightfield_size=matrix.heightfield_size if args.heightfield_size is None else args.heightfield_size,
     )
     config = EvaluationRunConfig(
         output_root=Path(args.output_root),
