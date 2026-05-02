@@ -22,6 +22,13 @@ from src.bridge.scene_builder import (
     build_two_robot_scene,
 )
 from src.bridge.sensor_types import SensorFrame
+from src.bridge.platforms.types import (
+    ControllerHealth,
+    RobotCommand,
+    RobotRuntimeState,
+    RobotRuntimeStatus,
+    RobotState,
+)
 
 
 # ---------- MultiRobotConfig tests ----------
@@ -227,6 +234,123 @@ def test_multi_bridge_stop_before_start_is_safe():
 
     assert not bridge.is_running
     assert bridge.step_count == 0
+
+
+class _FakeOneActuatorController:
+    def __init__(self, target: np.ndarray) -> None:
+        self.target = target
+        self.calls: list[tuple[RobotCommand, RobotState, float]] = []
+
+    def compute(self, command: RobotCommand, state: RobotState, dt: float) -> np.ndarray:
+        self.calls.append((command, state, dt))
+        return self.target
+
+    def health(self) -> ControllerHealth:
+        return ControllerHealth()
+
+
+class _FakeOneActuatorPlatform:
+    metadata = types.SimpleNamespace(
+        name="fake_one_actuator",
+        model_dir="models/fake_one_actuator",
+        actuator_count=1,
+        footprint_radius=0.3,
+    )
+
+    def extract_state(self, model, data, qpos_start, sim_time):
+        return RobotState(
+            base_pose=np.eye(4),
+            base_velocity=np.zeros(3),
+            joint_positions=np.zeros(1),
+            joint_velocities=np.zeros(1),
+            orientation_quat=np.array([1.0, 0.0, 0.0, 0.0]),
+            contacts=(),
+            sim_time=sim_time,
+        )
+
+    def runtime_status(self, robot_id, state, command, health, **kwargs):
+        return RobotRuntimeStatus(
+            state=RobotRuntimeState.STANDING,
+            last_command=command,
+            controller_health=health,
+            **kwargs,
+        )
+
+
+def _prepare_fake_one_robot_bridge(target: np.ndarray) -> tuple[MultiRobotBridge, _FakeOneActuatorController]:
+    controller = _FakeOneActuatorController(target)
+    bridge = MultiRobotBridge(MultiRobotConfig(robot_ids=("robot_a",), sim_steps_per_frame=1))
+    bridge._platform = _FakeOneActuatorPlatform()
+    bridge._controllers = {"robot_a": controller}
+    bridge._model = types.SimpleNamespace(opt=types.SimpleNamespace(timestep=0.002))
+    bridge._data = types.SimpleNamespace(qpos=np.zeros(3), ctrl=np.array([9.0], dtype=np.float64))
+    bridge._dt = 0.02
+    bridge._qpos_starts = {"robot_a": 0}
+    bridge._ctrl_indices = {"robot_a": [0]}
+    bridge._viewer_handle = None
+    bridge._commands = {"robot_a": RobotCommand.velocity([0.7, 0.0], 0.2)}
+    bridge._runtime_status = {}
+    return bridge, controller
+
+
+def test_multi_bridge_rejects_invalid_controller_output_without_mutating_ctrl(monkeypatch):
+    bridge, _controller = _prepare_fake_one_robot_bridge(np.array([np.nan], dtype=np.float64))
+    before = bridge._data.ctrl.copy()
+
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setattr(
+        MultiRobotBridge,
+        "_capture_frame",
+        lambda self, robot_id: types.SimpleNamespace(robot_id=robot_id),
+    )
+
+    with pytest.raises(ValueError, match="finite"):
+        bridge.step()
+
+    np.testing.assert_allclose(bridge._data.ctrl, before)
+
+
+@pytest.mark.parametrize(
+    "bad_indices, message",
+    [
+        ([0, 0], "duplicates"),
+        ([0, 2], "out of range"),
+    ],
+)
+def test_multi_bridge_rejects_bad_ctrl_indices_without_mutating_ctrl(monkeypatch, bad_indices, message):
+    bridge, _controller = _prepare_fake_one_robot_bridge(np.array([0.42, 0.24], dtype=np.float64))
+    bridge._data.ctrl = np.array([9.0], dtype=np.float64)
+    bridge._ctrl_indices["robot_a"] = bad_indices
+    before = bridge._data.ctrl.copy()
+
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setattr(
+        MultiRobotBridge,
+        "_capture_frame",
+        lambda self, robot_id: types.SimpleNamespace(robot_id=robot_id),
+    )
+
+    with pytest.raises(ValueError, match=message):
+        bridge.step()
+
+    np.testing.assert_allclose(bridge._data.ctrl, before)
+
+
+def test_multi_bridge_applies_fake_non_go2_one_actuator_target(monkeypatch):
+    bridge, controller = _prepare_fake_one_robot_bridge(np.array([0.42], dtype=np.float64))
+
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setattr(
+        MultiRobotBridge,
+        "_capture_frame",
+        lambda self, robot_id: types.SimpleNamespace(robot_id=robot_id),
+    )
+
+    frames = bridge.step()
+
+    assert len(controller.calls) == 1
+    assert bridge._data.ctrl[0] == 0.42
+    assert frames["robot_a"].robot_id == "robot_a"
 
 
 # ---------- MockMultiRobotBridge tests ----------
