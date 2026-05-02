@@ -484,5 +484,7 @@ class MPCController(_UnavailableControllerBase):
 
 @locomotion_controller(name="wbc", display="Whole-Body Control")
 class WBCController(_UnavailableControllerBase):
-    CAPABILITIES = _placeholder_capabilities("wbc", "torque_or_joint_position")
+    CAPABILITIES = _placeholder_capabilities("wbc", "undefined_deferred")
+    CAPABILITIES["model_requirements"]["action_contract"] = "undefined_deferred"
+    CAPABILITIES["model_requirements"]["env_action_mode"] = None
     UNAVAILABLE_REASON = WBC_UNAVAILABLE_REASON
