@@ -272,8 +272,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
 | 6. repair-evaluation-runner-semantics | 5/5 | Complete | 2026-05-01 |
 | 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
-| 8. locomotion-controller-seam-cleanup | 0/2 | Planned | - |
-| 9. milestone-closeout-hygiene | 0/3 | Planned | - |
+| 8. locomotion-controller-seam-cleanup | 2/2 | Complete | 2026-05-02 |
+| 9. milestone-closeout-hygiene | 2/3 | Executing | - |
 
 ## Requirement Coverage
 
@@ -295,4 +295,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 ## Next Step
 
-Run `/gsd-execute-phase 8` to execute the controller seam cleanup phase before formal v4.0 closure.
+Run `/gsd-complete-milestone v4.0` after Phase 09 verification passes.

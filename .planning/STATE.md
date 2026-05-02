@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
 status: executing
-stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-05-02T17:50:09.984Z"
-last_activity: 2026-05-02 -- Phase 09 execution started
+stopped_at: Phase 09 audit-open gate pending
+last_updated: "2026-05-02T18:05:50Z"
+last_activity: 2026-05-02 -- Phase 09 Plan 03 closeout bookkeeping in progress
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 35
-  completed_plans: 32
-  percent: 91
+  completed_plans: 34
+  percent: 97
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 09 (milestone-closeout-hygiene) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 09
-Last activity: 2026-05-02 -- Phase 09 execution started
+Plan: 3 of 3 — audit-open gate pending
+Status: Executing Phase 09 closeout validation
+Last activity: 2026-05-02 -- Phase 09 Plan 03 closeout bookkeeping in progress
 
-Progress: [████████░░] 78%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -73,9 +73,9 @@ Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim
 
 ### Pending Todos
 
-- Plan and execute Phase 08: locomotion-controller-seam-cleanup.
-- Plan and execute Phase 09: milestone-closeout-hygiene.
-- Re-run `/gsd-audit-milestone` after phases 08-09, then `/gsd-complete-milestone v4.0` when clean.
+- Phase 08 locomotion-controller-seam-cleanup completed and tracked in ROADMAP.
+- Phase 09 milestone-closeout-hygiene is executing its final audit-open gate.
+- Run `/gsd-complete-milestone v4.0` after Phase 09 verification passes.
 
 ### Blockers/Concerns
 
@@ -97,6 +97,6 @@ Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim
 
 ## Session Continuity
 
-Last activity: 2026-05-01 — Phase 06 verified passed; Phase 07 ready to plan
-Stopped at: Phase 9 UI-SPEC approved
-Resume file: .planning/phases/09-milestone-closeout-hygiene/09-UI-SPEC.md
+Last activity: 2026-05-02 — Phase 09 Plan 03 closeout bookkeeping in progress
+Stopped at: Phase 09 audit-open gate pending
+Resume file: .planning/phases/09-milestone-closeout-hygiene/09-03-PLAN.md
