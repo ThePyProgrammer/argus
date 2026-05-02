@@ -1,9 +1,9 @@
 ---
 phase: 9
 slug: milestone-closeout-hygiene
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: passed
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-03
 ---
 
@@ -38,9 +38,9 @@ created: 2026-05-03
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 09-01-01 | 01 | 1 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-01 | Metadata closure must cite matching verification evidence rather than inventing completion. | governance | `gsd-sdk query audit-open` | yes | pending |
-| 09-02-01 | 02 | 1 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-02 | Debug and quick-task frontmatter must satisfy scanner predicates only when the artifact contains completion evidence or an explicit out-of-closeout disposition. | governance | `gsd-sdk query audit-open` | yes | pending |
-| 09-03-01 | 03 | 2 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-03 | Final closeout audit must fail closed if any open blocking artifacts remain. | governance | `gsd-sdk query audit-open` | yes | pending |
+| 09-01-01 | 01 | 1 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-01 | Metadata closure must cite matching verification evidence rather than inventing completion. | governance | `gsd-sdk query audit-open` | yes | green |
+| 09-02-01 | 02 | 1 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-02 | Debug and quick-task frontmatter must satisfy scanner predicates only when the artifact contains completion evidence or an explicit out-of-closeout disposition. | governance | `gsd-sdk query audit-open` | yes | green |
+| 09-03-01 | 03 | 2 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 | T-09-03 | Final closeout audit must fail closed if any open blocking artifacts remain. | governance | `gsd-sdk query audit-open` | yes | green |
 
 *Status: pending · green · red · flaky*
 
@@ -64,11 +64,13 @@ Resolved during Plan 02 by manual browser verification or explicit out-of-v4 clo
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated `gsd-sdk query audit-open` verification or an explicit manual disposition.
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify.
-- [ ] Wave 0 covers all missing references.
-- [ ] No watch-mode flags.
-- [ ] Feedback latency <60s for the audit gate.
-- [ ] `nyquist_compliant: true` set in frontmatter after the final audit gate passes.
+- [x] All tasks have automated `gsd-sdk query audit-open` verification or an explicit manual disposition.
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify.
+- [x] Wave 0 covers all missing references.
+- [x] No watch-mode flags.
+- [x] Feedback latency <60s for the audit gate.
+- [x] `nyquist_compliant: true` set in frontmatter after the final audit gate passes.
 
-**Approval:** pending
+Final audit gate: gsd-sdk query audit-open — All artifact types clear. Safe to proceed.
+
+**Approval:** passed
