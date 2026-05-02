@@ -21,6 +21,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link — completed 2026-05-01
 - [x] **Phase 6: repair-evaluation-runner-semantics** - Gap closure for scenario command selection, real distance export flattening, and baseline regression threshold semantics — completed 2026-05-01
 - [x] **Phase 7: align-evaluation-action-mode-contract** - Gap closure for CLI action-mode support/rejection behavior and reproducible action-mode metadata — completed 2026-05-02
+- [ ] **Phase 8: locomotion-controller-seam-cleanup** - Cleanup for multi-robot controller seam consistency and future-controller action-mode metadata — planned
+- [ ] **Phase 9: milestone-closeout-hygiene** - Cleanup for validation metadata and pre-close artifact audit items before formal v4.0 archive — planned
 
 ## Phase Details
 
@@ -215,10 +217,44 @@ Plans:
 
 **Research flag**: light
 
+### Phase 8: locomotion-controller-seam-cleanup
+**Goal**: Resolve the v4.0 audit tech debt around multi-robot controller seam consistency and future-controller action-mode metadata.
+**Depends on**: Phase 7
+**Requirements**: LOC-CTRL-04, LOC-CTRL-03, LOC-REPORT-02
+**Gap Closure:** Closes tech-debt items from `.planning/v4.0-MILESTONE-AUDIT.md` for multi-robot controller abstraction and WBC placeholder metadata.
+**Success Criteria** (what must be TRUE):
+  1. MultiRobotBridge either uses the shared controller registry/dispatch seam equivalently to the single bridge or documents/tests a deliberate platform-runtime boundary.
+  2. Controller output validation and indexed control application remain covered for multi-robot bridge behavior.
+  3. WBC placeholder capability metadata no longer implies a runnable v4.0 env action mode that does not exist, or docs explicitly mark the future action contract as undefined/deferred.
+  4. Controller-family docs and registry tests agree on placeholder action-mode vocabulary.
+**Plans**: 0 plans
+Plans:
+
+- [ ] Plan with `/gsd-plan-phase 8`.
+
+**Research flag**: light
+
+### Phase 9: milestone-closeout-hygiene
+**Goal**: Clean up milestone governance metadata and open pre-close artifacts so `/gsd-complete-milestone` can run without acknowledged deferred items.
+**Depends on**: Phase 8
+**Requirements**: LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01
+**Gap Closure:** Closes v4.0 audit validation/Nyquist metadata debt and the open artifact audit items blocking milestone closeout.
+**Success Criteria** (what must be TRUE):
+  1. Phase 1, 2, 3, and 6 validation files accurately reflect current verification status, Wave 0 state, and Nyquist compliance.
+  2. Open debug sessions `point-cloud-below-ground`, `point-cloud-rotation`, and `voxel-becomes-pointcloud-closeup` are resolved, closed, or explicitly moved out of the v4.0 closeout path.
+  3. Incomplete quick-task artifact records are repaired, closed, or explicitly moved out of the v4.0 closeout path.
+  4. `gsd-sdk query audit-open` returns no open items that block milestone closure.
+**Plans**: 0 plans
+Plans:
+
+- [ ] Plan with `/gsd-plan-phase 9`.
+
+**Research flag**: light
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -227,8 +263,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
-| 6. repair-evaluation-runner-semantics | 3/3 | Complete | 2026-05-01 |
+| 6. repair-evaluation-runner-semantics | 5/5 | Complete | 2026-05-01 |
 | 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
+| 8. locomotion-controller-seam-cleanup | 0/0 | Planned | - |
+| 9. milestone-closeout-hygiene | 0/0 | Planned | - |
 
 ## Requirement Coverage
 
@@ -241,11 +279,13 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase 5 | LOC-REPORT-01, LOC-REPORT-02, LOC-REPORT-03 |
 | Phase 6 | LOC-METRICS-05, LOC-EVAL-01, LOC-EVAL-02, LOC-EVAL-04 |
 | Phase 7 | LOC-ENV-04, LOC-EVAL-03 |
+| Phase 8 | LOC-CTRL-04, LOC-CTRL-03, LOC-REPORT-02 |
+| Phase 9 | LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, LOC-EVAL-01 |
 
 **Coverage:** 20/20 active requirements mapped ✓
 **Orphans:** none
-**Duplicates:** none
+**Duplicates:** cleanup phases intentionally reference already satisfied requirements to close audit tech debt.
 
 ## Next Step
 
-Run `/gsd-complete-milestone` when ready to formally close v4.0.
+Run `/gsd-plan-phase 8` to plan the controller seam cleanup phase before formal v4.0 closure.

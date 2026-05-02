@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: milestone_complete
-stopped_at: v4.0 ready to complete
-last_updated: "2026-05-02T14:24:34Z"
-last_activity: 2026-05-02 -- Phase 07 verified passed; v4.0 milestone complete
+status: cleanup_planned
+stopped_at: Phase 08 ready to plan
+last_updated: "2026-05-02T15:17:57Z"
+last_activity: 2026-05-02 -- v4.0 audit routed as tech debt; cleanup phases 08-09 added before milestone closure
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 7
   total_plans: 30
   completed_plans: 30
-  percent: 100
+  percent: 78
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** v4.0 milestone complete — ready for formal closure
+**Current focus:** v4.0 cleanup phases 08-09 before formal closure
 
 ## Current Position
 
-Phase: 07
-Plan: 3 of 3
-Status: Milestone complete
-Last activity: 2026-05-02 -- Phase 07 verified passed; v4.0 milestone complete
+Phase: 08
+Plan: not planned
+Status: Cleanup phases planned
+Last activity: 2026-05-02 -- v4.0 audit routed as tech debt; phases 08-09 added before milestone closure
 
-Progress: [██████████] 100%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -69,11 +69,13 @@ Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim
 - 2026-04-30: v4.0 milestone started — Benchmarkable Locomotion Environment, 5 phases, 20 requirements, 100% coverage
 - 2026-04-30: Phase 2 completed — controller protocol/registry, analytical trot adapter, unavailable future-controller placeholders, env/bridge controller seam, clean code review, and verification passed.
 - 2026-05-01: v4.0 milestone completed — locomotion benchmark env, controller seams, metrics, evaluation runner, docs, and comparison matrix verified.
+- 2026-05-02: v4.0 completion paused after refreshed audit routed as tech debt; phases 08-09 added for controller seam cleanup and milestone closeout hygiene.
 
 ### Pending Todos
 
-- Address advisory Phase 5 code-review warnings if desired: `.planning/phases/05-harness-docs-and-comparison-matrix/05-REVIEW.md`.
-- Run `/gsd-complete-milestone` when ready to close v4.0 formally.
+- Plan and execute Phase 08: locomotion-controller-seam-cleanup.
+- Plan and execute Phase 09: milestone-closeout-hygiene.
+- Re-run `/gsd-audit-milestone` after phases 08-09, then `/gsd-complete-milestone v4.0` when clean.
 
 ### Blockers/Concerns
 
