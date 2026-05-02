@@ -1,30 +1,24 @@
 ---
 phase: 07-align-evaluation-action-mode-contract
-verified: 2026-05-02T06:12:18Z
-status: gaps_found
-score: 6/7 must-haves verified
+verified: 2026-05-02T14:24:34Z
+status: passed
+score: 8/8 must-haves verified
 overrides_applied: 0
-gaps:
-  - truth: "velocity_command, joint_position, and residual_baseline CLI paths either generate actions matching their env action spaces or fail fast with actionable errors"
-    status: failed
-    reason: "Direct --action-mode CLI rejection works, but --matrix-config scalar values are overwritten by argparse defaults; a config with action_mode=joint_position runs as velocity_command, exits 0, and writes artifacts instead of failing fast."
-    artifacts:
-      - path: "src/main.py"
-        issue: "run_eval_locomotion_mode rebuilds EvaluationMatrix with args.action_mode/default scalar args, ignoring matrix-config action_mode/max_episode_steps/sim_steps_per_frame/heightfield_size when flags are absent."
-      - path: "tests/test_main_args.py"
-        issue: "No CLI-level regression proves matrix-config action_mode is honored before env construction/artifact creation."
-    missing:
-      - "Use None parser defaults for scalar CLI overrides or otherwise distinguish absent flags from explicit overrides."
-      - "Preserve loaded matrix-config scalar values unless the user explicitly supplies a CLI override."
-      - "Add regression for eval-locomotion --matrix-config with action_mode=joint_position/residual_baseline proving fail-fast/no-artifact behavior."
+re_verification:
+  previous_status: gaps_found
+  previous_score: 6/7
+  gaps_closed:
+    - "Matrix-config action_mode and scalar values are preserved unless CLI scalar overrides are explicit, so unsupported matrix-config modes now fail fast before artifacts."
+  gaps_remaining: []
+  regressions: []
 ---
 
 # Phase 7: align-evaluation-action-mode-contract Verification Report
 
 **Phase Goal:** Close milestone audit gaps in CLI action-mode behavior so evaluation either emits valid actions for each supported mode or rejects unsupported modes before misleading runs/artifacts are produced.
-**Verified:** 2026-05-02T06:12:18Z
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-05-02T14:24:34Z
+**Status:** passed
+**Re-verification:** Yes — after gap closure
 
 ## Goal Achievement
 
@@ -32,88 +26,85 @@ gaps:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | The evaluation runner contract for non-default action modes is explicit and enforced before environment stepping. | VERIFIED | `src/locomotion/evaluation.py:31` defines `_EVALUATOR_RUNNABLE_ACTION_MODES = (ACTION_MODE_VELOCITY,)`; `validate_evaluation_matrix()` checks `available_action_modes()` then rejects non-runnable supported modes at lines 158-168 before `run_evaluation_matrix()` prepares the run dir or constructs envs at lines 227-245. |
-| 2 | `velocity_command` evaluation still constructs envs, steps actions matching its env action space, and preserves Phase 6 same-index command/export semantics. | VERIFIED | `run_evaluation_matrix()` builds step actions from `_action_from_command_context()` at lines 258-264 as 3-value velocity commands; `tests/locomotion/test_locomotion_evaluation_runner.py:313-338` asserts captured fake-env step actions exactly match same-index `step_rows[*]["commanded_velocity"]`. |
-| 3 | `velocity_command`, `joint_position`, and `residual_baseline` CLI paths either generate actions matching their env action spaces or fail fast with actionable errors. | FAILED | Direct `--action-mode joint_position` exits non-zero before output creation, but the matrix-config CLI path is broken: a JSON config with `"action_mode":"joint_position"` exited 0 and wrote `manifest.json`, `steps.jsonl`, `episodes.csv`, `summary.json`, and `comparison.md`. Root cause: `src/main.py:300-307` overwrites loaded matrix config scalars with argparse defaults such as `args.action_mode == "velocity_command"`. |
-| 4 | Exported metadata records only action modes that were actually used for completed runs. | VERIFIED | `_base_row()` includes `"action_mode": cell["action_mode"]` at `src/locomotion/evaluation.py:426-433`, feeding step rows, episode CSV rows, and manifest run rows; `_build_manifest()` records top-level `action_mode` and `validated_cells` at lines 610-638. `tests/locomotion/test_locomotion_evaluation_exports.py:230-248` checks manifest, validated cells, runs, JSONL steps, and CSV episodes all record `velocity_command`. |
-| 5 | Rejected action modes fail before env construction and before artifact writing in the evaluation library path. | VERIFIED | `run_evaluation_matrix()` calls `validate_evaluation_matrix()` before `_prepare_run_dir()` at `src/locomotion/evaluation.py:227-230`. Runner tests at `tests/locomotion/test_locomotion_evaluation_runner.py:170-212` assert unknown, `joint_position`, and `residual_baseline` leave `calls == []` and `tmp_path` empty. Export tests at `tests/locomotion/test_locomotion_evaluation_exports.py:251-267` assert rejected modes write no artifacts. |
-| 6 | CLI help/docs match the implemented evaluation action-mode contract. | VERIFIED with warning | `src/main.py:137-145` help says `velocity_command is the evaluator-runnable mode` and non-default modes are env-supported fail-fast seams; docs at `docs/locomotion-benchmark.md:37-43` state the same and list all three modes. Tests at `tests/test_main_args.py:267-286` and `tests/test_locomotion_benchmark_docs.py:110-117` guard this wording. Warning: docs line 37 has broken inline-code markup noted by review. |
-| 7 | LOC-EVAL-03 metadata contains reproducibility fields including git commit, controller id, scenario id, seed, environment config, and action mode. | VERIFIED | `src/locomotion/evaluation.py:617-638` builds manifest with `git_commit`, `matrix`, `environment_config`, top-level `action_mode`, `runs`, and `validated_cells`; run/cell rows include `controller_id`, `scenario_id`, `seed`, and `action_mode` through `_base_row()`. Export tests cover manifest metadata at `tests/locomotion/test_locomotion_evaluation_exports.py:120-145` and action mode at lines 230-248. |
+| 1 | The evaluation runner contract for non-default action modes is explicit and enforced before environment stepping. | VERIFIED | `src/locomotion/evaluation.py:31` defines `_EVALUATOR_RUNNABLE_ACTION_MODES = (ACTION_MODE_VELOCITY,)`; `validate_evaluation_matrix()` checks `available_action_modes()` then rejects non-runnable supported modes at `src/locomotion/evaluation.py:158-168`. `run_evaluation_matrix()` calls validation before `_prepare_run_dir()` or env construction at `src/locomotion/evaluation.py:227-245`. |
+| 2 | `velocity_command`, `joint_position`, and `residual_baseline` CLI paths either generate actions matching their env action spaces or fail fast with actionable errors. | VERIFIED | Env spaces for all three modes are implemented in `src/locomotion/actions.py:71-87` and guarded by `tests/locomotion/test_argus_go2_env_action_modes.py:33-63`. Evaluation only runs `velocity_command`; validation rejects `joint_position`/`residual_baseline` with actionable messages before side effects (`src/locomotion/evaluation.py:164-168`). Direct CLI and matrix-config paths now preserve/reject correctly: `src/main.py:300-308`, `tests/test_main_args.py:305-345`. Spot-check: matrix-config `joint_position` exited `status=1`, `out_exists=no`, and stderr included the runnable-mode/rejected-mode message. |
+| 3 | Exported metadata records only action modes that were actually used for completed runs. | VERIFIED | `_base_row()` includes `"action_mode": cell["action_mode"]` at `src/locomotion/evaluation.py:426-433`; `_build_manifest()` records top-level `action_mode`, `environment_config`, `runs`, and `validated_cells` at `src/locomotion/evaluation.py:610-638`. Rejected modes fail before `_write_artifacts()`, so no rejected-mode metadata is written. `tests/locomotion/test_locomotion_evaluation_exports.py:230-267` verifies completed `velocity_command` metadata and no-artifact rejection. |
+| 4 | CLI help/docs match the implemented evaluation action-mode contract. | VERIFIED | CLI help text in `src/main.py:137-145` says `velocity_command is the evaluator-runnable mode` and `joint_position and residual_baseline are env-supported seams`; docs state the same at `docs/locomotion-benchmark.md:37-43`. Tests guard both surfaces at `tests/test_main_args.py:283-302` and `tests/test_locomotion_benchmark_docs.py:110-117`. Spot-check help output contained all required fragments. |
+| 5 | Matrix-config scalar values are preserved unless the user explicitly supplies a CLI scalar override. | VERIFIED | Parser scalar defaults are `None` at `src/main.py:134-145`; `run_eval_locomotion_mode()` rebuilds `EvaluationMatrix` with `matrix.<field> if args.<field> is None else args.<field>` at `src/main.py:304-307`. `tests/test_main_args.py:348-427` verifies `residual_baseline`, max steps `7`, sim steps `8`, and heightfield size `9` survive absent CLI overrides. |
+| 6 | A matrix-config selecting `joint_position` or `residual_baseline` reaches evaluation validation and fails fast before artifact creation instead of silently running as `velocity_command`. | VERIFIED | `src/main.py:295-308` loads the JSON matrix and preserves `matrix.action_mode` unless `--action-mode` is explicit. `tests/test_main_args.py:305-345` exercises subprocess `python -m src.main eval-locomotion --matrix-config ... action_mode=joint_position` and asserts nonzero exit, actionable error text, and no output root. Manual spot-check produced `status=1` and `out_exists=no`. |
+| 7 | Direct CLI default behavior remains `velocity_command`, max episode steps `500`, sim steps per frame `10`, heightfield size `16`, and output root `outputs/locomotion-evals`. | VERIFIED | Parser uses `None` only as override sentinel while `run_eval_locomotion_mode()` falls back to `EvaluationMatrix()` defaults (`src/main.py:295-308`; `src/locomotion/evaluation.py:79-87`). `tests/test_main_args.py:238-250` verifies absent scalar args are `None` and output root remains `outputs/locomotion-evals`; `EvaluationMatrix` defaults provide `velocity_command`, `500`, `10`, `16`. |
+| 8 | Explicit CLI scalar overrides still override matrix-config values for `action_mode`, `max_episode_steps`, `sim_steps_per_frame`, and `heightfield_size`. | VERIFIED | The explicit-only merge expressions in `src/main.py:304-307` select `args.*` when non-`None`. `tests/test_main_args.py:429-509` parses `--action-mode velocity_command --max-episode-steps 11 --sim-steps-per-frame 12 --heightfield-size 13` over a fake matrix and asserts those exact override values reach `run_evaluation_matrix()`. |
 
-**Score:** 6/7 truths verified
+**Score:** 8/8 truths verified
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |---|---|---|---|
-| `src/locomotion/evaluation.py` | Fail-fast evaluator action-mode validation and mode-aware velocity-command action construction | VERIFIED | Exists, substantive, imports `ACTION_MODE_VELOCITY`/`available_action_modes`, validates action mode before side effects, preserves same-index velocity-command stepping. |
-| `tests/locomotion/test_locomotion_evaluation_runner.py` | Pre-side-effect rejection regressions and same-index action/export regression | VERIFIED | Contains tests for unknown/unsupported modes with `calls == []` and empty output root, plus same-index captured action assertions. |
-| `tests/locomotion/test_locomotion_evaluation_exports.py` | Completed-run metadata and no-artifact rejection regressions | VERIFIED | Contains completed metadata test and parametrized rejected-mode no-artifact test. |
-| `src/main.py` | Argparse help and CLI wiring for eval-locomotion action-mode contract | FAILED | Help text is present, but CLI matrix-config scalar merge ignores config `action_mode` and other scalar values by overwriting with parser defaults. |
-| `docs/locomotion-benchmark.md` | Canonical benchmark guide action-mode contract | VERIFIED with warning | Content states selected contract and matrix example uses `velocity_command`; inline-code markup on line 37 is malformed. |
-| `tests/test_main_args.py` | CLI help contract regression | PARTIAL | Help contract test exists, but missing matrix-config CLI regression for unsupported action-mode config. Also hardcodes a developer venv path in subprocess tests. |
-| `tests/test_locomotion_benchmark_docs.py` | Docs contract drift guard | VERIFIED | Content guards verify env-supported seam/fail-fast wording and all action modes. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | Fail-fast evaluator action-mode validation and completed-run metadata | VERIFIED | Exists and substantive. Imports `ACTION_MODE_VELOCITY`/`available_action_modes`, defines runnable-mode tuple, validates before `_prepare_run_dir()`, emits action-mode metadata only for validated cells/runs/rows. |
+| `/home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_runner.py` | Pre-side-effect rejection and same-index velocity-command regressions | VERIFIED | Contains unknown-mode and unsupported-mode tests at lines 170-212 with `calls == []` and empty output-root assertions; preserves executed action/row same-index checks at lines 313-338. |
+| `/home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_exports.py` | Completed-run action-mode metadata and no-artifact rejection regressions | VERIFIED | Lines 230-267 verify manifest/validated cells/runs/JSONL/CSV action-mode metadata and no artifacts for rejected modes. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | CLI help, explicit-only scalar merge, matrix-config wiring | VERIFIED | Parser scalar overrides default to `None`; output root default is unchanged; `run_eval_locomotion_mode()` loads matrix config and preserves scalar fields unless explicit CLI values are present. |
+| `/home/prannayag/pragnition/robotics/argus/tests/test_main_args.py` | CLI help, matrix-config fail-fast, scalar merge regressions | VERIFIED | Contains portable `sys.executable` subprocess tests, matrix-config no-artifact fail-fast test, parser sentinel test, matrix-preservation test, and explicit override test. No hardcoded `/home/prannayag/pragnition/robotics/argus/.venv/bin/python` path remains. |
+| `/home/prannayag/pragnition/robotics/argus/docs/locomotion-benchmark.md` | Canonical benchmark guide action-mode contract | VERIFIED | Lines 37-43 distinguish env-supported action modes from evaluator-runnable support; matrix JSON example uses `"action_mode": "velocity_command"` at line 77. Previous malformed inline-code issue is fixed. |
+| `/home/prannayag/pragnition/robotics/argus/tests/test_locomotion_benchmark_docs.py` | Docs contract drift guard | VERIFIED | Lines 110-117 assert current evaluation runs `velocity_command`, both non-default seams are mentioned, and docs include `env-supported seams` and `fail fast`. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| `src/locomotion/evaluation.py` | `src/locomotion/actions.py` | `available_action_modes` and `ACTION_MODE_VELOCITY` imported as authoritative env action-mode source | VERIFIED | Import at `src/locomotion/evaluation.py:16`; validation uses `available_action_modes()` at line 158. |
-| `src/locomotion/evaluation.py` | `tests/locomotion/test_locomotion_evaluation_runner.py` | Validation rejects before env factory is called | VERIFIED | Tests assert `calls == []` and empty `tmp_path` for invalid modes at lines 170-212. SDK pattern check false-negative was manually contradicted by file evidence. |
-| `src/locomotion/evaluation.py` | `tests/locomotion/test_locomotion_evaluation_exports.py` | Artifacts written only after completed velocity_command cells | VERIFIED | `run_evaluation_matrix()` validates before `_prepare_run_dir()`; export no-artifact test at lines 251-267. |
-| `src/main.py` | `src/locomotion/evaluation.py` | CLI args/matrix config build `EvaluationMatrix` then call `run_evaluation_matrix()` | FAILED | `src/main.py:295-308` loads matrix config but then overwrites `action_mode` and scalar runtime fields from argparse defaults before calling `run_evaluation_matrix()`, so matrix-config unsupported action modes bypass the fail-fast contract. |
-| `src/main.py` | `tests/test_main_args.py` | Help output contains exact runnable/deferred wording | VERIFIED | Test at `tests/test_main_args.py:267-286` checks `--action-mode`, runnable mode wording, and env-supported seam wording. |
-| `docs/locomotion-benchmark.md` | `tests/test_locomotion_benchmark_docs.py` | Content guard distinguishes env modes from evaluator-runnable mode | VERIFIED | Test at `tests/test_locomotion_benchmark_docs.py:110-117` checks required wording. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | `/home/prannayag/pragnition/robotics/argus/src/locomotion/actions.py` | Imports `ACTION_MODE_VELOCITY` and `available_action_modes` | WIRED | `src/locomotion/evaluation.py:16`; validation uses authoritative env mode list at lines 158-168. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | `/home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_runner.py` | Rejection before env factory construction | WIRED | SDK key-link pattern check had a false negative for `calls == []`, but manual file evidence verifies `calls == []` and empty output-root assertions at `tests/locomotion/test_locomotion_evaluation_runner.py:186-212`. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | `/home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_exports.py` | No-artifact rejection and completed metadata tests | WIRED | `tests/locomotion/test_locomotion_evaluation_exports.py:230-267` directly exercises `run_evaluation_matrix()`. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | Lazy imports, `load_matrix_config()`, `EvaluationMatrix`, and `run_evaluation_matrix()` | WIRED | `src/main.py:280-316` imports evaluation functions, loads matrix config, merges defaults/overrides, builds `EvaluationRunConfig`, and calls `run_evaluation_matrix()`. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | `/home/prannayag/pragnition/robotics/argus/tests/test_main_args.py` | Subprocess and fake-module CLI tests | WIRED | `tests/test_main_args.py:253-345` uses `sys.executable -m src.main`; lines 348-509 monkeypatch `src.locomotion.evaluation` to assert exact matrix values. |
+| `/home/prannayag/pragnition/robotics/argus/docs/locomotion-benchmark.md` | `/home/prannayag/pragnition/robotics/argus/tests/test_locomotion_benchmark_docs.py` | Content guard checks action-mode contract | WIRED | Docs text at line 37 is guarded by test assertions at lines 110-117. |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |---|---|---|---|---|
-| `src/locomotion/evaluation.py` | `matrix.action_mode` / `cell["action_mode"]` | `EvaluationMatrix` from CLI/config; `validate_evaluation_matrix()` | Yes for library/direct CLI path | FLOWING: validation rejects unsupported/unknown modes and completed rows propagate `cell["action_mode"]`. |
-| `src/main.py` | `matrix.action_mode` from `load_matrix_config()` | JSON matrix config in `--matrix-config` workflow | No | HOLLOW/OVERWRITTEN: config value is loaded at `src/main.py:295-296` then discarded at line 304 by `action_mode=args.action_mode`, whose parser default is `velocity_command`. |
-| `src/main.py` | Help text for `--action-mode` | argparse subparser | Yes | FLOWING: help command prints exact contract wording. |
-| `docs/locomotion-benchmark.md` | Action-mode contract wording | Markdown source consumed by docs tests | Yes | FLOWING with markup warning: content is present but line 37 has malformed inline-code formatting. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | `matrix.action_mode`, `matrix.max_episode_steps`, `matrix.sim_steps_per_frame`, `matrix.heightfield_size` | `load_matrix_config(Path(args.matrix_config))` or `EvaluationMatrix()` defaults, then explicit-only CLI merge | Yes | FLOWING: JSON matrix scalar values are retained when CLI args are `None`; tests capture actual matrix passed to evaluation. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | `cell["action_mode"]` | Validated `EvaluationMatrix.action_mode` through `validate_evaluation_matrix()` | Yes | FLOWING: unsupported modes fail before side effects; completed `velocity_command` cells propagate into env config, manifest, JSONL, and CSV rows. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | CLI help text | argparse subparser | Yes | FLOWING: subprocess help output contains exact contract wording. |
+| `/home/prannayag/pragnition/robotics/argus/docs/locomotion-benchmark.md` | Action-mode contract wording | Markdown source consumed by docs tests | Yes | FLOWING: text and matrix example are present and guarded by content tests. |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Phase test gate | `uv run python -m pytest tests/locomotion/test_locomotion_evaluation_runner.py tests/locomotion/test_locomotion_evaluation_exports.py tests/locomotion/test_argus_go2_env_action_modes.py tests/test_main_args.py tests/test_locomotion_benchmark_docs.py -q` | `73 passed in 17.35s` | PASS |
-| Library validation rejects action modes correctly | `uv run python - <<'PY' ... validate_evaluation_matrix(EvaluationMatrix(action_mode=mode)) ... PY` | `velocity_command OK`; `joint_position` and `residual_baseline` ValueError with actionable message; `not_a_mode` unknown-mode ValueError | PASS |
-| Direct CLI flag rejects unsupported action mode before artifacts | `uv run python -m src.main eval-locomotion --controller analytical_trot --scenario flat_ground --seed 101 --action-mode joint_position --output-root "$tmpdir/out"` | Exit 1; no output directory created | PASS |
-| Matrix-config CLI rejects unsupported action mode before artifacts | `uv run python -m src.main eval-locomotion --matrix-config matrix.json(action_mode=joint_position) --output-root "$tmpdir/out"` | Exit 0; output dir created with all artifacts | FAIL |
-| CLI help exposes action-mode contract | `uv run python -m src.main eval-locomotion --help` | Output includes `--action-mode`, `velocity_command is the evaluator-runnable mode`, and non-default env-supported fail-fast wording | PASS |
+| Focused Phase 7 gate | `uv run python -m pytest /home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_runner.py /home/prannayag/pragnition/robotics/argus/tests/locomotion/test_locomotion_evaluation_exports.py /home/prannayag/pragnition/robotics/argus/tests/locomotion/test_argus_go2_env_action_modes.py /home/prannayag/pragnition/robotics/argus/tests/test_main_args.py /home/prannayag/pragnition/robotics/argus/tests/test_locomotion_benchmark_docs.py -q` | `77 passed in 42.39s` | PASS |
+| Matrix-config unsupported mode fails before artifacts | Temporary JSON matrix with `action_mode=joint_position`; `uv run python -m src.main eval-locomotion --matrix-config ... --output-root ...` | Exit `1`; output root did not exist; stderr contained runnable-mode and requested-mode message | PASS |
+| Evaluation validation accepts/rejects action modes | Python snippet calling `validate_evaluation_matrix(EvaluationMatrix(action_mode=mode))` for all modes | `velocity_command OK`; `joint_position` and `residual_baseline` ValueError with actionable message; unknown mode ValueError with available env modes | PASS |
+| CLI help exposes action-mode contract | `uv run python -m src.main eval-locomotion --help | grep -E -- '--action-mode|velocity_command is the evaluator-runnable mode|joint_position and residual_baseline are env-supported seams'` | All required fragments printed | PASS |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |---|---|---|---|---|
-| LOC-ENV-04 | `07-01-PLAN.md`, `07-02-PLAN.md`; `.planning/REQUIREMENTS.md:18` | Developer can select action modes for velocity command, joint-position target, and residual-over-baseline control without changing the environment API. | PARTIAL / BLOCKED FOR PHASE GOAL | Environment action modes exist in `src/locomotion/actions.py:12-63` and evaluation explicitly supports/rejects them. However CLI matrix-config selection of `joint_position`/`residual_baseline` is silently ignored, so one documented selection path fails the phase goal. |
-| LOC-EVAL-03 | `07-01-PLAN.md`, `07-02-PLAN.md`; `.planning/REQUIREMENTS.md:39` | Evaluation stores enough metadata to reproduce a run: git commit, controller id, scenario id, seed, environment config, and action mode. | SATISFIED | Manifest construction at `src/locomotion/evaluation.py:617-638` and row metadata via `_base_row()` include required fields; tests verify manifest metadata and action-mode propagation. |
+| LOC-ENV-04 | `07-01-PLAN.md`, `07-02-PLAN.md`, `07-03-PLAN.md`; `/home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md:18` | Developer can select action modes for velocity command, joint-position target, and residual-over-baseline control without changing the environment API. | SATISFIED | Env action modes and action spaces are implemented in `src/locomotion/actions.py:12-87`; `ArgusGo2Env` public reset/step API supports all three modes as guarded by `tests/locomotion/test_argus_go2_env_action_modes.py:33-63`. Evaluation/CLI now either runs `velocity_command` or rejects supported-but-unevaluable modes before artifacts, including matrix-config selection. |
+| LOC-EVAL-03 | `07-01-PLAN.md`, `07-02-PLAN.md`, `07-03-PLAN.md`; `/home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md:39` | Evaluation stores enough metadata to reproduce a run: git commit, controller id, scenario id, seed, environment config, and action mode. | SATISFIED | `_build_manifest()` records `git_commit`, `matrix`, `environment_config`, `action_mode`, `runs`, and `validated_cells` at `src/locomotion/evaluation.py:617-638`; `_base_row()` records controller/scenario/seed/action_mode at lines 426-433; export tests verify manifest and action-mode propagation. |
 
-No orphaned Phase 7 requirements were found: `.planning/REQUIREMENTS.md:80` maps LOC-ENV-04 to Phase 7 and line 92 maps LOC-EVAL-03 to Phase 7; both appear in PLAN frontmatter.
+No orphaned Phase 7 requirements were found. `/home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md:80` maps LOC-ENV-04 to Phase 7 and line 92 maps LOC-EVAL-03 to Phase 7; all three Phase 7 plans list both IDs in frontmatter.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
-| `src/main.py` | 300-307 | Matrix config scalar fields overwritten by argparse defaults | BLOCKER | Causes unsupported action_mode in JSON matrix config to run as `velocity_command`, producing misleading artifacts. |
-| `docs/locomotion-benchmark.md` | 37 | Broken inline-code markup around contract sentence | WARNING | User-facing docs render the contract awkwardly; does not change executable behavior but weakens documentation quality. |
-| `tests/test_main_args.py` | 241-244, 270-273 | Hardcoded absolute `.venv/bin/python` path | WARNING | Tests are non-portable outside this developer checkout; current gate passed in this environment. |
-| `docs/locomotion-benchmark.md` | 119-122 | `placeholder` / `not currently` wording | INFO | Intentional v4.0 scope boundary for unavailable controller families, not an implementation stub. |
-| `src/locomotion/evaluation.py` | 198, 231-247, 493-500 | Empty list/dict initializers and empty returns | INFO | Legitimate accumulator/default initializers; populated by validation/execution paths, not user-visible stubs. |
+| `/home/prannayag/pragnition/robotics/argus/docs/locomotion-benchmark.md` | 119-122 | `placeholder` / `not implemented` scope text | INFO | Intentional documentation of unavailable deferred controller families; not a user-visible implementation stub for Phase 7. |
+| `/home/prannayag/pragnition/robotics/argus/src/locomotion/evaluation.py` | 198, 231-247, 493-500 | Empty list/dict initializers and empty returns | INFO | Legitimate accumulators/default serializable sequences populated by execution paths; not stubs. |
+| `/home/prannayag/pragnition/robotics/argus/tests/test_main_args.py` | 352-471 | Empty capture dictionaries and fake result rows | INFO | Test scaffolding for asserting CLI merge behavior; not product behavior. |
+| `/home/prannayag/pragnition/robotics/argus/src/main.py` | 339, 466, 571, 694 | Empty dict initializers / platform default return | INFO | Existing runtime initialization/default behavior unrelated to Phase 7 action-mode contract. |
 
 ### Human Verification Required
 
-None. The phase goal is programmatically checkable through library validation, CLI subprocess behavior, artifact existence, and static docs/help content.
+None. The phase goal is programmatically checkable through validation order, CLI subprocess behavior, artifact filesystem checks, metadata contents, and static docs/help guards.
 
 ### Gaps Summary
 
-The evaluation library layer is mostly correct: it validates action modes before side effects, only runs `velocity_command`, rejects known-but-unsupported env seams with actionable errors, and records `action_mode` in completed artifacts. Direct CLI `--action-mode joint_position` also fails fast without artifacts.
-
-The phase goal is still not achieved because the documented `--matrix-config` CLI path silently ignores scalar values from JSON configs. A config that selects `joint_position` should fail fast before env construction/artifact creation; instead `src/main.py` overwrites it with the parser default `velocity_command`, runs successfully, and writes a full artifact set. This is a blocker because the phase goal explicitly targets CLI action-mode behavior and avoiding misleading runs/artifacts.
+No blocking gaps remain. The previous verification blocker is closed: matrix-config scalar values are no longer overwritten by argparse defaults, unsupported matrix-config action modes now reach evaluation validation, and rejected modes fail before output-root/artifact creation. CLI help and benchmark documentation match the implemented contract, completed artifacts record only validated `velocity_command` runs, and LOC-ENV-04 plus LOC-EVAL-03 are accounted for against `/home/prannayag/pragnition/robotics/argus/.planning/REQUIREMENTS.md`.
 
 ---
 
-_Verified: 2026-05-02T06:12:18Z_
+_Verified: 2026-05-02T14:24:34Z_
 _Verifier: Claude (gsd-verifier)_
