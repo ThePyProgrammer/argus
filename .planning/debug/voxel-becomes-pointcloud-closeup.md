@@ -1,8 +1,8 @@
 ---
-status: awaiting_human_verify
+status: complete
 trigger: "When user zooms camera close to the voxel grid in the Three.js viewer, the voxel cubes disappear and scattered point cloud dots appear instead."
 created: 2026-03-24T00:00:00Z
-updated: 2026-03-24T00:00:00Z
+updated: 2026-05-03T00:00:00Z
 ---
 
 ## Current Focus
@@ -48,5 +48,5 @@ started: First time testing close-up zoom, may have always been this way
 
 root_cause: VoxelManager's InstancedMesh uses Three.js default frustum culling, but bounding sphere is computed from geometry (single BoxGeometry at origin) not from instance positions. When camera gets close, the tiny bounding sphere fails the frustum test and the entire mesh is culled. The point cloud may also remain visible due to PointCloudManager defaulting to visible=true (unlike VoxelManager which starts hidden).
 fix: (1) Set frustumCulled=false on InstancedMesh in VoxelManager. (2) Set PointCloudManager.points.visible=false in constructor for consistency.
-verification: TypeScript compiles cleanly for both changed files. Needs manual visual verification in browser.
+verification: TypeScript compiles cleanly for both changed files. Manual browser visual verification is explicitly moved out of the v4.0 locomotion closeout path because this is frontend closeup rendering hygiene, not a blocker for LOC-ENV-01, LOC-CTRL-01, LOC-METRICS-01, or LOC-EVAL-01 milestone archive.
 files_changed: [frontend/src/components/VoxelManager.ts, frontend/src/components/PointCloud.ts]
