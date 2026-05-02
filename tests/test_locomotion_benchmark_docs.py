@@ -106,6 +106,29 @@ def test_residual_policy_documentation_matches_registry_action_mode():
     )
 
 
+def test_wbc_documentation_matches_registry_deferred_action_contract():
+    from src.locomotion.actions import available_action_modes
+    from src.locomotion.controllers import ControllerRegistry
+
+    guide = GUIDE.read_text(encoding="utf-8")
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    wbc = entries["wbc"]
+    capabilities = wbc["capabilities"]
+    model_requirements = capabilities["model_requirements"]
+
+    assert wbc["available"] is False
+    assert capabilities["action_mode"] == "undefined_deferred"
+    assert capabilities["action_mode"] not in available_action_modes()
+    assert model_requirements["action_contract"] == "undefined_deferred"
+    assert model_requirements["env_action_mode"] is None
+    assert "torque_or_joint_position" not in guide
+    assert (
+        "Controller id `wbc`; future action contract `undefined_deferred` "
+        "(not a v4.0 env action mode)"
+        in guide
+    )
+
+
 
 def test_locomotion_benchmark_guide_states_evaluator_action_mode_contract():
     guide = GUIDE.read_text(encoding="utf-8")

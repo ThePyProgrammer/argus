@@ -155,6 +155,22 @@ def test_residual_placeholder_advertises_public_residual_baseline_action_mode():
     assert entries["residual_policy"]["available"] is False
 
 
+def test_wbc_placeholder_advertises_deferred_action_contract():
+    from src.locomotion.actions import available_action_modes
+    from src.locomotion.controllers import ControllerRegistry
+
+    entries = {entry["name"]: entry for entry in ControllerRegistry.list_controllers()}
+    wbc = entries["wbc"]
+    capabilities = wbc["capabilities"]
+    model_requirements = capabilities["model_requirements"]
+
+    assert wbc["available"] is False
+    assert capabilities["action_mode"] == "undefined_deferred"
+    assert capabilities["action_mode"] not in available_action_modes()
+    assert model_requirements["action_contract"] == "undefined_deferred"
+    assert model_requirements["env_action_mode"] is None
+
+
 
 def test_controller_registry_phase2_requirement_and_decision_coverage_is_explicit():
     """Pin LOC-CTRL-01/02/03 plus D-05/D-06/D-07/D-08 in one registry seam check."""
