@@ -207,8 +207,8 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 07-01-PLAN.md — Add test-first evaluator action-mode validation, unsupported-mode rejection before side effects, and completed-run metadata guards.
-- [ ] 07-02-PLAN.md — Update eval-locomotion help and benchmark docs to distinguish evaluator-runnable modes from env-supported seams.
+- [x] 07-01-PLAN.md — Add test-first evaluator action-mode validation, unsupported-mode rejection before side effects, and completed-run metadata guards.
+- [x] 07-02-PLAN.md — Update eval-locomotion help and benchmark docs to distinguish evaluator-runnable modes from env-supported seams.
 
 **Research flag**: light
 
