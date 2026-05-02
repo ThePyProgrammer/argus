@@ -250,8 +250,8 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 09-01-PLAN.md — Reconcile Phase 1/2/3/6 validation and Nyquist metadata with passed verification evidence.
-- [ ] 09-02-PLAN.md — Close debug-session and quick-task artifacts using scanner-readable statuses and evidence-backed disposition.
+- [x] 09-01-PLAN.md — Reconcile Phase 1/2/3/6 validation and Nyquist metadata with passed verification evidence.
+- [x] 09-02-PLAN.md — Close debug-session and quick-task artifacts using scanner-readable statuses and evidence-backed disposition.
 
 **Wave 2 *(blocked on Wave 1 completion)***
 - [ ] 09-03-PLAN.md — Finalize Phase 09 validation, STATE/ROADMAP bookkeeping, and clean audit-open gate.
