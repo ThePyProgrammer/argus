@@ -246,10 +246,15 @@ Plans:
   2. Open debug sessions `point-cloud-below-ground`, `point-cloud-rotation`, and `voxel-becomes-pointcloud-closeup` are resolved, closed, or explicitly moved out of the v4.0 closeout path.
   3. Incomplete quick-task artifact records are repaired, closed, or explicitly moved out of the v4.0 closeout path.
   4. `gsd-sdk query audit-open` returns no open items that block milestone closure.
-**Plans**: 0 plans
+**Plans**: 3 plans
 Plans:
 
-- [ ] Plan with `/gsd-plan-phase 9`.
+**Wave 1**
+- [ ] 09-01-PLAN.md — Reconcile Phase 1/2/3/6 validation and Nyquist metadata with passed verification evidence.
+- [ ] 09-02-PLAN.md — Close debug-session and quick-task artifacts using scanner-readable statuses and evidence-backed disposition.
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 09-03-PLAN.md — Finalize Phase 09 validation, STATE/ROADMAP bookkeeping, and clean audit-open gate.
 
 **Research flag**: light
 
@@ -268,7 +273,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. repair-evaluation-runner-semantics | 5/5 | Complete | 2026-05-01 |
 | 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
 | 8. locomotion-controller-seam-cleanup | 0/2 | Planned | - |
-| 9. milestone-closeout-hygiene | 0/0 | Planned | - |
+| 9. milestone-closeout-hygiene | 0/3 | Planned | - |
 
 ## Requirement Coverage
 
