@@ -53,7 +53,6 @@ from src.control.waypoint_runner import WaypointRunner
 from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
 from src.exploration.config import ExplorationConfig
 from src.exploration.exploration_loop import ExplorationLoop
-from src.mcp.server import configure as configure_mcp, mcp_endpoint
 from src.slam.registry import SLAMRegistry
 
 logger = logging.getLogger(__name__)
@@ -93,6 +92,7 @@ def parse_args() -> argparse.Namespace:
     eval_parser = subparsers.add_parser(
         "eval-locomotion",
         help="Run offline locomotion controller/scenario/seed evaluations",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     eval_parser.add_argument(
         "--controller",
@@ -134,7 +134,15 @@ def parse_args() -> argparse.Namespace:
     eval_parser.add_argument("--max-episode-steps", type=int, default=500)
     eval_parser.add_argument("--sim-steps-per-frame", type=int, default=10)
     eval_parser.add_argument("--heightfield-size", type=int, default=16)
-    eval_parser.add_argument("--action-mode", default="velocity_command")
+    eval_parser.add_argument(
+        "--action-mode",
+        default="velocity_command",
+        help=(
+            "Action mode for evaluation. velocity_command is the evaluator-runnable mode; "
+            "joint_position and residual_baseline are env-supported seams that fail fast "
+            "in eval-locomotion until explicit action sources exist."
+        ),
+    )
     eval_parser.add_argument("--max-matrix-runs", type=int, default=1000)
     eval_parser.add_argument(
         "--allow-locomotion-failures",
@@ -580,6 +588,8 @@ def run_web_mode(args: argparse.Namespace) -> None:
             robot.octomap.reset()
         coordinator.reset_merger()
         logger.info("[cloud config] SLAM and OctoMap reset for all robots")
+
+    from src.mcp.server import configure as configure_mcp, mcp_endpoint
 
     configure_mcp(coordinator, list(config.robot_ids))
 

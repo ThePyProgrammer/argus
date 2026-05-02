@@ -106,7 +106,8 @@ def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
         staticmethod(lambda **kwargs: SimpleNamespace(**kwargs)),
     )
     monkeypatch.setattr(main_module, "Coordinator", _FakeCoordinator)
-    monkeypatch.setattr(main_module, "configure_mcp", lambda coordinator, robot_ids: None)
+    mcp_stub = SimpleNamespace(configure=lambda coordinator, robot_ids: None, mcp_endpoint=None)
+    monkeypatch.setitem(sys.modules, "src.mcp.server", mcp_stub)
     monkeypatch.setattr(main_module, "create_app", fake_create_app)
     monkeypatch.setattr(main_module.subprocess, "run", lambda *args, **kwargs: None)
 
@@ -174,7 +175,8 @@ def test_web_mode_registers_builtin_slam_backends_before_robot_creation(monkeypa
     )
     monkeypatch.setattr(main_module.RobotInstance, "create", staticmethod(fake_robot_create))
     monkeypatch.setattr(main_module, "Coordinator", _FakeCoordinator)
-    monkeypatch.setattr(main_module, "configure_mcp", lambda coordinator, robot_ids: None)
+    mcp_stub = SimpleNamespace(configure=lambda coordinator, robot_ids: None, mcp_endpoint=None)
+    monkeypatch.setitem(sys.modules, "src.mcp.server", mcp_stub)
     monkeypatch.setattr(main_module, "create_app", fake_create_app)
     monkeypatch.setattr(main_module.subprocess, "run", lambda *args, **kwargs: None)
 
