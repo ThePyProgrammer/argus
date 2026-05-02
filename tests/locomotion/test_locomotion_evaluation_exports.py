@@ -10,6 +10,8 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from src.locomotion.evaluation import (
     EvaluationMatrix,
     EvaluationRunConfig,
@@ -223,6 +225,41 @@ def test_failed_episode_still_writes_all_artifacts_before_nonzero_exit(tmp_path)
         rows = list(csv.DictReader(fp))
     assert rows[0]["success"] == "False"
     assert rows[0]["failure_reason"] == "fell"
+
+
+def test_completed_velocity_command_run_records_action_mode_metadata(tmp_path):
+    result = run_evaluation_matrix(
+        _single_cell_matrix(),
+        EvaluationRunConfig(output_root=tmp_path),
+        env_factory=_factory(),
+    )
+
+    manifest = _read_json(result.run_dir / "manifest.json")
+    assert manifest["action_mode"] == "velocity_command"
+    assert all(cell["action_mode"] == "velocity_command" for cell in manifest["validated_cells"])
+    assert all(run["action_mode"] == "velocity_command" for run in manifest["runs"])
+
+    step_rows = [json.loads(line) for line in (result.run_dir / "steps.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert step_rows
+    assert all(row["action_mode"] == "velocity_command" for row in step_rows)
+
+    with (result.run_dir / "episodes.csv").open(newline="", encoding="utf-8") as fp:
+        rows = list(csv.DictReader(fp))
+    assert rows[0]["action_mode"] == "velocity_command"
+
+
+def test_rejected_action_mode_writes_no_artifacts(tmp_path):
+    with pytest.raises(
+        ValueError,
+        match="argus eval-locomotion currently runs action_mode='velocity_command'",
+    ):
+        run_evaluation_matrix(
+            EvaluationMatrix(action_mode="joint_position"),
+            EvaluationRunConfig(output_root=tmp_path),
+            env_factory=_factory(),
+        )
+
+    assert not any(tmp_path.iterdir())
 
 
 def test_regenerate_comparison_reads_saved_artifacts_without_env(tmp_path, monkeypatch):
