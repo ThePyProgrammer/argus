@@ -203,12 +203,15 @@ Plans:
   2. `velocity_command`, `joint_position`, and `residual_baseline` CLI paths either generate actions matching their env action spaces or fail fast with actionable errors.
   3. Exported metadata records only action modes that were actually used for completed runs.
   4. CLI help/docs match the implemented evaluation action-mode contract.
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
 
 **Wave 1**
 - [x] 07-01-PLAN.md — Add test-first evaluator action-mode validation, unsupported-mode rejection before side effects, and completed-run metadata guards.
 - [x] 07-02-PLAN.md — Update eval-locomotion help and benchmark docs to distinguish evaluator-runnable modes from env-supported seams.
+
+**Wave 2 *(gap closure; blocked on Wave 1 completion)***
+- [ ] 07-03-PLAN.md — Preserve matrix-config scalar values unless CLI overrides are explicit, add CLI no-artifact regressions, and clean action-mode docs markup.
 
 **Research flag**: light
 
@@ -225,7 +228,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
 | 6. repair-evaluation-runner-semantics | 0/3 | Pending | — |
-| 7. align-evaluation-action-mode-contract | 0/2 | Pending | — |
+| 7. align-evaluation-action-mode-contract | 2/3 | Executing | — |
 
 ## Requirement Coverage
 
@@ -245,4 +248,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 ## Next Step
 
-Execute Phase 6 with `/gsd-execute-phase 6`, then plan Phase 7 with `/gsd-plan-phase 7`. Re-run `/gsd-audit-milestone` after Phases 6 and 7 are complete.
+Execute Phase 7 gap closure with `/gsd-execute-phase 7 --gaps-only`, then re-run `/gsd-verify-work 7`.
