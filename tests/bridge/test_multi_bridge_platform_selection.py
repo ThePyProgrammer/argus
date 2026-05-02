@@ -46,6 +46,9 @@ def test_set_velocity_preserves_existing_api():
 
 
 class _FakeAgibotLikePlatform:
+    def __init__(self):
+        self.created_controllers: dict[str, _FakeController] = {}
+
     metadata = types.SimpleNamespace(
         name="fake_agibot",
         model_dir="models/fake_agibot",
@@ -63,7 +66,9 @@ class _FakeAgibotLikePlatform:
         return np.array([0.0])
 
     def make_controller(self, robot_id):
-        return _FakeController()
+        controller = _FakeController()
+        self.created_controllers[robot_id] = controller
+        return controller
 
     def extract_state(self, model, data, qpos_start, sim_time):
         return _fake_state(sim_time)
@@ -99,6 +104,16 @@ def _fake_state(sim_time=0.0):
         contacts=(),
         sim_time=sim_time,
     )
+
+
+def test_multi_bridge_platform_controller_boundary_is_explicit(monkeypatch):
+    platform = _FakeAgibotLikePlatform()
+    monkeypatch.setattr(multi_bridge_module, "create_platform", lambda *args, **kwargs: platform)
+
+    bridge = MultiRobotBridge(MultiRobotConfig(platform="fake_agibot", robot_ids=("robot_a",)))
+
+    assert set(platform.created_controllers) == {"robot_a"}
+    assert bridge._controllers["robot_a"] is platform.created_controllers["robot_a"]
 
 
 def test_start_discovers_platform_root_body_name(monkeypatch):

@@ -159,8 +159,7 @@ class MultiRobotBridge:
             self._data.qpos[qstart + 7:qstart + 7 + len(initial_qpos)] = initial_qpos
             state = self._platform.extract_state(self._model, self._data, qstart, sim_time=0.0)
             ctrl = self._controllers[robot_id].compute(RobotCommand.stand(), state, self._dt or 0.02)
-            for ctrl_i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = ctrl[ctrl_i]
+            self._apply_platform_controller_target(robot_id=robot_id, ctrl=ctrl)
             self._runtime_status[robot_id] = self._platform.runtime_status(
                 robot_id,
                 state,
@@ -223,12 +222,7 @@ class MultiRobotBridge:
                 self._step_count * self._dt,
             )
             ctrl = self._controllers[robot_id].compute(command, state, self._dt)
-            if ctrl.shape != (len(self._ctrl_indices[robot_id]),):
-                raise RuntimeError(
-                    f"Controller for {robot_id} returned {ctrl.shape}, expected {(len(self._ctrl_indices[robot_id]),)}"
-                )
-            for i, act_id in enumerate(self._ctrl_indices[robot_id]):
-                self._data.ctrl[act_id] = ctrl[i]
+            self._apply_platform_controller_target(robot_id, ctrl)
 
         # Step physics
         for _ in range(self._config.sim_steps_per_frame):
@@ -429,6 +423,39 @@ class MultiRobotBridge:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _apply_platform_controller_target(self, robot_id: str, ctrl: np.ndarray) -> None:
+        """Validate and apply a platform-local controller target atomically.
+
+        This mirrors the all-validation-before-mutation indexed write pattern in
+        ``apply_controller_target`` while supporting non-Go2 platform actuator
+        counts at the multi-robot runtime boundary.
+        """
+
+        target = np.asarray(ctrl, dtype=np.float64)
+        if target.ndim != 1:
+            raise ValueError(
+                f"Controller for {robot_id} returned {target.shape}, expected "
+                f"{(len(self._ctrl_indices[robot_id]),)}"
+            )
+        ctrl_indices = [int(idx) for idx in self._ctrl_indices[robot_id]]
+        if target.shape != (len(ctrl_indices),):
+            raise ValueError(
+                f"Controller for {robot_id} returned {target.shape}, expected {(len(ctrl_indices),)}"
+            )
+        if not np.all(np.isfinite(target)):
+            raise ValueError("Controller target must contain only finite values.")
+        if len(ctrl_indices) != len(target):
+            raise ValueError(
+                f"ctrl_indices must contain exactly {len(target)} entries, got {len(ctrl_indices)}."
+            )
+        if len(set(ctrl_indices)) != len(ctrl_indices):
+            raise ValueError("ctrl_indices must not contain duplicates.")
+        ctrl_size = int(self._data.ctrl.shape[0])
+        bad_indices = [idx for idx in ctrl_indices if idx < 0 or idx >= ctrl_size]
+        if bad_indices:
+            raise ValueError(f"ctrl_indices out of range for data.ctrl size {ctrl_size}: {bad_indices}")
+        self._data.ctrl[ctrl_indices] = target
 
     def _default_state(self) -> RobotState:
         try:
