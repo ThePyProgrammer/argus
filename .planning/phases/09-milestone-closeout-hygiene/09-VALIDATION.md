@@ -58,6 +58,8 @@ Existing infrastructure covers all phase requirements.
 |----------|-------------|------------|-------------------|
 | `voxel-becomes-pointcloud-closeup` visual disposition | LOC-ENV-01, LOC-METRICS-01 | The debug artifact states browser visual verification is still needed; automation cannot prove the screenshot-level closeup visual outcome. | Either perform and record the visual verification in the debug artifact, or explicitly move the item out of the v4.0 closeout path before the final audit gate. |
 
+Resolved during Plan 02 by manual browser verification or explicit out-of-v4 closeout disposition recorded in .planning/debug/voxel-becomes-pointcloud-closeup.md.
+
 ---
 
 ## Validation Sign-Off
