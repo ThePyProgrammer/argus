@@ -34,13 +34,13 @@ The observation dictionary contains these keys:
 | `command` | Current desired planar velocity command: vx, vy, omega. |
 | `previous_action` | Last 12 joint-position targets sent through the locomotion path. |
 
-The supported action modes are:
+The environment-supported action modes are listed below. `argus eval-locomotion currently runs `velocity_command`; `joint_position` and `residual_baseline` are env-supported seams that fail fast in evaluation until explicit action sources exist.
 
 | Action mode | Use |
 |-------------|-----|
-| `velocity_command` | Three-value planar velocity command routed through the selected controller. This is the default benchmark mode for `analytical_trot`. |
-| `joint_position` | Twelve direct joint-position targets for controller families that own joint target generation. |
-| `residual_baseline` | Twelve residuals applied over the analytical baseline seam for future residual-policy work. |
+| `velocity_command` | Three-value planar velocity command routed through the selected controller. This is the default benchmark/evaluator mode for `analytical_trot`. |
+| `joint_position` | 12-value direct joint-position env seam for controller families that own joint target generation; not currently evaluator-runnable without an explicit action source. |
+| `residual_baseline` | 12-value residual-over-baseline env seam for future residual-policy work; not currently evaluator-runnable without a trained residual policy/action source. |
 
 ## Reward and metrics
 
