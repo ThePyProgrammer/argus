@@ -34,7 +34,7 @@ The observation dictionary contains these keys:
 | `command` | Current desired planar velocity command: vx, vy, omega. |
 | `previous_action` | Last 12 joint-position targets sent through the locomotion path. |
 
-The environment-supported action modes are listed below. `argus eval-locomotion currently runs `velocity_command`; `joint_position` and `residual_baseline` are env-supported seams that fail fast in evaluation until explicit action sources exist.
+The environment-supported action modes are listed below. argus eval-locomotion currently runs `velocity_command`; `joint_position` and `residual_baseline` are env-supported seams that fail fast in evaluation until explicit action sources exist.
 
 | Action mode | Use |
 |-------------|-----|
