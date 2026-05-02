@@ -231,8 +231,8 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 08-01-PLAN.md — Make the multi-robot platform-runtime boundary explicit and replace direct indexed control writes with shared pre-mutation validation.
-- [ ] 08-02-PLAN.md — Replace misleading WBC placeholder action-mode vocabulary with explicit deferred contract metadata and docs guards.
+- [x] 08-01-PLAN.md — Make the multi-robot platform-runtime boundary explicit and replace direct indexed control writes with shared pre-mutation validation.
+- [x] 08-02-PLAN.md — Replace misleading WBC placeholder action-mode vocabulary with explicit deferred contract metadata and docs guards.
 
 **Research flag**: light
 
