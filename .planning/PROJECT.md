@@ -79,7 +79,7 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 
 **Shipped:** v3.0 Pluggable Perception & 3D Object Detection (2026-04-30)
 
-**Shipped:** v4.0 Benchmarkable Locomotion Environment completed on 2026-05-02 with the harness guide, controller-family comparison matrix, residual placeholder seam guards, repaired evaluation-runner command semantics, enforced evaluation action-mode contract, and cleaned locomotion controller seam audit debt verified.
+**Shipped:** v4.0 Benchmarkable Locomotion Environment completed on 2026-05-02 with the harness guide, controller-family comparison matrix, residual placeholder seam guards, repaired evaluation-runner command semantics, enforced evaluation action-mode contract, cleaned locomotion controller seam audit debt, and Phase 09 milestone closeout hygiene verified.
 
 **Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, and Zustand.
 
@@ -130,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-03 — v4.0 Phase 8 locomotion-controller-seam-cleanup completed*
+*Last updated: 2026-05-03 — v4.0 Phase 09 milestone-closeout-hygiene verified*
