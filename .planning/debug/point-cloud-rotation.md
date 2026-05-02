@@ -1,8 +1,8 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Point cloud voxels may not be rotated based on the robot dog's facing direction, causing voxels to be placed at incorrect world positions."
 created: 2026-03-24T00:00:00Z
-updated: 2026-03-24T00:00:00Z
+updated: 2026-05-03T00:00:00Z
 ---
 
 ## Current Focus

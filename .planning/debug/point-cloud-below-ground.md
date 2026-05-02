@@ -1,8 +1,8 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Point cloud voxels appear below ground level (z < 0) after camera pose rotation fix"
 created: 2026-03-24T00:00:00Z
-updated: 2026-03-24T00:00:00Z
+updated: 2026-05-03T00:00:00Z
 ---
 
 ## Current Focus
