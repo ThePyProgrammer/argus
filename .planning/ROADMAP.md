@@ -19,8 +19,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: locomotion-metrics-instrumentation** - Command tracking, stability, action-quality, and terrain/contact metrics collected from simulation state — completed 2026-04-30
 - [x] **Phase 4: evaluation-runner-and-regression** - CLI scenario/seed matrix runner, JSONL/CSV/summary exports, reproducibility metadata, and analytical-baseline regression test — completed 2026-05-01
 - [x] **Phase 5: harness-docs-and-comparison-matrix** - Harness guide, observation/action/reward/metric documentation, controller-family support matrix, and research rationale link — completed 2026-05-01
-- [ ] **Phase 6: repair-evaluation-runner-semantics** - Gap closure for scenario command selection, real distance export flattening, and baseline regression threshold semantics
-- [ ] **Phase 7: align-evaluation-action-mode-contract** - Gap closure for CLI action-mode support/rejection behavior and reproducible action-mode metadata
+- [x] **Phase 6: repair-evaluation-runner-semantics** - Gap closure for scenario command selection, real distance export flattening, and baseline regression threshold semantics — completed 2026-05-01
+- [x] **Phase 7: align-evaluation-action-mode-contract** - Gap closure for CLI action-mode support/rejection behavior and reproducible action-mode metadata — completed 2026-05-02
 
 ## Phase Details
 
@@ -227,8 +227,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. locomotion-metrics-instrumentation | 5/5 | Complete | 2026-04-30 |
 | 4. evaluation-runner-and-regression | 4/4 | Complete | 2026-05-01 |
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
-| 6. repair-evaluation-runner-semantics | 0/3 | Pending | — |
-| 7. align-evaluation-action-mode-contract | 2/3 | Executing | — |
+| 6. repair-evaluation-runner-semantics | 3/3 | Complete | 2026-05-01 |
+| 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
 
 ## Requirement Coverage
 
@@ -248,4 +248,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 ## Next Step
 
-Execute Phase 7 gap closure with `/gsd-execute-phase 7 --gaps-only`, then re-run `/gsd-verify-work 7`.
+Run `/gsd-complete-milestone` when ready to formally close v4.0.
