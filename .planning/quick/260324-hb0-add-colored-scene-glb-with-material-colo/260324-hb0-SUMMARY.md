@@ -1,6 +1,7 @@
 ---
 phase: quick
 plan: 260324-hb0
+status: complete
 subsystem: scene-rendering
 tags: [glb, mujoco, materials, frontend-toggle]
 key-files:

@@ -1,6 +1,7 @@
 ---
 phase: quick
 plan: 260324-euj
+status: complete
 subsystem: frontend
 tags: [ui, toggle, layout]
 key-files:

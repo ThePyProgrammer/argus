@@ -1,6 +1,7 @@
 ---
 phase: quick
 plan: 260324-ffy
+status: complete
 subsystem: frontend
 tags: [persistence, localStorage, output-mode, zustand]
 dependency_graph:
