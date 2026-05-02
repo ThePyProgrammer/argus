@@ -248,13 +248,18 @@ def test_completed_velocity_command_run_records_action_mode_metadata(tmp_path):
     assert rows[0]["action_mode"] == "velocity_command"
 
 
-def test_rejected_action_mode_writes_no_artifacts(tmp_path):
-    with pytest.raises(
-        ValueError,
-        match="argus eval-locomotion currently runs action_mode='velocity_command'",
-    ):
+@pytest.mark.parametrize(
+    ("action_mode", "message"),
+    (
+        ("joint_position", "argus eval-locomotion currently runs action_mode='velocity_command'"),
+        ("residual_baseline", "argus eval-locomotion currently runs action_mode='velocity_command'"),
+        ("not_a_mode", "Unknown locomotion action_mode 'not_a_mode'"),
+    ),
+)
+def test_rejected_action_mode_writes_no_artifacts(tmp_path, action_mode, message):
+    with pytest.raises(ValueError, match=message):
         run_evaluation_matrix(
-            EvaluationMatrix(action_mode="joint_position"),
+            EvaluationMatrix(action_mode=action_mode),
             EvaluationRunConfig(output_root=tmp_path),
             env_factory=_factory(),
         )
