@@ -287,17 +287,15 @@ Add an analogous WBC guard, but decide whether the assertion should be “in `av
 | A1 | No new dependencies should be required for Phase 8. | Standard Stack | If wrong, planner may omit dependency installation tasks. |
 | A2 | The best WBC metadata shape is likely an explicit undefined/deferred action contract rather than mapping WBC to `joint_position`. | Summary / Pitfalls | If maintainers prefer legal env-mode-only metadata, planner should update WBC to an existing mode and make docs say it is only a placeholder. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `MultiRobotBridge` use `ControllerRegistry.create("analytical_trot")` for Go2, or should the platform-local `Go2VelocityController` remain the runtime boundary?**  
-   - What we know: `MuJoCoBridge` uses `ControllerRegistry` while `MultiRobotBridge` uses `self._platform.make_controller(rid)`. [VERIFIED: `src/bridge/sim_bridge.py:57-58`; `src/bridge/multi_bridge.py:54-56`]  
-   - What's unclear: Whether `Go2VelocityController.compute(RobotCommand, RobotState, dt)` is intended to stay the platform abstraction for swarm/multi-robot runtime even when the underlying behavior resembles the analytical trot. [VERIFIED: `src/bridge/multi_bridge.py:225-231`; `tests/bridge/test_multi_bridge_platform_selection.py:48-78`]  
-   - Recommendation: Planner should create tests first that express the chosen boundary: Go2 registry unification if practical, otherwise explicit platform-boundary docs/tests plus shared target validation. [VERIFIED: `.planning/ROADMAP.md:225-227`]
+   - Resolution: `MultiRobotBridge` preserves the platform-runtime boundary in Phase 8 and does not construct benchmark `ControllerRegistry` controllers for multi-robot platform controllers. This keeps `self._platform.make_controller(rid)` as the runtime construction seam for Go2 and non-Go2 platforms while making that boundary explicit in tests.  
+   - LOC-CTRL-04 closure: Phase 8 closes the practical seam gap by documenting/testing the platform-runtime boundary and by moving indexed control writes through shared validation-before-mutation behavior before `data.ctrl` mutation. The generic bridge helper validates the platform controller output against that robot ctrl_indices, including finite values, target length, index count, duplicate indices, and control-sink bounds before any assignment. [VERIFIED: `.planning/ROADMAP.md:225-227`; `.planning/phases/08-locomotion-controller-seam-cleanup/08-01-PLAN.md`]
 
 2. **What exact vocabulary should WBC use for an undefined future action contract?**  
-   - What we know: `torque_or_joint_position` is not an env action mode and was flagged by audit. [VERIFIED: `src/locomotion/controllers.py:485-488`; `src/locomotion/actions.py:54-63`; `.planning/v4.0-MILESTONE-AUDIT.md:140`]  
-   - What's unclear: Whether registry `capabilities["action_mode"]` must always be an env action mode, or can be a sentinel like `undefined_deferred` for unavailable placeholders. [VERIFIED: current tests only enforce residual action-mode membership, not all placeholders; `tests/locomotion/test_locomotion_controller_registry.py:146-155`]  
-   - Recommendation: Prefer an explicit `undefined_deferred`/`future_wbc_contract` style value only if docs/tests also state it is not an env action mode; otherwise set WBC to `joint_position` and add a separate capability flag documenting that the WBC contract is deferred. [ASSUMED]
+   - Resolution: WBC placeholder metadata uses `undefined_deferred` for the unavailable future action contract. Registry metadata and docs/tests explicitly state this is not a runnable v4.0 env action mode.  
+   - LOC-CTRL-03 / LOC-REPORT-02 closure: `capabilities["action_mode"] == "undefined_deferred"`, `capabilities["model_requirements"]["action_contract"] == "undefined_deferred"`, `capabilities["model_requirements"]["env_action_mode"] is None`, and docs use the phrase `future action contract `undefined_deferred` (not a v4.0 env action mode)`. [VERIFIED: `.planning/ROADMAP.md:228-229`; `.planning/phases/08-locomotion-controller-seam-cleanup/08-02-PLAN.md`]
 
 ## Environment Availability
 

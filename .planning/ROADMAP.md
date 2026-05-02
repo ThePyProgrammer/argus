@@ -227,10 +227,12 @@ Plans:
   2. Controller output validation and indexed control application remain covered for multi-robot bridge behavior.
   3. WBC placeholder capability metadata no longer implies a runnable v4.0 env action mode that does not exist, or docs explicitly mark the future action contract as undefined/deferred.
   4. Controller-family docs and registry tests agree on placeholder action-mode vocabulary.
-**Plans**: 0 plans
+**Plans**: 2 plans
 Plans:
 
-- [ ] Plan with `/gsd-plan-phase 8`.
+**Wave 1**
+- [ ] 08-01-PLAN.md — Make the multi-robot platform-runtime boundary explicit and replace direct indexed control writes with shared pre-mutation validation.
+- [ ] 08-02-PLAN.md — Replace misleading WBC placeholder action-mode vocabulary with explicit deferred contract metadata and docs guards.
 
 **Research flag**: light
 
@@ -265,7 +267,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. harness-docs-and-comparison-matrix | 2/2 | Complete | 2026-05-01 |
 | 6. repair-evaluation-runner-semantics | 5/5 | Complete | 2026-05-01 |
 | 7. align-evaluation-action-mode-contract | 3/3 | Complete | 2026-05-02 |
-| 8. locomotion-controller-seam-cleanup | 0/0 | Planned | - |
+| 8. locomotion-controller-seam-cleanup | 0/2 | Planned | - |
 | 9. milestone-closeout-hygiene | 0/0 | Planned | - |
 
 ## Requirement Coverage
@@ -288,4 +290,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 ## Next Step
 
-Run `/gsd-plan-phase 8` to plan the controller seam cleanup phase before formal v4.0 closure.
+Run `/gsd-execute-phase 8` to execute the controller seam cleanup phase before formal v4.0 closure.
