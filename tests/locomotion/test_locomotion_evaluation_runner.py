@@ -167,6 +167,51 @@ def test_unknown_scenario_fails_before_env_construction(tmp_path):
     assert not any(tmp_path.iterdir())
 
 
+def test_unknown_action_mode_fails_before_env_construction(tmp_path):
+    calls = []
+    matrix = EvaluationMatrix(
+        controllers=("analytical_trot",),
+        scenarios=("flat_ground",),
+        seeds=(101,),
+        action_mode="not_a_mode",
+    )
+
+    with pytest.raises(ValueError, match="Unknown locomotion action_mode 'not_a_mode'"):
+        run_evaluation_matrix(
+            matrix,
+            EvaluationRunConfig(output_root=tmp_path),
+            env_factory=_fake_env_factory(calls),
+        )
+
+    assert calls == []
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("action_mode", ("joint_position", "residual_baseline"))
+def test_unsupported_action_modes_fail_before_env_construction(tmp_path, action_mode):
+    calls = []
+    matrix = EvaluationMatrix(
+        controllers=("analytical_trot",),
+        scenarios=("flat_ground",),
+        seeds=(101,),
+        action_mode=action_mode,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="argus eval-locomotion currently runs action_mode='velocity_command'",
+    ) as excinfo:
+        run_evaluation_matrix(
+            matrix,
+            EvaluationRunConfig(output_root=tmp_path),
+            env_factory=_fake_env_factory(calls),
+        )
+
+    assert f"requested action_mode='{action_mode}'" in str(excinfo.value)
+    assert calls == []
+    assert not any(tmp_path.iterdir())
+
+
 @pytest.mark.parametrize(
     "seeds, message",
     [

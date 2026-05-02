@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterable
 
 import numpy as np
 
+from src.locomotion.actions import ACTION_MODE_VELOCITY, available_action_modes
 from src.locomotion.controllers import ControllerRegistry, UnavailableControllerError
 from src.locomotion.env import ArgusGo2Env, ArgusGo2EnvConfig
 from src.locomotion.scenarios import list_scenarios
@@ -27,6 +28,7 @@ _ALLOWED_MATRIX_CONFIG_KEYS = {
     "heightfield_size",
 }
 _MAX_SEED = 2**32 - 1
+_EVALUATOR_RUNNABLE_ACTION_MODES = (ACTION_MODE_VELOCITY,)
 _ARTIFACT_FILES = ("manifest.json", "steps.jsonl", "episodes.csv", "summary.json", "comparison.md")
 _EPISODE_CSV_FIELDS = (
     "run_id",
@@ -153,6 +155,17 @@ def validate_evaluation_matrix(
     action_mode = matrix.action_mode
     if not isinstance(action_mode, str) or not action_mode:
         raise ValueError("action_mode must be a non-empty string")
+    supported_action_modes = available_action_modes()
+    if action_mode not in supported_action_modes:
+        raise ValueError(
+            f"Unknown locomotion action_mode '{action_mode}'. "
+            f"Available env action modes: {supported_action_modes}"
+        )
+    if action_mode not in _EVALUATOR_RUNNABLE_ACTION_MODES:
+        raise ValueError(
+            "argus eval-locomotion currently runs action_mode='velocity_command'; "
+            f"requested action_mode='{action_mode}' is an env-supported seam but has no evaluator action source"
+        )
     max_episode_steps = _positive_int(matrix.max_episode_steps, "max_episode_steps")
     sim_steps_per_frame = _positive_int(matrix.sim_steps_per_frame, "sim_steps_per_frame")
     heightfield_size = _positive_int(matrix.heightfield_size, "heightfield_size")
