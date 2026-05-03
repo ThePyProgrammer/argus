@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Benchmarkable Locomotion Environment
-status: milestone_complete
-stopped_at: Phase 09 audit-open gate passed
-last_updated: "2026-05-02T18:08:34.545Z"
-last_activity: 2026-05-02
+status: completed
+stopped_at: v4.0 archived; ready for next milestone planning
+last_updated: "2026-05-03T01:24:55.725Z"
+last_activity: 2026-05-03
 progress:
   total_phases: 9
   completed_phases: 9
@@ -18,41 +18,43 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-01)
+See: .planning/PROJECT.md (updated 2026-05-03)
 
 **Core value:** Multiple simulated robots autonomously explore, build individual maps, and merge them into a single navigation-grade 3D map in real time — with user-selectable SLAM/perception algorithms, live metrics, and repeatable locomotion benchmarks that make controller changes comparable instead of anecdotal.
-**Current focus:** Phase 09 — milestone-closeout-hygiene
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 09
-Plan: Complete
-Status: Milestone complete
-Last activity: 2026-05-02
+Phase: none
+Plan: none
+Status: v4.0 archived; no active milestone
+Last activity: 2026-05-03
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
-Phase 2 verification: controller-plugin-baseline passed with 5/5 must-haves verified.
-Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim_bridge.py tests/bridge/test_multi_bridge.py -q` → 248 passed.
+v4.0 shipped 9 phases, 35 plans, and 20/20 active requirements satisfied.
+Regression reference: Phase 09 verification recorded `uv run python -m pytest -x -q --tb=short` → 1072 passed, 13 skipped, 8 deselected, 3 warnings in 137.95s.
 
 **Historical reference:**
 
 - v1.0 shipped multi-robot 3D reconstruction MVP.
 - v2.0 shipped Generic SLAM API and pipeline editor foundation.
 - v3.0 shipped pluggable perception, real 3D OBBs, detection metrics, pipeline perception nodes, and semantic detection fusion.
+- v4.0 shipped a benchmarkable locomotion environment with controller seams, metrics, evaluation runner, action-mode contract, and closeout hygiene.
 
 ## Accumulated Context
 
-### Decisions (v4.0 — locked pre-roadmap)
+### Decisions (v4.0 — shipped)
 
-- **Benchmark before controller sophistication:** the locomotion R&D report shows Argus currently uses analytical trot + MuJoCo position actuators; v4.0 must make that baseline measurable before adding RL/MPC/WBC.
+- **Benchmark before controller sophistication:** the locomotion R&D report shows Argus currently uses analytical trot + MuJoCo position actuators; v4.0 made that baseline measurable before adding RL/MPC/WBC.
 - **Gymnasium-style API:** `ArgusGo2Env` is the common reset/step boundary for evaluation, regression tests, and future learning workflows.
 - **Scenario catalog:** flat ground, low friction, slope, rough heightfield, and push disturbance are the minimum named scenarios for useful locomotion comparisons.
 - **Controller protocol:** the existing analytical trot is the default registered controller; residual/direct-policy/MPC/WBC entries are seams/placeholders, not implementations.
 - **Metrics-first evaluation:** command tracking, stability, control quality, contact proxies, exports, and reproducibility metadata are required outputs, not optional diagnostics.
 - **CLI-first benchmark:** frontend overhaul is out of scope; machine-readable artifacts and concise docs are enough for this milestone.
+- **Multi-robot platform boundary:** accepted debt; multi-robot control uses a platform-runtime boundary with validation-before-mutation rather than exact single-robot registry unification.
 
 ### Research Basis
 
@@ -67,21 +69,19 @@ Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim
 - 2026-04-13: v3.0 milestone started — Pluggable Perception & 3D Object Detection, phase numbering reset to 1
 - 2026-04-13: v3.0 ROADMAP.md created — 8 phases, 42 requirements, 100% coverage
 - 2026-04-30: v4.0 milestone started — Benchmarkable Locomotion Environment, 5 phases, 20 requirements, 100% coverage
-- 2026-04-30: Phase 2 completed — controller protocol/registry, analytical trot adapter, unavailable future-controller placeholders, env/bridge controller seam, clean code review, and verification passed.
-- 2026-05-01: v4.0 milestone completed — locomotion benchmark env, controller seams, metrics, evaluation runner, docs, and comparison matrix verified.
 - 2026-05-02: v4.0 completion paused after refreshed audit routed as tech debt; phases 08-09 added for controller seam cleanup and milestone closeout hygiene.
+- 2026-05-03: v4.0 archived with roadmap, requirements, and audit under `.planning/milestones/`.
 
 ### Pending Todos
 
-- Phase 08 locomotion-controller-seam-cleanup completed and tracked in ROADMAP.
-- Phase 09 milestone-closeout-hygiene passed its final audit-open gate.
-- Run `/gsd-complete-milestone v4.0` now that Phase 09 verification has passed.
+- Start the next milestone with `/gsd-new-milestone`.
+- Define fresh requirements before adding more roadmap phases.
 
 ### Blockers/Concerns
 
-- Deterministic reset must cover MuJoCo state, terrain parameters, command schedule, and push timing; partial seeding is not enough for this milestone.
+- Phase 08 `08-VALIDATION.md` still contains stale draft/pending validation metadata despite passed verification; carried as accepted closeout debt.
 - Current position-actuator stack is not a torque-control stack; MPC/WBC work must remain deferred unless a later milestone changes actuator/state/control assumptions.
-- Contact/terrain metrics depend on reliable MuJoCo contact and foot identity mapping; validate early in Phase 3 planning.
+- Residual/direct RL policy training, ROS 2 hardware-style deployment, and perception-conditioned locomotion remain future milestone candidates.
 
 ### Quick Tasks Completed
 
@@ -97,6 +97,6 @@ Regression gate: `uv run python -m pytest tests/locomotion tests/bridge/test_sim
 
 ## Session Continuity
 
-Last activity: 2026-05-02 — Phase 09 audit-open gate passed
-Stopped at: Phase 09 audit-open gate passed
+Last activity: 2026-05-03 — v4.0 milestone archived
+Stopped at: Ready for `/gsd-new-milestone`
 Resume file: None

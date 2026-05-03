@@ -1,5 +1,39 @@
 # Milestones
 
+## v4.0 Benchmarkable Locomotion Environment (Shipped: 2026-05-03)
+
+**Phases completed:** 9 phases, 35 plans, 68 tasks
+
+**Delivered:** A repeatable locomotion benchmark harness for the existing Go2 analytical trot baseline, with Gymnasium-style environment semantics, scenario/seed reproducibility, controller seams, metrics, evaluation artifacts, and documentation for comparing future controller families.
+
+**Key accomplishments:**
+
+- Added `ArgusGo2Env` with Gymnasium-style reset/step semantics, deterministic scenario sampling, required flat/low-friction/slope/rough/push scenarios, and velocity/joint/residual action-mode seams.
+- Put locomotion control behind protocol/registry and dispatch helpers, with analytical trot as the default baseline and residual/direct/MPC/WBC families exposed as unavailable future-controller placeholders.
+- Instrumented command tracking, stability, action quality, and terrain/contact metrics with per-step info and episode summaries.
+- Shipped `argus eval-locomotion` for controller x scenario x seed matrices, JSONL/CSV/summary/comparison artifacts, reproducibility metadata, saved-run regeneration, and analytical flat-ground regression checks.
+- Published the locomotion benchmark guide and controller-family support/deferred matrix grounded in `outputs/locomotion-rd-systems.md`.
+- Closed milestone audit gaps through Phases 6-9: command-schedule semantics, distance export flattening, action-mode metadata, WBC placeholder wording, multi-robot validation-before-mutation, and pre-close artifact hygiene.
+
+### Requirements
+
+- 20/20 v4.0 active requirements satisfied.
+- See: `.planning/milestones/v4.0-REQUIREMENTS.md`
+
+### Known Debt Accepted
+
+- Phase 08 `08-VALIDATION.md` still contains stale draft/pending validation metadata despite `08-VERIFICATION.md` passing 8/8.
+- Multi-robot locomotion control remains an explicit platform-runtime boundary rather than the exact single-robot controller registry path; this was accepted under the "where practical" requirement caveat.
+- `audit-open` does not catch stale phase validation metadata, so validation consistency still needs explicit audit attention.
+
+### Archive
+
+- Roadmap: `.planning/milestones/v4.0-ROADMAP.md`
+- Requirements: `.planning/milestones/v4.0-REQUIREMENTS.md`
+- Audit: `.planning/milestones/v4.0-MILESTONE-AUDIT.md`
+
+---
+
 ## v3.0 Pluggable Perception & 3D Object Detection (Shipped: 2026-04-30)
 
 **Phases completed:** 8 phases, 79 plans

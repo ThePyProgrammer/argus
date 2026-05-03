@@ -33,15 +33,16 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - ✓ Frontend detector/lifter picker, parameter panel, restart overlay, and live detection metrics — v3.0
 - ✓ Pipeline-editor nodes for detector, 3D-projection, and tracker stages — v3.0
 - ✓ ByteTrack tracking, multi-robot detection fusion, semantic map layer, and heterogeneous per-robot detector support — v3.0
+- ✓ Gymnasium-style `ArgusGo2Env` benchmark wrapper with deterministic seeded resets — v4.0
+- ✓ Named locomotion scenario catalog: flat ground, low friction, slope, rough heightfield, and push disturbance — v4.0
+- ✓ Controller plugin seam for analytical trot, residual policies, direct policies, and future MPC/WBC adapters — v4.0
+- ✓ Locomotion metrics suite for command tracking, stability, control quality, contact/terrain proxies, and failure rates — v4.0
+- ✓ Repeatable CLI evaluation runner with JSONL/CSV exports, aggregate comparison table, metadata, baseline regression test, repaired command-schedule semantics, enforced action-mode metadata/CLI contract, and cleaned controller seam audit debt — v4.0
+- ✓ Harness guide and explicit controller-family comparison matrix grounded in the locomotion R&D report — v4.0
 
 ### Active
 
-- ✓ Gymnasium-style `ArgusGo2Env` benchmark wrapper with deterministic seeded resets — v4.0 Phase 1
-- ✓ Named locomotion scenario catalog: flat ground, low friction, slope, rough heightfield, and push disturbance — v4.0 Phase 1
-- ✓ Controller plugin seam for analytical trot, residual policies, direct policies, and future MPC/WBC adapters — v4.0 Phase 2
-- ✓ Locomotion metrics suite for command tracking, stability, control quality, contact/terrain proxies, and failure rates — v4.0 Phase 3
-- ✓ Repeatable CLI evaluation runner with JSONL/CSV exports, aggregate comparison table, metadata, baseline regression test, repaired command-schedule semantics, enforced action-mode metadata/CLI contract, and cleaned controller seam audit debt — v4.0 Phases 4, 6, 7 & 8
-- ✓ Harness guide and explicit controller-family comparison matrix grounded in the locomotion R&D report — v4.0 Phase 5
+None. The next milestone should define fresh requirements with `/gsd-new-milestone`.
 
 ### Out of Scope
 
@@ -59,29 +60,17 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 - ROS 2 / hardware deployment — future architecture milestone after simulation evaluation is repeatable
 - Frontend visualization overhaul — v4.0 can expose artifacts through CLI/docs first
 
-## Current Milestone: v4.0 Benchmarkable Locomotion Environment
-
-**Goal:** Turn Argus locomotion from a hard-coded analytical baseline into a benchmarkable comparison harness for analytical gait, residual learning, direct RL, MPC/WBC, and future ROS/hardware-oriented controllers.
-
-**Target features:**
-- Gymnasium-style `ArgusGo2Env` with `reset(seed=...)` and `step(action)` semantics
-- Scenario catalog for flat ground, low friction, slope, rough heightfield, and push-disturbance tests
-- Deterministic seeded resets covering spawn pose, terrain, command schedule, and disturbances
-- Action modes for velocity command, joint-position target, and residual-over-baseline control
-- Controller protocol/registry with analytical trot as the default deterministic baseline
-- Metrics suite for command tracking, stability, action quality, contact/terrain proxies, and failures
-- CLI evaluation runner over controller × scenario × seed matrices with reproducible metadata
-- Harness documentation and comparison matrix linking scope to `outputs/locomotion-rd-systems.md`
-
-**Key context:** The locomotion R&D report concludes Argus currently sits in the analytical gait + MuJoCo position-servo baseline family. v4.0 deliberately benchmarks and instruments this baseline before adding RL, MPC, WBC, or hardware-oriented control.
-
 ## Current State
 
-**Shipped:** v3.0 Pluggable Perception & 3D Object Detection (2026-04-30)
+**Shipped:** v4.0 Benchmarkable Locomotion Environment completed on 2026-05-03.
 
-**Shipped:** v4.0 Benchmarkable Locomotion Environment completed on 2026-05-02 with the harness guide, controller-family comparison matrix, residual placeholder seam guards, repaired evaluation-runner command semantics, enforced evaluation action-mode contract, cleaned locomotion controller seam audit debt, and Phase 09 milestone closeout hygiene verified.
+**Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, Zustand, Gymnasium-style locomotion benchmark APIs, controller registries, and repeatable CLI evaluation artifacts.
 
-**Codebase:** Python + TypeScript robotics/web stack with MuJoCo, Open3D, FastAPI, React 18, Three.js, React Flow, and Zustand.
+**Accepted closeout debt:** Phase 08 validation metadata remains stale despite passing verification; multi-robot locomotion control remains an explicit platform-runtime boundary instead of the exact single-robot controller registry path; `audit-open` does not catch stale phase validation metadata.
+
+## Next Milestone Goals
+
+No next milestone is open. Use `/gsd-new-milestone` to define fresh requirements. Candidate directions from the v4.0 future-requirements list include residual/direct RL policy training, MPC/WBC control, ROS 2 or hardware-style deployment, and perception-conditioned locomotion.
 
 ## Constraints
 
@@ -106,11 +95,12 @@ Multiple simulated robots autonomously explore, build individual maps, and merge
 | Subprocess isolation for C++/heavy backends | Native and ML backends can crash or stall; subprocess + ZMQ keeps main process alive | ✓ Good — crash detection + fallback |
 | Pose-graph optimization over ICP merge | ICP union naive for multi-robot; PGO produces globally consistent maps | ✓ Good — Open3D PGO + GTSAM iSAM2 |
 | React Flow for pipeline editor | Only mature React node-graph library; ComfyUI-style UX | ✓ Good — typed ports, presets, live animation |
-| Benchmark harness before new locomotion controllers | The research report shows advanced locomotion requires state/contact instrumentation and repeatable metrics first | v4.0 formalizes env, scenarios, metrics, and controller seams before RL/MPC/WBC |
-| Gymnasium-style environment API | Standard reset/step contract makes RL, evaluation, and regression tests share one interface | v4.0 uses `ArgusGo2Env` as the benchmark boundary |
-| Analytical trot remains the baseline | The existing controller is deterministic, inspectable, and already integrated with MuJoCo position actuators | v4.0 registers it behind the same controller protocol as future controllers |
-| Metrics are first-class output | Locomotion claims need scenario/seed aggregates, not visual demos | v4.0 exports JSONL/CSV plus summaries for comparisons |
-| Future-controller adapters are seams, not implementations | Avoid half-building RL/MPC/WBC without training/control infrastructure | v4.0 ships placeholders and extension points only |
+| Benchmark harness before new locomotion controllers | The research report shows advanced locomotion requires state/contact instrumentation and repeatable metrics first | ✓ Good — v4.0 formalized env, scenarios, metrics, and seams before RL/MPC/WBC |
+| Gymnasium-style environment API | Standard reset/step contract makes RL, evaluation, and regression tests share one interface | ✓ Good — `ArgusGo2Env` is the benchmark boundary |
+| Analytical trot remains the baseline | The existing controller is deterministic, inspectable, and already integrated with MuJoCo position actuators | ✓ Good — registered behind the same protocol as future controllers |
+| Metrics are first-class output | Locomotion claims need scenario/seed aggregates, not visual demos | ✓ Good — JSONL/CSV/summary/comparison artifacts shipped |
+| Future-controller adapters are seams, not implementations | Avoid half-building RL/MPC/WBC without training/control infrastructure | ✓ Good — placeholders and extension points shipped only |
+| Multi-robot controller seam as platform-runtime boundary | Non-Go2 platforms can have different actuator counts and controller semantics | ⚠ Revisit — accepted as v4.0 debt with validation-before-mutation coverage |
 
 ## Evolution
 
@@ -130,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-03 — v4.0 Phase 09 milestone-closeout-hygiene verified*
+*Last updated: 2026-05-03 after v4.0 milestone*
