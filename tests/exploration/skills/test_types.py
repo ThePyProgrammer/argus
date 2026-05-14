@@ -244,3 +244,12 @@ def test_parameter_profile_detaches_mutable_mapping_inputs() -> None:
     values["nested"]["window"].append(3)
 
     assert profile.to_dict()["values"] == {"goal_strategy": "nearest", "nested": {"window": [1, 2]}}
+
+
+def test_parameter_profile_to_dict_returns_detached_nested_values() -> None:
+    profile = SkillParameterProfile(profile_id="default", values={"nested": {"window": [1, 2]}})
+
+    payload = profile.to_dict()
+    payload["values"]["nested"]["window"].append(3)
+
+    assert profile.to_dict()["values"] == {"nested": {"window": [1, 2]}}

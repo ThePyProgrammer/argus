@@ -75,7 +75,7 @@ class SkillParameterProfile:
         object.__setattr__(self, "values", deepcopy(self.values))
 
     def to_dict(self) -> dict[str, Any]:
-        return {"profile_id": self.profile_id, "values": dict(self.values)}
+        return {"profile_id": self.profile_id, "values": deepcopy(self.values)}
 
 
 @dataclass(frozen=True)
