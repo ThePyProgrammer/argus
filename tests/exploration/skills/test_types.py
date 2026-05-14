@@ -26,6 +26,11 @@ def test_skill_state_serializes_to_plain_dict() -> None:
         is_stuck=False,
         no_progress_steps=0,
         blocked_path_count=1,
+        overlap_score=0.25,
+        idle_robot_count=3,
+        connectivity_health=0.8,
+        localization_health=0.9,
+        map_quality_health=0.7,
         recent_skill_ids=("frontier_pursuit",),
         recent_termination_reasons=(SkillTermination.SUCCESS,),
         scenario_id="office",
@@ -35,6 +40,11 @@ def test_skill_state_serializes_to_plain_dict() -> None:
     payload = state.to_dict()
 
     assert payload["coverage_pct"] == 12.5
+    assert payload["overlap_score"] == 0.25
+    assert payload["idle_robot_count"] == 3
+    assert payload["connectivity_health"] == 0.8
+    assert payload["localization_health"] == 0.9
+    assert payload["map_quality_health"] == 0.7
     assert payload["recent_skill_ids"] == ["frontier_pursuit"]
     assert payload["recent_termination_reasons"] == ["success"]
     assert payload["scenario_id"] == "office"

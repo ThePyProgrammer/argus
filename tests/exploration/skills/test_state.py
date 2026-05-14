@@ -84,11 +84,18 @@ def test_state_encoder_preserves_optional_health_fields() -> None:
         map_quality_health=0.7,
     )
 
+    payload = state.to_dict()
+
     assert state.overlap_score == 0.25
     assert state.idle_robot_count == 3
     assert state.connectivity_health == 0.8
     assert state.localization_health == 0.9
     assert state.map_quality_health == 0.7
+    assert payload["overlap_score"] == 0.25
+    assert payload["idle_robot_count"] == 3
+    assert payload["connectivity_health"] == 0.8
+    assert payload["localization_health"] == 0.9
+    assert payload["map_quality_health"] == 0.7
 
 
 @pytest.mark.parametrize("field_name,bad_value", [("no_progress_steps", True), ("no_progress_steps", 0.9), ("blocked_path_count", True), ("blocked_path_count", 0.9)])

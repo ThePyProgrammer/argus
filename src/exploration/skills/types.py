@@ -104,6 +104,11 @@ class SkillState:
     is_stuck: bool
     no_progress_steps: int
     blocked_path_count: int
+    overlap_score: float = 0.0
+    idle_robot_count: int = 0
+    connectivity_health: float = 1.0
+    localization_health: float = 1.0
+    map_quality_health: float = 1.0
     recent_skill_ids: tuple[str, ...] = ()
     recent_termination_reasons: tuple[SkillTermination, ...] = ()
     scenario_id: str | None = None

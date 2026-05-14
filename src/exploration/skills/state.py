@@ -50,7 +50,7 @@ class SkillStateEncoder:
         summary = self._summarize_frontiers(robot_position=robot_position, frontiers=frontiers)
         recent_coverage_delta = float(coverage_pct) - float(previous_coverage_pct)
 
-        state = SkillState(
+        return SkillState(
             coverage_pct=float(coverage_pct),
             recent_coverage_delta=recent_coverage_delta,
             frontier_count=summary.frontier_count,
@@ -61,18 +61,16 @@ class SkillStateEncoder:
             is_stuck=bool(is_stuck),
             no_progress_steps=no_progress_steps,
             blocked_path_count=blocked_path_count,
+            overlap_score=float(overlap_score),
+            idle_robot_count=idle_robot_count,
+            connectivity_health=float(connectivity_health),
+            localization_health=float(localization_health),
+            map_quality_health=float(map_quality_health),
             recent_skill_ids=tuple(recent_skill_ids),
             recent_termination_reasons=tuple(recent_termination_reasons),
             scenario_id=self._scenario_id,
             seed=self._seed,
         )
-
-        object.__setattr__(state, "overlap_score", float(overlap_score))
-        object.__setattr__(state, "idle_robot_count", idle_robot_count)
-        object.__setattr__(state, "connectivity_health", float(connectivity_health))
-        object.__setattr__(state, "localization_health", float(localization_health))
-        object.__setattr__(state, "map_quality_health", float(map_quality_health))
-        return state
 
     @staticmethod
     def _summarize_frontiers(
