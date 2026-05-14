@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from math import isfinite
 from typing import Any
 
 
@@ -17,6 +19,8 @@ def _require_real_in_range(field_name: str, value: Any, minimum: float, maximum:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{field_name} must be a real number")
     numeric_value = float(value)
+    if not isfinite(numeric_value):
+        raise ValueError(f"{field_name} must be finite and between {minimum} and {maximum}")
     if numeric_value < minimum or numeric_value > maximum:
         raise ValueError(f"{field_name} must be between {minimum} and {maximum}")
     return numeric_value
@@ -68,7 +72,7 @@ class SkillParameterProfile:
     values: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "values", dict(self.values))
+        object.__setattr__(self, "values", deepcopy(self.values))
 
     def to_dict(self) -> dict[str, Any]:
         return {"profile_id": self.profile_id, "values": dict(self.values)}

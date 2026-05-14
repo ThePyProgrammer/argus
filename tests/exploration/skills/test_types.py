@@ -129,8 +129,10 @@ def test_skill_proposal_rejects_invalid_bounds() -> None:
     for field_name, value, expected_message in [
         ("risk", -0.1, "risk must be between 0.0 and 1.0"),
         ("risk", 1.1, "risk must be between 0.0 and 1.0"),
+        ("risk", float("nan"), "risk must be finite and between 0.0 and 1.0"),
         ("confidence", -0.1, "confidence must be between 0.0 and 1.0"),
         ("confidence", 1.1, "confidence must be between 0.0 and 1.0"),
+        ("confidence", float("nan"), "confidence must be finite and between 0.0 and 1.0"),
         ("min_commitment_steps", -1, "min_commitment_steps must be a non-negative integer"),
     ]:
         kwargs = dict(base_kwargs)
@@ -235,9 +237,10 @@ def test_authority_enum_prevents_low_level_control_authority() -> None:
 
 
 def test_parameter_profile_detaches_mutable_mapping_inputs() -> None:
-    values = {"goal_strategy": "nearest"}
+    values = {"goal_strategy": "nearest", "nested": {"window": [1, 2]}}
     profile = SkillParameterProfile(profile_id="default", values=values)
 
     values["goal_strategy"] = "global"
+    values["nested"]["window"].append(3)
 
-    assert profile.to_dict()["values"] == {"goal_strategy": "nearest"}
+    assert profile.to_dict()["values"] == {"goal_strategy": "nearest", "nested": {"window": [1, 2]}}
