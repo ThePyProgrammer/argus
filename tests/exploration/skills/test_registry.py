@@ -97,17 +97,67 @@ def test_registry_collects_only_eligible_proposals() -> None:
     ]
 
 
-def test_contract_validation_requires_option_like_fields() -> None:
-    with pytest.raises(ValueError, match="purpose"):
-        SkillContract(
-            skill_id="frontier_pursuit",
-            version="1.0",
-            purpose="",
-            authority=(SkillAuthority.CHOOSE_SKILL,),
-            precondition=lambda state: GateResult("frontier_pursuit", True),
-            propose=lambda state: (_proposal("frontier_pursuit"),),
-            termination_conditions=(SkillTermination.SUCCESS,),
-            failure_modes=("no_frontiers",),
-            required_telemetry=("coverage_pct",),
-            required_metrics=("coverage_gain",),
-        )
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("skill_id", ""),
+        ("version", ""),
+        ("purpose", ""),
+    ],
+)
+def test_contract_validation_requires_text_fields(field_name: str, value: str) -> None:
+    kwargs = {
+        "skill_id": "frontier_pursuit",
+        "version": "1.0",
+        "purpose": "Choose a frontier",
+        "authority": (SkillAuthority.CHOOSE_SKILL,),
+        "precondition": lambda state: GateResult("frontier_pursuit", True),
+        "propose": lambda state: (_proposal("frontier_pursuit"),),
+        "termination_conditions": (SkillTermination.SUCCESS,),
+        "failure_modes": ("no_frontiers",),
+        "required_telemetry": ("coverage_pct",),
+        "required_metrics": ("coverage_gain",),
+    }
+    kwargs[field_name] = value
+
+    with pytest.raises(ValueError, match=field_name):
+        SkillContract(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "field_name,value",
+    [
+        ("authority", None),
+        ("authority", SkillAuthority.CHOOSE_SKILL),
+        ("authority", ()),
+        ("termination_conditions", None),
+        ("termination_conditions", SkillTermination.SUCCESS),
+        ("termination_conditions", ()),
+        ("failure_modes", None),
+        ("failure_modes", "no_frontiers"),
+        ("failure_modes", ()),
+        ("required_telemetry", None),
+        ("required_telemetry", "coverage_pct"),
+        ("required_telemetry", ()),
+        ("required_metrics", None),
+        ("required_metrics", "coverage_gain"),
+        ("required_metrics", ()),
+    ],
+)
+def test_contract_validation_requires_sequence_fields(field_name: str, value) -> None:
+    kwargs = {
+        "skill_id": "frontier_pursuit",
+        "version": "1.0",
+        "purpose": "Choose a frontier",
+        "authority": (SkillAuthority.CHOOSE_SKILL,),
+        "precondition": lambda state: GateResult("frontier_pursuit", True),
+        "propose": lambda state: (_proposal("frontier_pursuit"),),
+        "termination_conditions": (SkillTermination.SUCCESS,),
+        "failure_modes": ("no_frontiers",),
+        "required_telemetry": ("coverage_pct",),
+        "required_metrics": ("coverage_gain",),
+    }
+    kwargs[field_name] = value
+
+    with pytest.raises(ValueError, match=field_name):
+        SkillContract(**kwargs)

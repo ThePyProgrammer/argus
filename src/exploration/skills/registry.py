@@ -41,7 +41,12 @@ class SkillContract:
             ("required_telemetry", self.required_telemetry),
             ("required_metrics", self.required_metrics),
         ):
-            items = tuple(value)
+            if value is None or isinstance(value, (str, bytes)):
+                raise ValueError(f"{field_name} must not be empty")
+            try:
+                items = tuple(value)
+            except TypeError as exc:
+                raise ValueError(f"{field_name} must not be empty") from exc
             if not items:
                 raise ValueError(f"{field_name} must not be empty")
             object.__setattr__(self, field_name, items)
