@@ -36,6 +36,13 @@ class ExplorationConfig:
     min_cluster_size: int = 5
     goal_strategy: str = "nearest"        # "nearest" or "largest"
 
+    # Skill learning gate (disabled by default)
+    skill_learning_enabled: bool = False
+    skill_learning_shadow_mode: bool = False
+    skill_learning_min_confidence: float = 0.6
+    skill_learning_min_dwell_steps: int = 3
+    skill_learning_max_failures_before_baseline: int = 3
+
     # Coverage and logging
     log_interval_steps: int = 50          # log every N steps
     z_min: float = -100.0                  # auto-adapt: ground plane filtered dynamically

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.exploration.config import ExplorationConfig
 from src.exploration.skills.selector import GatedSkillSelector, SkillSelectorConfig
 from src.exploration.skills.types import GateResult, SkillProposal, SkillState, SkillTermination
 
@@ -44,6 +45,16 @@ def _proposal(
         confidence=confidence,
         reason_codes=reason_codes,
     )
+
+
+def test_exploration_skill_learning_is_disabled_by_default() -> None:
+    config = ExplorationConfig()
+
+    assert config.skill_learning_enabled is False
+    assert config.skill_learning_shadow_mode is False
+    assert config.skill_learning_min_confidence == 0.6
+    assert config.skill_learning_min_dwell_steps == 3
+    assert config.skill_learning_max_failures_before_baseline == 3
 
 
 def test_selector_returns_baseline_when_no_candidates() -> None:
