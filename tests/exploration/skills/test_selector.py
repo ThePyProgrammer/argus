@@ -157,6 +157,20 @@ def test_selector_minimum_dwell_eventually_expires() -> None:
     assert allowed.selected_skill_id == "coverage_sweep"
 
 
+def test_selector_non_safety_stuck_recovery_respects_minimum_dwell() -> None:
+    selector = GatedSkillSelector(SkillSelectorConfig(min_dwell_steps=4))
+    selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.9, 2.0, 1.0),), gates=())
+
+    decision = selector.select(
+        _state(),
+        proposals=(_proposal("stuck_recovery", 0.9, 0.0, 0.1),),
+        gates=(),
+    )
+
+    assert decision.uses_baseline
+    assert decision.reason_codes == ("minimum_dwell_active",)
+
+
 def test_selector_safety_reason_code_bypasses_minimum_dwell() -> None:
     selector = GatedSkillSelector(SkillSelectorConfig(min_dwell_steps=4))
     selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.9, 2.0, 1.0),), gates=())
@@ -169,6 +183,7 @@ def test_selector_safety_reason_code_bypasses_minimum_dwell() -> None:
 
     assert decision.selected_skill_id == "hazard_response"
     assert decision.reason_codes == ("safety",)
+
 
 
 def test_selector_emergency_reason_code_bypasses_minimum_dwell() -> None:

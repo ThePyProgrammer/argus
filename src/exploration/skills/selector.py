@@ -172,8 +172,9 @@ class GatedSkillSelector:
         return self._dwell_steps < self._config.min_dwell_steps
 
     def _is_safety_proposal(self, proposal: SkillProposal) -> bool:
-        return proposal.skill_id == "stuck_recovery" or any(
-            reason_code in {"safety", "emergency"} for reason_code in proposal.reason_codes
+        return any(
+            "safety" in reason_code or "emergency" in reason_code
+            for reason_code in proposal.reason_codes
         )
 
     def _advance_dwell(self) -> None:
