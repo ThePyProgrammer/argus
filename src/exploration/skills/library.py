@@ -25,7 +25,7 @@ def _proposal(
     return SkillProposal(
         skill_id=skill_id,
         skill_version=_VERSION,
-        target=() if target is None else target,
+        target=target,
         predicted_coverage_gain=predicted_coverage_gain,
         predicted_frontier_delta=predicted_frontier_delta,
         travel_cost=travel_cost,

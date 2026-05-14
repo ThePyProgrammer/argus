@@ -62,6 +62,16 @@ def test_stuck_state_prioritizes_recovery_proposal() -> None:
     assert any(gate.skill_id == "stuck_recovery" and gate.eligible for gate in gates)
 
 
+def test_targetless_proposals_use_none_targets() -> None:
+    registry = create_default_skill_registry()
+
+    proposals, _ = registry.proposals_for(_state(frontier_count=1, is_stuck=True))
+    proposal_by_id = {proposal.skill_id: proposal for proposal in proposals}
+
+    assert proposal_by_id["replan"].target is None
+    assert proposal_by_id["stuck_recovery"].target is None
+
+
 def test_team_skills_require_multi_robot_state() -> None:
     registry = create_default_skill_registry()
 
