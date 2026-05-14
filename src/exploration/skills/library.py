@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .registry import SkillContract, SkillRegistry
 from .types import GateResult, SkillAuthority, SkillProposal, SkillState, SkillTermination
 
@@ -37,7 +39,7 @@ def _proposal(
     )
 
 
-def _frontier_precondition(skill_id: str) -> callable:
+def _frontier_precondition(skill_id: str) -> Callable[[SkillState], GateResult]:
     def precondition(state: SkillState) -> GateResult:
         eligible = state.frontier_count > 0
         reasons = () if eligible else ("no_frontiers",)
@@ -52,7 +54,7 @@ def _stuck_precondition(state: SkillState) -> GateResult:
     return GateResult(skill_id="stuck_recovery", eligible=eligible, reasons=reasons)
 
 
-def _team_precondition(skill_id: str) -> callable:
+def _team_precondition(skill_id: str) -> Callable[[SkillState], GateResult]:
     def precondition(state: SkillState) -> GateResult:
         eligible = state.robot_count >= 2
         reasons = () if eligible else ("single_robot",)
@@ -62,9 +64,16 @@ def _team_precondition(skill_id: str) -> callable:
 
 
 def _loop_closure_precondition(state: SkillState) -> GateResult:
-    eligible = state.map_quality_health < 0.9 and state.frontier_count > 0
-    reasons = () if eligible else ("map_quality_sufficient", "no_frontiers")
-    return GateResult(skill_id="loop_closure_probe", eligible=eligible, reasons=reasons)
+    reasons: list[str] = []
+    if state.map_quality_health >= 0.9:
+        reasons.append("map_quality_sufficient")
+    if state.frontier_count <= 0:
+        reasons.append("no_frontiers")
+    return GateResult(
+        skill_id="loop_closure_probe",
+        eligible=not reasons,
+        reasons=tuple(reasons),
+    )
 
 
 def _frontier_pursuit(state: SkillState) -> tuple[SkillProposal, ...]:

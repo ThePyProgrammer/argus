@@ -4,7 +4,12 @@ from src.exploration.skills.library import create_default_skill_registry
 from src.exploration.skills.types import SkillState, SkillTermination
 
 
-def _state(frontier_count: int = 3, is_stuck: bool = False, robot_count: int = 1) -> SkillState:
+def _state(
+    frontier_count: int = 3,
+    is_stuck: bool = False,
+    robot_count: int = 1,
+    map_quality_health: float = 0.5,
+) -> SkillState:
     return SkillState(
         coverage_pct=25.0,
         recent_coverage_delta=0.2,
@@ -17,6 +22,7 @@ def _state(frontier_count: int = 3, is_stuck: bool = False, robot_count: int = 1
         no_progress_steps=0,
         blocked_path_count=0,
         recent_termination_reasons=(SkillTermination.SUCCESS,),
+        map_quality_health=map_quality_health,
     )
 
 
@@ -62,5 +68,39 @@ def test_team_skills_require_multi_robot_state() -> None:
     single_robot_proposals, _ = registry.proposals_for(_state(robot_count=1))
     multi_robot_proposals, _ = registry.proposals_for(_state(robot_count=3))
 
-    assert "robot_deconflict" not in {proposal.skill_id for proposal in single_robot_proposals}
-    assert "robot_deconflict" in {proposal.skill_id for proposal in multi_robot_proposals}
+    single_robot_ids = {proposal.skill_id for proposal in single_robot_proposals}
+    multi_robot_ids = {proposal.skill_id for proposal in multi_robot_proposals}
+
+    assert "robot_deconflict" not in single_robot_ids
+    assert "relay_or_rendezvous" not in single_robot_ids
+    assert "robot_deconflict" in multi_robot_ids
+    assert "relay_or_rendezvous" in multi_robot_ids
+
+
+def test_loop_closure_probe_eligible_when_map_quality_is_low_and_frontiers_exist() -> None:
+    registry = create_default_skill_registry()
+
+    proposals, gates = registry.proposals_for(_state(frontier_count=2, map_quality_health=0.5))
+
+    assert "loop_closure_probe" in {proposal.skill_id for proposal in proposals}
+    assert any(gate.skill_id == "loop_closure_probe" and gate.eligible for gate in gates)
+
+
+def test_loop_closure_probe_reports_only_no_frontiers_when_map_quality_is_low() -> None:
+    registry = create_default_skill_registry()
+
+    _, gates = registry.proposals_for(_state(frontier_count=0, map_quality_health=0.5))
+
+    gate = next(gate for gate in gates if gate.skill_id == "loop_closure_probe")
+    assert not gate.eligible
+    assert gate.reasons == ("no_frontiers",)
+
+
+def test_loop_closure_probe_reports_only_map_quality_when_frontiers_exist() -> None:
+    registry = create_default_skill_registry()
+
+    _, gates = registry.proposals_for(_state(frontier_count=2, map_quality_health=0.95))
+
+    gate = next(gate for gate in gates if gate.skill_id == "loop_closure_probe")
+    assert not gate.eligible
+    assert gate.reasons == ("map_quality_sufficient",)
