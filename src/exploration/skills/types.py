@@ -4,7 +4,7 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from math import isfinite
-from typing import Any
+from typing import Any, cast
 
 
 def _require_non_negative_int(field_name: str, value: Any) -> int:
@@ -30,6 +30,26 @@ def _require_skill_termination(field_name: str, value: Any) -> SkillTermination:
     if not isinstance(value, SkillTermination):
         raise TypeError(f"{field_name} must be a SkillTermination instance")
     return value
+
+
+def _require_skill_target(field_name: str, value: Any) -> tuple[float, float, float] | None:
+    if value is None:
+        return None
+    if not isinstance(value, (tuple, list)):
+        raise TypeError(f"{field_name} must be None or a 3-tuple of finite real numbers")
+    if len(value) != 3:
+        raise ValueError(f"{field_name} must be None or a 3-tuple of finite real numbers")
+
+    coords: list[float] = []
+    for coordinate in value:
+        if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)):
+            raise TypeError(f"{field_name} must be None or a 3-tuple of finite real numbers")
+        numeric_coordinate = float(coordinate)
+        if not isfinite(numeric_coordinate):
+            raise ValueError(f"{field_name} must be None or a 3-tuple of finite real numbers")
+        coords.append(numeric_coordinate)
+
+    return cast(tuple[float, float, float], tuple(coords))
 
 
 class SkillTermination(str, Enum):
@@ -148,6 +168,7 @@ class SkillProposal:
     reason_codes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "target", _require_skill_target("target", self.target))
         _require_real_in_range("risk", self.risk, 0.0, 1.0)
         _require_real_in_range("confidence", self.confidence, 0.0, 1.0)
         _require_non_negative_int("min_commitment_steps", self.min_commitment_steps)

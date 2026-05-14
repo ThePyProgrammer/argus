@@ -142,6 +142,41 @@ def test_skill_proposal_serializes_targetless_proposals() -> None:
     assert payload["reason_codes"] == ["replan_after_progress"]
 
 
+@pytest.mark.parametrize(
+    ("target", "expected_exception", "expected_message"),
+    [
+        ((), ValueError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, 2.0), ValueError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, 2.0, 3.0, 4.0), ValueError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, "2", 3.0), TypeError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, True, 3.0), TypeError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, float("nan"), 3.0), ValueError, "target must be None or a 3-tuple of finite real numbers"),
+        ((1.0, float("inf"), 3.0), ValueError, "target must be None or a 3-tuple of finite real numbers"),
+    ],
+)
+def test_skill_proposal_rejects_invalid_targets(
+    target: object,
+    expected_exception: type[Exception],
+    expected_message: str,
+) -> None:
+    with pytest.raises(expected_exception, match=expected_message):
+        SkillProposal(
+            skill_id="frontier_pursuit",
+            skill_version="1.0",
+            target=target,
+            predicted_coverage_gain=0.4,
+            predicted_frontier_delta=2.0,
+            travel_cost=3.0,
+            risk=0.1,
+            connectivity_impact=0.0,
+            map_quality_impact=0.2,
+            min_commitment_steps=5,
+            cancellation_triggers=(),
+            confidence=0.8,
+            reason_codes=(),
+        )
+
+
 def test_skill_proposal_rejects_invalid_bounds() -> None:
     base_kwargs = dict(
         skill_id="frontier_pursuit",
