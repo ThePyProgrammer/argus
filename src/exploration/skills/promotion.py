@@ -26,6 +26,18 @@ class PromotionGateConfig:
     max_switch_rate_delta: float = 0.1
     min_map_quality_delta: float = -0.01
 
+    def __post_init__(self) -> None:
+        for field_name in (
+            "min_score_improvement",
+            "min_coverage_delta",
+            "max_safety_event_delta",
+            "max_recovery_event_delta",
+            "max_path_length_delta",
+            "max_switch_rate_delta",
+            "min_map_quality_delta",
+        ):
+            _as_finite_real(getattr(self, field_name), field_name)
+
 
 @dataclass(frozen=True)
 class PromotionReport:
@@ -35,12 +47,12 @@ class PromotionReport:
     regressions: tuple[str, ...]
 
 
-def _as_finite_real(value: object) -> float:
+def _as_finite_real(value: object, field_name: str = "metric values") -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
-        raise TypeError("metric values must be finite real numbers")
+        raise TypeError(f"{field_name} must be a finite real number")
     numeric_value = float(value)
     if not isfinite(numeric_value):
-        raise ValueError("metric values must be finite real numbers")
+        raise ValueError(f"{field_name} must be a finite real number")
     return numeric_value
 
 
