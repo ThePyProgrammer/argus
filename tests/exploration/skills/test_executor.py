@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from src.exploration.skills.executor import SkillExecutor
 from src.exploration.skills.types import SkillDecision, SkillParameterProfile, SkillProposal
@@ -44,7 +45,18 @@ def test_executor_returns_none_for_baseline_decision() -> None:
 
     assert result.score_fn is None
     assert result.fallback_used is True
+    assert result.termination_reason == "baseline_fallback"
     assert result.reason_codes == ("test",)
+
+
+def test_executor_returns_none_for_non_target_required_targetless_skill() -> None:
+    executor = SkillExecutor()
+
+    result = executor.apply(_decision(_proposal("exploration_pass", target=None)))
+
+    assert result.score_fn is None
+    assert result.fallback_used is False
+    assert result.termination_reason is None
 
 
 def test_executor_rejects_targetless_frontier_skill() -> None:
@@ -66,3 +78,37 @@ def test_executor_builds_frontier_bias_for_targeted_skill() -> None:
 
     assert result.fallback_used is False
     assert near_score > far_score
+    assert near_score == 0.0
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        np.array([np.nan, 0.0]),
+        np.array([0.0, np.inf]),
+        [np.nan, 0.0],
+        [0.0, np.inf],
+    ],
+)
+def test_executor_rejects_non_finite_candidates(candidate: object) -> None:
+    executor = SkillExecutor()
+    result = executor.apply(_decision(_proposal("frontier_pursuit", target=(2.0, 0.0, 0.0))))
+
+    with pytest.raises(ValueError, match="candidate"):
+        result.score_fn(candidate)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        np.array([[2.0, 0.0], [3.0, 4.0]]),
+        np.array([[2.0, 0.0, 1.0]]),
+        [[2.0, 0.0], [3.0, 4.0]],
+    ],
+)
+def test_executor_rejects_batched_or_higher_rank_candidates(candidate: object) -> None:
+    executor = SkillExecutor()
+    result = executor.apply(_decision(_proposal("frontier_pursuit", target=(2.0, 0.0, 0.0))))
+
+    with pytest.raises(ValueError, match="candidate"):
+        result.score_fn(candidate)  # type: ignore[arg-type]

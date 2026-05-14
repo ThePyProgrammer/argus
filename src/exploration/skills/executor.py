@@ -55,11 +55,16 @@ class SkillExecutor:
         target_xy = (float(proposal.target[0]), float(proposal.target[1]))
 
         def score_fn(candidate: np.ndarray) -> float:
-            candidate_xy = np.asarray(candidate, dtype=float).reshape(-1)
+            candidate_xy = np.asarray(candidate, dtype=float)
+            if candidate_xy.ndim != 1:
+                raise ValueError("candidate must be a 1-D vector with at least two finite coordinates")
             if candidate_xy.size < 2:
-                raise ValueError("candidate must have at least two coordinates")
+                raise ValueError("candidate must be a 1-D vector with at least two finite coordinates")
+            if not np.isfinite(candidate_xy).all():
+                raise ValueError("candidate coordinates must be finite")
+
             distance = hypot(candidate_xy[0] - target_xy[0], candidate_xy[1] - target_xy[1])
-            return 1.0 / (1.0 + distance)
+            return -distance
 
         return SkillExecutionResult(
             score_fn=score_fn,
