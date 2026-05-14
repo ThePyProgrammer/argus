@@ -5,6 +5,29 @@ from enum import Enum
 from typing import Any
 
 
+def _require_non_negative_int(field_name: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{field_name} must be a non-negative integer")
+    if value < 0:
+        raise ValueError(f"{field_name} must be a non-negative integer")
+    return value
+
+
+def _require_real_in_range(field_name: str, value: Any, minimum: float, maximum: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{field_name} must be a real number")
+    numeric_value = float(value)
+    if numeric_value < minimum or numeric_value > maximum:
+        raise ValueError(f"{field_name} must be between {minimum} and {maximum}")
+    return numeric_value
+
+
+def _require_skill_termination(field_name: str, value: Any) -> SkillTermination:
+    if not isinstance(value, SkillTermination):
+        raise TypeError(f"{field_name} must be a SkillTermination instance")
+    return value
+
+
 class SkillTermination(str, Enum):
     success = "success"
     failure = "failure"
@@ -44,6 +67,9 @@ class SkillParameterProfile:
     profile_id: str
     values: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "values", dict(self.values))
+
     def to_dict(self) -> dict[str, Any]:
         return {"profile_id": self.profile_id, "values": dict(self.values)}
 
@@ -79,6 +105,16 @@ class SkillState:
     scenario_id: str | None = None
     seed: int | None = None
 
+    def __post_init__(self) -> None:
+        _require_real_in_range("coverage_pct", self.coverage_pct, 0.0, 100.0)
+        _require_non_negative_int("robot_count", self.robot_count)
+        _require_non_negative_int("no_progress_steps", self.no_progress_steps)
+        _require_non_negative_int("blocked_path_count", self.blocked_path_count)
+        object.__setattr__(self, "recent_termination_reasons", tuple(
+            _require_skill_termination("recent_termination_reasons", reason)
+            for reason in self.recent_termination_reasons
+        ))
+
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["recent_skill_ids"] = list(self.recent_skill_ids)
@@ -101,6 +137,13 @@ class SkillProposal:
     cancellation_triggers: tuple[str, ...] = ()
     confidence: float = 0.0
     reason_codes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_real_in_range("risk", self.risk, 0.0, 1.0)
+        _require_real_in_range("confidence", self.confidence, 0.0, 1.0)
+        _require_non_negative_int("min_commitment_steps", self.min_commitment_steps)
+        object.__setattr__(self, "cancellation_triggers", tuple(self.cancellation_triggers))
+        object.__setattr__(self, "reason_codes", tuple(self.reason_codes))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -129,6 +172,11 @@ class SkillDecision:
     reason_codes: tuple[str, ...] = ()
     fallback_skill_id: str | None = None
     rejected_candidates: tuple[GateResult, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_real_in_range("confidence", self.confidence, 0.0, 1.0)
+        object.__setattr__(self, "reason_codes", tuple(self.reason_codes))
+        object.__setattr__(self, "rejected_candidates", tuple(self.rejected_candidates))
 
     @classmethod
     def baseline(cls, reason_codes: tuple[str, ...]) -> SkillDecision:
@@ -172,6 +220,11 @@ class SkillOutcomeVector:
     future_affordance_gain: float
     termination: SkillTermination
     fallback_used: bool
+
+    def __post_init__(self) -> None:
+        _require_non_negative_int("safety_events", self.safety_events)
+        _require_non_negative_int("recovery_events", self.recovery_events)
+        object.__setattr__(self, "termination", _require_skill_termination("termination", self.termination))
 
     def to_dict(self) -> dict[str, Any]:
         return {
