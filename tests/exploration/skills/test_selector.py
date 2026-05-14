@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.exploration.skills.selector import GatedSkillSelector, SkillSelectorConfig
 from src.exploration.skills.types import GateResult, SkillProposal, SkillState, SkillTermination
 
@@ -19,7 +21,14 @@ def _state(is_stuck: bool = False, no_progress_steps: int = 0) -> SkillState:
     )
 
 
-def _proposal(skill_id: str, confidence: float, coverage_gain: float, travel_cost: float, risk: float = 0.0) -> SkillProposal:
+def _proposal(
+    skill_id: str,
+    confidence: float,
+    coverage_gain: float,
+    travel_cost: float,
+    risk: float = 0.0,
+    reason_codes: tuple[str, ...] = ("candidate",),
+) -> SkillProposal:
     return SkillProposal(
         skill_id=skill_id,
         skill_version="1.0",
@@ -33,26 +42,30 @@ def _proposal(skill_id: str, confidence: float, coverage_gain: float, travel_cos
         min_commitment_steps=3,
         cancellation_triggers=(),
         confidence=confidence,
-        reason_codes=("candidate",),
+        reason_codes=reason_codes,
     )
 
 
 def test_selector_returns_baseline_when_no_candidates() -> None:
     selector = GatedSkillSelector()
+    gates = (GateResult("frontier_pursuit", False, ("shadow_disabled",)),)
 
-    decision = selector.select(_state(), proposals=(), gates=())
+    decision = selector.select(_state(), proposals=(), gates=gates)
 
     assert decision.uses_baseline
     assert decision.reason_codes == ("no_eligible_proposals",)
+    assert decision.rejected_candidates == gates
 
 
 def test_selector_rejects_low_confidence_candidates() -> None:
     selector = GatedSkillSelector(SkillSelectorConfig(min_confidence=0.7))
+    gates = (GateResult("frontier_pursuit", True),)
 
-    decision = selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.5, 1.0, 1.0),), gates=())
+    decision = selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.5, 1.0, 1.0),), gates=gates)
 
     assert decision.uses_baseline
     assert decision.reason_codes == ("low_confidence",)
+    assert decision.rejected_candidates == gates
 
 
 def test_selector_prefers_stuck_recovery_when_robot_is_stuck() -> None:
@@ -86,6 +99,26 @@ def test_selector_scores_gain_cost_and_risk() -> None:
     assert decision.selected_skill_id == "efficient"
 
 
+def test_selector_filters_ineligible_gated_proposals() -> None:
+    selector = GatedSkillSelector()
+    gates = (
+        GateResult("blocked", False, ("unsafe",)),
+        GateResult("allowed", True),
+    )
+
+    decision = selector.select(
+        _state(),
+        proposals=(
+            _proposal("blocked", 0.9, 10.0, 0.1),
+            _proposal("allowed", 0.9, 1.0, 0.1),
+        ),
+        gates=gates,
+    )
+
+    assert decision.selected_skill_id == "allowed"
+    assert decision.rejected_candidates == gates
+
+
 def test_selector_degrades_to_baseline_after_repeated_failure() -> None:
     selector = GatedSkillSelector(SkillSelectorConfig(max_failures_before_baseline=2))
     selector.record_termination("frontier_pursuit", SkillTermination.FAILURE)
@@ -109,3 +142,71 @@ def test_selector_respects_minimum_dwell_for_non_safety_switches() -> None:
 
     assert decision.uses_baseline
     assert decision.reason_codes == ("minimum_dwell_active",)
+
+
+def test_selector_minimum_dwell_eventually_expires() -> None:
+    selector = GatedSkillSelector(SkillSelectorConfig(min_dwell_steps=2))
+    selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.9, 2.0, 1.0),), gates=())
+
+    first_blocked = selector.select(_state(), proposals=(_proposal("coverage_sweep", 0.9, 4.0, 0.5),), gates=())
+    second_blocked = selector.select(_state(), proposals=(_proposal("coverage_sweep", 0.9, 4.0, 0.5),), gates=())
+    allowed = selector.select(_state(), proposals=(_proposal("coverage_sweep", 0.9, 4.0, 0.5),), gates=())
+
+    assert first_blocked.reason_codes == ("minimum_dwell_active",)
+    assert second_blocked.reason_codes == ("minimum_dwell_active",)
+    assert allowed.selected_skill_id == "coverage_sweep"
+
+
+def test_selector_safety_reason_code_bypasses_minimum_dwell() -> None:
+    selector = GatedSkillSelector(SkillSelectorConfig(min_dwell_steps=4))
+    selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.9, 2.0, 1.0),), gates=())
+
+    decision = selector.select(
+        _state(),
+        proposals=(_proposal("hazard_response", 0.9, 0.0, 0.1, reason_codes=("safety",)),),
+        gates=(),
+    )
+
+    assert decision.selected_skill_id == "hazard_response"
+    assert decision.reason_codes == ("safety",)
+
+
+def test_selector_emergency_reason_code_bypasses_minimum_dwell() -> None:
+    selector = GatedSkillSelector(SkillSelectorConfig(min_dwell_steps=4))
+    selector.select(_state(), proposals=(_proposal("frontier_pursuit", 0.9, 2.0, 1.0),), gates=())
+
+    decision = selector.select(
+        _state(),
+        proposals=(_proposal("emergency_stop", 0.9, 0.0, 0.1, reason_codes=("emergency",)),),
+        gates=(),
+    )
+
+    assert decision.selected_skill_id == "emergency_stop"
+    assert decision.reason_codes == ("emergency",)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "exception_type"),
+    (
+        ("min_confidence", -0.1, ValueError),
+        ("min_confidence", 1.1, ValueError),
+        ("min_confidence", float("nan"), ValueError),
+        ("min_confidence", True, TypeError),
+        ("min_dwell_steps", -1, ValueError),
+        ("min_dwell_steps", 1.5, TypeError),
+        ("min_dwell_steps", False, TypeError),
+        ("max_failures_before_baseline", 0, ValueError),
+        ("max_failures_before_baseline", 1.5, TypeError),
+        ("max_failures_before_baseline", True, TypeError),
+        ("coverage_gain_weight", float("inf"), ValueError),
+        ("frontier_delta_weight", "heavy", TypeError),
+        ("travel_cost_weight", True, TypeError),
+        ("risk_weight", float("nan"), ValueError),
+        ("connectivity_weight", object(), TypeError),
+        ("map_quality_weight", float("-inf"), ValueError),
+        ("stuck_recovery_bonus", None, TypeError),
+    ),
+)
+def test_selector_config_rejects_invalid_values(field_name: str, value: object, exception_type: type[Exception]) -> None:
+    with pytest.raises(exception_type, match=field_name):
+        SkillSelectorConfig(**{field_name: value})
