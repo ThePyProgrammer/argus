@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from json import dumps
 from uuid import uuid4
@@ -16,10 +17,10 @@ class SkillTraceRecord:
     robot_ids: tuple[str, ...]
     selector_version: str
     skill_library_version: str
-    state: SkillState
-    gates: tuple[GateResult, ...]
-    decision: SkillDecision
-    outcome: SkillOutcomeVector | None = None
+    state: dict[str, object]
+    gates: tuple[dict[str, object], ...]
+    decision: dict[str, object]
+    outcome: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -30,10 +31,10 @@ class SkillTraceRecord:
             "robot_ids": list(self.robot_ids),
             "selector_version": self.selector_version,
             "skill_library_version": self.skill_library_version,
-            "state": self.state.to_dict(),
-            "gates": [gate.to_dict() for gate in self.gates],
-            "decision": self.decision.to_dict(),
-            "outcome": None if self.outcome is None else self.outcome.to_dict(),
+            "state": deepcopy(self.state),
+            "gates": [deepcopy(gate) for gate in self.gates],
+            "decision": deepcopy(self.decision),
+            "outcome": None if self.outcome is None else deepcopy(self.outcome),
         }
 
 
@@ -68,9 +69,9 @@ class SkillOutcomeRecorder:
                 robot_ids=tuple(robot_ids),
                 selector_version=self._selector_version,
                 skill_library_version=self._skill_library_version,
-                state=state,
-                gates=tuple(gates),
-                decision=decision,
+                state=state.to_dict(),
+                gates=tuple(gate.to_dict() for gate in gates),
+                decision=decision.to_dict(),
             )
         )
         return trace_id
@@ -89,10 +90,10 @@ class SkillOutcomeRecorder:
                     state=record.state,
                     gates=record.gates,
                     decision=record.decision,
-                    outcome=outcome,
+                    outcome=outcome.to_dict(),
                 )
                 return
         raise KeyError(trace_id)
 
     def to_jsonl(self) -> str:
-        return "\n".join(dumps(record.to_dict(), sort_keys=True) for record in self._records)
+        return "\n".join(dumps(record.to_dict(), sort_keys=True, allow_nan=False) for record in self._records)
