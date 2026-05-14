@@ -72,6 +72,16 @@ def test_targetless_proposals_use_none_targets() -> None:
     assert proposal_by_id["stuck_recovery"].target is None
 
 
+def test_targetless_proposals_remain_serializable() -> None:
+    registry = create_default_skill_registry()
+
+    proposals, _ = registry.proposals_for(_state(frontier_count=1, is_stuck=True))
+    payload_by_id = {proposal.skill_id: proposal.to_dict() for proposal in proposals if proposal.skill_id in {"replan", "stuck_recovery"}}
+
+    assert payload_by_id["replan"]["target"] is None
+    assert payload_by_id["stuck_recovery"]["target"] is None
+
+
 def test_team_skills_require_multi_robot_state() -> None:
     registry = create_default_skill_registry()
 

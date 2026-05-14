@@ -135,7 +135,7 @@ class SkillState:
 class SkillProposal:
     skill_id: str
     skill_version: str
-    target: tuple[float, ...]
+    target: tuple[float, ...] | None
     predicted_coverage_gain: float
     predicted_frontier_delta: float
     travel_cost: float
@@ -158,7 +158,7 @@ class SkillProposal:
         return {
             "skill_id": self.skill_id,
             "skill_version": self.skill_version,
-            "target": list(self.target),
+            "target": None if self.target is None else list(self.target),
             "predicted_coverage_gain": self.predicted_coverage_gain,
             "predicted_frontier_delta": self.predicted_frontier_delta,
             "travel_cost": self.travel_cost,

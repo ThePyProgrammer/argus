@@ -119,6 +119,29 @@ def test_skill_proposal_contains_audit_fields() -> None:
     assert payload["reason_codes"] == ["nearest_high_value_frontier"]
 
 
+def test_skill_proposal_serializes_targetless_proposals() -> None:
+    proposal = SkillProposal(
+        skill_id="replan",
+        skill_version="1.0",
+        target=None,
+        predicted_coverage_gain=0.1,
+        predicted_frontier_delta=0.2,
+        travel_cost=0.2,
+        risk=0.0,
+        connectivity_impact=0.1,
+        map_quality_impact=0.0,
+        min_commitment_steps=1,
+        cancellation_triggers=(),
+        confidence=0.6,
+        reason_codes=("replan_after_progress",),
+    )
+
+    payload = proposal.to_dict()
+
+    assert payload["target"] is None
+    assert payload["reason_codes"] == ["replan_after_progress"]
+
+
 def test_skill_proposal_rejects_invalid_bounds() -> None:
     base_kwargs = dict(
         skill_id="frontier_pursuit",
