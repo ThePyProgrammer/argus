@@ -334,6 +334,61 @@ class TestExplorationLoop:
         assert isinstance(result, ExplorationResult)
 
 
+def test_skill_learning_disabled_preserves_baseline_score_fn() -> None:
+    bridge = MockBridge()
+    slam = MockSLAM()
+    octomap = MockOctoMap()
+    loop = ExplorationLoop(
+        bridge,
+        slam,
+        octomap,
+        config=ExplorationConfig(
+            skill_learning_enabled=False,
+            rescan_distance_m=0.0,
+            rescan_voxel_delta=0,
+        ),
+    )
+    observed = {}
+
+    def score_fn(candidate: np.ndarray) -> float:
+        observed["called"] = True
+        return -float(np.linalg.norm(candidate[:2]))
+
+    loop.frontier_detector.detect = lambda occupied, grid_2d=None: [_make_cluster([2.0, 0.0, 0.0])]
+    loop._path_planner.plan = lambda start, goal, grid: [start, goal]
+
+    frame = _make_sensor_frame()
+    _, _, metrics = loop.step_once(frame, step=30, score_fn=score_fn)
+
+    assert metrics.frontiers == 1
+    assert observed["called"] is True
+
+
+def test_skill_learning_enabled_records_decision_trace() -> None:
+    bridge = MockBridge()
+    slam = MockSLAM()
+    octomap = MockOctoMap()
+    loop = ExplorationLoop(
+        bridge,
+        slam,
+        octomap,
+        config=ExplorationConfig(
+            skill_learning_enabled=True,
+            rescan_distance_m=0.0,
+            rescan_voxel_delta=0,
+        ),
+    )
+    loop.frontier_detector.detect = lambda occupied, grid_2d=None: [_make_cluster([2.0, 0.0, 0.0])]
+    loop._path_planner.plan = lambda start, goal, grid: [start, goal]
+
+    frame = _make_sensor_frame()
+    _, _, metrics = loop.step_once(frame, step=30)
+
+    assert metrics.frontiers == 1
+    assert loop.skill_trace_jsonl()
+    assert "frontier_pursuit" in loop.skill_trace_jsonl()
+
+
 # ---------------------------------------------------------------------------
 # StuckRecovery tests
 # ---------------------------------------------------------------------------

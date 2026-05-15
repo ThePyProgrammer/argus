@@ -42,6 +42,12 @@ from src.exploration.frontier_detector import FrontierDetector
 from src.exploration.goal_selector import GoalSelector
 from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
+from src.exploration.skills.executor import SkillExecutionResult, SkillExecutor
+from src.exploration.skills.library import create_default_skill_registry
+from src.exploration.skills.recorder import SkillOutcomeRecorder
+from src.exploration.skills.selector import GatedSkillSelector, SkillSelectorConfig
+from src.exploration.skills.state import SkillStateEncoder
+from src.exploration.skills.types import SkillOutcomeVector, SkillTermination
 from src.control.waypoint_runner import WaypointRunner
 
 logger = logging.getLogger(__name__)
@@ -166,6 +172,27 @@ class ExplorationLoop:
         self._last_frontier_count = 0
         self.last_tracking_status: str = "ok"
 
+        self._skill_registry = create_default_skill_registry() if self._config.skill_learning_enabled else None
+        self._skill_selector = (
+            GatedSkillSelector(
+                SkillSelectorConfig(
+                    min_confidence=self._config.skill_learning_min_confidence,
+                    min_dwell_steps=self._config.skill_learning_min_dwell_steps,
+                    max_failures_before_baseline=self._config.skill_learning_max_failures_before_baseline,
+                )
+            )
+            if self._config.skill_learning_enabled
+            else None
+        )
+        self._skill_executor = SkillExecutor() if self._config.skill_learning_enabled else None
+        self._skill_state_encoder = SkillStateEncoder() if self._config.skill_learning_enabled else None
+        self._skill_recorder = (
+            SkillOutcomeRecorder(run_id="local", selector_version="gated-v1", skill_library_version="default-v1")
+            if self._config.skill_learning_enabled
+            else None
+        )
+        self._last_skill_trace_id: str | None = None
+
     @property
     def frontier_detector(self) -> FrontierDetector:
         return self._frontier_detector
@@ -189,6 +216,12 @@ class ExplorationLoop:
             linear_speed=self._config.linear_speed,
             angular_speed=self._config.angular_speed,
         )
+
+    def skill_trace_jsonl(self) -> str:
+        """Return skill-learning decision/outcome traces as JSONL when enabled."""
+        if self._skill_recorder is None:
+            return ""
+        return self._skill_recorder.to_jsonl()
 
     # ------------------------------------------------------------------
     # Extracted helpers (called only from step_once)
@@ -355,6 +388,38 @@ class ExplorationLoop:
 
         frontier_count = len(frontiers)
         terminated = False
+        effective_score_fn = score_fn
+        skill_execution: SkillExecutionResult | None = None
+
+        if (self._skill_registry is not None
+                and self._skill_selector is not None
+                and self._skill_executor is not None
+                and self._skill_state_encoder is not None
+                and self._skill_recorder is not None):
+            state = self._skill_state_encoder.encode(
+                coverage_pct=self._last_coverage,
+                previous_coverage_pct=self._last_coverage,
+                robot_position=current_pos,
+                frontiers=frontiers,
+                is_stuck=self._stuck_recovery.is_active,
+                no_progress_steps=self._stuck_counter,
+                blocked_path_count=0,
+                recent_skill_ids=(),
+                recent_termination_reasons=(),
+            )
+            proposals, gates = self._skill_registry.proposals_for(state)
+            decision = self._skill_selector.select(state, proposals=proposals, gates=gates)
+            self._last_skill_trace_id = self._skill_recorder.record_decision(
+                scenario="local",
+                seed=0,
+                robot_ids=(state.robot_id,),
+                state=state,
+                gates=gates,
+                decision=decision,
+            )
+            skill_execution = self._skill_executor.apply(decision)
+            if not self._config.skill_learning_shadow_mode:
+                effective_score_fn = skill_execution.score_fn if skill_execution.score_fn is not None else score_fn
 
         if not frontiers:
             terminated = True
@@ -365,9 +430,9 @@ class ExplorationLoop:
             path = None
 
             while remaining:
-                if score_fn is not None:
+                if effective_score_fn is not None:
                     candidate = self._goal_selector.select_with_bias(
-                        remaining, pose, score_fn,
+                        remaining, pose, effective_score_fn,
                     )
                 else:
                     candidate = self._goal_selector.select(remaining, pose)
@@ -401,9 +466,32 @@ class ExplorationLoop:
         self._last_voxel_count = self._octomap.num_occupied
 
         # Update coverage
+        previous_coverage = self._last_coverage
         cov, bbox_cov = self._coverage_tracker.update(
             self._octomap.get_occupied_voxels(), frontier_count,
         )
+
+        if self._skill_recorder is not None and self._last_skill_trace_id:
+            path_succeeded = path is not None if frontiers else False
+            fallback_used = bool(skill_execution.fallback_used) if skill_execution is not None else not path_succeeded
+            self._skill_recorder.record_outcome(
+                self._last_skill_trace_id,
+                SkillOutcomeVector(
+                    coverage_gain=max(0.0, cov - previous_coverage),
+                    frontier_delta=0.0,
+                    path_length=float(len(path)) if path is not None else 0.0,
+                    command_effort=0.0,
+                    safety_events=0,
+                    recovery_events=0,
+                    duplicate_coverage_delta=0.0,
+                    connectivity_delta=0.0,
+                    map_quality_delta=0.0,
+                    future_affordance_gain=0.0,
+                    termination=SkillTermination.SUCCESS if path_succeeded else SkillTermination.BASELINE_FALLBACK,
+                    fallback_used=fallback_used,
+                ),
+            )
+
         self._last_coverage = cov
         self._last_bbox_coverage = bbox_cov
         self._last_frontier_count = frontier_count
