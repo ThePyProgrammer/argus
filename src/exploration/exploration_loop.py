@@ -390,6 +390,8 @@ class ExplorationLoop:
         terminated = False
         effective_score_fn = score_fn
         skill_execution: SkillExecutionResult | None = None
+        selected_skill_id: str | None = None
+        path: list[np.ndarray] | None = None
 
         if (self._skill_registry is not None
                 and self._skill_selector is not None
@@ -409,6 +411,7 @@ class ExplorationLoop:
             )
             proposals, gates = self._skill_registry.proposals_for(state)
             decision = self._skill_selector.select(state, proposals=proposals, gates=gates)
+            selected_skill_id = decision.selected_skill_id
             self._last_skill_trace_id = self._skill_recorder.record_decision(
                 scenario="local",
                 seed=0,
@@ -427,7 +430,6 @@ class ExplorationLoop:
             # Try to find a reachable frontier
             remaining = list(frontiers)
             goal = None
-            path = None
 
             while remaining:
                 if effective_score_fn is not None:
@@ -472,25 +474,34 @@ class ExplorationLoop:
         )
 
         if self._skill_recorder is not None and self._last_skill_trace_id:
-            path_succeeded = path is not None if frontiers else False
-            fallback_used = bool(skill_execution.fallback_used) if skill_execution is not None else not path_succeeded
-            self._skill_recorder.record_outcome(
-                self._last_skill_trace_id,
-                SkillOutcomeVector(
-                    coverage_gain=max(0.0, cov - previous_coverage),
-                    frontier_delta=0.0,
-                    path_length=float(len(path)) if path is not None else 0.0,
-                    command_effort=0.0,
-                    safety_events=0,
-                    recovery_events=0,
-                    duplicate_coverage_delta=0.0,
-                    connectivity_delta=0.0,
-                    map_quality_delta=0.0,
-                    future_affordance_gain=0.0,
-                    termination=SkillTermination.SUCCESS if path_succeeded else SkillTermination.BASELINE_FALLBACK,
-                    fallback_used=fallback_used,
-                ),
+            path_succeeded = path is not None
+            fallback_used = bool(skill_execution.fallback_used) if skill_execution is not None else True
+            if fallback_used:
+                termination = SkillTermination.BASELINE_FALLBACK
+            elif path_succeeded:
+                termination = SkillTermination.SUCCESS
+            else:
+                termination = SkillTermination.FAILURE
+
+            outcome = SkillOutcomeVector(
+                coverage_gain=max(0.0, cov - previous_coverage),
+                frontier_delta=0.0,
+                path_length=float(len(path)) if path is not None else 0.0,
+                command_effort=0.0,
+                safety_events=0,
+                recovery_events=0,
+                duplicate_coverage_delta=0.0,
+                connectivity_delta=0.0,
+                map_quality_delta=0.0,
+                future_affordance_gain=0.0,
+                termination=termination,
+                fallback_used=fallback_used,
             )
+            self._skill_recorder.record_outcome(self._last_skill_trace_id, outcome)
+            if (self._skill_selector is not None
+                    and selected_skill_id is not None
+                    and selected_skill_id != "baseline"):
+                self._skill_selector.record_termination(selected_skill_id, termination)
 
         self._last_coverage = cov
         self._last_bbox_coverage = bbox_cov

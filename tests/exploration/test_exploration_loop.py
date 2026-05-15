@@ -5,6 +5,7 @@ detect-select-plan-navigate cycle with various termination conditions.
 """
 
 
+import json
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -384,9 +385,72 @@ def test_skill_learning_enabled_records_decision_trace() -> None:
     frame = _make_sensor_frame()
     _, _, metrics = loop.step_once(frame, step=30)
 
+    records = [json.loads(line) for line in loop.skill_trace_jsonl().splitlines()]
+    outcome = records[-1]["outcome"]
     assert metrics.frontiers == 1
-    assert loop.skill_trace_jsonl()
+    assert records[-1]["decision"]["selected_skill_id"] != "baseline"
     assert "frontier_pursuit" in loop.skill_trace_jsonl()
+    assert outcome["termination"] == "success"
+    assert outcome["fallback_used"] is False
+
+
+def test_skill_learning_enabled_no_frontiers_records_baseline_outcome() -> None:
+    bridge = MockBridge()
+    slam = MockSLAM()
+    octomap = MockOctoMap()
+    loop = ExplorationLoop(
+        bridge,
+        slam,
+        octomap,
+        config=ExplorationConfig(
+            skill_learning_enabled=True,
+            rescan_distance_m=0.0,
+            rescan_voxel_delta=0,
+        ),
+    )
+    loop.frontier_detector.detect = lambda occupied, grid_2d=None: []
+
+    frame = _make_sensor_frame()
+    _, _, metrics = loop.step_once(frame, step=30)
+
+    records = [json.loads(line) for line in loop.skill_trace_jsonl().splitlines()]
+    outcome = records[-1]["outcome"]
+    assert metrics.terminated is True
+    assert metrics.frontiers == 0
+    assert records[-1]["decision"]["selected_skill_id"] == "baseline"
+    assert outcome["termination"] == "baseline_fallback"
+    assert outcome["fallback_used"] is True
+    assert outcome["path_length"] == 0.0
+
+
+def test_skill_learning_enabled_unreachable_frontier_records_failure_outcome() -> None:
+    bridge = MockBridge()
+    slam = MockSLAM()
+    octomap = MockOctoMap()
+    loop = ExplorationLoop(
+        bridge,
+        slam,
+        octomap,
+        config=ExplorationConfig(
+            skill_learning_enabled=True,
+            rescan_distance_m=0.0,
+            rescan_voxel_delta=0,
+        ),
+    )
+    loop.frontier_detector.detect = lambda occupied, grid_2d=None: [_make_cluster([2.0, 0.0, 0.0])]
+    loop._path_planner.plan = lambda start, goal, grid: None
+
+    frame = _make_sensor_frame()
+    _, _, metrics = loop.step_once(frame, step=30)
+
+    records = [json.loads(line) for line in loop.skill_trace_jsonl().splitlines()]
+    outcome = records[-1]["outcome"]
+    assert metrics.terminated is True
+    assert metrics.frontiers == 1
+    assert records[-1]["decision"]["selected_skill_id"] != "baseline"
+    assert outcome["termination"] == "failure"
+    assert outcome["fallback_used"] is False
+    assert outcome["path_length"] == 0.0
 
 
 # ---------------------------------------------------------------------------
