@@ -394,6 +394,46 @@ def test_skill_learning_enabled_records_decision_trace() -> None:
     assert outcome["fallback_used"] is False
 
 
+def test_skill_learning_shadow_mode_records_without_changing_baseline_bias() -> None:
+    bridge = MockBridge()
+    slam = MockSLAM()
+    octomap = MockOctoMap()
+    loop = ExplorationLoop(
+        bridge,
+        slam,
+        octomap,
+        config=ExplorationConfig(
+            skill_learning_enabled=True,
+            skill_learning_shadow_mode=True,
+            rescan_distance_m=0.0,
+            rescan_voxel_delta=0,
+        ),
+    )
+    loop.frontier_detector.detect = lambda occupied, grid_2d=None: [
+        _make_cluster([1.0, 0.0, 0.0]),
+        _make_cluster([5.0, 0.0, 0.0]),
+    ]
+    selected_goals: list[np.ndarray] = []
+
+    def fake_plan(start: np.ndarray, goal: np.ndarray, grid: np.ndarray) -> list[np.ndarray]:
+        selected_goals.append(goal)
+        return [start, goal]
+
+    loop._path_planner.plan = fake_plan
+
+    def prefer_far(candidate: np.ndarray) -> float:
+        return float(candidate[0])
+
+    frame = _make_sensor_frame()
+    _, _, metrics = loop.step_once(frame, step=30, score_fn=prefer_far)
+
+    trace_lines = loop.skill_trace_jsonl().splitlines()
+    assert metrics.frontiers == 2
+    assert selected_goals
+    assert selected_goals[0][0] == 5.0
+    assert trace_lines
+
+
 def test_skill_learning_enabled_no_frontiers_records_baseline_outcome() -> None:
     bridge = MockBridge()
     slam = MockSLAM()
