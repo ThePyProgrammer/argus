@@ -116,3 +116,26 @@ def test_retrieve_evidence_returns_claim_evidence():
         "claim_id": "claim_001",
         "evidence": {"type": "image", "uri": "image://drone_2/frame_5401"},
     }
+
+
+def test_belief_queries_report_confidence_staleness_and_confirmation_request():
+    graph = build_graph()
+    api = WorldQueryAPI(graph)
+    now = datetime(2026, 5, 18, 10, 50, tzinfo=timezone.utc)
+
+    assert api.get_confidence("claim_002") == {"claim": "claim_002", "confidence": 0.74, "status": "active"}
+    assert api.get_confidence("object_42") == {"entity": "object_42", "confidence": 0.81, "status": "active"}
+    stale = api.check_staleness("claim_002", now=now)
+    assert stale["status"] == "stale"
+    assert stale["recommended_action"] == {
+        "request_confirmation": {
+            "target": "region_8",
+            "preferred_robot_type": None,
+        }
+    }
+    assert api.request_confirmation("path_segment_4", preferred_robot_type="drone") == {
+        "request_confirmation": {
+            "target": "path_segment_4",
+            "preferred_robot_type": "drone",
+        }
+    }
