@@ -184,6 +184,23 @@ def test_refresh_stale_reactivates_nonexpired_claims_after_conflict_expires():
     assert graph.active_claims() == [graph.get_claim("claim_live")]
 
 
+def test_add_and_get_commitment_and_commitments():
+    graph = BeliefGraph()
+    commitment = Commitment(
+        id="commitment_1",
+        resource_id="charger_1",
+        robot_id="rover_3",
+        start=datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 18, 10, 30, tzinfo=timezone.utc),
+        task_id="task_42",
+    )
+
+    graph.add_commitment(commitment)
+
+    assert graph.get_commitment("commitment_1") == commitment
+    assert graph.commitments() == [commitment]
+
+
 def test_active_claims_excludes_superseded_stale_rejected_and_conflicted():
     graph = BeliefGraph()
     active = make_claim("claim_active", subject="path_segment_5")
