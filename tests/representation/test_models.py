@@ -60,6 +60,7 @@ def test_claim_serializes_required_metadata():
     }
 
 
+@pytest.mark.parametrize("object_value", [42, 0.5, True, None])
 def test_claim_serializes_scalar_object_values(object_value):
     observed_at = datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc)
     claim = Claim(

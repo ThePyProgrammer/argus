@@ -8,10 +8,10 @@ from src.representation.models import Claim, ClaimStatus, Commitment, EntityType
 
 
 class WorldQueryAPI:
-def __init__(self, graph: BeliefGraph) -> None:
+    def __init__(self, graph: BeliefGraph) -> None:
         self._graph = graph
 
-def find_objects(
+    def find_objects(
         self,
         query: str,
         region: str | None = None,
@@ -37,7 +37,7 @@ def find_objects(
             objects.append(self._entity_claim_view(entity.id, label, claim))
         return {"objects": objects}
 
-def find_hazards(
+    def find_hazards(
         self,
         region: str | None = None,
         hazard_type: str | None = None,
@@ -59,7 +59,7 @@ def find_hazards(
             hazards.append(self._entity_claim_view(entity.id, label, claim))
         return {"hazards": hazards}
 
-def summarize_region(self, region_id: str, include_uncertainty: bool = True) -> dict[str, Any]:
+    def summarize_region(self, region_id: str, include_uncertainty: bool = True) -> dict[str, Any]:
         claims = self._graph.claims_for_subject(region_id)
         object_count = 0
         hazard_count = 0
@@ -82,11 +82,11 @@ def summarize_region(self, region_id: str, include_uncertainty: bool = True) -> 
             "stale_claims": sum(1 for claim in claims if claim.status == ClaimStatus.STALE),
         }
 
-def retrieve_evidence(self, claim_id: str) -> dict[str, Any]:
+    def retrieve_evidence(self, claim_id: str) -> dict[str, Any]:
         claim = self._require_claim(claim_id)
         return {"claim_id": claim.id, "evidence": claim.evidence.to_dict()}
 
-def get_confidence(self, claim_or_entity_id: str) -> dict[str, Any]:
+    def get_confidence(self, claim_or_entity_id: str) -> dict[str, Any]:
         claim = self._graph.get_claim(claim_or_entity_id)
         if claim is not None:
             return {"claim": claim.id, "confidence": claim.confidence, "status": claim.status.value}
@@ -100,7 +100,7 @@ def get_confidence(self, claim_or_entity_id: str) -> dict[str, Any]:
         best = max(claims, key=lambda item: item.confidence)
         return {"entity": claim_or_entity_id, "confidence": best.confidence, "status": best.status.value}
 
-def check_staleness(self, claim_or_region_id: str, now: datetime) -> dict[str, Any]:
+    def check_staleness(self, claim_or_region_id: str, now: datetime) -> dict[str, Any]:
         self._graph.refresh_stale(now)
         claim = self._graph.get_claim(claim_or_region_id)
         if claim is not None:
@@ -122,14 +122,14 @@ def check_staleness(self, claim_or_region_id: str, now: datetime) -> dict[str, A
             result["recommended_action"] = self.request_confirmation(target)
         return result
 
-def compare_claims(self, claim_ids: list[str]) -> dict[str, Any]:
+    def compare_claims(self, claim_ids: list[str]) -> dict[str, Any]:
         claims = [self._require_claim(claim_id) for claim_id in claim_ids]
         return {
             "claims": [claim.to_dict() for claim in claims],
             "conflicts": [claim.id for claim in claims if claim.status == ClaimStatus.CONFLICTED],
         }
 
-def get_frontiers(
+    def get_frontiers(
         self,
         region: str | None = None,
         robot_type: str | None = None,
@@ -159,7 +159,7 @@ def get_frontiers(
             )
         return {"frontiers": frontiers}
 
-def query_traversability(self, region_or_path: str, robot_type: str) -> dict[str, Any]:
+    def query_traversability(self, region_or_path: str, robot_type: str) -> dict[str, Any]:
         blocking_claims = self._blocking_claims(region_or_path)
         if not blocking_claims:
             return {
@@ -176,7 +176,7 @@ def query_traversability(self, region_or_path: str, robot_type: str) -> dict[str
             "confidence": max(claim.confidence for claim in blocking_claims),
         }
 
-def plan_route(
+    def plan_route(
         self,
         robot_id: str,
         goal: str,
@@ -196,7 +196,7 @@ def plan_route(
             "alternatives": list(strongest.metadata.get("alternatives", [])),
         }
 
-def explain_blockage(self, route_or_region: str) -> dict[str, list[dict[str, Any]]]:
+    def explain_blockage(self, route_or_region: str) -> dict[str, list[dict[str, Any]]]:
         return {
             "blockages": [
                 {
@@ -212,7 +212,7 @@ def explain_blockage(self, route_or_region: str) -> dict[str, list[dict[str, Any
             ]
         }
 
-def request_confirmation(
+    def request_confirmation(
         self,
         target: str,
         preferred_robot_type: str | None = None,
@@ -224,7 +224,7 @@ def request_confirmation(
             }
         }
 
-def _blocking_claims(self, target: str) -> list[Claim]:
+    def _blocking_claims(self, target: str) -> list[Claim]:
         return [
             claim
             for claim in self._graph.claims_for_subject(target)
@@ -233,7 +233,7 @@ def _blocking_claims(self, target: str) -> list[Claim]:
             and claim.object != "clear"
         ]
 
-def allocate_task(
+    def allocate_task(
         self,
         task: str,
         candidate_robots: list[str] | None = None,
@@ -275,7 +275,7 @@ def allocate_task(
             "conflicts": [],
         }
 
-def reserve_resource(
+    def reserve_resource(
         self,
         resource_id: str,
         robot_id: str,
@@ -294,7 +294,7 @@ def reserve_resource(
         self._graph.add_commitment(commitment)
         return {"accepted": True, "commitment": commitment.to_dict(), "conflicts": []}
 
-def list_commitments(
+    def list_commitments(
         self,
         region: str | None = None,
         robot_id: str | None = None,
@@ -309,7 +309,7 @@ def list_commitments(
             commitments = [item for item in commitments if item.resource_id == region]
         return {"commitments": [item.to_dict() for item in commitments]}
 
-def detect_conflicts(self, plan_or_commitment: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+    def detect_conflicts(self, plan_or_commitment: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
         incoming = Commitment(
             id=plan_or_commitment["id"],
             resource_id=plan_or_commitment["resource_id"],
@@ -321,7 +321,7 @@ def detect_conflicts(self, plan_or_commitment: dict[str, Any]) -> dict[str, list
         )
         return {"conflicts": self._conflicting_commitments(incoming)}
 
-def _conflicting_commitments(self, incoming: Commitment) -> list[dict[str, str]]:
+    def _conflicting_commitments(self, incoming: Commitment) -> list[dict[str, str]]:
         conflicts: list[dict[str, str]] = []
         for existing in self._graph.commitments():
             if existing.robot_id == incoming.robot_id:
@@ -339,7 +339,7 @@ def _conflicting_commitments(self, incoming: Commitment) -> list[dict[str, str]]
             )
         return conflicts
 
-def _entity_claim_view(self, entity_id: str, label: str, claim: Claim) -> dict[str, Any]:
+    def _entity_claim_view(self, entity_id: str, label: str, claim: Claim) -> dict[str, Any]:
         return {
             "id": entity_id,
             "label": label,
@@ -351,7 +351,7 @@ def _entity_claim_view(self, entity_id: str, label: str, claim: Claim) -> dict[s
             "claim_id": claim.id,
         }
 
-def _require_claim(self, claim_id: str) -> Claim:
+    def _require_claim(self, claim_id: str) -> Claim:
         claim = self._graph.get_claim(claim_id)
         if claim is None:
             raise KeyError(f"unknown claim: {claim_id}")
