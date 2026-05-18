@@ -10,6 +10,7 @@ from .models import (
     RelationType,
     Source,
 )
+from .query_api import WorldQueryAPI
 
 __all__ = [
     "BeliefGraph",
@@ -24,4 +25,5 @@ __all__ = [
     "ObservationIngestor",
     "RelationType",
     "Source",
+    "WorldQueryAPI",
 ]
