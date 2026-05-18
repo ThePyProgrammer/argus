@@ -139,3 +139,80 @@ def test_belief_queries_report_confidence_staleness_and_confirmation_request():
             "preferred_robot_type": "drone",
         }
     }
+
+
+def test_navigation_queries_reject_blocked_path_and_suggest_alternatives():
+    graph = BeliefGraph()
+    ingestor = ObservationIngestor(graph)
+    now = datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc)
+    ingestor.ingest(
+        ObservationBatch(
+            source=Source(type="robot", id="rover_3"),
+            observed_at=now,
+            facts=[
+                ObservationFact(
+                    subject="path_segment_4",
+                    subject_type=EntityType.PATH_SEGMENT,
+                    predicate=RelationType.BLOCKS,
+                    object="hazard_12",
+                    object_type=EntityType.HAZARD,
+                    object_label="fallen_tree",
+                    confidence=0.74,
+                    evidence_type="point_cloud_slice",
+                    evidence_uri="local_submap://rover_3/slice_91",
+                    metadata={"alternatives": [{"send_robot": "legged_1"}, {"route": "path_segment_7"}]},
+                )
+            ],
+        )
+    )
+    api = WorldQueryAPI(graph)
+
+    traversability = api.query_traversability("path_segment_4", robot_type="wheeled")
+    route = api.plan_route("rover_2", goal="path_segment_4")
+    blockage = api.explain_blockage("path_segment_4")
+
+    assert traversability["traversable"] is False
+    assert traversability["blocking_claims"] == ["claim_001"]
+    assert route["feasible"] is False
+    assert route["reason"] == "path_segment_4 blocked_by hazard_12"
+    assert route["alternatives"] == [{"send_robot": "legged_1"}, {"route": "path_segment_7"}]
+    assert blockage["blockages"][0]["claim_id"] == "claim_001"
+
+
+def test_get_frontiers_filters_by_region_and_robot_type():
+    graph = BeliefGraph()
+    ingestor = ObservationIngestor(graph)
+    now = datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc)
+    ingestor.ingest(
+        ObservationBatch(
+            source=Source(type="robot", id="drone_2"),
+            observed_at=now,
+            facts=[
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object="frontier_9",
+                    object_type=EntityType.FRONTIER,
+                    confidence=0.9,
+                    evidence_type="frontier_detector",
+                    evidence_uri="frontier://region_8/frontier_9",
+                    metadata={"robot_types": ["drone", "legged"]},
+                )
+            ],
+        )
+    )
+    api = WorldQueryAPI(graph)
+
+    assert api.get_frontiers(region="region_8", robot_type="drone") == {
+        "frontiers": [
+            {
+                "id": "frontier_9",
+                "region": "region_8",
+                "confidence": 0.9,
+                "claim_id": "claim_001",
+                "robot_types": ["drone", "legged"],
+            }
+        ]
+    }
+    assert api.get_frontiers(region="region_8", robot_type="wheeled") == {"frontiers": []}
