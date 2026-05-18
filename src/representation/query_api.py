@@ -233,6 +233,112 @@ def _blocking_claims(self, target: str) -> list[Claim]:
             and claim.object != "clear"
         ]
 
+def allocate_task(
+        self,
+        task: str,
+        candidate_robots: list[str] | None = None,
+    ) -> dict[str, Any]:
+        task_entity = self._graph.get_entity(task)
+        if task_entity is None:
+            raise KeyError(f"unknown task: {task}")
+        required = set(task_entity.attributes.get("required_capabilities", []))
+        candidates = [
+            entity for entity in self._graph.entities_by_type(EntityType.ROBOT.value)
+            if candidate_robots is None or entity.id in candidate_robots
+        ]
+        feasible = [
+            entity
+            for entity in candidates
+            if required.issubset(set(entity.attributes.get("capabilities", [])))
+        ]
+        if not feasible:
+            return {
+                "selected_robot": None,
+                "reason": "no candidate robot satisfies required capabilities",
+                "commitments_created": [],
+                "conflicts": [],
+            }
+        selected = max(feasible, key=lambda entity: entity.attributes.get("battery", 0.0))
+        commitment = Commitment(
+            id=self._graph.next_commitment_id(),
+            resource_id=task,
+            robot_id=selected.id,
+            task_id=task,
+            start=datetime.min.replace(tzinfo=timezone.utc),
+            end=datetime.max.replace(tzinfo=timezone.utc),
+        )
+        self._graph.add_commitment(commitment)
+        return {
+            "selected_robot": selected.id,
+            "reason": "highest feasibility under capability and battery constraints",
+            "commitments_created": [commitment.id],
+            "conflicts": [],
+        }
+
+def reserve_resource(
+        self,
+        resource_id: str,
+        robot_id: str,
+        time_window: tuple[datetime, datetime],
+    ) -> dict[str, Any]:
+        commitment = Commitment(
+            id=self._graph.next_commitment_id(),
+            resource_id=resource_id,
+            robot_id=robot_id,
+            start=time_window[0],
+            end=time_window[1],
+        )
+        conflicts = self._conflicting_commitments(commitment)
+        if conflicts:
+            return {"accepted": False, "commitment": commitment.to_dict(), "conflicts": conflicts}
+        self._graph.add_commitment(commitment)
+        return {"accepted": True, "commitment": commitment.to_dict(), "conflicts": []}
+
+def list_commitments(
+        self,
+        region: str | None = None,
+        robot_id: str | None = None,
+        resource_id: str | None = None,
+    ) -> dict[str, list[dict[str, Any]]]:
+        commitments = self._graph.commitments()
+        if robot_id is not None:
+            commitments = [item for item in commitments if item.robot_id == robot_id]
+        if resource_id is not None:
+            commitments = [item for item in commitments if item.resource_id == resource_id]
+        if region is not None:
+            commitments = [item for item in commitments if item.resource_id == region]
+        return {"commitments": [item.to_dict() for item in commitments]}
+
+def detect_conflicts(self, plan_or_commitment: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+        incoming = Commitment(
+            id=plan_or_commitment["id"],
+            resource_id=plan_or_commitment["resource_id"],
+            robot_id=plan_or_commitment["robot_id"],
+            task_id=plan_or_commitment.get("task_id"),
+            start=datetime.fromisoformat(plan_or_commitment["start"]),
+            end=datetime.fromisoformat(plan_or_commitment["end"]),
+            status=plan_or_commitment.get("status", "active"),
+        )
+        return {"conflicts": self._conflicting_commitments(incoming)}
+
+def _conflicting_commitments(self, incoming: Commitment) -> list[dict[str, str]]:
+        conflicts: list[dict[str, str]] = []
+        for existing in self._graph.commitments():
+            if existing.robot_id == incoming.robot_id:
+                continue
+            if existing.resource_id != incoming.resource_id:
+                continue
+            if not existing.overlaps(incoming):
+                continue
+            conflicts.append(
+                {
+                    "commitment": existing.id,
+                    "resource_id": existing.resource_id,
+                    "robot_id": existing.robot_id,
+                }
+            )
+        return conflicts
+
 def _entity_claim_view(self, entity_id: str, label: str, claim: Claim) -> dict[str, Any]:
         return {
             "id": entity_id,
