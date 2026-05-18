@@ -1,3 +1,4 @@
+from .graph import BeliefGraph
 from .models import (
     Claim,
     ClaimStatus,
@@ -10,6 +11,7 @@ from .models import (
 )
 
 __all__ = [
+    "BeliefGraph",
     "Claim",
     "ClaimStatus",
     "Commitment",
