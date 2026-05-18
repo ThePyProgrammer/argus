@@ -216,3 +216,79 @@ def test_get_frontiers_filters_by_region_and_robot_type():
         ]
     }
     assert api.get_frontiers(region="region_8", robot_type="wheeled") == {"frontiers": []}
+
+
+def test_allocate_task_selects_robot_with_required_capability_and_best_battery():
+    graph = BeliefGraph()
+    graph.add_entity(Entity(
+        id="rover_1",
+        type=EntityType.ROBOT,
+        attributes={"capabilities": ["navigate"], "battery": 0.9},
+    ))
+    graph.add_entity(Entity(
+        id="legged_1",
+        type=EntityType.ROBOT,
+        attributes={"capabilities": ["navigate", "rough_terrain"], "battery": 0.7},
+    ))
+    graph.add_entity(Entity(
+        id="legged_2",
+        type=EntityType.ROBOT,
+        attributes={"capabilities": ["navigate", "rough_terrain"], "battery": 0.8},
+    ))
+    graph.add_entity(Entity(
+        id="task_rough_frontier",
+        type=EntityType.TASK,
+        attributes={"required_capabilities": ["navigate", "rough_terrain"]},
+    ))
+    api = WorldQueryAPI(graph)
+
+    result = api.allocate_task("task_rough_frontier")
+
+    assert result["selected_robot"] == "legged_2"
+    assert result["reason"] == "highest feasibility under capability and battery constraints"
+    assert result["commitments_created"] == ["commitment_001"]
+    commitment = graph.get_commitment("commitment_001")
+    assert commitment.robot_id == "legged_2"
+    assert commitment.start.tzinfo is not None
+    assert commitment.end.tzinfo is not None
+    assert commitment.start.tzinfo.utcoffset(commitment.start) == timedelta(0)
+    assert commitment.end.tzinfo.utcoffset(commitment.end) == timedelta(0)
+
+
+def test_reserve_resource_and_detect_conflicts_for_overlapping_commitments():
+    graph = BeliefGraph()
+    api = WorldQueryAPI(graph)
+    start = datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 5, 18, 10, 10, tzinfo=timezone.utc)
+
+    first = api.reserve_resource("corridor_4", "rover_2", (start, end))
+    second = api.reserve_resource("corridor_4", "rover_3", (start + timedelta(minutes=5), end + timedelta(minutes=5)))
+    conflicts = api.detect_conflicts(second["commitment"])
+
+    assert first["accepted"] is True
+    assert second["accepted"] is False
+    assert conflicts == {
+        "conflicts": [
+            {
+                "commitment": "commitment_001",
+                "resource_id": "corridor_4",
+                "robot_id": "rover_2",
+            }
+        ]
+    }
+    assert api.list_commitments(resource_id="corridor_4")["commitments"][0]["id"] == "commitment_001"
+
+
+def test_overlapping_commitments_for_different_resources_are_not_conflicts():
+    graph = BeliefGraph()
+    api = WorldQueryAPI(graph)
+    start = datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 5, 18, 10, 10, tzinfo=timezone.utc)
+
+    first = api.reserve_resource("corridor_4", "rover_2", (start, end))
+    second = api.reserve_resource("corridor_5", "rover_3", (start + timedelta(minutes=5), end + timedelta(minutes=5)))
+
+    assert first["accepted"] is True
+    assert second["accepted"] is True
+    assert api.detect_conflicts(second["commitment"]) == {"conflicts": []}
+    assert {item["resource_id"] for item in api.list_commitments()["commitments"]} == {"corridor_4", "corridor_5"}
