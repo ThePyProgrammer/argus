@@ -135,3 +135,70 @@ def test_set_claim_status_cleans_up_conflicts_and_reactivates_remaining_live_cla
     assert graph.get_claim("claim_b").status == ClaimStatus.ACTIVE
     assert graph.get_claim("claim_b").conflicts_with == []
     assert graph.active_claims() == [graph.get_claim("claim_b")]
+
+
+def test_refresh_stale_marks_expired_active_claims_stale():
+    now = datetime(2026, 5, 18, 10, 50, tzinfo=timezone.utc)
+    expired = make_claim("claim_expired", valid_until=now - timedelta(minutes=1))
+    fresh = make_claim("claim_fresh", valid_until=now + timedelta(minutes=1))
+    graph = BeliefGraph()
+
+    graph.add_claim(expired, resolve=False)
+    graph.add_claim(fresh, resolve=False)
+    stale_ids = graph.refresh_stale(now)
+
+    assert stale_ids == ["claim_expired"]
+    assert graph.get_claim("claim_expired").status == ClaimStatus.STALE
+    assert graph.get_claim("claim_fresh").status == ClaimStatus.ACTIVE
+
+
+def test_refresh_stale_skips_expired_superseded_claims():
+    now = datetime(2026, 5, 18, 10, 50, tzinfo=timezone.utc)
+    superseded = make_claim("claim_superseded", valid_until=now - timedelta(minutes=1))
+    superseded.status = ClaimStatus.SUPERSEDED
+    graph = BeliefGraph()
+
+    graph.add_claim(superseded, resolve=False)
+
+    stale_ids = graph.refresh_stale(now)
+
+    assert stale_ids == []
+    assert graph.get_claim("claim_superseded").status == ClaimStatus.SUPERSEDED
+
+
+def test_refresh_stale_reactivates_nonexpired_claims_after_conflict_expires():
+    now = datetime(2026, 5, 18, 10, 50, tzinfo=timezone.utc)
+    expired_conflict = make_claim("claim_expired", object="hazard_12", valid_until=now - timedelta(minutes=1))
+    live_claim = make_claim("claim_live", object="clear")
+    graph = BeliefGraph()
+
+    graph.add_claim(expired_conflict)
+    graph.add_claim(live_claim)
+
+    stale_ids = graph.refresh_stale(now)
+
+    assert stale_ids == ["claim_expired"]
+    assert graph.get_claim("claim_expired").status == ClaimStatus.STALE
+    assert graph.get_claim("claim_live").status == ClaimStatus.ACTIVE
+    assert graph.get_claim("claim_live").conflicts_with == []
+    assert graph.active_claims() == [graph.get_claim("claim_live")]
+
+
+def test_active_claims_excludes_superseded_stale_rejected_and_conflicted():
+    graph = BeliefGraph()
+    active = make_claim("claim_active", subject="path_segment_5")
+    stale = make_claim("claim_stale")
+    rejected = make_claim("claim_rejected")
+    conflict_base = make_claim("claim_conflict_base")
+    conflicted = make_claim("claim_conflicted", object="clear")
+    stale.status = ClaimStatus.STALE
+    rejected.status = ClaimStatus.REJECTED
+
+    graph.add_claim(active)
+    graph.add_claim(stale, resolve=False)
+    graph.add_claim(rejected, resolve=False)
+    graph.add_claim(conflict_base)
+    graph.add_claim(conflicted)
+
+    assert graph.get_claim("claim_conflicted").status == ClaimStatus.CONFLICTED
+    assert graph.active_claims() == [active]
