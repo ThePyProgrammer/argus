@@ -118,3 +118,51 @@ def test_claim_status_values_are_explicit():
         "stale",
         "rejected",
     ]
+
+
+def test_commitment_serializes_iso_timestamps_and_overlap_boundaries():
+    start = datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+    commitment = Commitment(
+        id="commitment_1",
+        resource_id="charger_1",
+        robot_id="rover_3",
+        start=start,
+        end=start + timedelta(minutes=30),
+        task_id="task_42",
+    )
+
+    assert commitment.to_dict() == {
+        "id": "commitment_1",
+        "resource_id": "charger_1",
+        "robot_id": "rover_3",
+        "start": "2026-05-18T10:00:00+00:00",
+        "end": "2026-05-18T10:30:00+00:00",
+        "task_id": "task_42",
+        "status": "active",
+    }
+
+    adjacent = Commitment(
+        id="commitment_2",
+        resource_id="charger_1",
+        robot_id="rover_4",
+        start=start + timedelta(minutes=30),
+        end=start + timedelta(minutes=45),
+    )
+    overlapping = Commitment(
+        id="commitment_3",
+        resource_id="charger_1",
+        robot_id="rover_5",
+        start=start + timedelta(minutes=20),
+        end=start + timedelta(minutes=40),
+    )
+    different_resource = Commitment(
+        id="commitment_4",
+        resource_id="charger_2",
+        robot_id="rover_6",
+        start=start + timedelta(minutes=20),
+        end=start + timedelta(minutes=40),
+    )
+
+    assert not commitment.overlaps(adjacent)
+    assert commitment.overlaps(overlapping)
+    assert not commitment.overlaps(different_resource)
