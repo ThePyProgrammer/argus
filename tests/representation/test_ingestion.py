@@ -137,6 +137,126 @@ def test_ingest_updates_existing_entity_label_when_non_none_label_arrives():
     assert graph.get_entity("region_8").label == "new label"
 
 
+def test_ingest_preserves_scalar_object_values_without_creating_object_entities():
+    graph = BeliefGraph()
+    ingestor = ObservationIngestor(graph)
+    observed_at = datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc)
+
+    claims = ingestor.ingest(
+        ObservationBatch(
+            source=Source(type="robot", id="drone_2"),
+            observed_at=observed_at,
+            facts=[
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object=3,
+                    object_type=EntityType.OBJECT,
+                    confidence=0.81,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5401",
+                ),
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object=2.5,
+                    object_type=EntityType.OBJECT,
+                    confidence=0.81,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5402",
+                ),
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object=True,
+                    object_type=EntityType.OBJECT,
+                    confidence=0.81,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5403",
+                ),
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object=None,
+                    object_type=EntityType.OBJECT,
+                    confidence=0.81,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5404",
+                ),
+            ],
+        )
+    )
+
+    assert [claim.object for claim in claims] == [3, 2.5, True, None]
+    assert graph.get_entity("3") is None
+    assert graph.get_entity("2.5") is None
+    assert graph.get_entity("True") is None
+    assert graph.get_entity("None") is None
+
+
+def test_ingest_creates_object_entities_only_when_object_type_is_provided():
+    graph = BeliefGraph()
+    ingestor = ObservationIngestor(graph)
+    observed_at = datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc)
+
+    ingestor.ingest(
+        ObservationBatch(
+            source=Source(type="robot", id="drone_2"),
+            observed_at=observed_at,
+            facts=[
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object="object_42",
+                    object_type=EntityType.OBJECT,
+                    confidence=0.81,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5401",
+                ),
+                ObservationFact(
+                    subject="region_8",
+                    subject_type=EntityType.REGION,
+                    predicate=RelationType.CONTAINS,
+                    object="object_43",
+                    confidence=0.79,
+                    evidence_type="image",
+                    evidence_uri="image://drone_2/frame_5402",
+                ),
+            ],
+        )
+    )
+
+    assert graph.get_entity("object_42") is not None
+    assert graph.get_entity("object_43") is None
+
+
+def test_observation_batch_converts_facts_to_tuple():
+    batch = ObservationBatch(
+        source=Source(type="robot", id="drone_2"),
+        observed_at=datetime(2026, 5, 18, 10, 41, tzinfo=timezone.utc),
+        facts=[
+            ObservationFact(
+                subject="region_8",
+                subject_type=EntityType.REGION,
+                predicate=RelationType.CONTAINS,
+                object="object_42",
+                object_type=EntityType.OBJECT,
+                confidence=0.81,
+                evidence_type="image",
+                evidence_uri="image://drone_2/frame_5401",
+            )
+        ],
+    )
+
+    assert isinstance(batch.facts, tuple)
+    assert len(batch.facts) == 1
+
+
 def test_ingest_conflicting_robot_reports_keeps_conflict_visible():
     graph = BeliefGraph()
     ingestor = ObservationIngestor(graph)
