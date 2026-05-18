@@ -74,3 +74,64 @@ def test_add_and_get_entity_and_claim():
     assert graph.get_entity("path_segment_4") == entity
     assert graph.get_claim("claim_1") == claim
     assert graph.claims_for_subject("path_segment_4") == [claim]
+
+
+def test_same_subject_predicate_object_supersedes_older_active_claim():
+    graph = BeliefGraph()
+    older = make_claim("claim_old", confidence=0.5)
+    newer = make_claim("claim_new", confidence=0.9)
+
+    graph.add_claim(older)
+    graph.add_claim(newer)
+
+    assert graph.get_claim("claim_old").status == ClaimStatus.SUPERSEDED
+    assert graph.get_claim("claim_new").status == ClaimStatus.ACTIVE
+
+
+def test_same_subject_predicate_different_object_marks_both_conflicted():
+    graph = BeliefGraph()
+    blocked = make_claim("claim_blocked", object="hazard_12")
+    clear = make_claim("claim_clear", object="clear")
+
+    graph.add_claim(blocked)
+    graph.add_claim(clear)
+
+    assert graph.get_claim("claim_blocked").status == ClaimStatus.CONFLICTED
+    assert graph.get_claim("claim_clear").status == ClaimStatus.CONFLICTED
+    assert graph.get_claim("claim_blocked").conflicts_with == ["claim_clear"]
+    assert graph.get_claim("claim_clear").conflicts_with == ["claim_blocked"]
+
+
+def test_superseded_claim_is_removed_from_live_conflicts():
+    graph = BeliefGraph()
+    claim_a = make_claim("claim_a", object="hazard_12")
+    claim_b = make_claim("claim_b", object="clear")
+    claim_c = make_claim("claim_c", object="hazard_12")
+
+    graph.add_claim(claim_a)
+    graph.add_claim(claim_b)
+    graph.add_claim(claim_c)
+
+    assert graph.get_claim("claim_a").status == ClaimStatus.SUPERSEDED
+    assert graph.get_claim("claim_a").conflicts_with == []
+    assert graph.get_claim("claim_b").status == ClaimStatus.CONFLICTED
+    assert graph.get_claim("claim_c").status == ClaimStatus.CONFLICTED
+    assert graph.get_claim("claim_b").conflicts_with == ["claim_c"]
+    assert graph.get_claim("claim_c").conflicts_with == ["claim_b"]
+
+
+def test_set_claim_status_cleans_up_conflicts_and_reactivates_remaining_live_claim():
+    graph = BeliefGraph()
+    claim_a = make_claim("claim_a", object="hazard_12")
+    claim_b = make_claim("claim_b", object="clear")
+
+    graph.add_claim(claim_a)
+    graph.add_claim(claim_b)
+
+    graph.set_claim_status("claim_a", ClaimStatus.REJECTED)
+
+    assert graph.get_claim("claim_a").status == ClaimStatus.REJECTED
+    assert graph.get_claim("claim_a").conflicts_with == []
+    assert graph.get_claim("claim_b").status == ClaimStatus.ACTIVE
+    assert graph.get_claim("claim_b").conflicts_with == []
+    assert graph.active_claims() == [graph.get_claim("claim_b")]
