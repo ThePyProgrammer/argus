@@ -129,6 +129,89 @@ def compare_claims(self, claim_ids: list[str]) -> dict[str, Any]:
             "conflicts": [claim.id for claim in claims if claim.status == ClaimStatus.CONFLICTED],
         }
 
+def get_frontiers(
+        self,
+        region: str | None = None,
+        robot_type: str | None = None,
+    ) -> dict[str, list[dict[str, Any]]]:
+        frontiers: list[dict[str, Any]] = []
+        for claim in self._graph.claims_by_predicate(RelationType.CONTAINS.value):
+            if claim.status != ClaimStatus.ACTIVE:
+                continue
+            if region is not None and claim.subject != region:
+                continue
+            if not isinstance(claim.object, str):
+                continue
+            entity = self._graph.get_entity(claim.object)
+            if entity is None or entity.type != EntityType.FRONTIER:
+                continue
+            robot_types = claim.metadata.get("robot_types", [])
+            if robot_type is not None and robot_type not in robot_types:
+                continue
+            frontiers.append(
+                {
+                    "id": entity.id,
+                    "region": claim.subject,
+                    "confidence": claim.confidence,
+                    "claim_id": claim.id,
+                    "robot_types": list(robot_types),
+                }
+            )
+        return {"frontiers": frontiers}
+
+def query_traversability(self, region_or_path: str, robot_type: str) -> dict[str, Any]:
+        blocking_claims = self._blocking_claims(region_or_path)
+        if not blocking_claims:
+            return {
+                "target": region_or_path,
+                "robot_type": robot_type,
+                "traversable": True,
+                "blocking_claims": [],
+            }
+        return {
+            "target": region_or_path,
+            "robot_type": robot_type,
+            "traversable": False,
+            "blocking_claims": [claim.id for claim in blocking_claims],
+            "confidence": max(claim.confidence for claim in blocking_claims),
+        }
+
+def plan_route(
+        self,
+        robot_id: str,
+        goal: str,
+        constraints: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        blocking_claims = self._blocking_claims(goal)
+        if not blocking_claims:
+            return {"robot": robot_id, "goal": goal, "feasible": True, "route": [goal]}
+        strongest = max(blocking_claims, key=lambda claim: claim.confidence)
+        return {
+            "robot": robot_id,
+            "goal": goal,
+            "feasible": False,
+            "reason": f"{strongest.subject} blocked_by {strongest.object}",
+            "confidence": strongest.confidence,
+            "source": strongest.source.to_dict(),
+            "alternatives": list(strongest.metadata.get("alternatives", [])),
+        }
+
+def explain_blockage(self, route_or_region: str) -> dict[str, list[dict[str, Any]]]:
+        return {
+            "blockages": [
+                {
+                    "claim_id": claim.id,
+                    "subject": claim.subject,
+                    "object": claim.object,
+                    "confidence": claim.confidence,
+                    "source": claim.source.to_dict(),
+                    "evidence": claim.evidence.to_dict(),
+                    "status": claim.status.value,
+                }
+                for claim in self._blocking_claims(route_or_region)
+            ]
+        }
+
 def request_confirmation(
         self,
         target: str,
@@ -140,6 +223,15 @@ def request_confirmation(
                 "preferred_robot_type": preferred_robot_type,
             }
         }
+
+def _blocking_claims(self, target: str) -> list[Claim]:
+        return [
+            claim
+            for claim in self._graph.claims_for_subject(target)
+            if claim.predicate == RelationType.BLOCKS
+            and claim.status in {ClaimStatus.ACTIVE, ClaimStatus.CONFLICTED}
+            and claim.object != "clear"
+        ]
 
 def _entity_claim_view(self, entity_id: str, label: str, claim: Claim) -> dict[str, Any]:
         return {
