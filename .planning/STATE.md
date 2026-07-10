@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.0
-milestone_name: Benchmarkable Locomotion Environment
-status: completed
-stopped_at: v4.0 archived; ready for next milestone planning
-last_updated: "2026-05-03T01:24:55.725Z"
+milestone_name: milestone
+status: v4.0 archived; no active milestone
+stopped_at: context exhaustion at 77% (2026-05-18)
+last_updated: "2026-05-18T04:18:36.984Z"
 last_activity: 2026-05-03
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 35
-  completed_plans: 35
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 100
 ---
 
@@ -98,5 +98,5 @@ Regression reference: Phase 09 verification recorded `uv run python -m pytest -x
 ## Session Continuity
 
 Last activity: 2026-05-03 — v4.0 milestone archived
-Stopped at: Ready for `/gsd-new-milestone`
+Stopped at: context exhaustion at 77% (2026-05-18)
 Resume file: None

@@ -1,0 +1,26 @@
+<h2>Recommended architecture: Layered Belief Graph + Query Services</h2>
+<p class="subtitle">Dense 3D data stays grounded below; agents interact through tools over a belief-aware graph.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Data flow</div>
+  <div class="mockup-body">
+    <div class="placeholder">Robot-local 3D substrate<br><small>point clouds · Gaussian splats · poses · sensor frames</small></div>
+    <div style="text-align:center;margin:8px">↓ extract/query</div>
+    <div class="placeholder">Metric layer<br><small>occupancy · ESDF · terrain · traversability · collision geometry</small></div>
+    <div style="text-align:center;margin:8px">↓ segment/abstract</div>
+    <div class="placeholder">Region + topology layer<br><small>frontiers · zones · paths · rooms · corridors · outdoor terrain patches</small></div>
+    <div style="text-align:center;margin:8px">↓ classify/ground</div>
+    <div class="placeholder">Semantic + affordance layer<br><small>objects · hazards · landmarks · humans · manipulable things · affordances</small></div>
+    <div style="text-align:center;margin:8px">↓ fuse across robots</div>
+    <div class="placeholder">Belief + provenance layer<br><small>confidence · source robot · timestamp · conflicts · stale state</small></div>
+    <div style="text-align:center;margin:8px">↓ coordinate</div>
+    <div class="placeholder">Commitment layer<br><small>task assignments · reservations · intentions · resource locks</small></div>
+    <div style="text-align:center;margin:8px">↓ tools</div>
+    <div class="placeholder">Agent-facing query API<br><small>find · summarize · plan · check · allocate · explain</small></div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Core idea</h3>
+  <p>The graph is not only objects and rooms. It stores anything the swarm can act on: regions, paths, frontiers, hazards, terrain patches, robot capabilities, uncertainty, observations, and commitments.</p>
+</div>

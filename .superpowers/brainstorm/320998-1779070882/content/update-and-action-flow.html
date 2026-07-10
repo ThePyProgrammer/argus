@@ -1,0 +1,39 @@
+<h2>Update and action flow</h2>
+<p class="subtitle">How raw observations become agent-usable claims, and how agent decisions become grounded swarm actions.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Observation → belief graph</div>
+    <div class="mockup-body">
+      <div class="placeholder">Robot observes scene<br><small>image · LiDAR · point cloud · splat update · pose</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Local extractors<br><small>occupancy · terrain · objects · hazards · frontiers</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Claim builder<br><small>normalizes entity IDs, confidence, timestamp, evidence pointer</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Fusion/conflict resolver<br><small>merge · supersede · conflict · mark stale</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Belief graph update</div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Agent decision → robot action</div>
+    <div class="mockup-body">
+      <div class="placeholder">Agent asks tool<br><small>search, route, inspect, allocate</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Planner/checker<br><small>route feasibility · collision · capability · commitments</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Commitment writer<br><small>assign task · reserve route/resource · set intent</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Robot executor<br><small>BT/action primitive/local controller</small></div>
+      <div style="text-align:center;margin:8px">↓</div>
+      <div class="placeholder">Execution feedback<br><small>complete · blocked · failed · new observation</small></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key boundary</h3>
+  <p>The agent can propose and coordinate. Local robot controllers still own low-latency safety, collision avoidance, and final execution feasibility.</p>
+</div>

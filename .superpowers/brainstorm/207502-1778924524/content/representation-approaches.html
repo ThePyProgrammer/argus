@@ -1,0 +1,61 @@
+<h2>Agent-friendly representation over splats / point clouds</h2>
+<p class="subtitle">Three viable architecture shapes for a general indoor/outdoor robot swarm. My recommendation is C.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A. Scene Graph First</div>
+        <div class="mockup-body">
+          <div class="placeholder">3D map</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">Objects · Places · Relations</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">LLM queries graph</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Scene graph first</h3>
+      <p>Convert geometry into entities and relations early. Great for inspect/understand and semantic search; weaker outdoors unless region/terrain primitives are carefully designed.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B. Query Services First</div>
+        <div class="mockup-body">
+          <div class="placeholder">3D map + robot state</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">Tools: free_space(), frontiers(), objects(), hazards()</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">Agent calls tools</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Query services first</h3>
+      <p>Expose APIs over geometry without committing to one grand world model. Fastest to prototype; can become messy if schemas are not disciplined.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C. Layered Belief Graph + Query Services</div>
+        <div class="mockup-body">
+          <div class="placeholder">Local 3D maps</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">Metric · Region · Semantic · Belief · Commitment layers</div>
+          <div style="text-align:center;margin:8px">↓</div>
+          <div class="placeholder">LLM tools + planners + swarm allocator</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Layered belief graph + tools</h3>
+      <p>Recommended. Keeps dense geometry grounded locally, exposes semantic/topological/belief abstractions, and supports search, navigation, inspection, and manipulation.</p>
+    </div>
+  </div>
+</div>

@@ -6,6 +6,8 @@ interface CameraFeedProps {
   robotId: string;
 }
 
+const EMPTY_DETECTION_ITEMS: Detection3DItem[] = [];
+
 /**
  * Interactive YOLO detection overlays as positioned HTML divs.
  * Hover to highlight and see a tooltip with details.
@@ -130,7 +132,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   const cameraUrl = useRobotStore((s) => s.robots.get(robotId)?.cameraUrl);
   const depthUrl = useRobotStore((s) => s.robots.get(robotId)?.depthUrl);
   const detectionItems = useRobotStore(
-    (s) => s.robots.get(robotId)?.detections_3d?.items ?? [],
+    (s) => s.robots.get(robotId)?.detections_3d?.items ?? EMPTY_DETECTION_ITEMS,
   );
   const colorIndex = useRobotStore(
     (s) => s.robots.get(robotId)?.colorIndex ?? 0,

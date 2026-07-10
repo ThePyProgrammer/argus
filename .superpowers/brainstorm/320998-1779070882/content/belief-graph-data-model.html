@@ -1,0 +1,32 @@
+<h2>Core data model: everything is a claim with evidence</h2>
+<p class="subtitle">The graph stores entities and relations, but every useful fact carries belief/provenance metadata.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Graph primitives</div>
+    <div class="mockup-body">
+      <div class="placeholder">Entity<br><small>robot · region · frontier · object · hazard · person · path · terrain patch</small></div>
+      <div style="text-align:center;margin:8px">↕ relations</div>
+      <div class="placeholder">Relation<br><small>contains · connects · blocks · near · observed_by · assigned_to · reachable_by</small></div>
+      <div style="text-align:center;margin:8px">↕ backed by</div>
+      <div class="placeholder">Evidence<br><small>point cloud slice · splat IDs · image frame · detector output · robot report</small></div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Belief metadata on every claim</div>
+    <div class="mockup-body">
+      <div class="placeholder">confidence: 0.74</div>
+      <div class="placeholder">source_robot: rover_3</div>
+      <div class="placeholder">observed_at: timestamp</div>
+      <div class="placeholder">frame_id: map / robot / local_submap</div>
+      <div class="placeholder">valid_until / stale_after</div>
+      <div class="placeholder">conflicts: [claim_17]</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Example</h3>
+  <p><code>hazard_12 blocks path_segment_4</code> is not stored as absolute truth. It is stored as a claim: observed by robot_3, at time T, confidence 0.74, backed by a local point-cloud/splat region, stale after 5 minutes, conflicting with robot_5's older clear-path report.</p>
+</div>

@@ -1,0 +1,25 @@
+<h2>Agent interface: tools over the belief graph</h2>
+<p class="subtitle">The LLM/agent should not receive the whole graph. It should ask bounded questions and get grounded answers.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Query flow</div>
+  <div class="mockup-body">
+    <div class="placeholder">Agent goal<br><small>"Search this area and route robots safely"</small></div>
+    <div style="text-align:center;margin:8px">↓ calls tools</div>
+    <div class="placeholder">World query API<br><small>find · summarize · route · check · allocate · explain</small></div>
+    <div style="text-align:center;margin:8px">↓ reads graph + geometry services</div>
+    <div class="placeholder">Belief graph + metric services<br><small>claims · entities · topology · occupancy · traversability · commitments</small></div>
+    <div style="text-align:center;margin:8px">↓ returns compact grounded answer</div>
+    <div class="placeholder">Answer with confidence + evidence<br><small>feasible: false · reason: blocked segment · confidence: 0.74 · source: rover_3</small></div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Recommended tool families</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="perception" onclick="toggleSelect(this)"><div class="letter">1</div><div class="content"><h3>Perception queries</h3><p>find_objects, find_hazards, summarize_region, retrieve_evidence</p></div></div>
+    <div class="option" data-choice="navigation" onclick="toggleSelect(this)"><div class="letter">2</div><div class="content"><h3>Navigation queries</h3><p>get_frontiers, query_traversability, plan_route, explain_blockage</p></div></div>
+    <div class="option" data-choice="coordination" onclick="toggleSelect(this)"><div class="letter">3</div><div class="content"><h3>Coordination queries</h3><p>allocate_task, reserve_resource, list_commitments, detect_conflicts</p></div></div>
+    <div class="option" data-choice="belief" onclick="toggleSelect(this)"><div class="letter">4</div><div class="content"><h3>Belief queries</h3><p>get_confidence, check_staleness, compare_claims, request_confirmation</p></div></div>
+  </div>
+</div>

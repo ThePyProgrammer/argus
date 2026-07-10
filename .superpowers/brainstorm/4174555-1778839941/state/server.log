@@ -1,0 +1,3 @@
+{"type":"server-started","port":59570,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:59570","screen_dir":"/home/prannayag/pragnition/robotics/argus/.superpowers/brainstorm/4174555-1778839941/content","state_dir":"/home/prannayag/pragnition/robotics/argus/.superpowers/brainstorm/4174555-1778839941/state"}
+{"type":"screen-added","file":"/home/prannayag/pragnition/robotics/argus/.superpowers/brainstorm/4174555-1778839941/content/representation-approaches.html"}
+{"type":"server-stopped","reason":"idle timeout"}
