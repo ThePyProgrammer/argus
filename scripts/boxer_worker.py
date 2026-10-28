@@ -101,6 +101,13 @@ def _load_pipeline(ckpts_dir: Path):
     return _BoxerPipeline(model, owl, labels)
 
 
+def _source_bbox(box, width, height, model_size):
+    """Undo square resizing and upstream x1,x2,y1,y2 ordering."""
+    return np.asarray(box, dtype=np.float64)[[0, 2, 1, 3]] * (
+        np.array([width, height, width, height]) / model_size
+    )
+
+
 class _BoxerPipeline:
     def __init__(self, model, owl, labels):
         self.model, self.owl, self.labels = model, owl, labels
@@ -145,8 +152,7 @@ class _BoxerPipeline:
                 if confidence < params.get("score_threshold", 0.3):
                     continue
                 # Upstream uses x1,x2,y1,y2 in its resized image.
-                bb = boxes[index].cpu().numpy()[[0, 2, 1, 3]]
-                bb *= np.array([width, height, width, height]) / size
+                bb = _source_bbox(boxes[index].cpu().numpy(), width, height, size)
                 result.append(SimpleNamespace(
                     class_id=self.labels[label_names[int(classes[index])]],
                     score=(confidence + float(scores[index])) / 2,

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useRobotStore, type Detection3DItem } from '../stores/robotStore';
 import { robotColor, OKABE_ITO_RGB } from '../utils/palette';
+import { cameraOverlayRect } from '../utils/cameraOverlay';
 
 interface CameraFeedProps {
   robotId: string;
@@ -22,9 +23,24 @@ function DetectionOverlay({
   imgHeight: number;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ width: imgWidth, height: imgHeight });
+
+  useLayoutEffect(() => {
+    const element = overlayRef.current;
+    if (!element) return;
+    const update = () => {
+      const { width, height } = element.getBoundingClientRect();
+      if (width > 0 && height > 0) setViewport({ width, height });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div style={{
+    <div ref={overlayRef} style={{
       position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
       zIndex: 2,
     }}>
@@ -40,16 +56,14 @@ function DetectionOverlay({
           : 0];
         const classColor = `rgb(${cr}, ${cg}, ${cb})`;
 
-        // Convert pixel coords to percentages for responsive positioning
-        const left = `${(x1 / imgWidth) * 100}%`;
-        const top = `${(y1 / imgHeight) * 100}%`;
-        const width = `${((x2 - x1) / imgWidth) * 100}%`;
-        const height = `${((y2 - y1) / imgHeight) * 100}%`;
+        const { left, top, width, height } = cameraOverlayRect(
+          [x1, y1, x2, y2], imgWidth, imgHeight, viewport.width, viewport.height,
+        );
         const isHovered = hovered === i;
 
         // Determine if label/tooltip would clip at top/bottom
-        const pctTop = (y1 / imgHeight) * 100;
-        const pctBottom = ((imgHeight - y2) / imgHeight) * 100;
+        const pctTop = (top / viewport.height) * 100;
+        const pctBottom = ((viewport.height - top - height) / viewport.height) * 100;
         const labelOnTop = pctTop > 5;   // enough room above?
         const tooltipOnBottom = pctBottom > 15; // enough room below?
 
@@ -133,13 +147,13 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
     (s) => s.robots.get(robotId)?.detections_3d,
   );
   const detectionItems = detections?.items ?? [];
+  const [imageHeight, imageWidth] = detections?.image_hw ?? [240, 320];
   const colorIndex = useRobotStore(
     (s) => s.robots.get(robotId)?.colorIndex ?? 0,
   );
   const color = robotColor(colorIndex);
 
-  // Images are rotated server-side (cv2.rotate in encode_camera_frame)
-  // so no CSS rotation needed.
+  // The server sends the raw image orientation; overlays use its pixel frame.
   const imgStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -203,8 +217,8 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
               <DetectionOverlay
                 items={detectionItems}
                 color={color}
-                imgWidth={640}
-                imgHeight={480}
+                imgWidth={imageWidth}
+                imgHeight={imageHeight}
               />
             </>
           ) : (
