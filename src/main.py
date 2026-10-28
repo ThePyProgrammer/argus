@@ -621,14 +621,17 @@ def run_web_mode(args: argparse.Namespace) -> None:
         },
     )
     coordinator.set_viz(streaming_viz)
-    from backend.web.spawn_routes import StartupSpawnSelection
+    from backend.web.spawn_routes import StartupSpawnSelection, set_simulation_status
 
     app.state.restart_spawn = StartupSpawnSelection(
         scene, dict(config.spawn_positions), platform_probe.metadata.footprint_radius,
     )
     startup_spawn = None
     startup_cancelled = threading.Event()
+    set_simulation_status(app, 'loading', 'Preparing simulation', dict(config.spawn_positions))
+    coordinator.on_simulation_ready = lambda: set_simulation_status(app, 'ready', 'Simulation ready')
     if getattr(args, "pick_spawn", False):
+        set_simulation_status(app, 'selecting', 'Choose starting positions')
         startup_spawn = StartupSpawnSelection(
             scene, dict(config.spawn_positions), platform_probe.metadata.footprint_radius,
         )
@@ -775,18 +778,23 @@ def run_web_mode(args: argparse.Namespace) -> None:
             coordinator.reset_merger()
             logger.info("Selected spawn positions: %s", config.spawn_positions)
 
+        set_simulation_status(app, 'loading', 'Loading perception models', dict(config.spawn_positions))
         _initialize_detector_pool(
             pending_detector=getattr(args, "detector", None),
             active_lifter_name=getattr(app.state, "active_lifter", None),
         )
         while True:
             try:
+                set_simulation_status(app, 'loading', 'Starting MuJoCo and preparing cameras')
                 result = coordinator.run(max_steps=max_steps)
+                if not coordinator.restart_requested:
+                    set_simulation_status(app, 'stopped', 'Simulation stopped')
                 logger.info(
                     "Simulation complete: %s, %d steps, %d merges",
                     result.terminated_reason, result.total_steps, result.merge_count,
                 )
             except Exception as e:
+                set_simulation_status(app, 'error', f'Simulation failed: {e}')
                 logger.warning("Simulation error: %s", e, exc_info=True)
 
             # Check if restart was requested
@@ -819,6 +827,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
                         spawn_height=platform_probe.metadata.spawn_height,
                     )
                 logger.info("Spawn positions: %s", config.spawn_positions)
+                set_simulation_status(app, 'loading', 'Rebuilding simulation and perception models', dict(config.spawn_positions))
 
                 # Read pending config: pipeline graph config takes priority over individual selections
                 pipeline_config = getattr(app.state, "pending_pipeline_config", None)
@@ -940,7 +949,14 @@ def run_web_mode(args: argparse.Namespace) -> None:
 
             logger.info("Simulation restarted.")
 
-    sim_thread = threading.Thread(target=_run_simulation_loop, daemon=True)
+    def _run_simulation_safely():
+        try:
+            _run_simulation_loop()
+        except Exception as exc:
+            set_simulation_status(app, 'error', f'Simulation initialization failed: {exc}')
+            logger.exception('Simulation initialization failed')
+
+    sim_thread = threading.Thread(target=_run_simulation_safely, daemon=True)
     sim_thread.start()
 
     print(f"Starting Argus at http://localhost:{args.port}")

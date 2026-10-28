@@ -24,7 +24,7 @@ export class RobotMarkerManager {
   private templateModel: THREE.Group | null = null;
   private modelLoaded = false;
   private modelFailed = false;
-  private pendingUpdates: Map<string, { position: [number, number, number]; colorIndex: number; platformMetadata?: PlatformMetadata | null }> = new Map();
+  private pendingUpdates: Map<string, { position: [number, number, number]; colorIndex: number; rotation?: number[]; trackingStatus?: string; bodyYaw?: number; platformMetadata?: PlatformMetadata | null }> = new Map();
   private fallbackGeometry: THREE.SphereGeometry;
   private fallbackMarkerKeys: Map<string, string> = new Map();
 
@@ -46,7 +46,7 @@ export class RobotMarkerManager {
 
         // Process any robots that were added before model loaded
         for (const [robotId, update] of this.pendingUpdates) {
-          this.createMeshMarker(robotId, update.position, update.colorIndex);
+          this.updateRobot(robotId, update.position, update.colorIndex, update.rotation, update.trackingStatus, update.bodyYaw, update.platformMetadata);
         }
         this.pendingUpdates.clear();
       },
@@ -57,7 +57,7 @@ export class RobotMarkerManager {
 
         // Create fallback markers for pending robots
         for (const [robotId, update] of this.pendingUpdates) {
-          this.createFallbackMarker(robotId, update.position, update.colorIndex, update.platformMetadata);
+          this.updateRobot(robotId, update.position, update.colorIndex, update.rotation, update.trackingStatus, update.bodyYaw, update.platformMetadata);
         }
         this.pendingUpdates.clear();
       },
@@ -224,7 +224,7 @@ export class RobotMarkerManager {
 
     // Model still loading — queue the update
     if (!this.modelLoaded && !this.modelFailed) {
-      this.pendingUpdates.set(robotId, { position, colorIndex, platformMetadata });
+      this.pendingUpdates.set(robotId, { position, colorIndex, rotation, trackingStatus, bodyYaw, platformMetadata });
       return;
     }
 
@@ -234,6 +234,8 @@ export class RobotMarkerManager {
     } else {
       this.createFallbackMarker(robotId, position, colorIndex, platformMetadata);
     }
+    // Apply heading on the first frame too, including asynchronously loaded models.
+    this.updateRobot(robotId, position, colorIndex, rotation, trackingStatus, bodyYaw, platformMetadata);
   }
 
   /**

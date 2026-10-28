@@ -13,6 +13,7 @@ import { ApplyBar } from './components/pipeline/ApplyBar';
 import { Minimap2D } from './components/Minimap2D';
 import StartupSpawnPicker from './components/StartupSpawnPicker';
 import WorkspaceHeader from './components/WorkspaceHeader';
+import SimulationStatus from './components/SimulationStatus';
 import { usePipelineStore } from './stores/pipelineStore';
 import { deserializeGraph } from './utils/pipelineSerializer';
 import { NODE_DEFINITIONS } from './utils/nodeDefinitions';
@@ -87,6 +88,7 @@ export default function App() {
   return (
     <div className="app-container">
       <WorkspaceHeader />
+      <SimulationStatus />
       <StartupSpawnPicker />
       <div className="viewer-area" id="scene-container" style={{ position: 'relative' }}>
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />

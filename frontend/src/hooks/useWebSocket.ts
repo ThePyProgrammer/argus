@@ -1,3 +1,4 @@
+import { useSimulationStore } from '../stores/simulationStore';
 import { useEffect, useRef } from 'react';
 import { useRobotStore } from '../stores/robotStore';
 import { useControlStore } from '../stores/controlStore';
@@ -87,6 +88,7 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
           break;
         }
         case 'pose_update': {
+          if (useSimulationStore.getState().status.phase === 'loading') break;
           const payload = msg.payload as PoseUpdatePayload;
           if (msg.robot_id) {
             store.updatePose(msg.robot_id, payload.position, payload.rotation, payload.tracking_status, payload.body_yaw);

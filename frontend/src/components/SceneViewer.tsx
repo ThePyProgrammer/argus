@@ -105,6 +105,12 @@ export default function SceneViewer() {
     const semanticMapLayer = new SemanticMapLayer(worldRoot);
     const cameraFrustumManager = new CameraFrustumManager(worldRoot);
 
+    // Seed markers when reopening the scene during initialization.
+    for (const [id, robot] of useRobotStore.getState().robots) {
+      robotMarkerManager.updateRobot(id, robot.position, robot.colorIndex, robot.rotation,
+        robot.trackingStatus, robot.bodyYaw, robot.platformMetadata);
+    }
+
     // --- Cloud offset subscription ---
     const unsubControl = useControlStore.subscribe((state, prev) => {
       if (state.cloudOffset !== prev.cloudOffset) {

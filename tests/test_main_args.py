@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 
 class _FakePlatformMetadata:
     spawn_height = 0.73
+    footprint_radius = 0.35
 
     def to_wire(self):
         return {"name": "fake_go2", "display_name": "Fake GO2 Test Platform"}

@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OKABE_ITO } from '../utils/palette';
 import { useControlStore } from '../stores/controlStore';
+import { useSimulationStore } from '../stores/simulationStore';
 import { useRobotStore } from '../stores/robotStore';
 
 type Point = [number, number];
@@ -235,6 +236,7 @@ export default function StartupSpawnPicker() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not confirm spawn positions');
+      if (data.status) useSimulationStore.getState().apply(data.status);
       if (restarting) {
         useRobotStore.getState().setCloudFull([], []);
         useControlStore.getState().setRunning(true);

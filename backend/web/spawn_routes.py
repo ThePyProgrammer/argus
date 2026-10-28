@@ -10,6 +10,23 @@ from pydantic import BaseModel, FiniteFloat
 router = APIRouter(prefix="/api/spawn", tags=["spawn"])
 
 
+def set_simulation_status(app, phase: str, message: str, positions=None):
+    previous = getattr(app.state, 'simulation_status', {})
+    positions = positions if positions is not None else previous.get('positions', {})
+    app.state.simulation_status = {
+        'phase': phase, 'message': message,
+        'positions': positions,
+        # Match MultiRobotBridge.start(): evenly spaced headings in robot order.
+        'headings': {rid: 2 * math.pi * i / len(positions)
+                     for i, rid in enumerate(positions)},
+    }
+
+
+@router.get('/status')
+async def get_simulation_status(request: Request):
+    return getattr(request.app.state, 'simulation_status', {'phase': 'idle', 'message': ''})
+
+
 @dataclass
 class StartupSpawnSelection:
     scene: str
@@ -24,7 +41,8 @@ class StartupSpawnSelection:
         if positions.keys() != self.defaults.keys():
             raise ValueError("Select one position for every robot in this session")
         selected = {}
-        for robot_id, (x, y) in positions.items():
+        for robot_id in self.defaults:
+            x, y = positions[robot_id]
             if not math.isfinite(x) or not math.isfinite(y) or max(abs(x), abs(y)) > 1000:
                 raise ValueError("Spawn coordinates must be finite and within 1000 meters")
             for other in selected.values():
@@ -63,8 +81,9 @@ async def confirm_restart(body: SpawnRequest, request: Request):
         selection.choose(body.positions)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    set_simulation_status(request.app, 'loading', 'Preparing simulation restart', selection.positions)
     callback({'action': 'restart', 'positions': selection.positions})
-    return {'positions': selection.positions}
+    return {'positions': selection.positions, 'status': request.app.state.simulation_status}
 
 
 @router.get("")
@@ -86,7 +105,11 @@ async def confirm_spawn(body: SpawnRequest, request: Request):
     if selection is None or selection.ready.is_set():
         raise HTTPException(status_code=409, detail="This session is not waiting for spawn selection")
     try:
+        # Validate separately so the preview is available before waking MuJoCo.
+        validated = StartupSpawnSelection(selection.scene, selection.defaults, selection.footprint_radius)
+        validated.choose(body.positions)
+        set_simulation_status(request.app, 'loading', 'Preparing simulation', validated.positions)
         selection.choose(body.positions)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"positions": selection.positions}
+    return {"positions": selection.positions, "status": request.app.state.simulation_status}

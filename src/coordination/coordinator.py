@@ -512,6 +512,9 @@ class Coordinator:
             robot.publisher.start()
 
         frames = self._bridge.start()
+        on_ready = getattr(self, 'on_simulation_ready', None)
+        if on_ready is not None:
+            on_ready()
         # Phase 6 BLOCKER 2: bridge is now started → mj_model / mj_data are
         # populated. Retry the GT-extractor attach (no-op if already attached
         # or if the scene YAML is absent).

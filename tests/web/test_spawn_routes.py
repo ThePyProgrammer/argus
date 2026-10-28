@@ -75,3 +75,18 @@ def test_restart_rejects_overlap_and_pending_startup():
     selection.ready.set()
     assert client.post('/api/spawn/restart', json=body).status_code == 422
     client.app.state.command_callback.assert_not_called()
+
+
+def test_spawn_status_previews_match_bridge_heading_order_and_remain_available():
+    from backend.web.spawn_routes import set_simulation_status
+    client, selection = client_for({'robot_a': (0, 0, .3), 'robot_b': (5, 0, .3)})
+    response = client.post('/api/spawn', json={'positions': {'robot_b': [3, 4], 'robot_a': [1, 2]}})
+    status = response.json()['status']
+    assert status['phase'] == 'loading'
+    assert status['positions']['robot_a'] == [1, 2, .3]
+    assert status['headings'] == {'robot_a': 0., 'robot_b': math.pi}
+    assert client.get('/api/spawn/status').json() == status
+    set_simulation_status(client.app, 'ready', 'Simulation ready')
+    ready = client.get('/api/spawn/status').json()
+    assert ready['phase'] == 'ready'
+    assert ready['positions'] == status['positions']
