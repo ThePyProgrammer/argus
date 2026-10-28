@@ -90,3 +90,39 @@ def test_spawn_status_previews_match_bridge_heading_order_and_remain_available()
     ready = client.get('/api/spawn/status').json()
     assert ready['phase'] == 'ready'
     assert ready['positions'] == status['positions']
+
+
+def test_scene_library_selection_is_atomic_until_confirmation():
+    client, selection = client_for()
+    details = client.get('/api/spawn?scene=coffee_shop').json()
+    assert len(details['scenes']) == 11
+    assert selection.scene == 'office'
+    assert not selection.ready.is_set()
+    response = client.post('/api/spawn', json={'scene': 'coffee_shop', 'positions': details['defaults']})
+    assert response.status_code == 200
+    assert selection.scene == 'coffee_shop'
+    assert selection.ready.is_set()
+    assert response.json()['status']['scene'] == 'coffee_shop'
+
+
+def test_restart_scene_change_and_invalid_scene_rejection():
+    from unittest.mock import Mock
+    client, selection = client_for()
+    client.app.state.startup_spawn = None
+    client.app.state.restart_spawn = selection
+    client.app.state.command_callback = Mock()
+    assert client.get('/api/spawn/restart?scene=../../secret').status_code == 422
+    response = client.post('/api/spawn/restart', json={'scene': 'coffee_shop', 'positions': {'robot_a': [0, 0]}})
+    assert response.status_code == 422
+    client.app.state.command_callback.assert_not_called()
+    details = client.get('/api/spawn/restart?scene=gym').json()
+    response = client.post('/api/spawn/restart', json={'scene': 'gym', 'positions': details['defaults']})
+    assert response.status_code == 200
+    assert client.app.state.pending_scene == 'gym'
+    assert client.app.state.restart_spawn.scene == 'gym'
+
+
+def test_geometry_endpoint_is_compiled_and_unknown_scene_is_404():
+    client, _ = client_for()
+    assert len(client.get('/api/spawn/geometry/workbench').json()['geoms']) > 20
+    assert client.get('/api/spawn/geometry/not-a-scene').status_code == 404

@@ -6,6 +6,7 @@ import threading
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, FiniteFloat
+from src.bridge.scene_library import catalog, require_scene, scene_geometry, default_positions, open_floor
 
 router = APIRouter(prefix="/api/spawn", tags=["spawn"])
 
@@ -15,6 +16,7 @@ def set_simulation_status(app, phase: str, message: str, positions=None):
     positions = positions if positions is not None else previous.get('positions', {})
     app.state.simulation_status = {
         'phase': phase, 'message': message,
+        'scene': getattr(app.state, 'active_scene', 'flat'),
         'positions': positions,
         # Match MultiRobotBridge.start(): evenly spaced headings in robot order.
         'headings': {rid: 2 * math.pi * i / len(positions)
@@ -55,18 +57,16 @@ class StartupSpawnSelection:
 
 class SpawnRequest(BaseModel):
     positions: dict[str, tuple[FiniteFloat, FiniteFloat]]
+    scene: str | None = None
 
 
 @router.get('/restart')
-async def get_restart_selection(request: Request):
+def get_restart_selection(request: Request, scene: str | None = None):
     selection = getattr(request.app.state, 'restart_spawn', None)
     if selection is None:
         raise HTTPException(status_code=409, detail='Restart placement is unavailable for this session')
-    return {
-        'scene': selection.scene,
-        'robot_ids': list(selection.defaults),
-        'defaults': {rid: list(point[:2]) for rid, point in selection.defaults.items()},
-    }
+    return selection_details(selection, scene)
+
 
 
 @router.post('/restart')
@@ -76,27 +76,26 @@ async def confirm_restart(body: SpawnRequest, request: Request):
     startup = getattr(request.app.state, 'startup_spawn', None)
     if template is None or callback is None or (startup is not None and not startup.ready.is_set()):
         raise HTTPException(status_code=409, detail='Simulation is not ready to restart')
-    selection = StartupSpawnSelection(template.scene, template.defaults, template.footprint_radius)
     try:
+        selection = validate_selection(template, body)
         selection.choose(body.positions)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    request.app.state.pending_scene = selection.scene
+    request.app.state.active_scene = selection.scene
+    request.app.state.restart_spawn = selection
     set_simulation_status(request.app, 'loading', 'Preparing simulation restart', selection.positions)
     callback({'action': 'restart', 'positions': selection.positions})
     return {'positions': selection.positions, 'status': request.app.state.simulation_status}
 
 
 @router.get("")
-async def get_spawn_selection(request: Request):
+def get_spawn_selection(request: Request, scene: str | None = None):
     selection = getattr(request.app.state, "startup_spawn", None)
     if selection is None:
         return {"awaiting_selection": False}
-    return {
-        "awaiting_selection": not selection.ready.is_set(),
-        "scene": selection.scene,
-        "robot_ids": list(selection.defaults),
-        "defaults": {rid: list(point[:2]) for rid, point in selection.defaults.items()},
-    }
+    return {**selection_details(selection, scene), 'awaiting_selection': not selection.ready.is_set()}
+
 
 
 @router.post("")
@@ -106,10 +105,41 @@ async def confirm_spawn(body: SpawnRequest, request: Request):
         raise HTTPException(status_code=409, detail="This session is not waiting for spawn selection")
     try:
         # Validate separately so the preview is available before waking MuJoCo.
-        validated = StartupSpawnSelection(selection.scene, selection.defaults, selection.footprint_radius)
+        validated = validate_selection(selection, body)
         validated.choose(body.positions)
+        request.app.state.active_scene = validated.scene
+        selection.scene = validated.scene
+        selection.defaults = validated.defaults
         set_simulation_status(request.app, 'loading', 'Preparing simulation', validated.positions)
         selection.choose(body.positions)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"positions": selection.positions, "status": request.app.state.simulation_status}
+
+
+def selection_details(selection, scene=None):
+    try:
+        selected = require_scene(scene or selection.scene)
+        defaults = selection.defaults if selected == selection.scene else default_positions(
+            selected, selection.defaults, next(iter(selection.defaults.values()))[2], selection.footprint_radius)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {'scene': selected, 'robot_ids': list(selection.defaults),
+            'defaults': {rid: list(pos[:2]) for rid, pos in defaults.items()}, 'scenes': catalog()}
+
+
+def validate_selection(template, body):
+    scene = require_scene(body.scene or template.scene)
+    selection = StartupSpawnSelection(scene, template.defaults, template.footprint_radius)
+    for x, y in body.positions.values():
+        if not open_floor(scene, x, y, template.footprint_radius):
+            raise ValueError('Choose clear floor inside the map, with space away from furniture and walls')
+    return selection
+
+
+@router.get('/geometry/{scene}')
+def get_scene_geometry(scene: str):
+    try:
+        return scene_geometry(scene)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

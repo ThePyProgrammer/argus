@@ -156,6 +156,10 @@ class WebStreamingViz:
         """Current export-session UUID4 hex (Plan 09 REST handler uses this)."""
         return self._session_id
 
+    def detach_gt_extractor(self) -> None:
+        """Discard scene-specific model handles before replacing a simulation."""
+        self._gt_extractor = None
+
     def attach_gt_extractor(
         self,
         mapping_yaml_path,

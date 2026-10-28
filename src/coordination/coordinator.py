@@ -243,6 +243,8 @@ class Coordinator:
         viz = self._viz
         if viz is None or not hasattr(viz, "attach_gt_extractor"):
             return
+        if self._config.scene != 'office':
+            return
         # Already attached — skip the reconstruction work.
         if getattr(viz, "gt_extractor", None) is not None:
             return
@@ -340,6 +342,8 @@ class Coordinator:
 
         self._bridge = bridge
         self._robots = robots
+        if self._viz is not None and hasattr(self._viz, 'detach_gt_extractor'):
+            self._viz.detach_gt_extractor()
         self._should_stop = False
         self._paused = False
         self._partitioned = False

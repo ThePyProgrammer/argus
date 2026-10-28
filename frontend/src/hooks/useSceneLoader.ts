@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { useSimulationStore } from '../stores/simulationStore';
+import { buildSceneGeometry, disposeScene } from '../utils/sceneGeometry';
 import { useControlStore } from '../stores/controlStore';
 
 /**
@@ -13,6 +15,7 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sceneObjRef = useRef<THREE.Object3D | null>(null);
+  const activeScene = useSimulationStore((s) => s.status.scene ?? 'flat');
   const sceneColored = useControlStore((s) => s.sceneColored);
 
   useEffect(() => {
@@ -30,7 +33,18 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
     setLoading(true);
     setError(null);
 
-    loader.load(
+    if (activeScene !== 'office') {
+      fetch(`/api/spawn/geometry/${encodeURIComponent(activeScene)}`)
+        .then(async response => { if (!response.ok) throw new Error('Could not load selected scene'); return response.json(); })
+        .then(data => {
+          if (cancelled) return;
+          const object = buildSceneGeometry(data, sceneColored);
+          object.visible = useControlStore.getState().showScene;
+          sceneObjRef.current = object;
+          parent.add(object);
+          setLoading(false);
+        }).catch(err => { if (!cancelled) { setError(String(err)); setLoading(false); } });
+    } else loader.load(
       glbUrl,
       (gltf) => {
         if (cancelled) return;
@@ -72,10 +86,11 @@ export function useSceneLoader(parent: THREE.Object3D | null): {
       // Remove scene from parent on cleanup so re-run loads fresh
       if (sceneObjRef.current?.parent === parent) {
         parent.remove(sceneObjRef.current);
+        disposeScene(sceneObjRef.current);
       }
       sceneObjRef.current = null;
     };
-  }, [parent, sceneColored]);
+  }, [parent, sceneColored, activeScene]);
 
   // Subscribe to showScene toggle
   useEffect(() => {

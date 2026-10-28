@@ -495,16 +495,31 @@ sudo pacman -S libvips  # Arch/CachyOS
 
 ### Running
 
-To choose where robots start, add `--pick-spawn`:
+To choose the scene and robot starting positions in the browser, add `--pick-spawn` (no `--scene` needed):
 
 ```powershell
-uv run --extra web argus --scene office --detector boxer --num-robots 1 --pick-spawn
+uv run --extra web argus --detector boxer --num-robots 1 --pick-spawn
 ```
 
 Open http://localhost:8000, select a robot in the startup dialog, and click
 open floor on the overhead map. Place each robot, then click **Start simulation**.
 The environment and detector wait until you confirm. Scroll to zoom and
 right-drag to pan. **Use default positions** skips manual placement.
+The picker includes a compact **Scene library**: the original Argus office, an open floor,
+and nine bundled environments from [MuJoCo Scene Editor](https://github.com/markusgrotz/mujoco-scene-editor/tree/main/examples/prompt):
+chemistry lab, chess room, coffee shop, gym, living room, modern office, playground,
+restaurant, and workbench. Choose a scene, place each robot on clear floor, and confirm.
+Changing the scene clears previous placements. **Use default positions** chooses validated
+floor locations for the bundled scenes. **Restart** in the top bar opens the same library
+and map, including switching environments. Cancel leaves the current run alone.
+
+The browser maps are generated from the same compiled MuJoCo primitives used by physics.
+They show the authored initial environment; loose props can move in simulation, while the
+browser environment mesh remains at its initial layout. RGB feeds show their live positions.
+The imported XML files and MIT license are bundled locally; no scene downloads are needed
+at runtime. Source revision and compatibility fixes are recorded in
+`data/scene_library/prompt/SOURCE.md`. MuJoCo 3.6 or newer is required.
+
 Add `--static` to keep robots stationary after spawning. Without `--pick-spawn`,
 Argus starts immediately as before.
 

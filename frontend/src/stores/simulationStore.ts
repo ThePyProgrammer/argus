@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useRobotStore } from './robotStore';
 export interface SimulationStatus {
   phase: string;
+  scene?: string;
   message: string;
   positions?: Record<string, [number, number, number]>;
   headings?: Record<string, number>;
@@ -12,7 +13,7 @@ export const useSimulationStore = create<{ status: SimulationStatus; apply: (sta
     const previous = get().status;
     set({ status });
     if (status.phase !== 'loading' || !status.positions) return;
-    if (previous.phase === 'loading' && JSON.stringify(previous.positions) === JSON.stringify(status.positions)) return;
+    if (previous.phase === 'loading' && previous.scene === status.scene && JSON.stringify(previous.positions) === JSON.stringify(status.positions)) return;
     const store = useRobotStore.getState();
     store.setRobotList(Object.keys(status.positions));
     store.setCloudFull([], []);

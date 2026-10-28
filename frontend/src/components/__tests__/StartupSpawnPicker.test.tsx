@@ -32,7 +32,17 @@ it('submits restart positions only after confirmation', async () => {
   render(<StartupSpawnPicker />);
   fireEvent.click(await screen.findByRole('button', { name: 'Use default positions' }));
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/spawn/restart', expect.objectContaining({
-    method: 'POST', body: JSON.stringify({ positions: setup.defaults }),
+    method: 'POST', body: JSON.stringify({ positions: setup.defaults, scene: setup.scene }),
   })));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+it('changes the selected scene before submitting startup positions', async () => {
+  const scenes = [{ id: 'flat', name: 'Open floor', description: 'Test floor', source: 'Argus' }, { id: 'gym', name: 'Gym', description: 'Exercise equipment', source: 'mujoco-scene-editor' }];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => ({ ok: true, json: async () => init?.method === 'POST' ? {} : { ...setup, awaiting_selection: true, scene: url.includes('scene=gym') ? 'gym' : 'flat', scenes } })));
+  render(<StartupSpawnPicker />);
+  fireEvent.click(await screen.findByRole('button', { name: /Gym/ }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /Gym/ }).getAttribute('aria-pressed')).toBe('true'));
+  fireEvent.click(screen.getByRole('button', { name: 'Use default positions' }));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/spawn', expect.objectContaining({ method: 'POST', body: JSON.stringify({ positions: setup.defaults, scene: 'gym' }) })));
 });

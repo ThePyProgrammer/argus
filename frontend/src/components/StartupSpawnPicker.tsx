@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildSceneGeometry } from '../utils/sceneGeometry';
 import { OKABE_ITO } from '../utils/palette';
 import { useControlStore } from '../stores/controlStore';
 import { useSimulationStore } from '../stores/simulationStore';
@@ -10,6 +11,7 @@ import { useRobotStore } from '../stores/robotStore';
 type Point = [number, number];
 interface SpawnSetup {
   awaiting_selection: boolean;
+  scenes?: { id: string; name: string; description: string; source: string }[];
   scene: string;
   robot_ids: string[];
   defaults: Record<string, Point>;
@@ -110,13 +112,15 @@ export function SpawnMap({ sceneName, positions, robotIds, onPick }: {
         setError('Could not load the office map. Use default positions or reload to retry.');
       });
     } else {
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshBasicMaterial({ color: '#26354c', side: THREE.DoubleSide }));
-      floor.rotation.x = -Math.PI / 2;
-      floor.userData.spawnFloor = true;
-      scene.add(floor);
-      scene.add(new THREE.GridHelper(30, 30, '#60738c', '#36485e'));
-      selectable.push(floor);
-      fit(floor);
+      fetch(`/api/spawn/geometry/${encodeURIComponent(sceneName)}`)
+        .then(async response => { if (!response.ok) throw new Error('Could not load scene map'); return response.json(); })
+        .then(data => {
+          if (cancelled) return;
+          const object = buildSceneGeometry(data);
+          object.traverse(child => { if (child instanceof THREE.Mesh) selectable.push(child); });
+          scene.add(object);
+          fit(object);
+        }).catch(() => { if (!cancelled) { setLoading(false); setError('Could not load this map. Choose another scene or retry.'); } });
     }
     const click = (event: MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -182,7 +186,7 @@ export function SpawnMap({ sceneName, positions, robotIds, onPick }: {
     redraw.current();
   }, [positions, robotIds]);
 
-  return <div style={{ position: 'relative', minHeight: 300, height: 'min(60vh, 620px)' }}>
+  return <div style={{ position: 'relative', minHeight: 300, height: 'min(52vh, 560px)' }}>
     <div ref={container} style={{ position: 'absolute', inset: 0, cursor: 'crosshair' }} />
     {(loading || error) && <div className="spawn-map-status" role="status" style={{ position: 'absolute', bottom: 12, left: 12, right: 12, background: '#101625dd', padding: 10, pointerEvents: 'none' }}>{error || 'Loading overhead map…'}</div>}
   </div>;
@@ -194,6 +198,7 @@ export default function StartupSpawnPicker() {
   const [setup, setSetup] = useState<SpawnSetup | null>(null);
   const [positions, setPositions] = useState<Record<string, Point>>({});
   const [active, setActive] = useState('');
+  const [changingScene, setChangingScene] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -220,11 +225,24 @@ export default function StartupSpawnPicker() {
     <section style={{ padding: 20 }}><p role="status">{error || 'Loading spawn selection...'}</p><button onClick={() => setRestartPickerOpen(false)}>Cancel</button></section>
   </div> : null;
   const pick = (point: Point) => {
-    if (pending) return;
+    if (pending || changingScene) return;
     const next = { ...positions, [active]: point };
     setPositions(next);
     const remaining = setup.robot_ids.find((id) => !next[id]);
     if (remaining) setActive(remaining);
+  };
+  const changeScene = async (scene: string) => {
+    setChangingScene(true);
+    setError('');
+    try {
+      const response = await fetch(`${restarting ? '/api/spawn/restart' : '/api/spawn'}?scene=${encodeURIComponent(scene)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Could not select scene');
+      setSetup(data);
+      setPositions({});
+      setActive(data.robot_ids[0]);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not select scene'); }
+    finally { setChangingScene(false); }
   };
   const confirm = async (chosen: Record<string, Point>) => {
     setPending(true);
@@ -232,7 +250,7 @@ export default function StartupSpawnPicker() {
     try {
       const response = await fetch(restarting ? '/api/spawn/restart' : '/api/spawn', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ positions: chosen }),
+        body: JSON.stringify({ positions: chosen, scene: setup.scene }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not confirm spawn positions');
@@ -254,19 +272,27 @@ export default function StartupSpawnPicker() {
     <section style={{ width: 'min(1050px, 96vw)', background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
       <header style={{ padding: '18px 22px' }}>
         <h2 id="spawn-title" style={{ margin: '0 0 8px' }}>{restarting ? 'Choose restart positions' : 'Choose starting positions'}</h2>
-        <p style={{ margin: 0, color: 'var(--muted)' }}>Select a robot, then click open floor on the overhead map. Scroll to zoom; right-drag to pan. MuJoCo starts after you confirm.</p>
+        <p style={{ margin: 0, color: 'var(--muted)' }}>Choose a scene and a robot, then click open floor on the overhead map. Scroll to zoom; right-drag to pan. MuJoCo starts after you confirm.</p>
       </header>
       <div style={{ display: 'flex', gap: 8, padding: '0 22px 14px', flexWrap: 'wrap' }}>
-        {setup.robot_ids.map((id, index) => <button key={id} disabled={pending} onClick={() => setActive(id)} aria-pressed={active === id} style={{ padding: '8px 12px', background: active === id ? 'var(--accent-wash)' : 'var(--surface-inset)', color: OKABE_ITO[index % 8], border: '1px solid var(--line-strong)', borderRadius: 6 }}>
+        {setup.robot_ids.map((id, index) => <button key={id} disabled={pending || changingScene} onClick={() => setActive(id)} aria-pressed={active === id} style={{ padding: '8px 12px', background: active === id ? 'var(--accent-wash)' : 'var(--surface-inset)', color: OKABE_ITO[index % 8], border: '1px solid var(--line-strong)', borderRadius: 6 }}>
           {id}: {positions[id] ? `(${positions[id][0].toFixed(2)}, ${positions[id][1].toFixed(2)})` : 'click to place'}
         </button>)}
       </div>
-      <SpawnMap sceneName={setup.scene} positions={positions} robotIds={setup.robot_ids} onPick={pick} />
+      <div className="spawn-library-layout">
+        {setup.scenes && <nav className="scene-library" aria-label="Scene library">
+          <div className="eyebrow">Scene library</div>
+          {setup.scenes.map(scene => <button key={scene.id} aria-pressed={setup.scene === scene.id} disabled={pending || changingScene} onClick={() => changeScene(scene.id)}>
+            <strong>{scene.name}</strong><span>{scene.description}</span>
+          </button>)}
+        </nav>}
+        <div style={{ minWidth: 0 }}><SpawnMap key={setup.scene} sceneName={setup.scene} positions={positions} robotIds={setup.robot_ids} onPick={pick} /></div>
+      </div>
       <footer style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span role="alert" style={{ color: '#ffa89b', flex: 1 }}>{error}</span>
-        {restarting && <button disabled={pending} onClick={() => { setSetup(null); setRestartPickerOpen(false); }}>Cancel</button>}
-        <button disabled={pending} onClick={() => confirm(setup.defaults)}>Use default positions</button>
-        <button disabled={pending || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: 'var(--button-primary)', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting...' : restarting ? 'Restart simulation' : 'Start simulation'}</button>
+        {restarting && <button disabled={pending || changingScene} onClick={() => { setSetup(null); setRestartPickerOpen(false); }}>Cancel</button>}
+        <button disabled={pending || changingScene} onClick={() => confirm(setup.defaults)}>Use default positions</button>
+        <button disabled={pending || changingScene || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: 'var(--button-primary)', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting...' : restarting ? 'Restart simulation' : 'Start simulation'}</button>
       </footer>
     </section>
   </div>;

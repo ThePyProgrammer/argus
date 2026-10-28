@@ -51,6 +51,7 @@ from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.bridge.sim_bridge import MuJoCoBridge
 from src.control.random_walk import RandomWalkController
 from src.control.waypoint_runner import WaypointRunner
+from src.bridge.scene_library import SCENES
 from src.coordination.spawn import generate_robot_ids, generate_spawn_positions
 from src.exploration.config import ExplorationConfig
 from src.exploration.exploration_loop import ExplorationLoop
@@ -210,7 +211,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scene",
-        choices=["flat", "office"],
+        choices=list(SCENES),
         default="flat",
         help="Scene type for multi-robot mode (default: flat)",
     )
@@ -221,7 +222,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--pick-spawn", action="store_true",
-        help="Choose robot spawn positions on an overhead map before starting web simulation",
+        help="Choose a scene from the library and robot positions before starting web simulation",
     )
     parser.add_argument(
         "--detector",
@@ -628,6 +629,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     )
     startup_spawn = None
     startup_cancelled = threading.Event()
+    app.state.active_scene = scene
     set_simulation_status(app, 'loading', 'Preparing simulation', dict(config.spawn_positions))
     coordinator.on_simulation_ready = lambda: set_simulation_status(app, 'ready', 'Simulation ready')
     if getattr(args, "pick_spawn", False):
@@ -772,6 +774,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     return
             if startup_cancelled.is_set():
                 return
+            config.scene = startup_spawn.scene
+            app.state.restart_spawn.scene = startup_spawn.scene
+            app.state.restart_spawn.defaults = dict(startup_spawn.positions)
             config.spawn_positions.update(startup_spawn.positions)
             for rid, position in startup_spawn.positions.items():
                 robots[rid].spawn_transform[:3, 3] = position
@@ -806,6 +811,8 @@ def run_web_mode(args: argparse.Namespace) -> None:
             with _restart_lock:
                 coordinator._restarting = True
                 new_positions = coordinator.restart_positions
+                config.scene = getattr(app.state, 'pending_scene', None) or config.scene
+                app.state.pending_scene = None
 
                 # Stop old bridge
                 try:

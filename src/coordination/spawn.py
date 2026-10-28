@@ -48,6 +48,10 @@ def generate_spawn_positions(
     Returns:
         Dict mapping robot_id to (x, y, z) spawn position.
     """
+    from src.bridge.scene_library import PROMPT_SCENES, default_positions, require_scene
+    require_scene(scene)
+    if scene in PROMPT_SCENES:
+        return default_positions(scene, robot_ids, spawn_height)
     n = len(robot_ids)
 
     if scene == "flat":

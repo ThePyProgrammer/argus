@@ -142,7 +142,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.100.0" },
     { name = "gymnasium", specifier = ">=1.3.0" },
     { name = "msgpack", specifier = ">=1.0" },
-    { name = "mujoco", specifier = ">=3.0.0" },
+    { name = "mujoco", specifier = ">=3.6.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "onnx", marker = "extra == 'perception'", specifier = ">=1.17.0" },
     { name = "onnxruntime", marker = "extra == 'perception'", specifier = ">=1.19.0" },

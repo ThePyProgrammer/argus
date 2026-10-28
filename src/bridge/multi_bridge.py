@@ -89,7 +89,10 @@ class MultiRobotBridge:
         self._step_count = 0
 
         # Generate combined XML
-        if self._config.scene == "office" and self._config.platform == "go2":
+        from src.bridge.scene_library import PROMPT_SCENES, build_library_model
+        if self._config.scene in PROMPT_SCENES:
+            self._model = build_library_model(self._platform, self._config.spawn_positions, self._config.scene)
+        elif self._config.scene == "office" and self._config.platform == "go2":
             xml_str, assets = build_two_robot_office_scene(
                 self._platform.metadata.model_dir,
                 self._config.spawn_positions,
