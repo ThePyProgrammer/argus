@@ -55,6 +55,7 @@ def create_app(
     app.state.robot_ids = robot_ids
     app.state.platform_metadata = platform_metadata or {}
     app.state.startup_spawn = None
+    app.state.restart_spawn = None
     app.state.cloud_config_fns = cloud_config_fns
 
     # SLAM backend selection state

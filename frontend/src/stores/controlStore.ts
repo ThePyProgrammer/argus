@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
 export interface ControlStoreState {
+  restartPickerOpen: boolean;
+  setRestartPickerOpen: (open: boolean) => void;
   connected: boolean;
   setConnected: (connected: boolean) => void;
   isRunning: boolean;
@@ -31,6 +33,8 @@ export interface ControlStoreState {
 }
 
 export const useControlStore = create<ControlStoreState>((set) => ({
+  restartPickerOpen: false,
+  setRestartPickerOpen: (restartPickerOpen) => set({ restartPickerOpen }),
   connected: false,
   setConnected: (connected) => set({ connected }),
   isRunning: true,

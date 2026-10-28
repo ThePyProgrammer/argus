@@ -10,9 +10,6 @@ import SliderField from './SliderField';
 export default function ControlPanel() {
   const [showCloudConfig, setShowCloudConfig] = useState(false);
   const [showCloudOffset, setShowCloudOffset] = useState(false);
-  const [showRestart, setShowRestart] = useState(false);
-  const [spawnA, setSpawnA] = useState({ x: -2.0, y: 3.0 });
-  const [spawnB, setSpawnB] = useState({ x: 5.0, y: -7.0 });
   const isRunning = useControlStore((s) => s.isRunning);
   const isPaused = useControlStore((s) => s.isPaused);
   const simSpeed = useControlStore((s) => s.simSpeed);
@@ -205,100 +202,6 @@ export default function ControlPanel() {
       <AlgorithmSection />
 
       <DetectorSection />
-
-      {/* Restart section */}
-      <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-          <button
-            onClick={() => {
-              sendRaw?.({ type: 'command', payload: { action: 'restart' } });
-              useRobotStore.getState().setCloudFull([], []);
-            }}
-            style={{
-              ...buttonStyle,
-              flex: 2,
-              background: 'var(--danger)',
-              color: '#fff',
-              border: 'none',
-            }}
-          >
-            🔄 Restart (Random)
-          </button>
-          <button
-            onClick={() => setShowRestart(!showRestart)}
-            style={{
-              ...buttonStyle,
-              flex: 1,
-              background: 'var(--surface-inset)',
-              color: 'var(--muted)',
-              border: '1px solid var(--muted)',
-              fontSize: '11px',
-            }}
-          >
-            {showRestart ? 'Hide' : 'Custom'}
-          </button>
-        </div>
-        {showRestart && (
-          <div style={{ background: 'var(--surface-inset)', padding: '8px', borderRadius: '4px' }}>
-            <div style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '6px' }}>
-              Set custom spawn positions (X, Y in meters)
-            </div>
-            {[
-              { label: 'Robot A', pos: spawnA, setPos: setSpawnA, color: 'var(--accent)' },
-              { label: 'Robot B', pos: spawnB, setPos: setSpawnB, color: '#ff9800' },
-            ].map(({ label, pos, setPos, color }) => (
-              <div key={label} style={{ marginBottom: '6px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color, marginBottom: '2px' }}>
-                  {label}
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {(['x', 'y'] as const).map((axis) => (
-                    <div key={axis} style={{ flex: 1 }}>
-                      <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{axis.toUpperCase()}</div>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={pos[axis]}
-                        onChange={(e) => setPos({ ...pos, [axis]: parseFloat(e.target.value) || 0 })}
-                        style={{
-                          width: '100%', padding: '3px 5px', fontSize: '11px',
-                          background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line-strong)',
-                          borderRadius: '3px',
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                sendRaw?.({
-                  type: 'command',
-                  payload: {
-                    action: 'restart',
-                    positions: {
-                      robot_a: [spawnA.x, spawnA.y, 0.3],
-                      robot_b: [spawnB.x, spawnB.y, 0.3],
-                    },
-                  },
-                });
-                useRobotStore.getState().setCloudFull([], []);
-              }}
-              style={{
-                ...buttonStyle,
-                width: '100%',
-                background: 'var(--warning)',
-                color: '#fff',
-                border: 'none',
-                fontSize: '12px',
-              }}
-            >
-              Restart at Custom Positions
-            </button>
-          </div>
-        )}
-      </div>
 
       {Object.keys(cloudConfigs).length > 0 && (
         <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>

@@ -1,4 +1,4 @@
-"""One-shot startup placement; MuJoCo waits until selection is confirmed."""
+"""Validated map placement for initial startup and simulation restarts."""
 
 from dataclasses import dataclass, field
 import math
@@ -37,6 +37,34 @@ class StartupSpawnSelection:
 
 class SpawnRequest(BaseModel):
     positions: dict[str, tuple[FiniteFloat, FiniteFloat]]
+
+
+@router.get('/restart')
+async def get_restart_selection(request: Request):
+    selection = getattr(request.app.state, 'restart_spawn', None)
+    if selection is None:
+        raise HTTPException(status_code=409, detail='Restart placement is unavailable for this session')
+    return {
+        'scene': selection.scene,
+        'robot_ids': list(selection.defaults),
+        'defaults': {rid: list(point[:2]) for rid, point in selection.defaults.items()},
+    }
+
+
+@router.post('/restart')
+async def confirm_restart(body: SpawnRequest, request: Request):
+    template = getattr(request.app.state, 'restart_spawn', None)
+    callback = getattr(request.app.state, 'command_callback', None)
+    startup = getattr(request.app.state, 'startup_spawn', None)
+    if template is None or callback is None or (startup is not None and not startup.ready.is_set()):
+        raise HTTPException(status_code=409, detail='Simulation is not ready to restart')
+    selection = StartupSpawnSelection(template.scene, template.defaults, template.footprint_radius)
+    try:
+        selection.choose(body.positions)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    callback({'action': 'restart', 'positions': selection.positions})
+    return {'positions': selection.positions}
 
 
 @router.get("")

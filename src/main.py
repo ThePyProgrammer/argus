@@ -621,11 +621,14 @@ def run_web_mode(args: argparse.Namespace) -> None:
         },
     )
     coordinator.set_viz(streaming_viz)
+    from backend.web.spawn_routes import StartupSpawnSelection
+
+    app.state.restart_spawn = StartupSpawnSelection(
+        scene, dict(config.spawn_positions), platform_probe.metadata.footprint_radius,
+    )
     startup_spawn = None
     startup_cancelled = threading.Event()
     if getattr(args, "pick_spawn", False):
-        from backend.web.spawn_routes import StartupSpawnSelection
-
         startup_spawn = StartupSpawnSelection(
             scene, dict(config.spawn_positions), platform_probe.metadata.footprint_radius,
         )

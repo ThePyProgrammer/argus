@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OKABE_ITO } from '../utils/palette';
+import { useControlStore } from '../stores/controlStore';
+import { useRobotStore } from '../stores/robotStore';
 
 type Point = [number, number];
 interface SpawnSetup {
@@ -186,6 +188,8 @@ export function SpawnMap({ sceneName, positions, robotIds, onPick }: {
 }
 
 export default function StartupSpawnPicker() {
+  const restarting = useControlStore((s) => s.restartPickerOpen);
+  const setRestartPickerOpen = useControlStore((s) => s.setRestartPickerOpen);
   const [setup, setSetup] = useState<SpawnSetup | null>(null);
   const [positions, setPositions] = useState<Record<string, Point>>({});
   const [active, setActive] = useState('');
@@ -193,15 +197,27 @@ export default function StartupSpawnPicker() {
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/spawn', { signal: controller.signal }).then((response) => response.ok ? response.json() : null).then((data) => {
-      if (data?.awaiting_selection) {
+    setSetup(null);
+    setPositions({});
+    setError('');
+    fetch(restarting ? '/api/spawn/restart' : '/api/spawn', { signal: controller.signal }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Could not load spawn selection');
+      return data;
+    }).then((data) => {
+      if (controller.signal.aborted) return;
+      if (data?.awaiting_selection || restarting) {
         setSetup(data);
         setActive(data.robot_ids[0]);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      if (!controller.signal.aborted && restarting) setError(err instanceof Error ? err.message : 'Could not load spawn selection');
+    });
     return () => controller.abort();
-  }, []);
-  if (!setup) return null;
+  }, [restarting]);
+  if (!setup) return restarting ? <div className="spawn-picker" role="dialog" aria-modal="true" aria-label="Restart placement" style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center' }}>
+    <section style={{ padding: 20 }}><p role="status">{error || 'Loading spawn selection...'}</p><button onClick={() => setRestartPickerOpen(false)}>Cancel</button></section>
+  </div> : null;
   const pick = (point: Point) => {
     if (pending) return;
     const next = { ...positions, [active]: point };
@@ -213,12 +229,18 @@ export default function StartupSpawnPicker() {
     setPending(true);
     setError('');
     try {
-      const response = await fetch('/api/spawn', {
+      const response = await fetch(restarting ? '/api/spawn/restart' : '/api/spawn', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ positions: chosen }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not confirm spawn positions');
+      if (restarting) {
+        useRobotStore.getState().setCloudFull([], []);
+        useControlStore.getState().setRunning(true);
+        useControlStore.getState().setPaused(false);
+        setRestartPickerOpen(false);
+      }
       setSetup(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start simulation');
@@ -229,7 +251,7 @@ export default function StartupSpawnPicker() {
   return <div className="spawn-picker" role="dialog" aria-modal="true" aria-labelledby="spawn-title" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: '#050914e8', display: 'grid', placeItems: 'center', padding: 20, color: 'var(--ink)' }}>
     <section style={{ width: 'min(1050px, 96vw)', background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
       <header style={{ padding: '18px 22px' }}>
-        <h2 id="spawn-title" style={{ margin: '0 0 8px' }}>Choose starting positions</h2>
+        <h2 id="spawn-title" style={{ margin: '0 0 8px' }}>{restarting ? 'Choose restart positions' : 'Choose starting positions'}</h2>
         <p style={{ margin: 0, color: 'var(--muted)' }}>Select a robot, then click open floor on the overhead map. Scroll to zoom; right-drag to pan. MuJoCo starts after you confirm.</p>
       </header>
       <div style={{ display: 'flex', gap: 8, padding: '0 22px 14px', flexWrap: 'wrap' }}>
@@ -240,8 +262,9 @@ export default function StartupSpawnPicker() {
       <SpawnMap sceneName={setup.scene} positions={positions} robotIds={setup.robot_ids} onPick={pick} />
       <footer style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span role="alert" style={{ color: '#ffa89b', flex: 1 }}>{error}</span>
+        {restarting && <button disabled={pending} onClick={() => { setSetup(null); setRestartPickerOpen(false); }}>Cancel</button>}
         <button disabled={pending} onClick={() => confirm(setup.defaults)}>Use default positions</button>
-        <button disabled={pending || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: 'var(--button-primary)', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting…' : 'Start simulation'}</button>
+        <button disabled={pending || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: 'var(--button-primary)', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting...' : restarting ? 'Restart simulation' : 'Start simulation'}</button>
       </footer>
     </section>
   </div>;
