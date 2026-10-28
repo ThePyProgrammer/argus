@@ -33,6 +33,20 @@ function getGeometrySize(mesh: THREE.Mesh): THREE.Vector3 {
 }
 
 describe('RobotMarkerManager platform metadata', () => {
+  it('removes a robot after reconnecting to a smaller robot list', () => {
+    const scene = new THREE.Group();
+    const manager = new RobotMarkerManager(scene);
+    manager.updateRobot('robot_a', [0, 0, 0.3], 0);
+    manager.updateRobot('robot_b', [5, 0, 0.3], 1);
+
+    manager.removeRobot('robot_b');
+
+    expect(scene.getObjectByName('robot-marker-robot_a')).toBeTruthy();
+    expect(scene.getObjectByName('robot-marker-robot_b')).toBeUndefined();
+    expect(manager.centerOnRobot('robot_b')).toBeNull();
+    manager.dispose();
+  });
+
   it('creates AGIBOT fallback marker as a capsule with local Z height from platform dimensions', () => {
     const scene = new THREE.Group();
     const manager = new RobotMarkerManager(scene);

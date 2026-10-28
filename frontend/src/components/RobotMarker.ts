@@ -112,7 +112,7 @@ export class RobotMarkerManager {
         for (const material of materials) {
           material.dispose();
         }
-        if (mesh.geometry && mesh.geometry !== this.fallbackGeometry) {
+        if (child === obj && mesh.geometry && mesh.geometry !== this.fallbackGeometry) {
           mesh.geometry.dispose();
         }
       }
@@ -127,6 +127,11 @@ export class RobotMarkerManager {
     this.scene.remove(obj);
     this.markers.delete(robotId);
     this.fallbackMarkerKeys.delete(robotId);
+  }
+
+  removeRobot(robotId: string): void {
+    this.pendingUpdates.delete(robotId);
+    this.removeMarker(robotId);
   }
 
   private createFallbackMarker(

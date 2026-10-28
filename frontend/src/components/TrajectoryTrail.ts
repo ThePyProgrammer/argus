@@ -101,6 +101,15 @@ export class TrajectoryTrailManager {
   }
 
   /** Release GPU resources for all trails. */
+  removeRobot(robotId: string): void {
+    const trail = this.trails.get(robotId);
+    if (!trail) return;
+    trail.geometry.dispose();
+    (trail.material as THREE.Material).dispose();
+    this.scene.remove(trail);
+    this.trails.delete(robotId);
+  }
+
   dispose(): void {
     for (const trail of this.trails.values()) {
       trail.geometry.dispose();

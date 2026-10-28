@@ -132,6 +132,14 @@ export default function SceneViewer() {
       }
 
       // Robot markers and trails
+      for (const id of prevState.robots.keys()) {
+        if (!state.robots.has(id)) {
+          robotMarkerManager.removeRobot(id);
+          trailManager.removeRobot(id);
+          cameraFrustumManager.removeRobot(id);
+          detectionBoxManager.updateDetections(id, null, 0);
+        }
+      }
       for (const [id, robot] of state.robots) {
         const prev = prevState.robots.get(id);
         if (!prev || prev.position !== robot.position || prev.rotation !== robot.rotation || prev.trackingStatus !== robot.trackingStatus || prev.bodyYaw !== robot.bodyYaw || prev.platformMetadata !== robot.platformMetadata) {

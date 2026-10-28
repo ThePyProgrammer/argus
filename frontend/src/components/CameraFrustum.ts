@@ -151,6 +151,20 @@ export class CameraFrustumManager {
     this.frustums.set(robotId, group);
   }
 
+  removeRobot(robotId: string): void {
+    const group = this.frustums.get(robotId);
+    if (!group) return;
+    this.scene.remove(group);
+    group.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh || (child as THREE.Line).isLine) {
+        const obj = child as THREE.Mesh | THREE.Line;
+        obj.geometry?.dispose();
+        (obj.material as THREE.Material).dispose();
+      }
+    });
+    this.frustums.delete(robotId);
+  }
+
   dispose(): void {
     for (const group of this.frustums.values()) {
       this.scene.remove(group);
