@@ -220,6 +220,10 @@ def parse_args() -> argparse.Namespace:
         help="Keep robots stationary (SLAM still runs, robots don't walk)",
     )
     parser.add_argument(
+        "--pick-spawn", action="store_true",
+        help="Choose robot spawn positions on an overhead map before starting web simulation",
+    )
+    parser.add_argument(
         "--detector",
         default=None,
         help="Detector backend for web mode (e.g. yolov11 or boxer)",
@@ -617,6 +621,15 @@ def run_web_mode(args: argparse.Namespace) -> None:
         },
     )
     coordinator.set_viz(streaming_viz)
+    startup_spawn = None
+    startup_cancelled = threading.Event()
+    if getattr(args, "pick_spawn", False):
+        from backend.web.spawn_routes import StartupSpawnSelection
+
+        startup_spawn = StartupSpawnSelection(
+            scene, dict(config.spawn_positions), platform_probe.metadata.footprint_radius,
+        )
+        app.state.startup_spawn = startup_spawn
     if getattr(args, "detector", None):
         app.state.active_detector_backend = args.detector
     if args.static:
@@ -746,6 +759,19 @@ def run_web_mode(args: argparse.Namespace) -> None:
     def _run_simulation_loop():
         nonlocal bridge, robots, coordinator, streaming_viz
 
+        if startup_spawn is not None:
+            logger.info("Waiting for spawn selection in the browser")
+            while not startup_spawn.ready.wait(timeout=0.2):
+                if startup_cancelled.is_set():
+                    return
+            if startup_cancelled.is_set():
+                return
+            config.spawn_positions.update(startup_spawn.positions)
+            for rid, position in startup_spawn.positions.items():
+                robots[rid].spawn_transform[:3, 3] = position
+            coordinator.reset_merger()
+            logger.info("Selected spawn positions: %s", config.spawn_positions)
+
         _initialize_detector_pool(
             pending_detector=getattr(args, "detector", None),
             active_lifter_name=getattr(app.state, "active_lifter", None),
@@ -758,7 +784,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     result.terminated_reason, result.total_steps, result.merge_count,
                 )
             except Exception as e:
-                logger.warning("Simulation error: %s", e)
+                logger.warning("Simulation error: %s", e, exc_info=True)
 
             # Check if restart was requested
             if not coordinator.restart_requested:
@@ -947,6 +973,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     except (KeyboardInterrupt, SystemExit):
         logger.info("Shutting down Argus...")
     finally:
+        startup_cancelled.set()
         coordinator.request_stop()
         sim_thread.join(timeout=5.0)
         detector_pool = getattr(coordinator, "_detector_pool", None)

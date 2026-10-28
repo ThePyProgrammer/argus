@@ -54,6 +54,7 @@ def create_app(
     app.state.slam_reset_callback = slam_reset_cb
     app.state.robot_ids = robot_ids
     app.state.platform_metadata = platform_metadata or {}
+    app.state.startup_spawn = None
     app.state.cloud_config_fns = cloud_config_fns
 
     # SLAM backend selection state
@@ -92,6 +93,8 @@ def create_app(
     app.include_router(detector_router)
     # Phase 6 — DET-METRICS-04: /api/detections/export JSONL stream
     app.include_router(detections_export_router)
+    from backend.web.spawn_routes import router as spawn_router
+    app.include_router(spawn_router)
 
     if mcp_endpoint is not None:
         app.post("/mcp")(mcp_endpoint)

@@ -495,6 +495,19 @@ sudo pacman -S libvips  # Arch/CachyOS
 
 ### Running
 
+To choose where robots start, add `--pick-spawn`:
+
+```powershell
+uv run --extra web argus --scene office --detector boxer --num-robots 1 --pick-spawn
+```
+
+Open http://localhost:8000, select a robot in the startup dialog, and click
+open floor on the overhead map. Place each robot, then click **Start simulation**.
+The environment and detector wait until you confirm. Scroll to zoom and
+right-drag to pan. **Use default positions** skips manual placement.
+Add `--static` to keep robots stationary after spawning. Without `--pick-spawn`,
+Argus starts immediately as before.
+
 ```bash
 # Start everything — backend + simulation + frontend
 uv run argus --scene office

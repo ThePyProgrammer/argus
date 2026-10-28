@@ -1,0 +1,48 @@
+import math
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+import pytest
+
+from backend.web.spawn_routes import StartupSpawnSelection, router
+
+
+def client_for(defaults=None):
+    app = FastAPI()
+    app.include_router(router)
+    selection = StartupSpawnSelection('office', defaults or {'robot_a': (0., 0., 0.73)})
+    app.state.startup_spawn = selection
+    return TestClient(app), selection
+
+
+def test_confirmation_preserves_platform_height_and_releases_startup_once():
+    client, selection = client_for()
+    assert client.get('/api/spawn').json()['awaiting_selection'] is True
+    assert not selection.ready.is_set()
+    response = client.post('/api/spawn', json={'positions': {'robot_a': [2.5, -1.25]}})
+    assert response.status_code == 200
+    assert selection.positions == {'robot_a': (2.5, -1.25, 0.73)}
+    assert selection.ready.is_set()
+    assert client.get('/api/spawn').json()['awaiting_selection'] is False
+    assert client.post('/api/spawn', json={'positions': {'robot_a': [0, 0]}}).status_code == 409
+
+
+@pytest.mark.parametrize('positions', [{}, {'robot_b': [0, 0]}, {'robot_a': [0, 0, 0]}, {'robot_a': [1001, 0]}])
+def test_invalid_selection_does_not_release_simulation(positions):
+    client, selection = client_for()
+    assert client.post('/api/spawn', json={'positions': positions}).status_code == 422
+    assert not selection.ready.is_set()
+
+
+def test_overlapping_robots_are_rejected():
+    client, selection = client_for({'robot_a': (0, 0, .3), 'robot_b': (5, 0, .3)})
+    response = client.post('/api/spawn', json={'positions': {'robot_a': [1, 1], 'robot_b': [1.1, 1]}})
+    assert response.status_code == 422
+    assert not selection.ready.is_set()
+
+
+def test_non_finite_positions_cannot_release_simulation():
+    _, selection = client_for()
+    with pytest.raises(ValueError):
+        selection.choose({'robot_a': (math.nan, 0)})
+    assert not selection.ready.is_set()
