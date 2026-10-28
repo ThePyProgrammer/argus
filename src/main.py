@@ -619,6 +619,13 @@ def run_web_mode(args: argparse.Namespace) -> None:
     # Build React frontend
     frontend_dir = Path(__file__).parent.parent / "frontend"
     if (frontend_dir / "package.json").exists():
+        from src.bridge.scene_assets import ensure_colored_scene
+
+        ensure_colored_scene(
+            frontend_dir / "public" / "scene.glb",
+            frontend_dir.parent / "data" / "scenes" / "scene_office1.xml",
+            frontend_dir / "public" / "scene_colored.glb",
+        )
         logger.info("Building React frontend...")
         try:
             subprocess.run(
@@ -632,6 +639,99 @@ def run_web_mode(args: argparse.Namespace) -> None:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             logger.warning("Frontend build failed (%s). Serving pre-built files if available.", e)
 
+    def _initialize_detector_pool(
+        pending_detector=None, pending_det_params=None,
+        active_lifter_name=None, pending_lifter_params=None,
+    ):
+        pending_det_params = pending_det_params or {}
+        pending_lifter_params = pending_lifter_params or {}
+        try:
+            # Side-effect imports force registry population before create()
+            from src.perception.registry import (  # noqa: F401
+                Detection3DRegistry,
+                DetectorRegistry,
+            )
+            import src.perception.backends  # noqa: F401  — register yolov11 + family
+            import src.perception.lifters   # noqa: F401  — register median_depth
+            from src.perception.worker_pool import DetectorWorkerPool
+
+            backend_name = pending_detector or DetectorRegistry.get_default()
+            # Phase 4 D-09: lifter is no longer restart-driven. Prefer
+            # the currently active lifter (set by /lifter-hotswap or
+            # initial boot default); fall back to the registry default
+            # on first boot when app.state.active_lifter is still None.
+            lifter_name = active_lifter_name or Detection3DRegistry.get_default()
+            # One CameraIntrinsics instance per robot (all share the same config today;
+            # Phase 8 stretch may diverge per-robot).
+            intrinsics_per_robot = {rid: intrinsics for rid in robots}
+            detector_pool = DetectorWorkerPool(
+                robot_ids=list(robots.keys()),
+                backend_name=backend_name,
+                backend_params=pending_det_params,
+                lifter_name=lifter_name,
+                intrinsics_per_robot=intrinsics_per_robot,
+                lifter_params=pending_lifter_params,
+            )
+
+            # Synchronous warmup BEFORE emitting detector_restart_complete (D-03).
+            # Pitfall 6: warmup frame resolution must match real inference resolution.
+            dummy_frames: dict[str, SensorFrame] = {}
+            for rid in robots:
+                cached = None
+                if hasattr(bridge, "get_last_frame"):
+                    try:
+                        cached = bridge.get_last_frame(rid)
+                    except Exception:
+                        cached = None
+                if cached is None:
+                    cached = SensorFrame(
+                        rgb=np.zeros((h, w, 3), dtype=np.uint8),
+                        depth=np.zeros((h, w), dtype=np.float32),
+                        ground_truth_pose=np.eye(4),
+                        sim_time=0.0,
+                    )
+                dummy_frames[rid] = cached
+            detector_pool.warmup_all(dummy_frames)
+            detector_pool.start()
+            # Phase 5 D-03 — wire streaming_viz so pool.on_backend_crash
+            # can append crash_fallback messages to the WS queue.
+            if streaming_viz is not None:
+                detector_pool.set_streaming_viz(streaming_viz)
+                # Phase 8 DET-STRETCH-02/03: reverse ref so
+                # _update_stats can call pool.latest() for fusion.
+                streaming_viz.set_detector_pool(detector_pool)
+            # Phase 7 DET-PIPELINE-05 D-12 — wire app.state so
+            # pool.on_backend_crash can update
+            # last_applied_pipeline_config.detector_name after a
+            # crash fallback (Pitfall 3 stale-baseline mitigation).
+            detector_pool.set_app_state(app.state)
+            coordinator._detector_pool = detector_pool
+            # Plan 04-05 (Open Question #4): expose the pool via
+            # app.state so POST /api/detectors/lifter-hotswap can
+            # reach it via request.app.state.detector_pool.
+            app.state.detector_pool = detector_pool
+            app.state.active_detector_backend = backend_name
+            app.state.pending_detector_backend = None
+            # pending_detector_params intentionally retained — coordinator may
+            # consume live-tunable values per-frame.
+            # Phase 4 D-09: lifter selection is hot-swap driven
+            # (POST /api/detectors/lifter-hotswap). The restart block
+            # only refreshes active_lifter from the value the pool was
+            # built with so /active-lifter stays consistent across
+            # a spawn/detector restart. No pending_lifter consumption —
+            # that field is removed.
+            app.state.active_lifter = lifter_name
+            # pending_lifter_params intentionally retained — same live-tunable
+            # path as pending_detector_params (per-frame consumable).
+        except Exception as exc:
+            # T-02-24 mitigation: pool construction failure must not crash restart.
+            logger.exception("Detector pool rebuild failed: %s", exc)
+            coordinator._detector_pool = None
+            # Plan 04-05 (T-04-23 mitigation): keep app.state in sync
+            # with coordinator — /lifter-hotswap returns 503 while the
+            # pool is absent.
+            app.state.detector_pool = None
+
     max_steps = args.multi_max_steps
     _restart_lock = threading.Lock()
 
@@ -639,6 +739,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     def _run_simulation_loop():
         nonlocal bridge, robots, coordinator, streaming_viz
 
+        _initialize_detector_pool(active_lifter_name=app.state.active_lifter)
         while True:
             try:
                 result = coordinator.run(max_steps=max_steps)
@@ -758,92 +859,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
                     if getattr(pipeline_config, "lifter_params", None):
                         pending_lifter_params = dict(pipeline_config.lifter_params)
 
-                try:
-                    # Side-effect imports force registry population before create()
-                    from src.perception.registry import (  # noqa: F401
-                        Detection3DRegistry,
-                        DetectorRegistry,
-                    )
-                    import src.perception.backends  # noqa: F401  — register yolov11 + family
-                    import src.perception.lifters   # noqa: F401  — register median_depth
-                    from src.perception.worker_pool import DetectorWorkerPool
-
-                    backend_name = pending_detector or DetectorRegistry.get_default()
-                    # Phase 4 D-09: lifter is no longer restart-driven. Prefer
-                    # the currently active lifter (set by /lifter-hotswap or
-                    # initial boot default); fall back to the registry default
-                    # on first boot when app.state.active_lifter is still None.
-                    lifter_name = active_lifter_name or Detection3DRegistry.get_default()
-                    # One CameraIntrinsics instance per robot (all share the same config today;
-                    # Phase 8 stretch may diverge per-robot).
-                    intrinsics_per_robot = {rid: intrinsics for rid in robots}
-                    detector_pool = DetectorWorkerPool(
-                        robot_ids=list(robots.keys()),
-                        backend_name=backend_name,
-                        backend_params=pending_det_params,
-                        lifter_name=lifter_name,
-                        intrinsics_per_robot=intrinsics_per_robot,
-                        lifter_params=pending_lifter_params,
-                    )
-
-                    # Synchronous warmup BEFORE emitting detector_restart_complete (D-03).
-                    # Pitfall 6: warmup frame resolution must match real inference resolution.
-                    dummy_frames: dict[str, SensorFrame] = {}
-                    for rid in robots:
-                        cached = None
-                        if hasattr(bridge, "get_last_frame"):
-                            try:
-                                cached = bridge.get_last_frame(rid)
-                            except Exception:
-                                cached = None
-                        if cached is None:
-                            cached = SensorFrame(
-                                rgb=np.zeros((480, 640, 3), dtype=np.uint8),
-                                depth=np.zeros((480, 640), dtype=np.float32),
-                                ground_truth_pose=np.eye(4),
-                                sim_time=0.0,
-                            )
-                        dummy_frames[rid] = cached
-                    detector_pool.warmup_all(dummy_frames)
-                    detector_pool.start()
-                    # Phase 5 D-03 — wire streaming_viz so pool.on_backend_crash
-                    # can append crash_fallback messages to the WS queue.
-                    if streaming_viz is not None:
-                        detector_pool.set_streaming_viz(streaming_viz)
-                        # Phase 8 DET-STRETCH-02/03: reverse ref so
-                        # _update_stats can call pool.latest() for fusion.
-                        streaming_viz.set_detector_pool(detector_pool)
-                    # Phase 7 DET-PIPELINE-05 D-12 — wire app.state so
-                    # pool.on_backend_crash can update
-                    # last_applied_pipeline_config.detector_name after a
-                    # crash fallback (Pitfall 3 stale-baseline mitigation).
-                    detector_pool.set_app_state(app.state)
-                    coordinator._detector_pool = detector_pool
-                    # Plan 04-05 (Open Question #4): expose the pool via
-                    # app.state so POST /api/detectors/lifter-hotswap can
-                    # reach it via request.app.state.detector_pool.
-                    app.state.detector_pool = detector_pool
-                    app.state.active_detector_backend = backend_name
-                    app.state.pending_detector_backend = None
-                    # pending_detector_params intentionally retained — coordinator may
-                    # consume live-tunable values per-frame.
-                    # Phase 4 D-09: lifter selection is hot-swap driven
-                    # (POST /api/detectors/lifter-hotswap). The restart block
-                    # only refreshes active_lifter from the value the pool was
-                    # built with so /active-lifter stays consistent across
-                    # a spawn/detector restart. No pending_lifter consumption —
-                    # that field is removed.
-                    app.state.active_lifter = lifter_name
-                    # pending_lifter_params intentionally retained — same live-tunable
-                    # path as pending_detector_params (per-frame consumable).
-                except Exception as exc:
-                    # T-02-24 mitigation: pool construction failure must not crash restart.
-                    logger.exception("Detector pool rebuild failed: %s", exc)
-                    coordinator._detector_pool = None
-                    # Plan 04-05 (T-04-23 mitigation): keep app.state in sync
-                    # with coordinator — /lifter-hotswap returns 503 while the
-                    # pool is absent.
-                    app.state.detector_pool = None
+                _initialize_detector_pool(
+                    pending_detector, pending_det_params,
+                    active_lifter_name, pending_lifter_params,
+                )
 
                 # Reset streaming viz cloud tracking
                 if streaming_viz is not None:
@@ -920,6 +939,8 @@ def run_web_mode(args: argparse.Namespace) -> None:
     finally:
         coordinator.request_stop()
         sim_thread.join(timeout=5.0)
+        if coordinator.detector is not None:
+            coordinator.detector.shutdown()
         try:
             bridge.stop()
         except RuntimeError:

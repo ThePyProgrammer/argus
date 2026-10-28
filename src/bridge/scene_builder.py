@@ -266,8 +266,6 @@ def build_two_robot_office_scene(
     map_elem.set("znear", "0.01")
     map_elem.set("zfar", "100")
 
-    xml_str = ET.tostring(scene_root, encoding="unicode")
-
     # Build assets dictionary: scene assets + robot mesh assets
     assets: dict[str, bytes] = {}
 
@@ -291,4 +289,10 @@ def build_two_robot_office_scene(
             if f.is_file() and f.name not in assets:
                 assets[f.name] = f.read_bytes()
 
-    return xml_str, assets
+    from src.bridge.scene_assets import recover_office_assets
+
+    recover_office_assets(
+        scene_root, assets,
+        Path(__file__).resolve().parents[2] / "frontend" / "public" / "scene.glb",
+    )
+    return ET.tostring(scene_root, encoding="unicode"), assets

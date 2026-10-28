@@ -458,11 +458,13 @@ On Windows PowerShell, use `npm.cmd ci` if script execution policy blocks
 `npm.ps1`. The dashboard is served at http://localhost:8000; the app builds
 the frontend at startup. Remove `--static` to enable robot motion.
 
-The office scene additionally requires the real Git LFS scene assets.
-Run `git lfs pull` before using `--scene office`. If LFS reports a missing
-object (404), recover those objects from an original clone or backup and
-upload them to the repository's LFS storage. LFS pointer files alone cannot
-be loaded by MuJoCo. The flat scene works without these office assets.
+Start the office simulation with `uv run argus --scene office --static`.
+If its OBJ assets are missing or still Git LFS pointers, Argus recovers the
+visual and collision meshes from `frontend/public/scene.glb`, retaining the
+office XML's body transforms and collision settings. Missing textures use
+the XML's material colors. For the original textures, run `git lfs pull`;
+server-side missing objects (404) require recovery from an original clone
+or backup. The flat scene intentionally contains only a checkerboard floor.
 
 ### Optional Dependencies
 
