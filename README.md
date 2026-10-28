@@ -468,6 +468,18 @@ or backup. The flat scene intentionally contains only a checkerboard floor.
 
 ### Optional Dependencies
 
+BoxeR runs in a separate environment with OWLv2 proposals and native BoxerNet
+3D boxes. Set it up once, then select it at launch:
+
+```powershell
+uv run python scripts/setup_boxer_subprocess.py
+uv run --extra web argus --scene office --static --detector boxer --num-robots 1
+```
+
+Setup downloads approximately 1.3 GB of checkpoints. CPU inference is supported
+but slower than YOLO; start with one robot. BoxeR also appears in the dashboard's
+detector selector after setup.
+
 ```bash
 # Default YOLO detector (CPU inference; enabled on initial web startup)
 uv sync --extra web --extra detection --extra dev

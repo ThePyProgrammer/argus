@@ -10,4 +10,4 @@ download-models-rtdetrv2:
 	uv run python scripts/download_models.py --backend rtdetrv2
 
 download-models-boxer:
-	bash scripts/setup_boxer_subprocess.sh
+	uv run python scripts/setup_boxer_subprocess.py

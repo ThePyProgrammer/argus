@@ -70,33 +70,90 @@ def _resolve_ckpts_dir() -> Path:
 
 
 def _load_pipeline(ckpts_dir: Path):
-    """Try to load BoxeR's Python pipeline. Open Risk #1 mitigation.
+    """Load the actual pinned upstream BoxerNet and OWLv2 APIs."""
+    repo = Path(__file__).resolve().parents[1] / "subprocess_venvs" / "boxer" / "repo"
+    sys.path.insert(0, str(repo))
+    import torch
+    torch.set_num_threads(min(8, os.cpu_count() or 2))
+    import utils.demo_utils as paths
+    paths.CKPT_PATH = str(ckpts_dir.resolve())
+    from boxernet.boxernet import BoxerNet
+    import owl.clip_tokenizer as tokenizer
+    import owl.owl_wrapper as owl_module
+    tokenizer._CKPT_PATH = str(ckpts_dir.resolve() / "owlv2-base-patch16-ensemble.pt")
+    owl_module._CKPT_PATH = tokenizer._CKPT_PATH
+    labels = {
+        "chair": 56, "couch": 57, "potted plant": 58, "bed": 59,
+        "dining table": 60, "toilet": 61, "tv": 62, "laptop": 63,
+        "mouse": 64, "remote": 65, "keyboard": 66, "cell phone": 67,
+        "refrigerator": 72, "book": 73, "clock": 74, "vase": 75,
+        "person": 0, "backpack": 24, "bottle": 39, "cup": 41,
+    }
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = BoxerNet.load_from_checkpoint(
+        str(ckpts_dir / "boxernet_hw960in4x6d768-wssxpf9p.ckpt"), device=device,
+    )
+    owl = owl_module.OwlWrapper(
+        device=device, text_prompts=list(labels), min_confidence=0.2,
+        precision="float32", warmup=False,
+    )
+    logger.info("BoxerNet + OWLv2 loaded on %s", device)
+    return _BoxerPipeline(model, owl, labels)
 
-    Preferred path: boxer.model.load_boxer_pipeline(ckpts_dir, device='cpu')
-    Fallback: import boxer; report the actual public symbol list via help()
-    and return None — the caller will emit a diagnostic reply and exit.
-    """
-    # Add BoxeR's cloned repo to sys.path so `import boxer` resolves.
-    # setup_boxer_subprocess.sh clones into subprocess_venvs/boxer/repo and
-    # pip installs editable, so `import boxer` should work without path
-    # manipulation — but keep this guard in case the install fails silently.
-    try:
-        import boxer  # noqa: F401 — probe import
-    except ImportError as exc:
-        logger.error("Cannot import boxer (did setup_boxer_subprocess.sh run?): %s", exc)
-        return None
 
-    # Try the RESEARCH-documented public API first.
-    try:
-        from boxer.model import load_boxer_pipeline  # type: ignore[import-not-found]
-        return load_boxer_pipeline(ckpts_dir=str(ckpts_dir), device="cpu")
-    except (ImportError, AttributeError) as exc:
-        logger.warning(
-            "boxer.model.load_boxer_pipeline unavailable (%s). "
-            "Falling back to CLI shim — per-frame latency may be higher.",
-            exc,
-        )
-        return None  # Caller sends diagnostic reply and exits
+class _BoxerPipeline:
+    def __init__(self, model, owl, labels):
+        self.model, self.owl, self.labels = model, owl, labels
+
+    def __call__(self, rgb, depth, params):
+        import cv2
+        import torch
+        from types import SimpleNamespace
+        from loaders.base_loader import BaseLoader
+        from utils.tw.pose import PoseTW
+
+        height, width = rgb.shape[:2]
+        size = int(self.model.hw)
+        image = cv2.resize(rgb, (size, size))
+        tensor = BaseLoader.img_to_tensor(image)
+        with torch.inference_mode():
+            boxes, scores, classes, _ = self.owl.forward(
+                tensor * 255, False, resize_to_HW=(size, size),
+            )
+            if len(boxes) == 0:
+                return SimpleNamespace(boxes_3d=[])
+            fx, fy, cx, cy = params["intrinsics"]
+            camera = BaseLoader.pinhole_from_K(
+                size, size, fx * size / width, fy * size / height,
+                cx * size / width, cy * size / height, valid_radius=(size, size),
+            )
+            # MuJoCo camera axes are x-right/y-up/z-back; Boxer uses OpenCV.
+            pose = np.asarray(params["camera_pose"], dtype=np.float32)
+            rotation = pose[:3, :3] @ np.diag([1, -1, -1]).astype(np.float32)
+            translation = pose[:3, 3]
+            points = BaseLoader.sdp_from_depth(depth, fx, fy, cx, cy, rotation, translation)
+            datum = {
+                "img0": tensor, "cam0": camera,
+                "T_world_rig0": PoseTW.from_Rt(torch.from_numpy(rotation), torch.from_numpy(translation)),
+                "rotated0": torch.tensor([False]), "sdp_w": points, "bb2d": boxes,
+            }
+            obbs = self.model.forward(datum)["obbs_pr_w"].cpu()[0]
+            result = []
+            label_names = list(self.labels)
+            for index, obb in enumerate(obbs):
+                confidence = float(obb.prob.squeeze())
+                if confidence < params.get("score_threshold", 0.3):
+                    continue
+                # Upstream uses x1,x2,y1,y2 in its resized image.
+                bb = boxes[index].cpu().numpy()[[0, 2, 1, 3]]
+                bb *= np.array([width, height, width, height]) / size
+                result.append(SimpleNamespace(
+                    class_id=self.labels[label_names[int(classes[index])]],
+                    score=(confidence + float(scores[index])) / 2,
+                    bbox_2d=bb.tolist(), center=obb.bb3_center_world.numpy(),
+                    extent=obb.bb3_diagonal.numpy(), R_world_box=obb.T_world_object.R.numpy(),
+                ))
+            return SimpleNamespace(boxes_3d=result)
 
 
 def _run_inference(pipeline, rgb: np.ndarray, depth: np.ndarray | None, params: dict) -> dict:

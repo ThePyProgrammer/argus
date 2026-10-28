@@ -64,6 +64,15 @@ class _FakeCoordinator:
         pass
 
 
+def test_parser_accepts_boxer_at_startup(monkeypatch):
+    import src.main as main_module
+
+    monkeypatch.setattr(sys, "argv", ["argus", "--detector", "boxer", "--num-robots", "1"])
+    args = main_module.parse_args()
+    assert args.detector == "boxer"
+    assert args.num_robots == 1
+
+
 def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
     """Production startup should wire selected platform metadata into WS app setup."""
     import src.main as main_module

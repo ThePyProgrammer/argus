@@ -320,13 +320,16 @@ class DetectorWorker:
                 )
                 continue
             try:
-                dets_3d = self._lifter.lift(
-                    dets_2d,
-                    frame,
-                    pose,
-                    self._intrinsics,
-                    slam_cloud,
-                )
+                if isinstance(dets_2d, Detections3D):
+                    dets_3d = dets_2d
+                else:
+                    dets_3d = self._lifter.lift(
+                        dets_2d,
+                        frame,
+                        pose,
+                        self._intrinsics,
+                        slam_cloud,
+                    )
                 # D-11/D-12/D-13: worker is the authoritative source for the
                 # envelope-level pose + timestamp. Phase 1 lifter defaults are
                 # always overwritten here so the invariant holds even for

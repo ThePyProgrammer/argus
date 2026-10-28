@@ -107,7 +107,7 @@ def test_available_when_ready_marker_missing(monkeypatch, tmp_path) -> None:
     available, reason = boxer_backend.BoxeRBackend.available()
     assert available is False
     assert reason is not None
-    assert "make download-models-boxer" in reason or "setup_boxer_subprocess.sh" in reason
+    assert "setup_boxer_subprocess.py" in reason
 
 
 def test_available_when_ready_marker_present(monkeypatch, tmp_path) -> None:

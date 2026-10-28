@@ -28,13 +28,14 @@ from __future__ import annotations
 
 import collections
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from src.bridge.sensor_types import SensorFrame
+from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.perception.registry import detector_backend
 from src.perception.subprocess_bridge import (
     BridgeHangError,  # noqa: F401 -- re-exported for pool crash handler (Plan 09)
@@ -60,7 +61,7 @@ BOXER_MODEL_DIR: Path = Path("models") / "boxer" / BOXER_SHA
 # Subprocess venv location (D-01).
 _VENV_DIR: Path = Path("subprocess_venvs") / "boxer"
 _READY_MARKER: Path = _VENV_DIR / ".ready"
-_WORKER_PYTHON: Path = _VENV_DIR / "bin" / "python"
+_WORKER_PYTHON: Path = _VENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 _WORKER_SCRIPT: Path = Path("scripts") / "boxer_worker.py"
 
 # COCO 80-class name mapping. BoxeR outputs COCO-class ids via its internal
@@ -86,7 +87,7 @@ _COCO_NAMES: dict[int, str] = {
 
 # Handshake budget: BoxeR's DINOv3+BoxerNet+OWLv2 weight load can take 5-15 s;
 # allow 60 s to cover worst-case cold disk + slow CPU (Open Risk #3 mitigation).
-_HANDSHAKE_TIMEOUT_S: float = 60.0
+_HANDSHAKE_TIMEOUT_S: float = 180.0
 
 
 @detector_backend(name="boxer", display="facebook/BoxeR (subprocess)")
@@ -121,7 +122,7 @@ class BoxeRBackend:
         if _READY_MARKER.exists():
             return True, None
         return False, (
-            "Run `make download-models-boxer` (scripts/setup_boxer_subprocess.sh) "
+            "Run `python scripts/setup_boxer_subprocess.py` "
             f"to create {_VENV_DIR}/.ready and fetch pinned checkpoints."
         )
 
@@ -136,17 +137,23 @@ class BoxeRBackend:
         if not _READY_MARKER.exists():
             raise RuntimeError(
                 f"BoxeR subprocess venv not set up: {_READY_MARKER} missing. "
-                f"Run `make download-models-boxer` first."
+                f"Run `python scripts/setup_boxer_subprocess.py` first."
             )
         bridge = SubprocessDetectorBridge(
             binary_path=str(_WORKER_PYTHON),
             args=[str(_WORKER_SCRIPT)],
+            ipc_endpoint="tcp://127.0.0.1:*",
+            hang_timeout_ms=120000,
         )
         bridge.start()
         # Open Risk #3 mitigation — wait for worker to connect AFTER its
         # model-load completes. Without this, the first send_frame races
         # BoxeR's 5–15 s weight load and fires a spurious BridgeHangError.
-        bridge.wait_for_handshake(timeout_s=_HANDSHAKE_TIMEOUT_S)
+        try:
+            bridge.wait_for_handshake(timeout_s=_HANDSHAKE_TIMEOUT_S)
+        except Exception:
+            bridge.shutdown()
+            raise
         self._bridge = bridge
         logger.info(
             "BoxeRBackend bridge ready (pid=%s)",
@@ -171,11 +178,17 @@ class BoxeRBackend:
         Reply schema per 05-CONTEXT.md D-02. Extent halving per D-02 gotcha line.
         """
         bridge = self._ensure_bridge()
+        height, width = frame.rgb.shape[:2]
+        intrinsics = CameraIntrinsics.from_fov(width, height)
         reply = bridge.send_frame(
             rgb=frame.rgb,
             depth=frame.depth,
             timestamp=float(frame.sim_time),
-            params={"score_threshold": self._score_threshold},
+            params={
+                "score_threshold": self._score_threshold,
+                "camera_pose": frame.ground_truth_pose.tolist(),
+                "intrinsics": [intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy],
+            },
         )
         # send_frame raises BridgeHangError / SubprocessDiedError on failure
         # (Plan 05) — no None-return path to handle here. The exceptions

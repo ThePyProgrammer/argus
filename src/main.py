@@ -220,6 +220,11 @@ def parse_args() -> argparse.Namespace:
         help="Keep robots stationary (SLAM still runs, robots don't walk)",
     )
     parser.add_argument(
+        "--detector",
+        default=None,
+        help="Detector backend for web mode (e.g. yolov11 or boxer)",
+    )
+    parser.add_argument(
         "--num-robots",
         type=int,
         default=2,
@@ -612,6 +617,8 @@ def run_web_mode(args: argparse.Namespace) -> None:
         },
     )
     coordinator.set_viz(streaming_viz)
+    if getattr(args, "detector", None):
+        app.state.active_detector_backend = args.detector
     if args.static:
         coordinator.set_freeze_motion(True)
     logger.info("MCP endpoint available at http://localhost:%d/mcp", args.port)
@@ -739,7 +746,10 @@ def run_web_mode(args: argparse.Namespace) -> None:
     def _run_simulation_loop():
         nonlocal bridge, robots, coordinator, streaming_viz
 
-        _initialize_detector_pool(active_lifter_name=getattr(app.state, "active_lifter", None))
+        _initialize_detector_pool(
+            pending_detector=getattr(args, "detector", None),
+            active_lifter_name=getattr(app.state, "active_lifter", None),
+        )
         while True:
             try:
                 result = coordinator.run(max_steps=max_steps)

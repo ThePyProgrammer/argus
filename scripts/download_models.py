@@ -182,12 +182,12 @@ def download_boxer() -> None:
     processing (e.g., post-copy BoxeR ckpts from repo-local default location
     into models/boxer/<sha>/ if the upstream script doesn't honor our layout).
     """
-    script = Path(__file__).parent / "setup_boxer_subprocess.sh"
+    script = Path(__file__).parent / "setup_boxer_subprocess.py"
     if not script.exists():
         raise FileNotFoundError(
             f"Expected {script}. Phase 5 Plan 06 creates this file — run that plan first."
         )
-    subprocess.run(["bash", str(script)], check=True)
+    subprocess.run([sys.executable, str(script)], check=True)
 
 
 def main(argv: list[str] | None = None) -> int:

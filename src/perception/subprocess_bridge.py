@@ -141,7 +141,10 @@ class SubprocessDetectorBridge:
         self._endpoint = (
             ipc_endpoint
             if ipc_endpoint is not None
-            else f"ipc:///tmp/detector_bridge_{os.getpid()}_{id(self)}"
+            else (
+                f"ipc:///tmp/detector_bridge_{os.getpid()}_{id(self)}"
+                if zmq.has("ipc") else "tcp://127.0.0.1:*"
+            )
         )
         self._timeout = hang_timeout_ms if hang_timeout_ms is not None else self.HANG_TIMEOUT_MS
         self._process: subprocess.Popen | None = None
@@ -168,7 +171,7 @@ class SubprocessDetectorBridge:
 
     @property
     def endpoint(self) -> str:
-        """ZMQ IPC endpoint string (``ipc:///tmp/detector_bridge_...``)."""
+        """ZMQ endpoint: IPC when supported, otherwise a loopback TCP port."""
         return self._endpoint
 
     # ------------------------------------------------------------------
@@ -196,8 +199,12 @@ class SubprocessDetectorBridge:
         self._socket.setsockopt(zmq.RCVTIMEO, self._timeout)
         self._socket.setsockopt(zmq.LINGER, 0)
         self._socket.bind(self._endpoint)
+        self._endpoint = self._socket.getsockopt_string(zmq.LAST_ENDPOINT)
 
-        cmd = [self._binary, "--zmq", self._endpoint, *self._args]
+        if self._args and self._args[0].endswith(".py"):
+            cmd = [self._binary, *self._args, "--zmq", self._endpoint]
+        else:
+            cmd = [self._binary, "--zmq", self._endpoint, *self._args]
         logger.info("Spawning detector subprocess: %s", " ".join(cmd))
         self._process = subprocess.Popen(
             cmd,
