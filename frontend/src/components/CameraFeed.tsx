@@ -129,9 +129,10 @@ function DetectionOverlay({
 export default function CameraFeed({ robotId }: CameraFeedProps) {
   const cameraUrl = useRobotStore((s) => s.robots.get(robotId)?.cameraUrl);
   const depthUrl = useRobotStore((s) => s.robots.get(robotId)?.depthUrl);
-  const detectionItems = useRobotStore(
-    (s) => s.robots.get(robotId)?.detections_3d?.items ?? [],
+  const detections = useRobotStore(
+    (s) => s.robots.get(robotId)?.detections_3d,
   );
+  const detectionItems = detections?.items ?? [];
   const colorIndex = useRobotStore(
     (s) => s.robots.get(robotId)?.colorIndex ?? 0,
   );

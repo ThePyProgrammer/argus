@@ -442,24 +442,27 @@ A visual DAG editor (React Flow) for connecting SLAM, detection, and description
 - Git LFS (for DimOS scene data)
 
 ```bash
-# Install Python 3.12 and create venv
-uv python install 3.12
-uv venv --python 3.12
-uv pip install -e .
-uv pip install -e ./dimos
-
-# Pull MuJoCo scene data from LFS
-cd dimos && git lfs pull --include "data/.lfs/mujoco_sim.tar.gz" && cd ..
-
-# Extract scene data
-cd dimos/data && tar xzf .lfs/mujoco_sim.tar.gz && cd ../..
+# Install Python 3.12 and the locked dependencies, including the web server
+uv sync --python 3.12 --extra web --extra dev
 
 # Install frontend dependencies
-cd frontend && npm install && cd ..
+cd frontend
+npm ci
+cd ..
 
-# Convert scene to GLB for the web viewer (one-time)
-python scripts/convert_scene_glb.py
+# Start with the included robot assets and checkerboard scene
+uv run argus --scene flat --static
 ```
+
+On Windows PowerShell, use `npm.cmd ci` if script execution policy blocks
+`npm.ps1`. The dashboard is served at http://localhost:8000; the app builds
+the frontend at startup. Remove `--static` to enable robot motion.
+
+The office scene additionally requires the real Git LFS scene assets.
+Run `git lfs pull` before using `--scene office`. If LFS reports a missing
+object (404), recover those objects from an original clone or backup and
+upload them to the repository's LFS storage. LFS pointer files alone cannot
+be loaded by MuJoCo. The flat scene works without these office assets.
 
 ### Optional Dependencies
 

@@ -26,6 +26,7 @@ Control modes:
 
 import argparse
 import logging
+import shutil
 import subprocess
 import sys
 import threading
@@ -621,7 +622,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
         logger.info("Building React frontend...")
         try:
             subprocess.run(
-                ["npm", "run", "build"],
+                [shutil.which("npm") or "npm", "run", "build"],
                 cwd=str(frontend_dir),
                 check=True,
                 capture_output=True,
