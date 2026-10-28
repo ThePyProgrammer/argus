@@ -19,9 +19,9 @@ const CATEGORY_ICONS: Record<NodeCategory, string> = {
 // Status badge colors
 const STATUS_COLORS: Record<string, string> = {
   idle: '#666666',
-  processing: '#2ecc71',
-  error: '#d32f2f',
-  initializing: '#4fc3f7',
+  processing: 'var(--success)',
+  error: 'var(--danger)',
+  initializing: 'var(--accent)',
 };
 
 // Pulsing animation for initializing status via CSS keyframes
@@ -80,8 +80,8 @@ function PipelineNodeComponent({ data, selected, id }: NodeProps) {
     <div
       onClick={handleClick}
       style={{
-        background: selected ? '#242448' : '#1e1e32',
-        border: selected ? '2px solid #4fc3f7' : '1px solid #2a2a4a',
+        background: selected ? 'var(--accent-wash)' : 'var(--surface-raised)',
+        border: selected ? '2px solid var(--accent)' : '1px solid var(--line)',
         borderRadius: '8px',
         minWidth: '220px',
         maxWidth: '320px',
@@ -154,10 +154,10 @@ function PipelineNodeComponent({ data, selected, id }: NodeProps) {
                     marginBottom: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#aaa', minWidth: '60px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)', minWidth: '60px' }}>
                     {key}
                   </span>
-                  <span style={{ fontSize: '10px', color: liveTunable ? '#ff9800' : '#666' }}>
+                  <span style={{ fontSize: '10px', color: liveTunable ? '#ff9800' : 'var(--muted)' }}>
                     {liveTunable ? '\u26A1' : '\u{1F512}'}
                   </span>
                   {isBool ? (
@@ -166,7 +166,7 @@ function PipelineNodeComponent({ data, selected, id }: NodeProps) {
                         width: '28px',
                         height: '14px',
                         borderRadius: '7px',
-                        background: value ? '#2ecc71' : '#4a4a6a',
+                        background: value ? 'var(--success)' : 'var(--line-strong)',
                         position: 'relative',
                       }}
                     >
@@ -189,7 +189,7 @@ function PipelineNodeComponent({ data, selected, id }: NodeProps) {
                         style={{
                           flex: 1,
                           height: '4px',
-                          background: '#4a4a6a',
+                          background: 'var(--line-strong)',
                           borderRadius: '2px',
                           position: 'relative',
                           minWidth: '60px',
@@ -202,12 +202,12 @@ function PipelineNodeComponent({ data, selected, id }: NodeProps) {
                             top: 0,
                             height: '4px',
                             borderRadius: '2px',
-                            background: '#4fc3f7',
+                            background: 'var(--button-primary)',
                             width: `${Math.min(100, Math.max(0, ((numValue - Number(schema.minimum ?? 0)) / (Number(schema.maximum ?? 1) - Number(schema.minimum ?? 0))) * 100))}%`,
                           }}
                         />
                       </div>
-                      <span style={{ fontSize: '10px', color: '#888', minWidth: '30px', textAlign: 'right' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--muted)', minWidth: '30px', textAlign: 'right' }}>
                         {typeof numValue === 'number' ? numValue.toFixed(numValue % 1 === 0 ? 0 : 2) : numValue}
                       </span>
                     </div>

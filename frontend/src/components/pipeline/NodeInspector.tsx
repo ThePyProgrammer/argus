@@ -33,8 +33,8 @@ export function NodeInspector() {
 
   const containerStyle: React.CSSProperties = {
     width: 320,
-    background: '#1a1a2e',
-    borderLeft: '1px solid #2a2a4a',
+    background: 'var(--surface)',
+    borderLeft: '1px solid var(--line)',
     height: '100%',
     overflowY: 'auto',
     padding: 16,
@@ -47,7 +47,7 @@ export function NodeInspector() {
         <div
           style={{
             fontSize: 13,
-            color: '#666',
+            color: 'var(--muted)',
             textAlign: 'center',
             marginTop: 64,
           }}
@@ -59,7 +59,7 @@ export function NodeInspector() {
   }
 
   const { category, label, registryName, parameterSchema, paramValues } = selectedNode.data;
-  const catColor = CATEGORY_COLORS[category] ?? '#666';
+  const catColor = CATEGORY_COLORS[category] ?? 'var(--muted)';
   const properties = (parameterSchema as Record<string, unknown> | null)?.properties as
     | Record<string, Record<string, unknown>>
     | undefined;
@@ -85,15 +85,15 @@ export function NodeInspector() {
             flexShrink: 0,
           }}
         />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0' }}>{label}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 10, color: '#666', marginTop: 4, marginLeft: 16 }}>
+      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, marginLeft: 16 }}>
         {selectedNode.data.nodeType}
       </div>
 
       {/* Registry info */}
       {registryName && (
-        <div style={{ fontSize: 10, color: '#888', marginTop: 4, marginLeft: 16 }}>
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, marginLeft: 16 }}>
           Backend: {registryName}
         </div>
       )}
@@ -117,9 +117,9 @@ export function NodeInspector() {
               marginTop: 4,
               marginLeft: 16,
               padding: '4px 8px',
-              background: '#0a0a14',
-              color: '#e0e0e0',
-              border: '1px solid #2a2a4a',
+              background: 'var(--surface-inset)',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
               borderRadius: 3,
               fontSize: 11,
               fontWeight: 600,
@@ -145,13 +145,13 @@ export function NodeInspector() {
       {/* Phase 8 DET-STRETCH-04 — per-robot backend override section */}
       {selectedNode.data.nodeType === 'detector_generic' && robots.size > 1 && (
         <div>
-          <div style={{ borderTop: '1px solid #2a2a4a', margin: '12px 0 8px 0' }} />
+          <div style={{ borderTop: '1px solid var(--line)', margin: '12px 0 8px 0' }} />
           <div style={{
             fontSize: 10,
             fontWeight: 600,
             letterSpacing: '1px',
             textTransform: 'uppercase',
-            color: '#666',
+            color: 'var(--muted)',
             marginBottom: 8,
           }}>
             per-robot override
@@ -165,7 +165,7 @@ export function NodeInspector() {
               borderLeft: `3px solid ${robotColor(index)}`,
               paddingLeft: 8,
             }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#888', minWidth: 60 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', minWidth: 60 }}>
                 Robot {index}
               </span>
               <select
@@ -206,9 +206,9 @@ export function NodeInspector() {
                 style={{
                   flex: 1,
                   padding: '4px 8px',
-                  background: '#0a0a14',
-                  color: '#e0e0e0',
-                  border: '1px solid #2a2a4a',
+                  background: 'var(--surface-inset)',
+                  color: 'var(--ink)',
+                  border: '1px solid var(--line)',
                   borderRadius: 3,
                   fontSize: 11,
                   fontWeight: 600,
@@ -229,7 +229,7 @@ export function NodeInspector() {
                 })()}
               </select>
               {perRobotError[rid] && (
-                <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4, marginLeft: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4, marginLeft: 16 }}>
                   {perRobotError[rid]}
                 </div>
               )}
@@ -239,16 +239,16 @@ export function NodeInspector() {
       )}
 
       {/* Separator */}
-      <div style={{ borderTop: '1px solid #2a2a4a', margin: '16px 0' }} />
+      <div style={{ borderTop: '1px solid var(--line)', margin: '16px 0' }} />
 
       {/* Parameters heading */}
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>
         Parameters
       </div>
 
       {/* Parameters */}
       {!properties || Object.keys(properties).length === 0 ? (
-        <div style={{ fontSize: 11, color: '#666' }}>No tunable parameters</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)' }}>No tunable parameters</div>
       ) : (
         Object.entries(properties).map(([key, prop]) => {
           const currentValue =
@@ -265,18 +265,18 @@ export function NodeInspector() {
                     {'\u26A1'}
                   </span>
                 ) : (
-                  <span style={{ color: '#888', fontSize: 12 }} title="Requires restart">
+                  <span style={{ color: 'var(--muted)', fontSize: 12 }} title="Requires restart">
                     {'\uD83D\uDD12'}
                   </span>
                 )}
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#aaa' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>
                   {humanize(key)}
                 </span>
               </div>
 
               {/* Description */}
               {typeof prop.description === 'string' && (
-                <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>
                   {prop.description}
                 </div>
               )}
@@ -302,9 +302,9 @@ export function NodeInspector() {
                   style={{
                     width: '100%',
                     padding: '4px 8px',
-                    background: currentValue ? '#1b5e20' : '#37474f',
-                    color: '#e0e0e0',
-                    border: '1px solid #444',
+                    background: currentValue ? 'var(--accent-wash)' : 'var(--surface-inset)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--line-strong)',
                     fontSize: 11,
                     fontWeight: 600,
                     cursor: 'pointer',

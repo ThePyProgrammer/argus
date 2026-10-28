@@ -54,8 +54,8 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: '#12122a',
-    border: `1px solid ${hovered ? '#2ecc71' : '#444'}`,
+    background: 'var(--surface-inset)',
+    border: `1px solid ${hovered ? 'var(--success)' : 'var(--line-strong)'}`,
     borderRadius: isOpen ? '4px 4px 0 0' : '4px',
     padding: '8px 16px',
     cursor: 'pointer',
@@ -66,8 +66,8 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
     top: '100%',
     left: 0,
     right: 0,
-    background: '#12122a',
-    border: '1px solid #2a2a4a',
+    background: 'var(--surface-inset)',
+    border: '1px solid var(--line)',
     borderRadius: '0 0 4px 4px',
     zIndex: 100,
     maxHeight: '240px',
@@ -83,18 +83,18 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <span style={{ fontSize: '13px', fontWeight: 400, color: backends.length === 0 ? '#888' : '#e0e0e0' }}>
+        <span style={{ fontSize: '13px', fontWeight: 400, color: backends.length === 0 ? 'var(--muted)' : 'var(--ink)' }}>
           {backends.length === 0 ? 'Loading backends...' : activeDisplay}
         </span>
         {backends.length > 0 && (
-          <span style={{ fontSize: '10px', color: '#888' }}>{'\u25BC'}</span>
+          <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{'\u25BC'}</span>
         )}
       </div>
 
       {isOpen && (
         <div style={listStyle}>
           {backends.length === 0 ? (
-            <div style={{ padding: '8px 16px', fontSize: '11px', color: '#666' }}>
+            <div style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--muted)' }}>
               No backends available
             </div>
           ) : (
@@ -105,7 +105,7 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
               const itemStyle: React.CSSProperties = {
                 padding: '8px 16px',
                 cursor: isAvailable ? 'pointer' : 'not-allowed',
-                borderLeft: isActive ? '2px solid #2ecc71' : '2px solid transparent',
+                borderLeft: isActive ? '2px solid var(--success)' : '2px solid transparent',
                 background: isActive ? 'rgba(46, 204, 113, 0.08)' : 'transparent',
                 opacity: isAvailable ? 1 : 0.4,
               };
@@ -120,7 +120,7 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
                   }}
                   onMouseEnter={(e) => {
                     if (isAvailable && !isActive) {
-                      e.currentTarget.style.background = '#222244';
+                      e.currentTarget.style.background = 'var(--surface-raised)';
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -131,7 +131,7 @@ export function DetectorDropdown({ onSelect }: { onSelect: (name: string) => voi
                     }
                   }}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 400, color: isAvailable ? '#e0e0e0' : '#555' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 400, color: isAvailable ? 'var(--ink)' : 'var(--muted)' }}>
                     {backend.display}
                   </div>
                   <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap' }}>

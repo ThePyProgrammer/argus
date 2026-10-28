@@ -5,23 +5,23 @@ import Sparkline from './Sparkline';
 import type { DetectionGtMetrics } from '../utils/messageTypes';
 
 const STATUS_DOT_COLORS: Record<string, string> = {
-  ok: '#2ecc71',
+  ok: 'var(--success)',
   initializing: '#f1c40f',
   relocalizing: '#f1c40f',
-  lost: '#e74c3c',
+  lost: 'var(--danger)',
 };
 
 function deltaColor(delta: number): string {
-  if (delta === 0) return '#888';
+  if (delta === 0) return 'var(--muted)';
   // For all three metrics (ATE, RPE, ms/frame): lower is better.
   // Negative delta = improvement (green), positive = regression (red).
-  return delta < 0 ? '#2ecc71' : '#e74c3c';
+  return delta < 0 ? 'var(--success)' : 'var(--danger)';
 }
 
 function formatDelta(current: number, baseline: number): { text: string; color: string } {
-  if (baseline === 0) return { text: '0%', color: '#888' };
+  if (baseline === 0) return { text: '0%', color: 'var(--muted)' };
   const delta = ((current - baseline) / baseline) * 100;
-  if (Math.abs(delta) < 0.05) return { text: '0%', color: '#888' };
+  if (Math.abs(delta) < 0.05) return { text: '0%', color: 'var(--muted)' };
   const sign = delta > 0 ? '+' : '';
   return {
     text: `${sign}${delta.toFixed(0)}%`,
@@ -30,26 +30,26 @@ function formatDelta(current: number, baseline: number): { text: string; color: 
 }
 
 // Phase 6 DET-METRICS-01 — single-source empty-state formatter.
-// Returns `--` at #888 when value is null/undefined; otherwise formats
-// with caller's formatter at the neutral #e0e0e0 text color.
+// Returns `--` at var(--muted) when value is null/undefined; otherwise formats
+// with caller's formatter at the neutral var(--ink) text color.
 function formatMetric(
   v: number | null | undefined,
   formatter: (x: number) => string,
 ): { text: string; color: string } {
-  if (v == null) return { text: '--', color: '#888' };
-  return { text: formatter(v), color: '#e0e0e0' };
+  if (v == null) return { text: '--', color: 'var(--muted)' };
+  return { text: formatter(v), color: 'var(--ink)' };
 }
 
 // UI-SPEC §Color — `fresh` traffic-light: <=1s normal, <=3s warning, >3s destructive.
 function freshnessColor(v: number): string {
-  if (v <= 1.0) return '#e0e0e0';
+  if (v <= 1.0) return 'var(--ink)';
   if (v <= 3.0) return '#f1c40f';
-  return '#e74c3c';
+  return 'var(--danger)';
 }
 
 // SC#2 revision 2026-04-15 — aggregate across classes per robot (simple mean).
-// `null` result → row renders `--` at #888. Both aggregates are displayed as
-// neutral `#e0e0e0` (no traffic-light; SC#2 reports the number as-is).
+// `null` result → row renders `--` at var(--muted). Both aggregates are displayed as
+// neutral `var(--ink)` (no traffic-light; SC#2 reports the number as-is).
 function aggregateCenterError(gt: DetectionGtMetrics | undefined): number | null {
   if (!gt) return null;
   const vals = Object.values(gt)
@@ -84,7 +84,7 @@ export default function MetricsPanel() {
   const firstRobotId = robotIds[0] ?? null;
 
   return (
-    <div style={{ background: '#111122', borderTop: '1px solid #2a2a4a' }}>
+    <div className="metrics-panel" style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)' }}>
       {/* Collapse/expand toggle bar */}
       <button
         onClick={() => setCollapsed(!collapsed)}
@@ -97,7 +97,7 @@ export default function MetricsPanel() {
           cursor: 'pointer',
           fontSize: '12px',
           fontWeight: 600,
-          color: '#888',
+          color: 'var(--muted)',
           background: 'transparent',
           border: 'none',
           userSelect: 'none',
@@ -127,8 +127,8 @@ export default function MetricsPanel() {
                     cursor: 'pointer',
                     background: 'transparent',
                     border: 'none',
-                    borderBottom: isActive ? '2px solid #2ecc71' : '2px solid transparent',
-                    color: isActive ? '#2ecc71' : '#888',
+                    borderBottom: isActive ? '2px solid var(--success)' : '2px solid transparent',
+                    color: isActive ? 'var(--success)' : 'var(--muted)',
                   }}
                 >
                   {label}
@@ -142,8 +142,8 @@ export default function MetricsPanel() {
             <>
               {robotIds.length === 0 ? (
                 <div style={{ padding: '12px 0' }}>
-                  <div style={{ fontSize: '13px', color: '#888' }}>No metrics yet</div>
-                  <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--muted)' }}>No metrics yet</div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
                     Start a session to see live SLAM metrics.
                   </div>
                 </div>
@@ -151,7 +151,7 @@ export default function MetricsPanel() {
                 <div style={{ display: 'flex', gap: '24px', overflowX: 'auto' }}>
                   {robotIds.map((robotId, index) => {
                     const m = perRobot[robotId];
-                    const dotColor = STATUS_DOT_COLORS[m.tracking_status] ?? '#888';
+                    const dotColor = STATUS_DOT_COLORS[m.tracking_status] ?? 'var(--muted)';
                     return (
                       <div key={robotId} style={{ minWidth: '140px' }}>
                         {/* Robot header with colored left border */}
@@ -161,7 +161,7 @@ export default function MetricsPanel() {
                             paddingLeft: '8px',
                             fontSize: '12px',
                             fontWeight: 600,
-                            color: '#e0e0e0',
+                            color: 'var(--ink)',
                             marginBottom: '8px',
                           }}
                         >
@@ -172,31 +172,31 @@ export default function MetricsPanel() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {/* ATE */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '12px', color: '#888' }}>ATE</span>
-                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#e0e0e0' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--muted)' }}>ATE</span>
+                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--ink)' }}>
                               {m.ate_rmse.toFixed(3)}m
                             </span>
                           </div>
 
                           {/* RPE */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '12px', color: '#888' }}>RPE</span>
-                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#e0e0e0' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--muted)' }}>RPE</span>
+                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--ink)' }}>
                               {m.rpe_rmse.toFixed(3)}m
                             </span>
                           </div>
 
                           {/* ms/frame */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '12px', color: '#888' }}>ms/frame</span>
-                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#e0e0e0' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--muted)' }}>ms/frame</span>
+                            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--ink)' }}>
                               {m.ms_per_frame.toFixed(1)}
                             </span>
                           </div>
 
                           {/* Status */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '12px', color: '#888' }}>Status</span>
+                            <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Status</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span
                                 aria-hidden="true"
@@ -208,7 +208,7 @@ export default function MetricsPanel() {
                                   display: 'inline-block',
                                 }}
                               />
-                              <span style={{ fontSize: '13px', color: '#e0e0e0' }}>
+                              <span style={{ fontSize: '13px', color: 'var(--ink)' }}>
                                 {m.tracking_status}
                               </span>
                             </div>
@@ -220,12 +220,12 @@ export default function MetricsPanel() {
                           marginTop: '12px',
                           marginBottom: '8px',
                           paddingTop: '8px',
-                          borderTop: '1px solid #2a2a4a',
+                          borderTop: '1px solid var(--line)',
                           fontSize: '10px',
                           fontWeight: 600,
                           letterSpacing: '1px',
                           textTransform: 'uppercase',
-                          color: '#666',
+                          color: 'var(--muted)',
                         }}>
                           detection
                         </div>
@@ -242,7 +242,7 @@ export default function MetricsPanel() {
                             ];
                             // freshness row: traffic-light override (UI-SPEC §Color)
                             const freshCell = det?.freshness_s == null
-                              ? { text: '--', color: '#888' }
+                              ? { text: '--', color: 'var(--muted)' }
                               : { text: `${det.freshness_s.toFixed(2)}s`, color: freshnessColor(det.freshness_s) };
                             const jitterCell = formatMetric(det?.jitter_m, (v) => `${v.toFixed(3)}m`);
                             // SC#2 rows — aggregate per-robot across classes (UI-SPEC Amendment 2026-04-15):
@@ -252,25 +252,25 @@ export default function MetricsPanel() {
                               <>
                                 {rows.map(([label, cell]) => (
                                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '12px', color: '#888' }}>{label}</span>
+                                    <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{label}</span>
                                     <span style={{ fontSize: '13px', fontFamily: 'monospace', color: cell.color }}>{cell.text}</span>
                                   </div>
                                 ))}
                                 <div key="fresh" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '12px', color: '#888' }}>{'fresh'}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{'fresh'}</span>
                                   <span style={{ fontSize: '13px', fontFamily: 'monospace', color: freshCell.color }}>{freshCell.text}</span>
                                 </div>
                                 <div key="jitter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '12px', color: '#888' }}>{'jitter'}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{'jitter'}</span>
                                   <span style={{ fontSize: '13px', fontFamily: 'monospace', color: jitterCell.color }}>{jitterCell.text}</span>
                                 </div>
                                 {/* SC#2 rows — UI-SPEC Amendment 2026-04-15 */}
                                 <div key="err-m" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '12px', color: '#888' }}>{'err m'}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{'err m'}</span>
                                   <span style={{ fontSize: '13px', fontFamily: 'monospace', color: errCell.color }}>{errCell.text}</span>
                                 </div>
                                 <div key="recall" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '12px', color: '#888' }}>{'recall'}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{'recall'}</span>
                                   <span style={{ fontSize: '13px', fontFamily: 'monospace', color: recallCell.color }}>{recallCell.text}</span>
                                 </div>
                               </>
@@ -283,20 +283,20 @@ export default function MetricsPanel() {
                 </div>
               )}
               {/* Phase 8 DET-STRETCH-02 — FUSION subsection (cross-robot aggregate) */}
-              <div style={{ borderTop: '1px solid #2a2a4a', marginTop: 12, paddingTop: 8 }}>
+              <div style={{ borderTop: '1px solid var(--line)', marginTop: 12, paddingTop: 8 }}>
                 <div style={{
                   fontSize: 10,
                   fontWeight: 600,
                   letterSpacing: '1px',
                   textTransform: 'uppercase',
-                  color: '#666',
+                  color: 'var(--muted)',
                   marginBottom: 8,
                 }}>
                   fusion
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#888' }}>fused</span>
-                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: '#e0e0e0' }}>{fusedDetections.length}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>fused</span>
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--ink)' }}>{fusedDetections.length}</span>
                 </div>
               </div>
             </>
@@ -307,8 +307,8 @@ export default function MetricsPanel() {
             <>
               {baseline === null ? (
                 <div style={{ padding: '12px 0' }}>
-                  <div style={{ fontSize: '13px', color: '#888' }}>No baseline recorded</div>
-                  <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--muted)' }}>No baseline recorded</div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
                     Run a session with ICP backend first to establish baseline metrics.
                   </div>
                 </div>
@@ -327,7 +327,7 @@ export default function MetricsPanel() {
                     const histArr = historyData ? historyData[histKey] : [];
                     const delta = currentVal != null && baselineVal != null
                       ? formatDelta(currentVal, baselineVal)
-                      : { text: '0%', color: '#888' };
+                      : { text: '0%', color: 'var(--muted)' };
 
                     return (
                       <div
@@ -338,17 +338,17 @@ export default function MetricsPanel() {
                           gap: '12px',
                         }}
                       >
-                        <span style={{ fontSize: '12px', color: '#888', minWidth: '50px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)', minWidth: '50px' }}>
                           {label}
                         </span>
                         <Sparkline
                           data={histArr}
                           width={120}
                           height={30}
-                          color="#2ecc71"
+                          color="var(--success)"
                           baselineValue={baselineVal}
                         />
-                        <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#e0e0e0', minWidth: '60px', textAlign: 'right' }}>
+                        <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--ink)', minWidth: '60px', textAlign: 'right' }}>
                           {currentVal != null
                             ? key === 'ms_per_frame'
                               ? currentVal.toFixed(1)
@@ -361,7 +361,7 @@ export default function MetricsPanel() {
                       </div>
                     );
                   })}
-                  <div style={{ fontSize: '10px', color: '#555', marginTop: '-4px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '-4px' }}>
                     ICP baseline
                   </div>
                 </div>

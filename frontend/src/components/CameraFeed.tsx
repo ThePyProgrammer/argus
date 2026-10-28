@@ -157,7 +157,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
   const imgStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
     display: 'block',
   };
 
@@ -166,18 +166,18 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    color: '#555',
+    color: 'var(--muted)',
     fontSize: '12px',
   };
 
   return (
     <div
+      className="camera-feed"
       style={{
-        width: '100%',
-        maxWidth: '640px',
-        aspectRatio: '4 / 3',
+        width: '393px',
+        height: '150px',
         flexShrink: 0,
-        background: '#0a0a1a',
+        background: 'var(--canvas)',
         borderRadius: '4px',
         overflow: 'hidden',
         position: 'relative',
@@ -186,7 +186,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
       {/* Color accent bar */}
       <div style={{ height: '3px', background: color, width: '100%' }} />
       {/* Label */}
-      <div
+      <div className="camera-caption"
         style={{
           position: 'absolute',
           top: '6px',
@@ -196,7 +196,7 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
           background: 'rgba(0,0,0,0.6)',
           padding: '2px 6px',
           borderRadius: '3px',
-          color: '#e0e0e0',
+          color: 'var(--ink)',
           zIndex: 3,
         }}
       >
@@ -204,10 +204,10 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
       </div>
       {/* Side-by-side: RGB (with detection overlay) + Depth */}
       <div style={{ display: 'flex', height: 'calc(100% - 3px)' }}>
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <div style={{
+        <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+          <div className="camera-caption" style={{
             position: 'absolute', bottom: '4px', left: '4px',
-            fontSize: '10px', color: '#aaa', background: 'rgba(0,0,0,0.5)',
+            fontSize: '10px', color: 'var(--muted)', background: 'rgba(0,0,0,0.5)',
             padding: '1px 4px', borderRadius: '2px', zIndex: 3,
           }}>RGB</div>
           {cameraUrl ? (
@@ -222,20 +222,20 @@ export default function CameraFeed({ robotId }: CameraFeedProps) {
               />
             </>
           ) : (
-            <div style={noFeedStyle}>No RGB</div>
+            <div className="camera-empty" style={noFeedStyle}>No RGB</div>
           )}
         </div>
-        <div style={{ width: '1px', background: '#2a2a4a' }} />
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <div style={{
+        <div style={{ width: '1px', background: 'var(--line)' }} />
+        <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+          <div className="camera-caption" style={{
             position: 'absolute', bottom: '4px', left: '4px',
-            fontSize: '10px', color: '#aaa', background: 'rgba(0,0,0,0.5)',
+            fontSize: '10px', color: 'var(--muted)', background: 'rgba(0,0,0,0.5)',
             padding: '1px 4px', borderRadius: '2px', zIndex: 3,
           }}>Depth</div>
           {depthUrl ? (
             <img src={depthUrl} alt={`${robotId} depth`} style={imgStyle} />
           ) : (
-            <div style={noFeedStyle}>No depth</div>
+            <div className="camera-empty" style={noFeedStyle}>No depth</div>
           )}
         </div>
       </div>

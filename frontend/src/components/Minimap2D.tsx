@@ -73,7 +73,7 @@ export function Minimap2D() {
     ctx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
     // Background
-    ctx.fillStyle = '#12122a';
+    ctx.fillStyle = '#26352e';
     ctx.beginPath();
     ctx.roundRect(0, 0, MAP_WIDTH, MAP_HEIGHT, 8);
     ctx.fill();

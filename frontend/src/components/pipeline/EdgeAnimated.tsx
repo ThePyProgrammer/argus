@@ -43,12 +43,12 @@ function EdgeAnimated({
         id={id}
         path={edgePath}
         style={{
-          stroke: isActive ? '#4fc3f7' : '#4a4a6a',
+          stroke: isActive ? 'var(--accent)' : 'var(--line-strong)',
           strokeWidth: 2,
         }}
       />
       {isActive && !prefersReducedMotion && (
-        <circle r="3" fill="#4fc3f7" opacity={0.6}>
+        <circle r="3" fill="var(--accent)" opacity={0.6}>
           <animateMotion dur="2s" repeatCount="indefinite" path={edgePath} />
         </circle>
       )}
@@ -58,7 +58,7 @@ function EdgeAnimated({
           y={midY - 8}
           style={{
             fontSize: '10px',
-            fill: '#888',
+            fill: 'var(--muted)',
             textAnchor: 'middle',
             pointerEvents: 'none',
           }}

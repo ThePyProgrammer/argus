@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe('CameraFeed without detections', () => {
-  it('aligns a source-pixel box with the cropped image in the RGB pane', () => {
+  it('shows the full image and aligns boxes with letterboxing in a narrow pane', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
       width: 160, height: 240, x: 0, y: 0, top: 0, left: 0, right: 160, bottom: 240,
       toJSON: () => ({}),
@@ -34,12 +34,13 @@ describe('CameraFeed without detections', () => {
       metrics: { detector_ms: 10, lifter_ms: 0, n_raw: 1, n_final: 1 },
     });
 
-    const { getByText } = render(<CameraFeed robotId="robot_a" />);
+    const { getByText, getByAltText } = render(<CameraFeed robotId="robot_a" />);
+    expect(getByAltText('robot_a rgb').style.objectFit).toBe('contain');
     const style = getByText('chair 80%').parentElement!.style;
-    expect(style.left).toBe('0px');
-    expect(style.top).toBe('60px');
-    expect(style.width).toBe('160px');
-    expect(style.height).toBe('120px');
+    expect(style.left).toBe('40px');
+    expect(style.top).toBe('90px');
+    expect(style.width).toBe('80px');
+    expect(style.height).toBe('60px');
   });
 
   it('mounts and accepts camera updates before detections arrive', () => {

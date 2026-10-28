@@ -46,8 +46,8 @@ export function ConfirmModal(props: ConfirmModalProps) {
   };
 
   const cardStyle: React.CSSProperties = {
-    background: '#1a1a3e',
-    border: '1px solid #2a2a4a',
+    background: 'var(--surface)',
+    border: '1px solid var(--line)',
     borderRadius: '8px',
     padding: '24px',
     maxWidth: '400px',
@@ -58,13 +58,13 @@ export function ConfirmModal(props: ConfirmModalProps) {
   const headingStyle: React.CSSProperties = {
     fontSize: '16px',
     fontWeight: 600,
-    color: '#e0e0e0',
+    color: 'var(--ink)',
     margin: 0,
   };
 
   const bodyStyle: React.CSSProperties = {
     fontSize: '13px',
-    color: '#aaa',
+    color: 'var(--muted)',
     marginTop: '16px',
   };
 
@@ -76,7 +76,7 @@ export function ConfirmModal(props: ConfirmModalProps) {
   };
 
   const cancelButtonStyle: React.CSSProperties = {
-    background: '#1565c0',
+    background: 'var(--button-primary)',
     color: '#fff',
     padding: '8px 16px',
     border: 'none',
@@ -87,7 +87,7 @@ export function ConfirmModal(props: ConfirmModalProps) {
   };
 
   const confirmButtonStyle: React.CSSProperties = {
-    background: '#2ecc71',
+    background: 'var(--button-primary)',
     color: '#fff',
     padding: '8px 16px',
     border: 'none',

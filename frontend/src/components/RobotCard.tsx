@@ -48,10 +48,10 @@ export default function RobotCard({ robot }: RobotCardProps) {
       className="robot-card"
       onClick={handleClick}
       style={{
-        padding: '10px 12px',
+        padding: '8px 9px',
         marginBottom: '6px',
-        background: '#222244',
-        borderRadius: '6px',
+        background: 'var(--surface-raised)',
+        borderRadius: '4px',
         cursor: 'pointer',
         borderLeft: `3px solid ${color}`,
       }}
@@ -62,17 +62,17 @@ export default function RobotCard({ robot }: RobotCardProps) {
             width: '10px',
             height: '10px',
             borderRadius: '50%',
-            background: '#4caf50',
+            background: 'var(--success)',
             display: 'inline-block',
             flexShrink: 0,
           }}
         />
-        <span style={{ fontWeight: 600, fontSize: '14px' }}>{robot.id}</span>
+        <span style={{ fontWeight: 600, fontSize: '12px' }}>{robot.id}</span>
         <span
           style={{
             marginLeft: 'auto',
             fontSize: '12px',
-            color: '#aaa',
+            color: 'var(--muted)',
             textTransform: 'capitalize',
           }}
         >
@@ -81,11 +81,11 @@ export default function RobotCard({ robot }: RobotCardProps) {
       </div>
       <div style={{
         display: 'flex', justifyContent: 'space-between', marginTop: '6px',
-        fontSize: '11px', color: '#9ca3af',
+        fontSize: '11px', color: 'var(--muted)',
       }}>
         <span>{robot.platformMetadata?.display_name ?? robot.platform}</span>
         <span style={{
-          color: robot.disabled ? '#ff6b6b' : '#8fd18f',
+          color: robot.disabled ? 'var(--danger)' : 'var(--success)',
           textTransform: 'capitalize',
           fontWeight: 600,
         }}>
@@ -93,20 +93,20 @@ export default function RobotCard({ robot }: RobotCardProps) {
         </span>
       </div>
       {robot.fallReason !== 'none' && (
-        <div style={{ marginTop: '4px', fontSize: '11px', color: '#ffb86b' }}>
+        <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--warning)' }}>
           Fall: {robot.fallReason}
         </div>
       )}
       <div style={{
         display: 'flex', justifyContent: 'space-between', marginTop: '4px',
-        fontSize: '11px', color: '#aaa',
+        fontSize: '11px', color: 'var(--muted)',
       }}>
         <span>
           Controller: {controllerHealthLabel(robot.controllerHealth)}
         </span>
         <span>Near misses: {robot.nearMissCount}</span>
       </div>
-      <div style={{ marginTop: '4px', fontSize: '11px', color: robot.collisionCount > 0 ? '#ff6b6b' : '#777' }}>
+      <div style={{ marginTop: '4px', fontSize: '11px', color: robot.collisionCount > 0 ? 'var(--danger)' : 'var(--muted)' }}>
         Collisions: {robot.collisionCount}
       </div>
       <div
@@ -115,7 +115,7 @@ export default function RobotCard({ robot }: RobotCardProps) {
           justifyContent: 'space-between',
           marginTop: '6px',
           fontSize: '12px',
-          color: '#bbb',
+          color: 'var(--muted)',
         }}
       >
         <span>Coverage: {robot.coveragePct.toFixed(1)}%</span>
@@ -124,8 +124,8 @@ export default function RobotCard({ robot }: RobotCardProps) {
       {/* Scene description from VLM */}
       {robot.sceneDescription && (
         <div style={{
-          marginTop: '6px', padding: '4px 6px', background: '#1a1a3a',
-          borderRadius: '4px', fontSize: '11px', color: '#9ca3af',
+          marginTop: '6px', padding: '4px 6px', background: 'var(--surface-inset)',
+          borderRadius: '4px', fontSize: '11px', color: 'var(--muted)',
           fontStyle: 'italic', lineHeight: '1.3',
         }}>
           🔍 {robot.sceneDescription}
@@ -135,19 +135,19 @@ export default function RobotCard({ robot }: RobotCardProps) {
       {/* YOLO detections (Phase 2: detections_3d envelope) */}
       {(robot.detections_3d?.items.length ?? 0) > 0 && (
         <div style={{
-          marginTop: '4px', fontSize: '11px', color: '#aaa',
+          marginTop: '4px', fontSize: '11px', color: 'var(--muted)',
           display: 'flex', flexWrap: 'wrap', gap: '3px',
         }}>
           {(robot.detections_3d?.items ?? []).slice(0, 8).map((det, i) => (
             <span key={i} style={{
-              padding: '1px 5px', background: '#2a2a4a', borderRadius: '3px',
+              padding: '1px 5px', background: 'var(--line)', borderRadius: '3px',
               fontSize: '10px',
             }}>
               {det.class_name} {(det.score * 100).toFixed(0)}%
             </span>
           ))}
           {(robot.detections_3d?.items.length ?? 0) > 8 && (
-            <span style={{ fontSize: '10px', color: '#666' }}>
+            <span style={{ fontSize: '10px', color: 'var(--muted)' }}>
               +{(robot.detections_3d?.items.length ?? 0) - 8} more
             </span>
           )}
@@ -163,13 +163,13 @@ export default function RobotCard({ robot }: RobotCardProps) {
           marginTop: '6px',
           padding: '4px 10px',
           width: '100%',
-          border: placingRobot === robot.id ? '1px solid #ff9800' : '1px solid #555',
+          border: placingRobot === robot.id ? '1px solid #ff9800' : '1px solid var(--muted)',
           borderRadius: '4px',
           cursor: 'pointer',
           fontSize: '11px',
           fontWeight: 600,
-          background: placingRobot === robot.id ? '#4a2800' : '#1a1a2e',
-          color: placingRobot === robot.id ? '#ff9800' : '#aaa',
+          background: placingRobot === robot.id ? '#4a2800' : 'var(--surface)',
+          color: placingRobot === robot.id ? '#ff9800' : 'var(--muted)',
         }}
       >
         {placingRobot === robot.id ? 'Cancel — Click scene to place' : 'Send To...'}

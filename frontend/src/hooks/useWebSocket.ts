@@ -39,6 +39,7 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
       wsRef.current = ws;
 
       ws.onopen = () => {
+        useControlStore.getState().setConnected(true);
         // Register sendCommand with controlStore
         const sendCommand = (cmd: { action: string; value?: number }) => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -63,6 +64,7 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
       };
 
       ws.onclose = () => {
+        useControlStore.getState().setConnected(false);
         // Reconnect after 2 second delay
         reconnectTimerRef.current = setTimeout(() => {
           connect();
@@ -283,6 +285,7 @@ export function useWebSocket(url: string = `ws://${window.location.host}/ws`): v
     connect();
 
     return () => {
+      useControlStore.getState().setConnected(false);
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }

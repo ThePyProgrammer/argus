@@ -28,15 +28,15 @@ export function RestartOverlay({ subsystem, name }: RestartOverlayProps) {
   const spinnerStyle: React.CSSProperties = {
     width: '40px',
     height: '40px',
-    border: '3px solid #2a2a4a',
-    borderTopColor: '#2ecc71',
+    border: '3px solid var(--line)',
+    borderTopColor: 'var(--success)',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   };
 
   const textStyle: React.CSSProperties = {
     marginTop: '16px',
-    color: '#aaa',
+    color: 'var(--muted)',
     fontSize: '13px',
   };
 

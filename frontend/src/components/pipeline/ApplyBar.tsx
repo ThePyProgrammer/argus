@@ -76,8 +76,8 @@ export function ApplyBar() {
 
   const containerStyle: React.CSSProperties = {
     height: 48,
-    background: '#1a1a2e',
-    borderTop: '1px solid #2a2a4a',
+    background: 'var(--surface)',
+    borderTop: '1px solid var(--line)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -86,8 +86,8 @@ export function ApplyBar() {
   };
 
   const applyButtonStyle: React.CSSProperties = {
-    background: '#4fc3f7',
-    color: '#0a0a14',
+    background: 'var(--button-primary)',
+    color: 'var(--surface-inset)',
     fontWeight: 600,
     fontSize: 13,
     padding: '6px 20px',
@@ -101,8 +101,8 @@ export function ApplyBar() {
     position: 'absolute',
     bottom: '100%',
     right: 16,
-    background: '#1e1e32',
-    border: '1px solid #d32f2f',
+    background: 'var(--surface-raised)',
+    border: '1px solid var(--danger)',
     padding: 8,
     borderRadius: 4,
     marginBottom: 4,
@@ -117,8 +117,8 @@ export function ApplyBar() {
     position: 'absolute',
     bottom: '100%',
     left: 16,
-    background: '#1e3a2a',
-    border: '1px solid #4caf50',
+    background: 'var(--accent-wash)',
+    border: '1px solid var(--success)',
     borderRadius: 4,
     padding: '8px 12px',
     marginBottom: 4,
@@ -155,10 +155,10 @@ export function ApplyBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         {/* Validation status */}
         {isValid ? (
-          <span style={{ fontSize: 11, color: '#2ecc71' }}>Pipeline valid</span>
+          <span style={{ fontSize: 11, color: 'var(--success)' }}>Pipeline valid</span>
         ) : (
           <span
-            style={{ fontSize: 11, color: '#d32f2f', cursor: 'pointer' }}
+            style={{ fontSize: 11, color: 'var(--danger)', cursor: 'pointer' }}
             onClick={() => setShowErrors(!showErrors)}
           >
             {validationErrors.length} validation error{validationErrors.length !== 1 ? 's' : ''}
@@ -167,7 +167,7 @@ export function ApplyBar() {
 
         {/* Apply error inline */}
         {applyError && (
-          <span style={{ fontSize: 11, color: '#d32f2f' }}>{applyError}</span>
+          <span style={{ fontSize: 11, color: 'var(--danger)' }}>{applyError}</span>
         )}
 
         {/* Apply button */}
@@ -184,9 +184,9 @@ export function ApplyBar() {
       {showErrors && validationErrors.length > 0 && (
         <div style={errorListStyle}>
           {validationErrors.map((err, i) => (
-            <div key={i} style={{ fontSize: 11, color: '#d32f2f', marginBottom: 4 }}>
+            <div key={i} style={{ fontSize: 11, color: 'var(--danger)', marginBottom: 4 }}>
               {err.nodeId && (
-                <span style={{ color: '#888', marginRight: 4 }}>[{err.nodeId}]</span>
+                <span style={{ color: 'var(--muted)', marginRight: 4 }}>[{err.nodeId}]</span>
               )}
               {err.message}
             </div>
@@ -205,19 +205,19 @@ export function ApplyBar() {
           <div style={{
             fontSize: 11,
             fontWeight: 600,
-            color: '#a5d6a7',
+            color: 'var(--accent)',
             lineHeight: 1.4,
             display: 'flex',
             alignItems: 'center',
           }}>
-            <span style={{ color: '#4caf50', marginRight: 6, fontSize: 12 }}>{'\u2713'}</span>
+            <span style={{ color: 'var(--success)', marginRight: 6, fontSize: 12 }}>{'\u2713'}</span>
             Pipeline updated in place
           </div>
           {hotToast.changed.length > 0 && (
             <div style={{
               fontSize: 10,
               fontWeight: 400,
-              color: '#888',
+              color: 'var(--muted)',
               lineHeight: 1.4,
               marginTop: 2,
             }}>

@@ -108,9 +108,9 @@ export function PresetSelector() {
   }
 
   const dropdownButtonStyle: React.CSSProperties = {
-    background: '#1e1e32',
-    border: '1px solid #2a2a4a',
-    color: '#e0e0e0',
+    background: 'var(--surface-raised)',
+    border: '1px solid var(--line)',
+    color: 'var(--ink)',
     padding: '4px 12px',
     borderRadius: 4,
     fontSize: 13,
@@ -121,8 +121,8 @@ export function PresetSelector() {
     position: 'absolute',
     bottom: '100%',
     left: 0,
-    background: '#1e1e32',
-    border: '1px solid #2a2a4a',
+    background: 'var(--surface-raised)',
+    border: '1px solid var(--line)',
     borderRadius: 4,
     zIndex: 100,
     minWidth: 200,
@@ -135,7 +135,7 @@ export function PresetSelector() {
     padding: 8,
     cursor: 'pointer',
     fontSize: 13,
-    color: '#e0e0e0',
+    color: 'var(--ink)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -146,7 +146,7 @@ export function PresetSelector() {
       ref={dropdownRef}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 8, position: 'relative' }}
     >
-      <span style={{ fontSize: 11, fontWeight: 600, color: '#aaa' }}>Preset:</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>Preset:</span>
       <button style={dropdownButtonStyle} onClick={() => setShowDropdown(!showDropdown)}>
         {activePreset ?? 'Custom'}
       </button>
@@ -158,7 +158,7 @@ export function PresetSelector() {
               key={preset.name}
               style={presetItemStyle}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = '#242448';
+                (e.currentTarget as HTMLElement).style.background = 'var(--accent-wash)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -167,20 +167,20 @@ export function PresetSelector() {
             >
               <span>{preset.name}</span>
               {preset.builtIn && (
-                <span style={{ fontSize: 10, color: '#888', fontStyle: 'italic' }}>Built-in</span>
+                <span style={{ fontSize: 10, color: 'var(--muted)', fontStyle: 'italic' }}>Built-in</span>
               )}
             </div>
           ))}
 
           {/* Separator */}
-          <div style={{ borderTop: '1px solid #2a2a4a', margin: '4px 0' }} />
+          <div style={{ borderTop: '1px solid var(--line)', margin: '4px 0' }} />
 
           {/* Save option */}
           {!showSaveInput ? (
             <div
-              style={{ ...presetItemStyle, color: '#4fc3f7' }}
+              style={{ ...presetItemStyle, color: 'var(--accent)' }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = '#242448';
+                (e.currentTarget as HTMLElement).style.background = 'var(--accent-wash)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -201,9 +201,9 @@ export function PresetSelector() {
                 }}
                 style={{
                   flex: 1,
-                  background: '#0a0a14',
-                  border: '1px solid #2a2a4a',
-                  color: '#e0e0e0',
+                  background: 'var(--surface-inset)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--ink)',
                   fontSize: 11,
                   padding: '4px 8px',
                   borderRadius: 3,
@@ -214,8 +214,8 @@ export function PresetSelector() {
               <button
                 onClick={handleSavePreset}
                 style={{
-                  background: '#4fc3f7',
-                  color: '#0a0a14',
+                  background: 'var(--button-primary)',
+                  color: 'var(--surface-inset)',
                   border: 'none',
                   borderRadius: 3,
                   fontSize: 11,

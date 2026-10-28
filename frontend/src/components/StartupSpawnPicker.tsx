@@ -181,7 +181,7 @@ export function SpawnMap({ sceneName, positions, robotIds, onPick }: {
 
   return <div style={{ position: 'relative', minHeight: 300, height: 'min(60vh, 620px)' }}>
     <div ref={container} style={{ position: 'absolute', inset: 0, cursor: 'crosshair' }} />
-    {(loading || error) && <div role="status" style={{ position: 'absolute', bottom: 12, left: 12, right: 12, background: '#101625dd', padding: 10, pointerEvents: 'none' }}>{error || 'Loading overhead map…'}</div>}
+    {(loading || error) && <div className="spawn-map-status" role="status" style={{ position: 'absolute', bottom: 12, left: 12, right: 12, background: '#101625dd', padding: 10, pointerEvents: 'none' }}>{error || 'Loading overhead map…'}</div>}
   </div>;
 }
 
@@ -226,14 +226,14 @@ export default function StartupSpawnPicker() {
       setPending(false);
     }
   };
-  return <div role="dialog" aria-modal="true" aria-labelledby="spawn-title" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: '#050914e8', display: 'grid', placeItems: 'center', padding: 20, color: '#e5edf8' }}>
-    <section style={{ width: 'min(1050px, 96vw)', background: '#151e30', border: '1px solid #3c506e', borderRadius: 12, overflow: 'hidden' }}>
+  return <div className="spawn-picker" role="dialog" aria-modal="true" aria-labelledby="spawn-title" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: '#050914e8', display: 'grid', placeItems: 'center', padding: 20, color: 'var(--ink)' }}>
+    <section style={{ width: 'min(1050px, 96vw)', background: 'var(--surface-raised)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
       <header style={{ padding: '18px 22px' }}>
         <h2 id="spawn-title" style={{ margin: '0 0 8px' }}>Choose starting positions</h2>
-        <p style={{ margin: 0, color: '#afbed2' }}>Select a robot, then click open floor on the overhead map. Scroll to zoom; right-drag to pan. MuJoCo starts after you confirm.</p>
+        <p style={{ margin: 0, color: 'var(--muted)' }}>Select a robot, then click open floor on the overhead map. Scroll to zoom; right-drag to pan. MuJoCo starts after you confirm.</p>
       </header>
       <div style={{ display: 'flex', gap: 8, padding: '0 22px 14px', flexWrap: 'wrap' }}>
-        {setup.robot_ids.map((id, index) => <button key={id} disabled={pending} onClick={() => setActive(id)} aria-pressed={active === id} style={{ padding: '8px 12px', background: active === id ? '#334968' : '#202c42', color: OKABE_ITO[index % 8], border: '1px solid #526b8d', borderRadius: 6 }}>
+        {setup.robot_ids.map((id, index) => <button key={id} disabled={pending} onClick={() => setActive(id)} aria-pressed={active === id} style={{ padding: '8px 12px', background: active === id ? 'var(--accent-wash)' : 'var(--surface-inset)', color: OKABE_ITO[index % 8], border: '1px solid var(--line-strong)', borderRadius: 6 }}>
           {id}: {positions[id] ? `(${positions[id][0].toFixed(2)}, ${positions[id][1].toFixed(2)})` : 'click to place'}
         </button>)}
       </div>
@@ -241,7 +241,7 @@ export default function StartupSpawnPicker() {
       <footer style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span role="alert" style={{ color: '#ffa89b', flex: 1 }}>{error}</span>
         <button disabled={pending} onClick={() => confirm(setup.defaults)}>Use default positions</button>
-        <button disabled={pending || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: '#397bce', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting…' : 'Start simulation'}</button>
+        <button disabled={pending || setup.robot_ids.some((id) => !positions[id])} onClick={() => confirm(positions)} style={{ background: 'var(--button-primary)', color: 'white', border: 0, padding: '10px 18px', borderRadius: 6 }}>{pending ? 'Starting…' : 'Start simulation'}</button>
       </footer>
     </section>
   </div>;

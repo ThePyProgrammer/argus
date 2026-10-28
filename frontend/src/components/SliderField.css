@@ -7,7 +7,7 @@
 .slider-field__label {
   font-size: 11px;
   font-weight: 600;
-  color: #aaa;
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -31,14 +31,14 @@
 .slider-field__range::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 4px;
-  background: #2a2a3e;
+  background: var(--line);
 }
 
 /* Track — Firefox */
 .slider-field__range::-moz-range-track {
   height: 8px;
   border-radius: 4px;
-  background: #2a2a3e;
+  background: var(--line);
   border: none;
 }
 
@@ -48,22 +48,22 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #6366f1;
-  border: 2px solid #818cf8;
+  background: var(--accent);
+  border: 2px solid #75946b;
   cursor: grab;
   margin-top: -5px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 4px rgba(33, 55, 37, 0.15);
   transition: background 0.15s, box-shadow 0.15s;
 }
 
 .slider-field__range::-webkit-slider-thumb:hover {
-  background: #818cf8;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: #75946b;
+  box-shadow: 0 0 0 3px rgba(59, 101, 80, 0.25), 0 1px 4px rgba(33, 55, 37, 0.15);
 }
 
 .slider-field__range::-webkit-slider-thumb:active {
   cursor: grabbing;
-  background: #a5b4fc;
+  background: #9ab18e;
 }
 
 /* Thumb — Firefox */
@@ -71,21 +71,21 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #6366f1;
-  border: 2px solid #818cf8;
+  background: var(--accent);
+  border: 2px solid #75946b;
   cursor: grab;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 4px rgba(33, 55, 37, 0.15);
   transition: background 0.15s, box-shadow 0.15s;
 }
 
 .slider-field__range::-moz-range-thumb:hover {
-  background: #818cf8;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: #75946b;
+  box-shadow: 0 0 0 3px rgba(59, 101, 80, 0.25), 0 1px 4px rgba(33, 55, 37, 0.15);
 }
 
 .slider-field__range::-moz-range-thumb:active {
   cursor: grabbing;
-  background: #a5b4fc;
+  background: #9ab18e;
 }
 
 /* Focus states */
@@ -94,22 +94,22 @@
 }
 
 .slider-field__range:focus::-webkit-slider-thumb {
-  border-color: #a5b4fc;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
+  border-color: #9ab18e;
+  box-shadow: 0 0 0 3px rgba(59, 101, 80, 0.3), 0 1px 4px rgba(33, 55, 37, 0.15);
 }
 
 .slider-field__range:focus::-moz-range-thumb {
-  border-color: #a5b4fc;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
+  border-color: #9ab18e;
+  box-shadow: 0 0 0 3px rgba(59, 101, 80, 0.3), 0 1px 4px rgba(33, 55, 37, 0.15);
 }
 
 /* Number input — text-based, no spinners */
 .slider-field__number {
   width: 72px;
   min-width: 72px;
-  background: #1a1a2e;
-  color: #e0e0e0;
-  border: 1px solid #333;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 13px;
@@ -121,8 +121,8 @@
 
 .slider-field__number:focus {
   outline: none;
-  border-color: #6366f1;
-  background: #1e1e34;
+  border-color: var(--accent);
+  background: var(--surface-inset);
 }
 
 .slider-field__number:disabled {

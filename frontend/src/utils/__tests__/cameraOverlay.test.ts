@@ -8,15 +8,15 @@ describe('camera overlay image coordinates', () => {
     });
   });
 
-  it('accounts for horizontal cropping in the narrow RGB pane', () => {
+  it('accounts for letterboxing in a narrow RGB pane', () => {
     expect(cameraOverlayRect([80, 60, 240, 180], 320, 240, 160, 240)).toEqual({
-      left: 0, top: 60, width: 160, height: 120,
+      left: 40, top: 90, width: 80, height: 60,
     });
   });
 
-  it('accounts for vertical cropping in a wide pane', () => {
+  it('accounts for pillarboxing in a wide pane', () => {
     expect(cameraOverlayRect([80, 60, 240, 180], 320, 240, 640, 240)).toEqual({
-      left: 160, top: 0, width: 320, height: 240,
+      left: 240, top: 60, width: 160, height: 120,
     });
   });
 });

@@ -206,11 +206,11 @@ export default function DetectorSection() {
 
   return (
     <div>
-      {/* Section header — mirrors SLAM ALGORITHM styling (12px bold #888) */}
+      {/* Section header — mirrors SLAM ALGORITHM styling (12px bold var(--muted)) */}
       <div
         onClick={() => setShowSection(!showSection)}
         style={{
-          borderTop: '1px solid #2a2a4a',
+          borderTop: '1px solid var(--line)',
           paddingTop: '16px',
           marginTop: '16px',
           cursor: 'pointer',
@@ -219,10 +219,10 @@ export default function DetectorSection() {
           justifyContent: 'space-between',
         }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 600, color: '#888' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)' }}>
           OBJECT DETECTION
         </span>
-        <span style={{ fontSize: '10px', color: '#888' }}>
+        <span style={{ fontSize: '10px', color: 'var(--muted)' }}>
           {showSection ? '\u25BC' : '\u25B6'}
         </span>
       </div>

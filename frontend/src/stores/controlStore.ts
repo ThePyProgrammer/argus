@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
 export interface ControlStoreState {
+  connected: boolean;
+  setConnected: (connected: boolean) => void;
   isRunning: boolean;
   isPaused: boolean;
   simSpeed: number;
@@ -29,6 +31,8 @@ export interface ControlStoreState {
 }
 
 export const useControlStore = create<ControlStoreState>((set) => ({
+  connected: false,
+  setConnected: (connected) => set({ connected }),
   isRunning: true,
   isPaused: false,
   simSpeed: 1.0,

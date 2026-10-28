@@ -17,39 +17,29 @@ export default function CameraStrip() {
 
   return (
     <div
+      className="camera-strip"
       style={{
-        background: '#111122',
-        borderTop: '1px solid #2a2a4a',
-        height: collapsed ? '32px' : '272px',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--line)',
+        height: collapsed ? '28px' : '188px',
         overflow: 'hidden',
         transition: 'height 0.2s ease',
       }}
     >
-      {/* Toggle bar */}
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        style={{
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          fontSize: '12px',
-          color: '#888',
-          userSelect: 'none',
-        }}
-      >
-        {collapsed ? '\u25B2 Camera Feeds' : '\u25BC Camera Feeds'}
-      </div>
+      <button className="camera-strip-header" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed}>
+        <span>Sensor feeds <span style={{ marginLeft: 8, color: 'var(--muted)', fontWeight: 400 }}>{robotIds.length.toString().padStart(2, '0')}</span></span>
+        <span>{collapsed ? 'Expand feeds +' : 'RGB & depth / Collapse -'}</span>
+      </button>
       {/* Feed row */}
       {!collapsed && (
         <div
           style={{
             display: 'flex',
             gap: '8px',
-            padding: '0 8px 8px 8px',
+            padding: '0 6px 6px',
             overflowX: 'auto',
-            height: '240px',
+            overflowY: 'hidden',
+            height: '160px',
           }}
         >
           {robotIds.map((id) => (
@@ -62,7 +52,7 @@ export default function CameraStrip() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
-                color: '#555',
+                color: 'var(--muted)',
                 fontSize: '13px',
               }}
             >

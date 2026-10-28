@@ -40,7 +40,7 @@ export function CrashToast() {
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 600,
-    border: '1px solid #e65100',
+    border: '1px solid var(--warning)',
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
     zIndex: 50,
     display: 'flex',

@@ -30,7 +30,7 @@ export function CapabilityBadge({ label, value }: CapabilityBadgeProps) {
     fontSize: '10px',
     fontWeight: 400,
     background: 'rgba(46, 204, 113, 0.15)',
-    color: '#2ecc71',
+    color: 'var(--success)',
     border: '1px solid rgba(46, 204, 113, 0.3)',
     marginRight: '4px',
     marginBottom: '2px',

@@ -37,91 +37,17 @@ export default function Sidebar() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div
-        style={{
-          padding: '16px 12px 12px',
-          borderBottom: '1px solid #2a2a4a',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: '16px',
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-            }}
-          >
-            Argus
-          </h2>
-          <span style={{ fontSize: '12px', color: '#888' }}>
-            {formatTime(elapsed)}
-          </span>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: '16px',
-            marginTop: '8px',
-            fontSize: '12px',
-            color: '#aaa',
-            alignItems: 'center',
-          }}
-        >
-          <span>Coverage: {totalCoverage.toFixed(1)}%</span>
-          <span>Merges: {mergeCount}</span>
-          <button
-              onClick={() => setOutputHidden(!outputHidden)}
-              style={{
-                marginLeft: 'auto',
-                background: '#2a2a4a',
-                border: 'none',
-                borderRadius: '4px',
-                height: '28px',
-                padding: '0 10px',
-                fontSize: '11px',
-                fontWeight: 500,
-                color: '#aaa',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget.style.background = '#3a3a5a'); }}
-              onMouseLeave={(e) => { (e.currentTarget.style.background = '#2a2a4a'); }}
-            >
-              {outputHidden ? 'Show Output' : 'Hide Output'}
-            </button>
-        </div>
+    <aside className="sidebar-shell" aria-label="Session controls">
+      <div className="fleet-header">
+        <div className="fleet-heading"><h2>Session</h2><span className="session-clock">{formatTime(elapsed)}</span></div>
+        <div className="session-stats"><span>Coverage <strong>{totalCoverage.toFixed(1)}%</strong></span><span>Merges <strong>{mergeCount}</strong></span></div>
       </div>
-
-      {/* Robot cards */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 0' }}>
-        {robots.map((robot) => (
-          <RobotCard key={robot.id} robot={robot} />
-        ))}
-        {robots.length === 0 && (
-          <div
-            style={{
-              textAlign: 'center',
-              color: '#555',
-              padding: '24px',
-              fontSize: '13px',
-            }}
-          >
-            Waiting for robots...
-          </div>
-        )}
+      <div className="fleet-list">
+        <div className="fleet-list-heading"><span className="eyebrow">Robots / {robots.length.toString().padStart(2, '0')}</span><button className="quiet-button" onClick={() => setOutputHidden(!outputHidden)}>{outputHidden ? 'Show map output' : 'Hide map output'}</button></div>
+        {robots.map((robot) => <RobotCard key={robot.id} robot={robot} />)}
+        {robots.length === 0 && <div style={{ padding: '22px 10px', color: 'var(--muted)', fontSize: 12, lineHeight: 1.7 }}>Waiting for your robots.<br />They will appear when the session connects.</div>}
       </div>
-
-      {/* Control panel at bottom */}
       <ControlPanel />
-    </div>
+    </aside>
   );
 }

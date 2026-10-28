@@ -34,7 +34,7 @@ export function ParameterPanel() {
 
   if (!properties || Object.keys(properties).length === 0) {
     return (
-      <div style={{ fontSize: '11px', fontWeight: 400, color: '#666', marginTop: '8px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 400, color: 'var(--muted)', marginTop: '8px' }}>
         No tunable parameters
       </div>
     );
@@ -54,18 +54,18 @@ export function ParameterPanel() {
                   {'\u26A1'}
                 </span>
               ) : (
-                <span style={{ color: '#888', fontSize: '12px' }} title="Requires restart">
+                <span style={{ color: 'var(--muted)', fontSize: '12px' }} title="Requires restart">
                   {'\uD83D\uDD12'}
                 </span>
               )}
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#aaa' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)' }}>
                 {humanize(key)}
               </span>
             </div>
 
             {/* Description */}
             {prop.description && (
-              <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '4px' }}>
                 {prop.description}
               </div>
             )}
@@ -89,9 +89,9 @@ export function ParameterPanel() {
                 style={{
                   width: '100%',
                   padding: '4px 8px',
-                  background: currentValue ? '#1b5e20' : '#37474f',
-                  color: '#e0e0e0',
-                  border: '1px solid #444',
+                  background: currentValue ? 'var(--accent-wash)' : 'var(--surface-inset)',
+                  color: 'var(--ink)',
+                  border: '1px solid var(--line-strong)',
                   fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',

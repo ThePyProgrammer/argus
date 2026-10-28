@@ -42,7 +42,7 @@ export function PortHandle({ port, type, position, index }: PortHandleProps) {
           height: `${size}px`,
           borderRadius,
           transform,
-          border: '2px solid #0a0a14',
+          border: '2px solid var(--surface-inset)',
           top: 0,
           position: 'relative',
         }}
@@ -56,7 +56,7 @@ export function PortHandle({ port, type, position, index }: PortHandleProps) {
             : { right: '18px' }),
           fontSize: '11px',
           fontWeight: 600,
-          color: '#888',
+          color: 'var(--muted)',
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
         }}

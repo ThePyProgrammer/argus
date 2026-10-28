@@ -75,7 +75,7 @@ function PipelineEditorInner() {
 
   return (
     <div
-      style={{ width: '100%', height: '100%', background: '#0a0a14' }}
+      style={{ width: '100%', height: '100%', background: 'var(--surface-inset)' }}
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
@@ -99,18 +99,18 @@ function PipelineEditorInner() {
             height: 120,
             bottom: 16,
             right: 16,
-            backgroundColor: '#12122a',
+            backgroundColor: 'var(--surface-inset)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
           }}
           nodeStrokeWidth={3}
-          nodeColor="#1e1e32"
+          nodeColor="var(--surface-raised)"
           maskColor="rgba(10, 10, 20, 0.7)"
           pannable
           zoomable
         />
-        <Background variant={BackgroundVariant.Dots} color="#1a1a2e" gap={20} />
+        <Background variant={BackgroundVariant.Dots} color="var(--surface)" gap={20} />
       </ReactFlow>
     </div>
   );

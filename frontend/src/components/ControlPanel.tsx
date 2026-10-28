@@ -56,24 +56,25 @@ export default function ControlPanel() {
   };
 
   const buttonStyle: React.CSSProperties = {
-    padding: '8px 16px',
+    padding: '6px 10px',
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
     fontWeight: 600,
-    fontSize: '13px',
+    fontSize: '11px',
     flex: 1,
   };
 
   return (
     <div
+      className="controls-panel"
       style={{
-        padding: '12px',
-        background: '#1a1a3e',
-        borderTop: '1px solid #2a2a4a',
+        padding: '10px',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--line)',
       }}
     >
-      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#888' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--muted)' }}>
         CONTROLS
       </div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -81,7 +82,7 @@ export default function ControlPanel() {
           onClick={handleStartStop}
           style={{
             ...buttonStyle,
-            background: isRunning ? '#d32f2f' : '#2e7d32',
+            background: isRunning ? 'var(--danger)' : 'var(--accent)',
             color: '#fff',
           }}
         >
@@ -92,7 +93,7 @@ export default function ControlPanel() {
           disabled={!isRunning}
           style={{
             ...buttonStyle,
-            background: isPaused ? '#f57c00' : '#1565c0',
+            background: isPaused ? '#795e32' : 'var(--button-primary)',
             color: '#fff',
             opacity: isRunning ? 1 : 0.4,
           }}
@@ -102,22 +103,22 @@ export default function ControlPanel() {
       </div>
       <div>
         <label
-          style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '4px' }}
+          style={{ fontSize: '12px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}
         >
           Speed: {simSpeed.toFixed(1)}x
         </label>
         <SliderField min={0.1} max={5.0} step={0.1} value={simSpeed} onChange={handleSpeedChange} showInput={false} />
       </div>
 
-      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="scene-controls" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
           onClick={toggleScene}
           style={{
             ...buttonStyle,
             width: '100%',
-            background: showScene ? '#37474f' : '#263238',
-            color: showScene ? '#e0e0e0' : '#666',
-            border: '1px solid #444',
+            background: showScene ? 'var(--surface-inset)' : 'var(--surface-inset)',
+            color: showScene ? 'var(--ink)' : 'var(--muted)',
+            border: '1px solid var(--line-strong)',
           }}
         >
           {showScene ? 'Hide Scene Mesh' : 'Show Scene Mesh'}
@@ -128,9 +129,9 @@ export default function ControlPanel() {
             style={{
               ...buttonStyle,
               width: '100%',
-              background: sceneColored ? '#1b5e20' : '#37474f',
-              color: '#e0e0e0',
-              border: '1px solid #444',
+              background: sceneColored ? 'var(--accent-wash)' : 'var(--surface-inset)',
+              color: 'var(--ink)',
+              border: '1px solid var(--line-strong)',
             }}
           >
             {sceneColored ? 'Grey Scene' : 'Colored Scene'}
@@ -145,9 +146,9 @@ export default function ControlPanel() {
           style={{
             ...buttonStyle,
             width: '100%',
-            background: colorMode === 'true_rgb' ? '#1b5e20' : '#37474f',
-            color: '#e0e0e0',
-            border: '1px solid #444',
+            background: colorMode === 'true_rgb' ? 'var(--accent-wash)' : 'var(--surface-inset)',
+            color: 'var(--ink)',
+            border: '1px solid var(--line-strong)',
           }}
         >
           {colorMode === 'robot_tint' ? 'Switch to True RGB' : 'Switch to Robot Colors'}
@@ -161,9 +162,9 @@ export default function ControlPanel() {
             borderRadius: 3,
             cursor: 'pointer',
             width: '100%',
-            background: semanticMapVisible ? '#1b5e20' : '#37474f',
-            color: '#e0e0e0',
-            border: '1px solid #444',
+            background: semanticMapVisible ? 'var(--accent-wash)' : 'var(--surface-inset)',
+            color: 'var(--ink)',
+            border: '1px solid var(--line-strong)',
           }}
         >
           Semantic Map
@@ -171,8 +172,8 @@ export default function ControlPanel() {
       </div>
 
       {/* RENDERING section - output format toggle */}
-      <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#888' }}>
+      <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--muted)' }}>
           RENDERING
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -187,9 +188,9 @@ export default function ControlPanel() {
                 style={{
                   ...buttonStyle,
                   flex: 1,
-                  background: isActive ? '#1a3a2a' : '#263238',
-                  color: isActive ? '#2ecc71' : '#666',
-                  border: isActive ? '2px solid #2ecc71' : '1px solid #444',
+                  background: isActive ? 'var(--accent-wash)' : 'var(--surface-inset)',
+                  color: isActive ? 'var(--success)' : 'var(--muted)',
+                  border: isActive ? '2px solid var(--success)' : '1px solid var(--line-strong)',
                   fontSize: '11px',
                   padding: '6px 4px',
                 }}
@@ -206,7 +207,7 @@ export default function ControlPanel() {
       <DetectorSection />
 
       {/* Restart section */}
-      <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
+      <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
           <button
             onClick={() => {
@@ -216,7 +217,7 @@ export default function ControlPanel() {
             style={{
               ...buttonStyle,
               flex: 2,
-              background: '#b71c1c',
+              background: 'var(--danger)',
               color: '#fff',
               border: 'none',
             }}
@@ -228,9 +229,9 @@ export default function ControlPanel() {
             style={{
               ...buttonStyle,
               flex: 1,
-              background: '#37474f',
-              color: '#aaa',
-              border: '1px solid #555',
+              background: 'var(--surface-inset)',
+              color: 'var(--muted)',
+              border: '1px solid var(--muted)',
               fontSize: '11px',
             }}
           >
@@ -238,12 +239,12 @@ export default function ControlPanel() {
           </button>
         </div>
         {showRestart && (
-          <div style={{ background: '#12122a', padding: '8px', borderRadius: '4px' }}>
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '6px' }}>
+          <div style={{ background: 'var(--surface-inset)', padding: '8px', borderRadius: '4px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '6px' }}>
               Set custom spawn positions (X, Y in meters)
             </div>
             {[
-              { label: 'Robot A', pos: spawnA, setPos: setSpawnA, color: '#4285f4' },
+              { label: 'Robot A', pos: spawnA, setPos: setSpawnA, color: 'var(--accent)' },
               { label: 'Robot B', pos: spawnB, setPos: setSpawnB, color: '#ff9800' },
             ].map(({ label, pos, setPos, color }) => (
               <div key={label} style={{ marginBottom: '6px' }}>
@@ -253,7 +254,7 @@ export default function ControlPanel() {
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {(['x', 'y'] as const).map((axis) => (
                     <div key={axis} style={{ flex: 1 }}>
-                      <div style={{ fontSize: '10px', color: '#777' }}>{axis.toUpperCase()}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{axis.toUpperCase()}</div>
                       <input
                         type="number"
                         step="0.5"
@@ -261,7 +262,7 @@ export default function ControlPanel() {
                         onChange={(e) => setPos({ ...pos, [axis]: parseFloat(e.target.value) || 0 })}
                         style={{
                           width: '100%', padding: '3px 5px', fontSize: '11px',
-                          background: '#1a1a2e', color: '#e0e0e0', border: '1px solid #444',
+                          background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line-strong)',
                           borderRadius: '3px',
                         }}
                       />
@@ -287,7 +288,7 @@ export default function ControlPanel() {
               style={{
                 ...buttonStyle,
                 width: '100%',
-                background: '#e65100',
+                background: 'var(--warning)',
                 color: '#fff',
                 border: 'none',
                 fontSize: '12px',
@@ -300,11 +301,11 @@ export default function ControlPanel() {
       </div>
 
       {Object.keys(cloudConfigs).length > 0 && (
-        <div style={{ marginTop: '12px', borderTop: '1px solid #2a2a4a', paddingTop: '10px' }}>
+        <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
           <div
             onClick={() => setShowCloudConfig(!showCloudConfig)}
             style={{
-              fontSize: '12px', fontWeight: 600, color: '#888', cursor: 'pointer',
+              fontSize: '12px', fontWeight: 600, color: 'var(--muted)', cursor: 'pointer',
               userSelect: 'none', display: 'flex', justifyContent: 'space-between',
             }}
           >
@@ -321,14 +322,14 @@ export default function ControlPanel() {
                   }}
                   style={{
                     padding: '4px 8px',
-                    border: key === activeCloudConfig ? '2px solid #2ecc71' : '1px solid #444',
+                    border: key === activeCloudConfig ? '2px solid var(--success)' : '1px solid var(--line-strong)',
                     borderRadius: '3px',
                     cursor: 'pointer',
                     fontFamily: 'monospace',
                     fontSize: '11px',
                     textAlign: 'left',
-                    background: key === activeCloudConfig ? '#1a3a2a' : '#222',
-                    color: key === activeCloudConfig ? '#2ecc71' : '#aaa',
+                    background: key === activeCloudConfig ? 'var(--accent-wash)' : 'var(--surface-inset)',
+                    color: key === activeCloudConfig ? 'var(--success)' : 'var(--muted)',
                   }}
                 >
                   <strong>{key}</strong>: {label}
@@ -337,11 +338,11 @@ export default function ControlPanel() {
             </div>
           )}
 
-          <div style={{ marginTop: '10px', borderTop: '1px solid #2a2a4a', paddingTop: '8px' }}>
+          <div style={{ marginTop: '10px', borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
             <div
               onClick={() => setShowCloudOffset(!showCloudOffset)}
               style={{
-                fontSize: '11px', fontWeight: 600, color: '#777', cursor: 'pointer',
+                fontSize: '11px', fontWeight: 600, color: 'var(--muted)', cursor: 'pointer',
                 userSelect: 'none', display: 'flex', justifyContent: 'space-between',
               }}
             >
@@ -352,7 +353,7 @@ export default function ControlPanel() {
               <div style={{ marginTop: '4px' }}>
                 {(['X', 'Y', 'Z'] as const).map((axis, i) => (
                   <div key={axis} style={{ marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)' }}>
                       <span>{axis}</span>
                       <span>{cloudOffset[i].toFixed(1)}m</span>
                     </div>
@@ -371,8 +372,8 @@ export default function ControlPanel() {
                 <button
                   onClick={() => setCloudOffset([0, 0, 0])}
                   style={{
-                    padding: '3px 8px', border: '1px solid #444', borderRadius: '3px',
-                    cursor: 'pointer', fontSize: '10px', background: '#222', color: '#aaa',
+                    padding: '3px 8px', border: '1px solid var(--line-strong)', borderRadius: '3px',
+                    cursor: 'pointer', fontSize: '10px', background: 'var(--surface-inset)', color: 'var(--muted)',
                     width: '100%', marginTop: '2px',
                   }}
                 >
