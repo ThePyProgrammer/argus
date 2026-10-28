@@ -51,6 +51,8 @@ class VoronoiPartitioner:
         Returns:
             Dict mapping robot_id -> (K, 3) centroids assigned to that robot.
         """
+        if len(robot_ids) == 1:
+            return {robot_ids[0]: frontier_centroids}
         pos_a = self._robot_positions[robot_ids[0]]
         pos_b = self._robot_positions[robot_ids[1]]
         midpoint = (pos_a + pos_b) / 2.0
@@ -94,6 +96,8 @@ class VoronoiPartitioner:
 
         if not self._robot_positions:
             return base_score
+        if len(robot_ids) == 1:
+            return base_score * self._in_region_weight
 
         # Determine which region this frontier belongs to
         pos_a = self._robot_positions[robot_ids[0]]

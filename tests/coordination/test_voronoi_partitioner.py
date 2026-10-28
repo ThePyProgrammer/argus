@@ -30,6 +30,15 @@ def test_assign_frontiers_near_robot_a(partitioner):
     np.testing.assert_array_almost_equal(assignments["robot_a"][0], [3.0, 0.0, 0.0])
 
 
+def test_single_robot_owns_all_frontiers():
+    partitioner = VoronoiPartitioner()
+    partitioner.update_positions({"robot_a": np.array([0., 0., .3])})
+    frontiers = np.array([[3., 0., 0.], [-4., 2., 0.]])
+    np.testing.assert_array_equal(partitioner.assign_frontiers(frontiers, ("robot_a",))["robot_a"], frontiers)
+    assert not partitioner.should_repartition("robot_a", frontiers, ("robot_a",))
+    assert partitioner.score_frontier_with_bias(frontiers[0], "robot_a", np.eye(4), ("robot_a",)) > 0
+
+
 def test_assign_frontiers_near_robot_b(partitioner):
     """Frontier at (7,0,0) should be assigned to robot_b (closer to B side)."""
     centroids = np.array([[7.0, 0.0, 0.0]])
