@@ -469,6 +469,10 @@ or backup. The flat scene intentionally contains only a checkerboard floor.
 ### Optional Dependencies
 
 ```bash
+# Default YOLO detector (CPU inference; enabled on initial web startup)
+uv sync --extra web --extra detection --extra dev
+uv run --extra web --extra detection argus --scene office --static
+
 # YOLO object detection (2D + 3D bounding boxes)
 pip install ultralytics
 

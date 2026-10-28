@@ -91,7 +91,7 @@ class YOLOv11Backend(TorchBackendMixin):
         "properties": {
             "confidence": {
                 "type": "number",
-                "default": 0.5,
+                "default": 0.25,
                 "minimum": 0.0,
                 "maximum": 1.0,
                 "description": "Score threshold below which detections are dropped",
@@ -118,7 +118,7 @@ class YOLOv11Backend(TorchBackendMixin):
     def __init__(
         self,
         model_name: str = "yolo11n.pt",
-        confidence: float = 0.5,
+        confidence: float = 0.25,
         device: str = "cpu",
         min_bbox_size_px: int = 20,
         class_filter: list[int] | None = None,

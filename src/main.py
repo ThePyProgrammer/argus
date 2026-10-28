@@ -739,7 +739,7 @@ def run_web_mode(args: argparse.Namespace) -> None:
     def _run_simulation_loop():
         nonlocal bridge, robots, coordinator, streaming_viz
 
-        _initialize_detector_pool(active_lifter_name=app.state.active_lifter)
+        _initialize_detector_pool(active_lifter_name=getattr(app.state, "active_lifter", None))
         while True:
             try:
                 result = coordinator.run(max_steps=max_steps)
@@ -939,8 +939,9 @@ def run_web_mode(args: argparse.Namespace) -> None:
     finally:
         coordinator.request_stop()
         sim_thread.join(timeout=5.0)
-        if coordinator.detector is not None:
-            coordinator.detector.shutdown()
+        detector_pool = getattr(coordinator, "_detector_pool", None)
+        if detector_pool is not None:
+            detector_pool.shutdown()
         try:
             bridge.stop()
         except RuntimeError:

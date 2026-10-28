@@ -72,11 +72,19 @@ def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
     robot_ids = ["robot_a", "robot_b"]
     platform_metadata = _FakePlatformMetadata()
     platform_wire = platform_metadata.to_wire()
+    from src.perception import worker_pool
+    pool = MagicMock()
+    pool_factory = MagicMock(return_value=pool)
+    monkeypatch.setattr(worker_pool, "DetectorWorkerPool", pool_factory)
+    monkeypatch.setattr(
+        main_module.threading, "Thread",
+        lambda target, daemon: SimpleNamespace(start=target, join=lambda **kwargs: None),
+    )
 
     def fake_create_app(robot_ids_arg, **kwargs):
         captured["robot_ids"] = robot_ids_arg
         captured["platform_metadata"] = kwargs.get("platform_metadata")
-        return SimpleNamespace(state=SimpleNamespace()), SimpleNamespace()
+        return SimpleNamespace(state=SimpleNamespace()), MagicMock()
 
     def fake_generate_spawn_positions(ids, scene, *, spawn_height):
         captured["spawn_height"] = spawn_height
@@ -133,6 +141,13 @@ def test_web_mode_passes_bridge_platform_metadata_to_create_app(monkeypatch):
     assert captured["robot_ids"] == robot_ids
     assert captured["spawn_height"] == platform_metadata.spawn_height
     assert captured["platform_metadata"] == {rid: platform_wire for rid in robot_ids}
+    pool_factory.assert_called_once()
+    pool.warmup_all.assert_called_once()
+    warmup_frames = pool.warmup_all.call_args.args[0]
+    assert set(warmup_frames) == set(robot_ids)
+    assert warmup_frames["robot_a"].rgb.shape == (480, 640, 3)
+    pool.start.assert_called_once()
+    pool.shutdown.assert_called_once()
 
 
 def test_web_mode_registers_builtin_slam_backends_before_robot_creation(monkeypatch):
