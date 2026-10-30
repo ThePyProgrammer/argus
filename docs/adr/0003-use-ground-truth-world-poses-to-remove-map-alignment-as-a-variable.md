@@ -51,6 +51,6 @@ Ground-truth poses turn map fusion into a systems integration problem rather tha
 
 ## References
 
-- `README.md` — When Robots Are Cheap, Coordination Is Everything
-- `README.md` — On Ground Truth as a Research Accelerant
+- [Research methodology: coordination as the research question](../notes/research-method.md#coordination-as-the-research-question)
+- [Research methodology: ground truth as a controlled variable](../notes/research-method.md#ground-truth-as-a-controlled-variable)
 - `.planning/PROJECT.md` — Core value and constraints

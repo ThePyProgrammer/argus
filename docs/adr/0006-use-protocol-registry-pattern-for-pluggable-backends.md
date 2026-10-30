@@ -54,4 +54,4 @@ Protocol/Registry keeps backend definition, metadata, and availability close to 
 - `.planning/PROJECT.md` — Generic SLAM API and v3.0 detector API decisions
 - `.planning/research/ARCHITECTURE.md` — DetectorProtocol and Detection3DProtocol design
 - `.planning/research/FEATURES.md` — v2.0 pattern to mirror
-- `README.md` — On Pluggability as a Research Methodology
+- [Research methodology: pluggability as an experimental method](../notes/research-method.md#pluggability-as-an-experimental-method)

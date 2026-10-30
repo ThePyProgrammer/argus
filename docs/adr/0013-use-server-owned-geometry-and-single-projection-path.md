@@ -54,4 +54,4 @@ The backend has the authoritative sensor frame, camera intrinsics, depth, and po
 - `.planning/REQUIREMENTS.md` — DET-3D-05 and DET-3D-06
 - `.planning/PROJECT.md` — Single geometry path and OBB wire decisions
 - `.planning/research/PITFALLS.md` — RGB-D convention drift and FOV hardcode pitfalls
-- `README.md` — The Perception Problem
+- [Systems design rationale: make coordinate frames explicit](../notes/systems-design.md#make-coordinate-frames-explicit)

@@ -53,4 +53,4 @@ MuJoCo gives Argus the data it needs: RGB, depth, world-frame body/camera poses,
 
 - `.planning/PROJECT.md` — Key Decisions: MuJoCo over SimWorld
 - `.planning/REQUIREMENTS.md` — Out of Scope: physical deployment, GPU-dependent detectors
-- `README.md` — Philosophical Foundations: ground truth as research accelerant
+- [Research methodology: ground truth as a controlled variable](../notes/research-method.md#ground-truth-as-a-controlled-variable)
