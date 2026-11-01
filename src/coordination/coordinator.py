@@ -95,6 +95,15 @@ class CoordinationResult:
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class CoordinationStep:
+    frames: dict[str, SensorFrame]
+    commands: dict[str, RobotCommand]
+    metrics: dict[str, Any]
+    decision_sim_time: float
+    termination_reason: str | None = None
+
+
 class Coordinator:
     """Orchestrates multi-robot exploration lifecycle.
 
@@ -140,6 +149,11 @@ class Coordinator:
         self._viz = viz
         self._partitioned = False
         self._step_count = 0
+        self._active = False
+        self._closed = False
+        self._frames: dict[str, SensorFrame] = {}
+        self.cleanup_errors: list[str] = []
+        self._disabled_robots: set[str] = set()
         self._merge_count = 0
         self._body_trajectories: dict[str, list[np.ndarray]] = {}
 
@@ -340,6 +354,11 @@ class Coordinator:
                 logger.warning("detector_pool.shutdown failed: %s", exc)
             self._detector_pool = None
 
+        self.close()
+        self._active, self._closed = False, False
+        self._frames = {}
+        self.cleanup_errors = []
+        self._disabled_robots.clear()
         self._bridge = bridge
         self._robots = robots
         if self._viz is not None and hasattr(self._viz, 'detach_gt_extractor'):
@@ -500,150 +519,211 @@ class Coordinator:
     def _teardown_subscriptions(self) -> None:
         """Stop all pLCM subscriber transports."""
         for transport in self._subscribers:
-            transport.stop()
+            try:
+                transport.stop()
+            except Exception as exc:
+                self.cleanup_errors.append(str(exc))
         self._subscribers.clear()
+        self._latest_map_data.clear()
+
+    def start(self) -> dict[str, SensorFrame]:
+        """Settle the bridge and open transports before autonomous decisions."""
+        if self._active or self._closed:
+            raise RuntimeError("Coordinator must be fresh or reset before start")
+        try:
+            self._setup_subscriptions()
+            for robot in self._robots.values():
+                robot.publisher.start()
+            self._frames = self._bridge.start()
+            on_ready = getattr(self, "on_simulation_ready", None)
+            if on_ready is not None:
+                on_ready()
+            self._attach_gt_extractor_if_possible()
+            self._active = True
+            return self._frames
+        except BaseException:
+            self.close()
+            raise
+
+    def advance(self, *, stop_on_termination: bool = False) -> CoordinationStep:
+        """One shared decision/physics tick for interactive and batch execution."""
+        if not self._active:
+            raise RuntimeError("Coordinator is not active")
+        robot_ids = tuple(self._robots)
+        frames = self._frames
+        decision_time = float(next(iter(frames.values())).sim_time)
+        step = self._step_count + 1
+        commands, step_metrics = {}, {}
+        # Per-robot: run one exploration step
+        any_rescan_triggered = False
+
+        for rid in robot_ids:
+            robot = self._robots[rid]
+            frame = frames[rid]
+
+            if hasattr(self._bridge, "get_runtime_status"):
+                runtime_status = self._bridge.get_runtime_status(rid)
+                if rid in self._disabled_robots or getattr(runtime_status, "disabled", False) is True:
+                    if hasattr(self._bridge, "stop_robot"):
+                        self._bridge.stop_robot(rid)
+                    commands[rid] = RobotCommand.stop()
+                    continue
+
+            try:
+                # Build score function if partitioned
+                score_fn = None
+                if self._partitioned:
+                    _poses = robot.slam.get_poses()
+                    _current_pose = _poses[-1] if _poses else np.eye(4)
+                    score_fn = lambda centroid, _rid=rid, _cp=_current_pose: (
+                            self._partitioner.score_frontier_with_bias(
+                                centroid,
+                                _rid,
+                                _cp,
+                                robot_ids,
+                            )
+                        )
+
+                linear, angular, metrics = robot.exploration.step_once(
+                    frame, step, score_fn=score_fn,
+                )
+                if stop_on_termination:
+                    diagnostics = robot.exploration.measurement_state
+                    if diagnostics["tracking_status"] == "lost" or robot.exploration.slam_backend_type is not type(robot.slam):
+                        metrics.error = "SLAM tracking lost or backend changed"
+                        metrics.terminated = True
+            except (IndexError, ValueError) as e:
+                logger.warning("[Step %d] %s exploration error: %s", step, rid, e)
+                linear, angular = np.zeros(2), 0.0
+                from src.exploration.exploration_loop import StepMetrics
+                metrics = StepMetrics(
+                    frontiers=0, coverage=0.0, terminated=True,
+                    voxels=0, rescan_triggered=False,
+                    error=str(e),
+                )
+
+            if stop_on_termination and metrics.terminated:
+                linear, angular = np.zeros(2), 0.0
+            if self._freeze_motion:
+                self._bridge.set_velocity(rid, np.zeros(2), 0.0)
+            else:
+                self._bridge.set_velocity(rid, linear, angular)
+
+            commands[rid] = RobotCommand.velocity(np.zeros(2) if self._freeze_motion else linear,
+                                                   0.0 if self._freeze_motion else angular)
+            step_metrics[rid] = metrics
+
+            # When rescan triggered: robot publishes map via pLCM
+            if metrics.rescan_triggered:
+                any_rescan_triggered = True
+                robot.publish_map_state(
+                    coverage_pct=metrics.coverage,
+                )
+
+        reason = None
+        if stop_on_termination:
+            if any(m.error for m in step_metrics.values()):
+                reason = "algorithm_error"
+            elif not step_metrics:
+                reason = "all_robots_failed"
+            elif all(m.terminated for m in step_metrics.values()):
+                reason = "no_frontiers" if all(m.frontiers == 0 for m in step_metrics.values()) else "all_unreachable"
+            if reason is not None:
+                for rid in robot_ids:
+                    self._bridge.stop_robot(rid)
+                    commands[rid] = RobotCommand.stop()
+                return CoordinationStep(frames, commands, step_metrics, decision_time, reason)
+
+        # Slow down for visualization
+        if self._config.step_delay > 0:
+            import time
+            time.sleep(self._config.step_delay)
+
+        # Step simulation (advances both robots)
+        frames = self._bridge.step()
+
+        # After boot phase: compute first Voronoi partition
+        if not self._partitioned and step >= self._config.boot_phase_steps:
+            self._compute_partition(robot_ids)
+
+        # Check re-partition (direct call -- allowed per CONTEXT.md)
+        if self._partitioned:
+            self._check_repartition(robot_ids)
+
+        # Merge maps -- triggered by rescan event (per user decision:
+        # "Merge triggers on the same event as frontier rescan")
+        # NOT step % 50 or any fixed interval
+        if any_rescan_triggered:
+            self._merge_occupancy_maps(robot_ids)
+
+        # Visualization update (every 10 frames)
+        if step % 10 == 0 and self._viz is not None:
+            if self._merge_count == 0:
+                try:
+                    self._merge_occupancy_maps(robot_ids)
+                except Exception as e:
+                    logger.debug("Viz merge skipped: %s", e)
+            self._send_viz_update(robot_ids, frames)
+
+        self._frames = frames
+        self._step_count = step
+        return CoordinationStep(frames, commands, step_metrics, decision_time)
+
+    def deactivate_robot(self, robot_id: str) -> None:
+        """Absorb a runtime failure for the remainder of a batch episode."""
+        if robot_id not in self._robots:
+            raise KeyError(robot_id)
+        self._disabled_robots.add(robot_id)
+        self._bridge.stop_robot(robot_id)
+
+    def close(self) -> None:
+        """Release all owned resources, including after partial startup failure."""
+        if self._closed:
+            return
+        self._closed, self._active = True, False
+        operations = [self._teardown_subscriptions]
+        operations.extend(robot.publisher.stop for robot in self._robots.values())
+        if self._detector_pool is not None:
+            operations.append(self._detector_pool.shutdown)
+            self._detector_pool = None
+        for robot in self._robots.values():
+            for name in ("close", "shutdown"):
+                method = getattr(type(robot.slam), name, None)
+                if callable(method):
+                    operations.append(getattr(robot.slam, name))
+                    break
+        operations.append(self._bridge.stop)
+        self._frames = {}
+        for operation in operations:
+            try:
+                operation()
+            except Exception as exc:
+                self.cleanup_errors.append(str(exc))
+                logger.exception("Coordinator resource cleanup failed")
 
     def run(self, max_steps: int = 0) -> CoordinationResult:
-        """Run the multi-robot coordination loop.
-
-        Args:
-            max_steps: Maximum steps. 0 = run forever (until Ctrl+C or stop command).
-        """
-        # Start pLCM subscriptions for robot data
-        self._setup_subscriptions()
-        # Start robot pLCM publishers
-        for rid, robot in self._robots.items():
-            robot.publisher.start()
-
-        frames = self._bridge.start()
-        on_ready = getattr(self, 'on_simulation_ready', None)
-        if on_ready is not None:
-            on_ready()
-        # Phase 6 BLOCKER 2: bridge is now started → mj_model / mj_data are
-        # populated. Retry the GT-extractor attach (no-op if already attached
-        # or if the scene YAML is absent).
-        self._attach_gt_extractor_if_possible()
-        robot_ids = tuple(self._robots.keys())
-        terminated_reason = "stopped"
-
-        step = 0
-        while max_steps == 0 or step < max_steps:
-            self._step_count = step
-            step += 1
-
-            # Check web control flags
-            if self._should_stop:
-                terminated_reason = "user_stopped"
-                break
-            while self._paused:
-                import time
-                time.sleep(0.1)
+        """Interactive loop using the same lifecycle as evaluation episodes."""
+        import time
+        reason = "stopped"
+        try:
+            self.start()
+            while max_steps == 0 or self._step_count < max_steps:
                 if self._should_stop:
+                    reason = "user_stopped"
                     break
-
-            # Per-robot: run one exploration step
-            any_rescan_triggered = False
-
-            for rid in robot_ids:
-                robot = self._robots[rid]
-                frame = frames[rid]
-
-                if hasattr(self._bridge, "get_runtime_status"):
-                    runtime_status = self._bridge.get_runtime_status(rid)
-                    if getattr(runtime_status, "disabled", False) is True:
-                        if hasattr(self._bridge, "stop_robot"):
-                            self._bridge.stop_robot(rid)
-                        continue
-
-                try:
-                    # Build score function if partitioned
-                    score_fn = None
-                    if self._partitioned:
-                        _poses = robot.slam.get_poses()
-                        _current_pose = _poses[-1] if _poses else np.eye(4)
-                        score_fn = lambda centroid, _rid=rid, _cp=_current_pose: (
-                                self._partitioner.score_frontier_with_bias(
-                                    centroid,
-                                    _rid,
-                                    _cp,
-                                    robot_ids,
-                                )
-                            )
-
-                    linear, angular, metrics = robot.exploration.step_once(
-                        frame, step, score_fn=score_fn,
-                    )
-                except (IndexError, ValueError) as e:
-                    logger.warning("[Step %d] %s exploration error: %s", step, rid, e)
-                    linear, angular = np.zeros(2), 0.0
-                    from src.exploration.exploration_loop import StepMetrics
-                    metrics = StepMetrics(
-                        frontiers=0, coverage=0.0, terminated=True,
-                        voxels=0, rescan_triggered=False,
-                        error=str(e),
-                    )
-
-                if self._freeze_motion:
-                    self._bridge.set_velocity(rid, np.zeros(2), 0.0)
-                else:
-                    self._bridge.set_velocity(rid, linear, angular)
-
-                # When rescan triggered: robot publishes map via pLCM
-                if metrics.rescan_triggered:
-                    any_rescan_triggered = True
-                    robot.publish_map_state(
-                        coverage_pct=metrics.coverage,
-                    )
-
-            # Slow down for visualization
-            if self._config.step_delay > 0:
-                import time
-                time.sleep(self._config.step_delay)
-
-            # Step simulation (advances both robots)
-            frames = self._bridge.step()
-
-            # After boot phase: compute first Voronoi partition
-            if not self._partitioned and step >= self._config.boot_phase_steps:
-                self._compute_partition(robot_ids)
-
-            # Check re-partition (direct call -- allowed per CONTEXT.md)
-            if self._partitioned:
-                self._check_repartition(robot_ids)
-
-            # Merge maps -- triggered by rescan event (per user decision:
-            # "Merge triggers on the same event as frontier rescan")
-            # NOT step % 50 or any fixed interval
-            if any_rescan_triggered:
-                self._merge_occupancy_maps(robot_ids)
-
-            # Visualization update (every 10 frames)
-            if step % 10 == 0 and self._viz is not None:
-                if self._merge_count == 0:
-                    try:
-                        self._merge_occupancy_maps(robot_ids)
-                    except Exception as e:
-                        logger.debug("Viz merge skipped: %s", e)
-                self._send_viz_update(robot_ids, frames)
-
-        # Final merge
-        self._merge_occupancy_maps(robot_ids)
-
-        # Cleanup
-        self._teardown_subscriptions()
-        for rid, robot in self._robots.items():
-            robot.publisher.stop()
-        self._bridge.stop()
-
-        return CoordinationResult(
-            total_steps=self._step_count + 1,
-            merge_count=self._merge_count,
-            terminated_reason=terminated_reason,
-            merged_voxel_count=len(self._merger.last_merged_voxels),
-            per_robot_voxels={
-                rid: self._robots[rid].octomap.num_occupied for rid in robot_ids
-            },
-        )
+                if self._paused:
+                    time.sleep(.1)
+                    continue
+                self.advance()
+            self._merge_occupancy_maps(tuple(self._robots))
+            return CoordinationResult(
+                total_steps=self._step_count, merge_count=self._merge_count,
+                terminated_reason=reason,
+                merged_voxel_count=len(self._merger.last_merged_voxels),
+                per_robot_voxels={rid: robot.octomap.num_occupied for rid, robot in self._robots.items()},
+            )
+        finally:
+            self.close()
 
     def _compute_partition(self, robot_ids: tuple[str, ...]) -> None:
         """Compute Voronoi partition from current robot positions (direct call)."""
