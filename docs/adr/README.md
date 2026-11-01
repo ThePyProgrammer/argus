@@ -78,3 +78,4 @@ Examples:
 | [0017](0017-treat-x2-locomotion-as-external-walking-policy-boundary.md) | Treat X2 Locomotion as External Walking Policy Boundary | Proposed | API Design |
 | [0018](0018-use-reproducible-gymnasium-style-locomotion-benchmark-harness.md) | Use Reproducible Gymnasium-Style Locomotion Benchmark Harness | Proposed | Architecture Pattern |
 | [0019](0019-benchmark-locomotion-before-adding-new-controller-families.md) | Benchmark Locomotion Before Adding New Controller Families | Proposed | Process / Workflow |
+| [0020](0020-evaluate-exploration-against-fixed-reference-area.md) | Evaluate Exploration Against a Fixed Reference Area | Proposed | Testing Strategy |

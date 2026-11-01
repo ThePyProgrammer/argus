@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "scenario_id": "cluttered_room",
+  "description": "Six static columns create occlusions and multiple routes through one shared room.",
+  "source": "Original geometry authored for the Argus exploration benchmark; no imported assets.",
+  "license": "NOASSERTION",
+  "bounds": [
+    -6,
+    -4,
+    6,
+    4
+  ],
+  "wall_height_m": 2.0,
+  "wall_thickness_m": 0.2,
+  "obstacles": [
+    {
+      "name": "obstacle_column_0",
+      "bounds": [
+        -3.5,
+        -2.5,
+        -2.5,
+        -1.5
+      ]
+    },
+    {
+      "name": "obstacle_column_1",
+      "bounds": [
+        -0.5,
+        -2.5,
+        0.5,
+        -1.5
+      ]
+    },
+    {
+      "name": "obstacle_column_2",
+      "bounds": [
+        2.5,
+        -2.5,
+        3.5,
+        -1.5
+      ]
+    },
+    {
+      "name": "obstacle_column_3",
+      "bounds": [
+        -3.5,
+        1.5,
+        -2.5,
+        2.5
+      ]
+    },
+    {
+      "name": "obstacle_column_4",
+      "bounds": [
+        -0.5,
+        1.5,
+        0.5,
+        2.5
+      ]
+    },
+    {
+      "name": "obstacle_column_5",
+      "bounds": [
+        2.5,
+        1.5,
+        3.5,
+        2.5
+      ]
+    }
+  ],
+  "component_anchor": [
+    0,
+    0
+  ],
+  "spawn_pool": [
+    [
+      -4.8,
+      -2.8
+    ],
+    [
+      4.8,
+      2.8
+    ],
+    [
+      -4.8,
+      2.8
+    ],
+    [
+      4.8,
+      -2.8
+    ],
+    [
+      -1.5,
+      -2
+    ],
+    [
+      1.5,
+      2
+    ],
+    [
+      -3,
+      0
+    ],
+    [
+      3,
+      0
+    ]
+  ],
+  "headings_deg": [
+    0,
+    90,
+    180,
+    270
+  ]
+}

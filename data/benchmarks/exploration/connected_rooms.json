@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "scenario_id": "connected_rooms",
+  "description": "Four rooms with 1.6 m doorways; Euclidean distance and navigable path cost can differ.",
+  "source": "Original geometry authored for the Argus exploration benchmark; no imported assets.",
+  "license": "NOASSERTION",
+  "bounds": [
+    -6,
+    -4,
+    6,
+    4
+  ],
+  "wall_height_m": 2.0,
+  "wall_thickness_m": 0.2,
+  "obstacles": [
+    {
+      "name": "obstacle_vertical_south",
+      "bounds": [
+        -0.1,
+        -4,
+        0.1,
+        -2.8
+      ]
+    },
+    {
+      "name": "obstacle_vertical_middle",
+      "bounds": [
+        -0.1,
+        -1.2,
+        0.1,
+        1.2
+      ]
+    },
+    {
+      "name": "obstacle_vertical_north",
+      "bounds": [
+        -0.1,
+        2.8,
+        0.1,
+        4
+      ]
+    },
+    {
+      "name": "obstacle_horizontal_west",
+      "bounds": [
+        -6,
+        -0.1,
+        -3.8,
+        0.1
+      ]
+    },
+    {
+      "name": "obstacle_horizontal_middle",
+      "bounds": [
+        -2.2,
+        -0.1,
+        2.2,
+        0.1
+      ]
+    },
+    {
+      "name": "obstacle_horizontal_east",
+      "bounds": [
+        3.8,
+        -0.1,
+        6,
+        0.1
+      ]
+    }
+  ],
+  "component_anchor": [
+    -3,
+    -2
+  ],
+  "spawn_pool": [
+    [
+      -4.5,
+      -2
+    ],
+    [
+      4.5,
+      2
+    ],
+    [
+      -4.5,
+      2
+    ],
+    [
+      4.5,
+      -2
+    ],
+    [
+      -1.5,
+      -2
+    ],
+    [
+      1.5,
+      2
+    ],
+    [
+      -1.5,
+      2
+    ],
+    [
+      1.5,
+      -2
+    ]
+  ],
+  "headings_deg": [
+    0,
+    90,
+    180,
+    270
+  ]
+}

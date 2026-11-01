@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "scenario_id": "branching_corridor",
+  "description": "Four corridor arms meeting at one junction; opposing goals create allocation choices.",
+  "source": "Original geometry authored for the Argus exploration benchmark; no imported assets.",
+  "license": "NOASSERTION",
+  "bounds": [
+    -6,
+    -4,
+    6,
+    4
+  ],
+  "wall_height_m": 2.0,
+  "wall_thickness_m": 0.2,
+  "obstacles": [
+    {
+      "name": "obstacle_southwest",
+      "bounds": [
+        -6,
+        -4,
+        -1.2,
+        -1.2
+      ]
+    },
+    {
+      "name": "obstacle_southeast",
+      "bounds": [
+        1.2,
+        -4,
+        6,
+        -1.2
+      ]
+    },
+    {
+      "name": "obstacle_northwest",
+      "bounds": [
+        -6,
+        1.2,
+        -1.2,
+        4
+      ]
+    },
+    {
+      "name": "obstacle_northeast",
+      "bounds": [
+        1.2,
+        1.2,
+        6,
+        4
+      ]
+    }
+  ],
+  "component_anchor": [
+    0,
+    0
+  ],
+  "spawn_pool": [
+    [
+      -4.5,
+      0
+    ],
+    [
+      4.5,
+      0
+    ],
+    [
+      0,
+      -2.5
+    ],
+    [
+      0,
+      2.5
+    ],
+    [
+      -2,
+      0
+    ],
+    [
+      2,
+      0
+    ],
+    [
+      0,
+      -1.5
+    ],
+    [
+      0,
+      1.5
+    ]
+  ],
+  "headings_deg": [
+    0,
+    90,
+    180,
+    270
+  ]
+}

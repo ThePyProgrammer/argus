@@ -1,8 +1,14 @@
 # Multi-robot exploration evaluation: execution plan
 
-Status: proposed implementation plan. Created November 1, 2026.
+Status: implementation started. Created November 1, 2026.
 
 The CLI commands, module names, method IDs, and artifacts below are proposed contracts unless explicitly described as existing. This document does not claim that the evaluator or any experimental results already exist.
+
+### Implementation progress
+
+Phase A (PR 1) is implemented: [fixture contracts](../../src/exploration/evaluation/scenarios.py), [three static layouts](../../data/benchmarks/exploration/README.md), deterministic spawn samples, analytical reference masks, and [ADR-0020](../adr/0020-evaluate-exploration-against-fixed-reference-area.md). The 262 exploration tests pass, including area calculations at two resolutions, compiled-geometry agreement, spawn validation, and initial Go2 camera ray checks.
+
+Next: PR 2, the reference extractor for compiled geometry. The current analytical masks deliberately support only these axis-aligned fixtures. Camera depth coverage, episode execution, and `eval-exploration` are not implemented yet.
 
 ## 1. Result to produce
 
@@ -142,11 +148,11 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 ### PR 1: Define study and benchmark scenes
 
-- [ ] Add an ADR defining evaluation-only geometry, the observed-floor metric, fixed horizon, and supported assumptions. Choose the next available ADR number at implementation time.
-- [ ] Add the three bounded static MJCF fixtures, source/license metadata, analytic floor masks, and clear spawn pools with heading samples.
-- [ ] Add a typed scenario contract in proposed `src/exploration/evaluation/scenarios.py`.
-- [ ] Validate door clearance, connected components, non-overlapping spawns, and camera visibility. Freeze loose geometry or exclude it explicitly.
-- [ ] Record proposed defaults: two Go2 robots, 320x240 sensors, 0.10 m evaluation grid, existing ICP backend, `icp_union`, no optional inference, and zero visualization delay. Resolve planner/voxel resolution from explicit config rather than conflicting defaults.
+- [x] Add an ADR defining evaluation-only geometry, the observed-floor metric, fixed horizon, and supported assumptions. Recorded in ADR-0020.
+- [x] Add the three bounded static MJCF fixtures, source/license metadata, analytic floor masks, and clear spawn pools with heading samples.
+- [x] Add a typed scenario contract in `src/exploration/evaluation/scenarios.py`.
+- [x] Validate door clearance, connected components, non-overlapping spawns, and initial camera visibility with compiled-geometry ray checks. All geometry is static; rendered depth validation belongs to PR 3.
+- [x] Record proposed defaults: two Go2 robots, 320x240 sensors, 0.10 m evaluation and map grids, existing ICP backend, `icp_union`, no optional inference, and zero visualization delay. `StudyDefaults` makes these explicit; applying them to the runtime belongs to PR 4.
 
 **Gate:** Independently hand-check free area and obstacle boundaries on small analytical fixtures. Invalid spawns or empty denominators fail before constructing the runtime.
 
