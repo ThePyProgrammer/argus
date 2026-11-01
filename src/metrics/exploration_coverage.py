@@ -191,6 +191,8 @@ class CoverageCollector:
         if self._reason is not None:
             raise ValueError("Episode measurements have ended")
         elapsed = _number(sim_time, "sim_time") - self.start_sim_time
+        if math.isclose(elapsed, self.config.horizon_s, rel_tol=0, abs_tol=1e-9):
+            elapsed = self.config.horizon_s
         if elapsed < self._elapsed or elapsed > self.config.horizon_s:
             raise ValueError("Time must be monotonic and within the episode horizon")
         return elapsed

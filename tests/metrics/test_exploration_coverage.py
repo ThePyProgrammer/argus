@@ -233,6 +233,14 @@ def test_horizon_observations_contribute_zero_auc(reference):
     assert result["time_to_threshold_s"] == 10
 
 
+def test_horizon_tolerates_floating_point_tick_roundoff(reference):
+    metrics = CoverageCollector(reference, ("a",), start_sim_time=0,
+                                config=CoverageConfig(horizon_s=.35))
+    timestamp = 35 * .01
+    metrics.observe_batch(timestamp, {"a": observation(timestamp)})
+    assert metrics.finalize("horizon")["elapsed_s"] == .35
+
+
 def test_one_failed_robot_freezes_while_survivor_continues(reference):
     metrics = collector(reference)
     metrics.observe_batch(11, {"a": observation(11, x=-2)})
