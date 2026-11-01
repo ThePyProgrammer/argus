@@ -10,7 +10,7 @@ uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --s
 
 The script prints a JSON result and closes all simulation resources. It opens no viewer and loads no optional detectors. Horizons must be positive multiples of the sensor interval, currently 0.01 simulated seconds. For repeatability checks on PowerShell, set `$env:OMP_NUM_THREADS = '1'` before launching Python. The validated environment uses MuJoCo 3.6 and one OpenMP thread; cross-platform bitwise equivalence is not claimed.
 
-The development smoke case above currently ends with `all_unreachable` at 0.29 simulated seconds. Both robots fail their first frontier planning attempt. This is a retained algorithm failure, not a successful exploration result. Diagnose frontier targets and planning-grid reachability before running a performance campaign. This case terminates before the initial Voronoi partition, so it cannot compare allocation methods.
+The development smoke case above currently ends with `all_unreachable` at 0.29 simulated seconds. The [diagnosis](notes/exploration-first-scan-failure.md) confirms occupied cluster centroids despite reachable frontier cells, plus floor voxels retained by the occupancy projection. This is a retained algorithm failure, not a successful exploration result. Correct target selection and floor separation before running a performance campaign. This case terminates before the initial Voronoi partition, so it cannot compare allocation methods.
 
 ## Lifecycle
 

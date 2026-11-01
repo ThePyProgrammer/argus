@@ -22,6 +22,8 @@ Validation for PR 4: 695 tests pass across the runtime, metrics, SLAM, dashboard
 
 Development finding: `branching_corridor`, seed 101, currently terminates with `all_unreachable` at 0.29 simulated seconds, on the first frontier scan. The failure is retained and scored through the requested horizon. Successful navigation and long-horizon repeatability are not established. Diagnose this shared baseline issue before comparing allocation methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
 
+The [first-scan diagnosis](../notes/exploration-first-scan-failure.md) now confirms that both selected cluster centroids are occupied, although all 94 and 312 cells in those clusters are reachable under the current planner's rules. Paths to actual frontier cells succeed on the unchanged grids. The floor-removal threshold also stays inactive, retaining near-floor and below-floor voxels. Next: correct target selection and validate floor separation across the shared baselines.
+
 ## 1. Result to produce
 
 Build a reproducible study answering:
