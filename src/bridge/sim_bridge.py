@@ -15,6 +15,7 @@ import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
 from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix, IMUReading
+from src.bridge.depth import clean_metric_depth
 from src.locomotion.controller_dispatch import (
     apply_controller_target,
     command_from_velocity,
@@ -245,19 +246,8 @@ class MuJoCoBridge:
         depth_raw = self._renderer.render().copy()  # (H, W) float32
         self._renderer.disable_depth_rendering()
 
-        # MuJoCo depth: convert based on value range
-        extent = self._model.stat.extent
-        znear = self._model.vis.map.znear * extent
-        zfar = self._model.vis.map.zfar * extent
-
-        if depth_raw.max() <= 1.0 + 1e-6:
-            depth = znear * zfar / (zfar - depth_raw * (zfar - znear))
-            depth[depth_raw >= 0.999] = 0.0
-        else:
-            depth = depth_raw.copy()
-            depth[depth_raw >= zfar * 0.99] = 0.0
-
-        depth = np.clip(depth, 0, 20.0).astype(np.float32)
+        zfar = self._model.vis.map.zfar * self._model.stat.extent
+        depth = clean_metric_depth(depth_raw, zfar)
 
         # Ground-truth pose from camera transform (not body qpos).
         # Depth is rendered from the camera, so the pose must match the

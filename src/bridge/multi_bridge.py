@@ -17,6 +17,7 @@ from src.bridge.platforms import create_platform
 from src.bridge.platforms.types import RobotCommand, RobotRuntimeStatus, RobotState
 from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_office_scene
 from src.bridge.sensor_types import SensorFrame, quat_to_rotation_matrix
+from src.bridge.depth import clean_metric_depth
 
 logger = logging.getLogger(__name__)
 
@@ -499,21 +500,8 @@ class MultiRobotBridge:
         depth_raw = renderer.render().copy()
         renderer.disable_depth_rendering()
 
-        # MuJoCo depth: convert based on value range
-        extent = self._model.stat.extent
-        znear = self._model.vis.map.znear * extent
-        zfar = self._model.vis.map.zfar * extent
-
-        if depth_raw.max() <= 1.0 + 1e-6:
-            # Normalized [0,1] buffer: convert to metric
-            depth = znear * zfar / (zfar - depth_raw * (zfar - znear))
-            depth[depth_raw >= 0.999] = 0.0
-        else:
-            # Raw values already in distance units: clip far pixels to 0
-            depth = depth_raw.copy()
-            depth[depth_raw >= zfar * 0.99] = 0.0
-
-        depth = np.clip(depth, 0, 20.0).astype(np.float32)  # cap at 20m
+        zfar = self._model.vis.map.zfar * self._model.stat.extent
+        depth = clean_metric_depth(depth_raw, zfar)
 
         # Pose from camera transform (not body qpos).
         # cam_xmat is R_world_from_cam (columns = camera axes in world).
