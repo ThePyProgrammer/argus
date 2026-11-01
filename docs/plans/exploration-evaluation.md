@@ -8,7 +8,11 @@ The CLI commands, module names, method IDs, and artifacts below are proposed con
 
 Phase A (PR 1) is implemented: [fixture contracts](../../src/exploration/evaluation/scenarios.py), [three static layouts](../../data/benchmarks/exploration/README.md), deterministic spawn samples, analytical reference masks, and [ADR-0020](../adr/0020-evaluate-exploration-against-fixed-reference-area.md). The 262 exploration tests pass, including area calculations at two resolutions, compiled-geometry agreement, spawn validation, and initial Go2 camera ray checks.
 
-Next: PR 2, the reference extractor for compiled geometry. The current analytical masks deliberately support only these axis-aligned fixtures. Camera depth coverage, episode execution, and `eval-exploration` are not implemented yet.
+PR 2 is implemented: the [compiled-geometry reference extractor](../../src/metrics/exploration_reference.py) supports static boxes at arbitrary rotations, fixed bounds, footprint/height clearance, and connected components with swept-clearance checks. It matches the analytical fixture masks at both validated resolutions. The [reference-area guide](../exploration-reference.md) covers diagnostic SVG/JSON/NPZ exports and rejected spawn markers.
+
+Validation: 44 reference-extractor tests and 324 tests across the metrics and exploration suites pass. All three diagnostic exports were generated and checked.
+
+Next: PR 3, camera-based coverage and reliability collectors. Camera depth coverage, episode execution, and `eval-exploration` are not implemented yet.
 
 ## 1. Result to produce
 
@@ -158,9 +162,9 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 ### PR 2: Implement the reference mask
 
-- [ ] Add proposed `src/metrics/exploration_reference.py` for collision projection, footprint inflation, fixed bounds, connected-component selection, and hashes.
-- [ ] Use actual collision transforms. Do not reuse preview AABBs as an exact geometry oracle.
-- [ ] Store a diagnostic overlay of the reference mask and rejected spawn locations.
+- [x] Add `src/metrics/exploration_reference.py` for compiled collision geometry, footprint/height clearance, fixed bounds, connected-component selection, and hashes. Supported geometry is explicit; arbitrary meshes and other collider families remain unsupported.
+- [x] Use actual collision transforms, including rotated and tilted boxes. Verify against independent analytical fixtures and MuJoCo box contact calculations; do not reuse preview AABBs.
+- [x] Store diagnostic SVG overlays, mask arrays, metadata, and rejected spawn locations through `scripts/inspect_exploration_reference.py`.
 
 **Gate:** Rotated obstacles, narrow doors, disconnected rooms, boundary cells, and translation/rotation transforms have independently derived expected outcomes. Refining grid resolution does not produce unexplained area changes.
 

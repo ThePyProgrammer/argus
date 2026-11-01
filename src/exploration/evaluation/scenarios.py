@@ -15,8 +15,12 @@ import json
 import math
 from numbers import Integral
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from src.metrics.exploration_reference import ReferenceGrid
 
 
 SCENARIO_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks" / "exploration"
@@ -181,6 +185,25 @@ class BenchmarkScenario:
             "cell_count": int(mask.sum()),
             "area_m2": float(mask.sum() * resolution_m**2),
         }
+
+    def compiled_reference(self, resolution_m: float = DEFAULTS.evaluation_resolution_m) -> ReferenceGrid:
+        """Build the evaluation grid independently from compiled collision shapes.
+
+        The analytical mask remains a separate validation oracle. This method is
+        for evaluation tooling and is not part of the robot's planning inputs.
+        """
+        import mujoco
+        from src.metrics.exploration_reference import ReferenceConfig, build_reference_grid
+
+        b = self.bounds
+        config = ReferenceConfig(
+            bounds=(b.x_min, b.y_min, b.x_max, b.y_max),
+            component_anchor=self.component_anchor,
+            resolution_m=resolution_m,
+            clearance_half_extent_m=DEFAULTS.clearance_half_extent_m,
+            clearance_height_m=DEFAULTS.clearance_height_m,
+        )
+        return build_reference_grid(mujoco.MjModel.from_xml_string(self.mjcf_xml), config)
 
     def validate_spawn_pair(self, poses: tuple[SpawnPose, SpawnPose]) -> None:
         if len(poses) != 2 or tuple(p.robot_id for p in poses) != ("robot_a", "robot_b"):

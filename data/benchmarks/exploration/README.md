@@ -28,7 +28,7 @@ At a 0.10 m resolution, cells are sampled at their centers. Rows increase with w
 
 The corridor expression adds the horizontal and vertical arms and subtracts their common junction. The rooms expression subtracts the inflated internal wall segments and restores their shared crossing. Its 1.60 m doorways retain 0.80 m of center-position clearance. The clutter expression subtracts six disjoint inflated columns. Tests independently check these areas at both 0.10 m and 0.05 m resolution.
 
-`reference_mask()` is a restricted analytical fixture oracle. The production reference extractor for general compiled geometry, and the camera observation collector, are separate work items in the [execution plan](../../../docs/plans/exploration-evaluation.md).
+`reference_mask()` is a restricted analytical fixture oracle. `compiled_reference()` independently extracts the grid from compiled collision boxes, including rotated and tilted boxes. See the [reference-area guide](../../../docs/exploration-reference.md) for diagnostic exports and supported geometry. The camera observation collector remains a separate work item in the [execution plan](../../../docs/plans/exploration-evaluation.md).
 
 ## Initial conditions and provenance
 
