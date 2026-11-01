@@ -94,6 +94,16 @@ npm run build
 
 Some integration tests require optional models or assets. To regenerate the original office GLB, run `uv run python scripts/convert_scene_glb.py`; output goes to `frontend/public/scene.glb`.
 
+## Exploration development
+
+For the exploration evaluator under development, run a [headless smoke episode](exploration-episodes.md):
+
+```bash
+uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --seed 101 --horizon 0.35
+```
+
+This exercises the current coordinator and measurement collectors. The batch evaluation command and allocator comparison are not available yet.
+
 ## Code map
 
 | Path | Responsibility |

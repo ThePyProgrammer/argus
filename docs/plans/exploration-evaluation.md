@@ -16,7 +16,11 @@ PR 3 collectors are implemented: [camera-based coverage](../../src/metrics/explo
 
 Validation for PR 3: 59 collector tests and 6 depth regression tests were added. The metrics/exploration suites pass 383 tests; the bridge suite passes 121 with 3 skips. Rendered fixtures cover sub-meter and oblique floor views, wall occlusion, and robot occlusion.
 
-Next: PR 4, deterministic episode execution and collector integration. The collectors accept an explicit post-settling time origin; the runner still needs to establish that boundary before autonomous bootstrap motion. Full runtime command-trace invariance, wall time/memory measurement, and `eval-exploration` are not implemented yet.
+PR 4's development lifecycle is implemented: [ExplorationEpisode](../../src/exploration/evaluation/episode.py) shares coordinator start/advance/close operations with the dashboard, applies resolved fixture spawns, owns recovery streams, and wires the collectors at the post-settling boundary. The [episode guide](../exploration-episodes.md) covers the smoke script, failure outcomes, timing, and process-memory scope. Repeatability tests compare real command and body traces with and without collection, including the first frontier scan.
+
+Validation for PR 4: 695 tests pass across the runtime, metrics, SLAM, dashboard integration, and worker checks, with 7 skips. Nine existing subprocess SLAM tests fail because this Windows ZeroMQ build reports no IPC support. Those backend files are unchanged. Real episode tests include 17 cases; the two-episode planning test has a scoped 120-second timeout for offscreen rendering.
+
+Development finding: `branching_corridor`, seed 101, currently terminates with `all_unreachable` at 0.29 simulated seconds, on the first frontier scan. The failure is retained and scored through the requested horizon. Successful navigation and long-horizon repeatability are not established. Diagnose this shared baseline issue before comparing allocation methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
 
 ## 1. Result to produce
 
@@ -183,14 +187,16 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 ### PR 4: Extract a deterministic episode lifecycle
 
-- [ ] Introduce proposed `ExplorationEpisode` in `src/exploration/evaluation/episode.py` with start, advance, inspect, and close operations. Reuse the coordinator's control path rather than copying its loop.
-- [ ] Capture observations and commands at explicit frame boundaries and allow an evaluation observer to attach without influencing decisions.
-- [ ] Establish the collectors' post-settling clock origin before autonomous bootstrap motion. Wire body states, geom ownership, contact cadence, planning events, allocator latency, wall time, and peak memory into measurements.
-- [ ] Convert wall-clock dependencies and unowned randomness on the benchmark path to simulation-time scheduling and named random streams. Audit spawn selection and recovery randomness.
-- [ ] Close the bridge, renderers, subscribers, and workers in `finally` paths. Preserve the dashboard's existing start/stop behavior.
-- [ ] Make caught exploration errors, disabled robots, and unexpected backend fallback explicit episode events and outcomes.
+- [x] Introduce `ExplorationEpisode` in `src/exploration/evaluation/episode.py` with start, advance, inspect, and close operations. Reuse the coordinator's control path rather than copying its loop.
+- [x] Capture observations and commands at explicit frame boundaries and allow measurement collection to attach without influencing decisions.
+- [x] Establish the collectors' post-settling clock origin before autonomous bootstrap motion. Wire body states, geom ownership, contact cadence, planning events, goal-selection latency, wall time, and process RSS high-water mark into measurements. Per-episode memory isolation and the joint allocator timing boundary remain future work.
+- [x] Use simulation-time recovery intervals and named random streams on the benchmark path. Resolve spawns and headings explicitly; isolate depth-to-cloud settings from the dashboard.
+- [x] Close the bridge, renderers, subscribers, and workers in `finally` paths. Preserve the dashboard's existing start/stop behavior.
+- [x] Make caught exploration errors, disabled robots, and unexpected backend fallback explicit episode events and outcomes.
 
 **Gate:** Same inputs on the same supported environment reproduce spawn state and decision traces within declared numerical tolerances. Running an episode alone or after another episode gives equivalent results. Evaluation collectors do not alter commands.
+
+Development gate passes for short episodes and the current first-scan failure, with MuJoCo 3.6 and one OpenMP thread. Longer successful episodes must pass the same checks after the baseline navigation issue is resolved.
 
 ### PR 5: Add `eval-exploration` and artifacts
 

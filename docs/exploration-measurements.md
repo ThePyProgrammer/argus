@@ -2,7 +2,7 @@
 
 The evaluation collectors measure visible reachable floor, body travel, and reliability events. They consume captured data and never supply reference geometry to the planner. Existing dashboard progress fields retain their current meaning.
 
-The collectors are implemented and tested. Wiring them into post-settling episode execution is the next step; `eval-exploration` is not available yet.
+The collectors are wired into [headless development episodes](exploration-episodes.md). The batch `eval-exploration` command is not available yet.
 
 ## Floor visibility
 
@@ -24,7 +24,7 @@ This is a finite-resolution visibility metric. Subpixel occluders and surfaces w
 
 ## Time and failure handling
 
-The caller supplies `start_sim_time` after settling and before autonomous motion. Frame times must use that same clock. The collector subtracts the origin, rejects backward or out-of-horizon samples, and rejects repeated frames for a robot at the same timestamp. Each batch is validated before its measurements are applied. The episode runner will establish this boundary around bridge boot and exploration bootstrap.
+The caller supplies `start_sim_time` after settling and before autonomous motion. Frame times must use that same clock. The collector subtracts the origin, rejects backward or out-of-horizon samples, and rejects repeated frames for a robot at the same timestamp. Horizon roundoff within one nanosecond is snapped to the configured endpoint. Each batch is validated before its measurements are applied. The episode lifecycle establishes this boundary around bridge boot and exploration bootstrap.
 
 Per-robot first-observation times define cumulative sets. Repeated stationary frames add no area. Team coverage counts their union; overlap counts cells seen by at least two robots divided by the union. For the primary two-robot study this is intersection over union. Empty observations give overlap zero and `zero_observation: true`.
 
@@ -57,7 +57,7 @@ Unseen cells have infinite first-observation time and contribute zero. A capture
 
 `ContactClassifier` takes explicit robot geom ownership, foot geoms, and floor geoms from the compiled scene. Obstacle bodies group composite geoms; separate world geoms retain distinct identities. Proximity warnings are not contact measurements. Debouncing starts at the first sample reporting absence, so event counts depend on the declared contact sampling cadence.
 
-The collector returns detached event records and summaries. Wall time, peak memory, real-time factor, state classification, and event sampling remain responsibilities of the episode runner. No simulated benchmark results have been produced yet.
+The collector returns detached event records and summaries. The episode runtime supplies wall time, process memory, real-time factor, state classification, and event sampling. Development smoke results exist; no comparative benchmark has been run.
 
 ## Validation
 
@@ -65,4 +65,4 @@ The collector returns detached event records and summaries. Wall time, peak memo
 uv run pytest tests/metrics/test_exploration_coverage.py tests/metrics/test_exploration_metrics.py tests/bridge/test_metric_depth.py
 ```
 
-Tests use real offscreen MuJoCo renders for close and oblique floor views, wall occlusion, and robot occlusion. Analytical timelines verify union, overlap, AUC, threshold timing, and absorbing failures. Real MuJoCo contacts verify foot exclusions, body-floor contact, and robot-robot contact. Other tests cover immutable captures, input rejection, and event transitions. Full episode command-trace invariance remains a gate for PR 4 in the [execution plan](plans/exploration-evaluation.md).
+Tests use real offscreen MuJoCo renders for close and oblique floor views, wall occlusion, and robot occlusion. Analytical timelines verify union, overlap, AUC, threshold timing, and absorbing failures. Real MuJoCo contacts verify foot exclusions, body-floor contact, and robot-robot contact. Other tests cover immutable captures, input rejection, and event transitions. Development episode tests verify command-trace invariance with and without collection; longer successful runs remain a gate in the [execution plan](plans/exploration-evaluation.md).
