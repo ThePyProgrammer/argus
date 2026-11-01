@@ -25,6 +25,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Generated exploration reference masks and diagnostics
 /outputs/exploration-reference/
+/outputs/exploration-planning/
 
 # Phase 5 (D-01): BoxeR subprocess venv — owns its own torch/DINOv3/BoxerNet stack
 subprocess_venvs/
