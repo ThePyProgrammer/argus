@@ -53,6 +53,8 @@ These are research directions, not shipped features:
 - **Robust coordination:** Study sensor noise, pose uncertainty, communication limits, and larger teams.
 - **Persistent world models:** Connect the existing belief-graph prototype to live observations and test its value for task planning.
 
+Next proposed milestone: [multi-robot exploration evaluation plan](docs/plans/exploration-evaluation.md).
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) and [design decisions](docs/adr/README.md)
