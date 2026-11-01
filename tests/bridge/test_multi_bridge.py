@@ -297,7 +297,7 @@ def test_multi_bridge_rejects_invalid_controller_output_without_mutating_ctrl(mo
     bridge, _controller = _prepare_fake_one_robot_bridge(np.array([np.nan], dtype=np.float64))
     before = bridge._data.ctrl.copy()
 
-    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None, mj_forward=lambda model, data: None))
     monkeypatch.setattr(
         MultiRobotBridge,
         "_capture_frame",
@@ -323,7 +323,7 @@ def test_multi_bridge_rejects_bad_ctrl_indices_without_mutating_ctrl(monkeypatch
     bridge._ctrl_indices["robot_a"] = bad_indices
     before = bridge._data.ctrl.copy()
 
-    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None, mj_forward=lambda model, data: None))
     monkeypatch.setattr(
         MultiRobotBridge,
         "_capture_frame",
@@ -339,7 +339,7 @@ def test_multi_bridge_rejects_bad_ctrl_indices_without_mutating_ctrl(monkeypatch
 def test_multi_bridge_applies_fake_non_go2_one_actuator_target(monkeypatch):
     bridge, controller = _prepare_fake_one_robot_bridge(np.array([0.42], dtype=np.float64))
 
-    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None, mj_forward=lambda model, data: None))
     monkeypatch.setattr(
         MultiRobotBridge,
         "_capture_frame",

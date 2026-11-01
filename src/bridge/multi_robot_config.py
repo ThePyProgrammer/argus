@@ -37,3 +37,5 @@ class MultiRobotConfig:
     step_delay: float = 0.0  # seconds to sleep between steps (0 = full speed)
     platform: str = "go2"
     platform_config: dict = field(default_factory=dict)
+    launch_viewer: bool = True
+    spawn_headings: dict[str, float] | None = None

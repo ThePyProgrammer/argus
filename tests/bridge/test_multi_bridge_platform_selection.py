@@ -132,6 +132,7 @@ def test_start_discovers_platform_root_body_name(monkeypatch):
 
     class FakeData:
         def __init__(self, model):
+            self.time = 0.0
             self.qpos = np.zeros(8)
             self.ctrl = np.zeros(1)
 
@@ -155,6 +156,7 @@ def test_start_discovers_platform_root_body_name(monkeypatch):
         Renderer=FakeRenderer,
         mj_name2id=fake_name2id,
         mj_step=lambda model, data: None,
+        mj_forward=lambda model, data: None,
         mjtObj=types.SimpleNamespace(
             mjOBJ_BODY="body",
             mjOBJ_ACTUATOR="actuator",
@@ -201,7 +203,7 @@ def test_step_records_stop_as_last_command_when_robot_was_disabled(monkeypatch):
         )
     }
 
-    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None))
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=lambda model, data: None, mj_forward=lambda model, data: None))
     monkeypatch.setattr(
         MultiRobotBridge,
         "_capture_frame",

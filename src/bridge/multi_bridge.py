@@ -7,7 +7,7 @@ buffer. Joint/actuator indices are discovered dynamically via mj_name2id().
 
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -32,8 +32,9 @@ class MultiRobotBridge:
         5. ``bridge.stop()``             -- cleans up
     """
 
-    def __init__(self, config: MultiRobotConfig | None = None) -> None:
+    def __init__(self, config: MultiRobotConfig | None = None, *, model_factory: Callable | None = None) -> None:
         self._config = config or MultiRobotConfig()
+        self._model_factory = model_factory
         self._model: Any = None
         self._data: Any = None
         self._renderers: dict[str, Any] = {}
@@ -91,7 +92,9 @@ class MultiRobotBridge:
 
         # Generate combined XML
         from src.bridge.scene_library import PROMPT_SCENES, build_library_model
-        if self._config.scene in PROMPT_SCENES:
+        if self._model_factory is not None:
+            self._model = self._model_factory()
+        elif self._config.scene in PROMPT_SCENES:
             self._model = build_library_model(self._platform, self._config.spawn_positions, self._config.scene)
         elif self._config.scene == "office" and self._config.platform == "go2":
             xml_str, assets = build_two_robot_office_scene(
@@ -156,6 +159,8 @@ class MultiRobotBridge:
         for i, robot_id in enumerate(self._config.robot_ids):
             qstart = self._qpos_starts[robot_id]
             yaw = (2 * math.pi * i) / n_robots
+            if self._config.spawn_headings is not None:
+                yaw = self._config.spawn_headings[robot_id]
             self._data.qpos[qstart + 3] = math.cos(yaw / 2)
             self._data.qpos[qstart + 4] = 0.0
             self._data.qpos[qstart + 5] = 0.0
@@ -174,25 +179,32 @@ class MultiRobotBridge:
         # Settle physics
         for _ in range(self._config.boot_phase_steps):
             mujoco.mj_step(self._model, self._data)
+        mujoco.mj_forward(self._model, self._data)
+        self._settled_sim_time = float(self._data.time)
+        for rid in self._config.robot_ids:
+            state = self._platform.extract_state(self._model, self._data, self._qpos_starts[rid], 0.0)
+            self._runtime_status[rid] = self._platform.runtime_status(
+                rid, state, RobotCommand.stand(), self._controllers[rid].health())
 
         # Create one renderer per robot
         w, h = self._config.resolution
         for robot_id in self._config.robot_ids:
             self._renderers[robot_id] = mujoco.Renderer(self._model, height=h, width=w)
-        self._overview_renderer = mujoco.Renderer(self._model, height=h, width=w)
+        if self._config.launch_viewer:
+            self._overview_renderer = mujoco.Renderer(self._model, height=h, width=w)
 
         # Launch interactive MuJoCo 3D viewer
         self._viewer_handle = None
-        try:
-            import warnings
-            import mujoco.viewer
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message=".*Wayland.*")
-                self._viewer_handle = mujoco.viewer.launch_passive(self._model, self._data)
-            logger.info("MuJoCo interactive viewer launched")
-        except Exception as e:
-            logger.warning("Could not launch MuJoCo viewer: %s", e)
-
+        if self._config.launch_viewer:
+            try:
+                import warnings
+                import mujoco.viewer
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message=".*Wayland.*")
+                    self._viewer_handle = mujoco.viewer.launch_passive(self._model, self._data)
+                logger.info("MuJoCo interactive viewer launched")
+            except Exception as e:
+                logger.warning("Could not launch MuJoCo viewer: %s", e)
         self._step_count = 0
 
         # Capture initial frames
@@ -231,6 +243,9 @@ class MultiRobotBridge:
         # Step physics
         for _ in range(self._config.sim_steps_per_frame):
             mujoco.mj_step(self._model, self._data)
+        # mj_step integrates qpos after its last forward pass. Refresh camera
+        # transforms and contacts to match the state stamped on this frame.
+        mujoco.mj_forward(self._model, self._data)
 
         self._step_count += 1
 
@@ -370,11 +385,10 @@ class MultiRobotBridge:
 
     def stop(self) -> None:
         """Clean up MuJoCo resources."""
-        for renderer in self._renderers.values():
-            renderer.close()
+        resources = list(self._renderers.values())
         self._renderers.clear()
         if self._overview_renderer is not None:
-            self._overview_renderer.close()
+            resources.append(self._overview_renderer)
             self._overview_renderer = None
         viewer = self._viewer_handle
         self._viewer_handle = None
@@ -385,7 +399,34 @@ class MultiRobotBridge:
                 logger.debug("Viewer handle close failed (may already be closed)")
         self._model = None
         self._data = None
+        self._last_frames.clear()
         self._step_count = 0
+        errors = []
+        for renderer in resources:
+            try:
+                renderer.close()
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise RuntimeError("Failed to close a MuJoCo renderer") from errors[0]
+
+    @property
+    def frame_dt(self) -> float:
+        """Exact simulated duration of one sensor interval, excluding settling."""
+        return self._dt
+
+    @property
+    def settled_sim_time(self) -> float:
+        return self._settled_sim_time
+
+    def get_body_position(self, robot_id: str) -> np.ndarray:
+        start = self._qpos_starts[robot_id]
+        return self._data.qpos[start:start + 3].copy()
+
+    def camera_intrinsics(self, robot_id: str):
+        from src.bridge.sensor_types import CameraIntrinsics
+        width, height = self._config.resolution
+        return CameraIntrinsics.from_fov(width, height, float(self._model.cam_fovy[self._cam_ids[robot_id]]))
 
     def render_overview(self, distance: float = 8.0, elevation: float = -35.0) -> np.ndarray:
         """Render a bird's-eye overview of the scene using MuJoCo's free camera.
