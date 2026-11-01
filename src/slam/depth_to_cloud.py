@@ -21,6 +21,7 @@ def depth_to_pointcloud(
     rgb: np.ndarray,
     intrinsics: CameraIntrinsics,
     max_depth: float = 10.0,
+    cloud_config_key: str | None = None,
 ) -> o3d.geometry.PointCloud:
     """Convert depth + RGB to Open3D PointCloud using active config.
 
@@ -37,7 +38,7 @@ def depth_to_pointcloud(
         Open3D PointCloud with points and colors.
     """
     h, w = depth.shape
-    cfg = CLOUD_CONFIGS[get_active_config()]
+    cfg = CLOUD_CONFIGS[get_active_config() if cloud_config_key is None else cloud_config_key]
 
     o3d_intrinsics = o3d.camera.PinholeCameraIntrinsic(
         w, h, intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy,

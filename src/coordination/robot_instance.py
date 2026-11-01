@@ -93,6 +93,9 @@ class RobotInstance:
         config: ExplorationConfig | None = None,
         spawn_position: tuple[float, float, float] = (0.0, 0.0, 0.3),
         backend_name: str | None = None,
+        recovery_rng: np.random.Generator | None = None,
+        frame_dt: float | None = None,
+        backend_kwargs: dict | None = None,
     ) -> "RobotInstance":
         """Factory method to create a fully wired robot instance with pLCM publisher.
 
@@ -101,13 +104,14 @@ class RobotInstance:
         Args:
             backend_name: SLAM backend name, or None for registry default ('icp').
         """
-        slam = SLAMRegistry.create(backend_name, intrinsics=intrinsics)
+        slam = SLAMRegistry.create(backend_name, intrinsics=intrinsics, **(backend_kwargs or {}))
         octomap = OctoMapBuilder(
             resolution=(config or ExplorationConfig()).voxel_resolution,
         )
         exploration = ExplorationLoop(
             bridge=bridge, slam=slam, octomap=octomap, config=config,
             intrinsics=intrinsics,
+            recovery_rng=recovery_rng, frame_dt=frame_dt,
         )
 
         spawn_transform = np.eye(4, dtype=np.float64)

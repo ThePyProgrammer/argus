@@ -14,6 +14,7 @@ Supports two modes:
 
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Callable, TYPE_CHECKING
 
@@ -67,11 +68,13 @@ class StuckRecovery:
         angular_speed: float = 1.5,
         reverse_speed: float = 1.0,  # faster reverse
         reverse_steps: int = 25,     # longer reverse to clear obstacles
+        rng: np.random.Generator | None = None,
     ) -> None:
         self._turn_angle = turn_angle
         self._angular_speed = angular_speed
         self._reverse_speed = reverse_speed
         self._reverse_steps = reverse_steps
+        self._rng = rng
         self._remaining_turn: float = 0.0
         self._remaining_reverse: int = 0
         self._active: bool = False
@@ -80,7 +83,7 @@ class StuckRecovery:
     def trigger(self) -> None:
         """Start a reverse-then-turn recovery."""
         self._remaining_reverse = self._reverse_steps
-        direction = 1.0 if np.random.random() > 0.5 else -1.0
+        direction = 1.0 if (self._rng.random() if self._rng is not None else np.random.random()) > 0.5 else -1.0
         self._remaining_turn = self._turn_angle * direction
         self._active = True
         self._phase = "reverse"
@@ -141,6 +144,8 @@ class ExplorationLoop:
         config: ExplorationConfig | None = None,
         streaming_viz: object | None = None,
         intrinsics: object | None = None,
+        recovery_rng: np.random.Generator | None = None,
+        frame_dt: float | None = None,
     ):
         self._bridge = bridge
         self._slam = slam
@@ -165,7 +170,13 @@ class ExplorationLoop:
         self._last_rescan_pos = np.zeros(3, dtype=np.float64)
         self._last_voxel_count = 0
         self._stuck_counter = 0
-        self._stuck_recovery = StuckRecovery()
+        self._stuck_recovery = StuckRecovery(rng=recovery_rng)
+        self._frame_dt = frame_dt
+        self._previous_sim_time: float | None = None
+        self._planning_attempts: list[tuple[str, bool]] = []
+        self._selection_latency_ms: list[float] = []
+        self._planning_sequence = 0
+        self._goal_id: str | None = None
         self._last_position = np.zeros(3, dtype=np.float64)
         self._last_coverage = 0.0
         self._last_bbox_coverage = 0.0
@@ -196,6 +207,20 @@ class ExplorationLoop:
     @property
     def frontier_detector(self) -> FrontierDetector:
         return self._frontier_detector
+
+    @property
+    def measurement_state(self) -> dict:
+        """Detached decision diagnostics; no evaluator state enters navigation."""
+        return {"recovering": self._stuck_recovery.is_active,
+                "goal_id": self._goal_id if self._current_waypoint_runner is not None
+                and not self._current_waypoint_runner.is_complete else None,
+                "planning_attempts": tuple(self._planning_attempts),
+                "selection_latency_ms": tuple(self._selection_latency_ms),
+                "tracking_status": self.last_tracking_status}
+
+    @property
+    def slam_backend_type(self) -> type:
+        return type(self._slam)
 
     @property
     def frontier_resolution(self) -> float:
@@ -298,7 +323,7 @@ class ExplorationLoop:
 
         # If stuck recovery is active, execute recovery turn instead of normal logic
         if self._stuck_recovery.is_active:
-            dt = 0.2  # approximate frame dt
+            dt = self._frame_dt if self._frame_dt is not None else 0.2
             recovery_cmd = self._stuck_recovery.step(dt)
             if recovery_cmd is not None:
                 vx, vy, omega = recovery_cmd
@@ -432,18 +457,22 @@ class ExplorationLoop:
             goal = None
 
             while remaining:
+                selection_start = time.perf_counter()
                 if effective_score_fn is not None:
                     candidate = self._goal_selector.select_with_bias(
                         remaining, pose, effective_score_fn,
                     )
                 else:
                     candidate = self._goal_selector.select(remaining, pose)
+                self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
                 if candidate is None:
                     break
 
                 planned_path = self._path_planner.plan(
                     current_pos, candidate, grid_2d,
                 )
+                self._planning_sequence += 1
+                self._planning_attempts.append((str(self._planning_sequence), planned_path is not None))
                 if planned_path is not None:
                     goal = candidate
                     path = planned_path
@@ -457,6 +486,7 @@ class ExplorationLoop:
             if goal is None or path is None:
                 terminated = True
             else:
+                self._goal_id = ",".join(format(float(v), ".9g") for v in goal)
                 self._current_waypoint_runner = WaypointRunner(
                     path,
                     linear_speed=config.linear_speed,
@@ -506,6 +536,8 @@ class ExplorationLoop:
         self._last_coverage = cov
         self._last_bbox_coverage = bbox_cov
         self._last_frontier_count = frontier_count
+        if terminated:
+            self._goal_id = None
 
         return frontier_count, terminated
 
@@ -531,6 +563,15 @@ class ExplorationLoop:
         config = self._config
 
         # a. Update SLAM and OctoMap
+        self._planning_attempts = []
+        self._selection_latency_ms = []
+        if self._frame_dt is not None:
+            if self._previous_sim_time is not None:
+                elapsed = frame.sim_time - self._previous_sim_time
+                if elapsed <= 0:
+                    raise ValueError("Exploration sensor times must increase")
+                self._frame_dt = elapsed
+            self._previous_sim_time = frame.sim_time
         pose, current_pos = self._update_slam(frame)
 
         # b. Stuck detection and recovery

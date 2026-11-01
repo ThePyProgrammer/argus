@@ -33,9 +33,10 @@ class SLAMPipeline:
         voxel_size: Voxel size for downsampling (meters). Smaller = denser.
     """
 
-    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.03):
+    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.03, *, cloud_config_key: str | None = None):
         self._intrinsics = intrinsics
         self._voxel_size = voxel_size
+        self._cloud_config_key = cloud_config_key
         self._global_cloud = o3d.geometry.PointCloud()
         self._slam_poses: list[np.ndarray] = []
         self._prev_cloud: o3d.geometry.PointCloud | None = None
@@ -76,7 +77,8 @@ class SLAMPipeline:
 
         # Convert depth to point cloud in camera frame
         cloud = depth_to_pointcloud(
-            frame.depth, frame.rgb, self._intrinsics, max_depth=10.0
+            frame.depth, frame.rgb, self._intrinsics, max_depth=10.0,
+            **({"cloud_config_key": self._cloud_config_key} if self._cloud_config_key is not None else {}),
         )
         cloud = cloud.voxel_down_sample(self._voxel_size)
 

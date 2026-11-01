@@ -52,8 +52,8 @@ class ICPBackend:
         },
     }
 
-    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.03):
-        self._pipeline = SLAMPipeline(intrinsics, voxel_size=voxel_size)
+    def __init__(self, intrinsics: CameraIntrinsics, voxel_size: float = 0.03, *, cloud_config_key: str | None = None):
+        self._pipeline = SLAMPipeline(intrinsics, voxel_size=voxel_size, cloud_config_key=cloud_config_key)
 
     def process_frame(self, frame: SensorFrame) -> SLAMResult:
         """Process one RGB-D frame via ICP, return SLAMResult."""
