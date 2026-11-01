@@ -12,7 +12,11 @@ PR 2 is implemented: the [compiled-geometry reference extractor](../../src/metri
 
 Validation: 44 reference-extractor tests and 324 tests across the metrics and exploration suites pass. All three diagnostic exports were generated and checked.
 
-Next: PR 3, camera-based coverage and reliability collectors. Camera depth coverage, episode execution, and `eval-exploration` are not implemented yet.
+PR 3 collectors are implemented: [camera-based coverage](../../src/metrics/exploration_coverage.py), first-observation exports, fixed-horizon AUC and overlap, body travel, contact episodes, recovery/fall transitions, planning failures, goal changes, and allocator latency. The [measurement contract](../exploration-measurements.md) defines depth tolerances, pixel support, event debounce, and failure scoring. A shared bridge fix preserves MuJoCo's metric depth for sub-meter views and invalidates readings beyond the sensing range.
+
+Validation for PR 3: 59 collector tests and 6 depth regression tests were added. The metrics/exploration suites pass 383 tests; the bridge suite passes 121 with 3 skips. Rendered fixtures cover sub-meter and oblique floor views, wall occlusion, and robot occlusion.
+
+Next: PR 4, deterministic episode execution and collector integration. The collectors accept an explicit post-settling time origin; the runner still needs to establish that boundary before autonomous bootstrap motion. Full runtime command-trace invariance, wall time/memory measurement, and `eval-exploration` are not implemented yet.
 
 ## 1. Result to produce
 
@@ -170,10 +174,10 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 ### PR 3: Implement coverage and reliability collectors
 
-- [ ] Add proposed `src/metrics/exploration_coverage.py` and `exploration_metrics.py` for sensor visibility, observation masks, AUC, travel, events, and timing.
-- [ ] Keep legacy progress metrics available under clearly distinct names. Do not silently change the meaning of existing dashboard fields.
-- [ ] Use capture-time camera transforms and simulator time; separate post-settling `t=0` from the bridge's internal boot steps. Include any autonomous bootstrap motion in the measured interval.
-- [ ] Define collision event debouncing and recovery-entry counting so sustained contact is not counted once per frame.
+- [x] Add `src/metrics/exploration_coverage.py` and `exploration_metrics.py` for sensor visibility, observation masks, AUC, travel, events, and allocator timing. Runtime wall time and memory measurement belong to PR 4.
+- [x] Keep legacy progress metrics available under clearly distinct names. Do not silently change the meaning of existing dashboard fields.
+- [x] Snapshot capture-time camera transforms and simulator time; accept an explicit post-settling `t=0` and reject samples outside the measured interval. Establishing this boundary before autonomous bootstrap motion is part of PR 4 integration.
+- [x] Define collision event debouncing and recovery-entry counting so sustained contact is not counted once per frame.
 
 **Gate:** A stationary camera cannot gain coverage from repeated frames; two identical views do not double team coverage; a wall occludes floor behind it; invalid depth adds nothing; no-frontier status does not imply 100% coverage. Test the unprojection/projection convention with rendered fixtures.
 
@@ -181,6 +185,7 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 - [ ] Introduce proposed `ExplorationEpisode` in `src/exploration/evaluation/episode.py` with start, advance, inspect, and close operations. Reuse the coordinator's control path rather than copying its loop.
 - [ ] Capture observations and commands at explicit frame boundaries and allow an evaluation observer to attach without influencing decisions.
+- [ ] Establish the collectors' post-settling clock origin before autonomous bootstrap motion. Wire body states, geom ownership, contact cadence, planning events, allocator latency, wall time, and peak memory into measurements.
 - [ ] Convert wall-clock dependencies and unowned randomness on the benchmark path to simulation-time scheduling and named random streams. Audit spawn selection and recovery randomness.
 - [ ] Close the bridge, renderers, subscribers, and workers in `finally` paths. Preserve the dashboard's existing start/stop behavior.
 - [ ] Make caught exploration errors, disabled robots, and unexpected backend fallback explicit episode events and outcomes.
