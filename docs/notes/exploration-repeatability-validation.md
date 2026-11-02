@@ -62,3 +62,5 @@ uv run python scripts/compare_exploration_traces.py outputs/exploration-planning
 Use the same runtime revision and environment for both runs. Repeat the first command with `connected_rooms` and `cluttered_room`, using separate output directories, for the other layout checks. The local validation wrapper additionally records source hashes and progress; the commands above use the same episode and diagnostic functions.
 
 One seed per layout cannot establish general navigation reliability. Next remove repeated voxel-query work while preserving traces, then diagnose the cluttered-room frontier exhaustion. Additional development seeds, longer horizons, and footprint-clearance validation remain before allocation comparisons. The planner's 15 cm hard obstacle margin remains a known limitation.
+
+Follow-up: [occupied-voxel caching and frontier diagnosis](exploration-voxel-cache-validation.md) preserves the complete cluttered-room trace, measures query-workload speedup, and identifies an inferred-free-space rule that suppresses reachable frontiers.
