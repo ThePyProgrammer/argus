@@ -344,7 +344,6 @@ class ExplorationLoop:
             if len(points):
                 self._octomap.insert_scan(points, current_pos)
 
-        self._robot_positions.append(current_pos)
         return pose, current_pos
 
     def _check_stuck(
@@ -586,7 +585,12 @@ class ExplorationLoop:
                 raise ValueError("Exploration sensor times must increase")
             self._frame_dt = elapsed
         self._previous_sim_time = frame.sim_time
-        pose, current_pos = self._update_slam(frame)
+        camera_pose, _ = self._update_slam(frame)
+        # Mapping and floor filtering use the camera origin. Navigation uses
+        # the body origin and forward axis, derived only from fixed calibration.
+        pose = frame.body_pose_from_camera(camera_pose)
+        current_pos = pose[:3, 3].copy()
+        self._robot_positions.append(current_pos)
 
         # b. Stuck detection and recovery
         force_rescan, early_return = self._check_stuck(step, pose, frame.sim_time)

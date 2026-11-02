@@ -157,6 +157,34 @@ def test_failed_cell_does_not_discard_other_cells_of_the_same_cluster():
     assert loop.measurement_state["planning_attempts"] == (("1", False), ("2", True))
 
 
+@pytest.mark.parametrize("yaw", [0., np.pi / 2])
+def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(yaw, monkeypatch):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    mount = np.array([[0., 0., -1., .4], [-1., 0., 0., 0.],
+                      [0., 1., 0., .05], [0., 0., 0., 1.]])
+    body = np.eye(4)
+    body[:2, :2] = [[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]
+    body[2, 3] = .3
+    camera = body @ mount
+    frame = _make_sensor_frame(np.array([99., 99., 99.]))  # Not a navigation oracle.
+    frame.body_from_camera = mount
+    monkeypatch.setattr(loop._slam, "process_frame", lambda f: SLAMResult(
+        pose=camera, points=np.ones((1, 3)), colors=np.ones((1, 3)), metrics={},
+        tracking_status=TrackingStatus.OK))
+    scan = MagicMock(wraps=loop._octomap.insert_scan)
+    monkeypatch.setattr(loop._octomap, "insert_scan", scan)
+    target = [3 * np.cos(yaw), 3 * np.sin(yaw), 0.]
+    monkeypatch.setattr(loop.frontier_detector, "detect", lambda *a, **kw: [_make_cluster(target)])
+    plan = MagicMock(side_effect=lambda start, goal, grid: [start, goal])
+    monkeypatch.setattr(loop._path_planner, "plan", plan)
+    linear, angular, metrics = loop.step_once(frame, 30)
+    assert not metrics.terminated and linear[0] > 0
+    assert angular == pytest.approx(0., abs=1e-12)
+    np.testing.assert_allclose(plan.call_args.args[0], body[:3, 3], atol=1e-12)
+    np.testing.assert_allclose(scan.call_args.args[1], camera[:3, 3], atol=1e-12)
+    np.testing.assert_allclose(loop._robot_positions[-1], body[:3, 3], atol=1e-12)
+
+
 @pytest.mark.parametrize("failure", ["no_frontiers", "no_candidates", "astar_failure"])
 def test_failed_rescan_discards_route_and_stays_idle_until_success(failure, monkeypatch):
     loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())

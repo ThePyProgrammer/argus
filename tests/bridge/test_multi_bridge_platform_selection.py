@@ -125,6 +125,10 @@ def test_start_discovers_platform_root_body_name(monkeypatch):
         jnt_bodyid = np.array([7])
         jnt_type = np.array([0])
         jnt_qposadr = np.array([0])
+        cam_bodyid = np.array([7])
+        cam_mode = np.array([0])
+        cam_pos = np.array([[.2, 0., .1]])
+        cam_quat = np.array([[1., 0., 0., 0.]])
 
         @staticmethod
         def from_xml_string(xml_str, assets):

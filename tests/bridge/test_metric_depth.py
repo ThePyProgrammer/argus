@@ -52,9 +52,11 @@ def test_both_capture_paths_preserve_sub_meter_depth(bridge_class):
     bridge._step_count, bridge._dt = 3, .01
     if bridge_class is MuJoCoBridge:
         bridge._renderer, bridge._cam_id = renderer, 0
+        bridge._body_from_camera = np.eye(4)
         frame = bridge._capture_frame()
     else:
         bridge._renderers, bridge._cam_ids = {"robot_a": renderer}, {"robot_a": 0}
+        bridge._camera_mounts = {"robot_a": np.eye(4)}
         frame = bridge._capture_frame("robot_a")
     assert np.all(frame.depth == .5)
     assert frame.sim_time == pytest.approx(.03)

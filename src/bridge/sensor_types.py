@@ -62,6 +62,33 @@ class SensorFrame:
     ground_truth_pose: np.ndarray  # (4, 4) float64 homogeneous transform
     sim_time: float  # simulation timestamp in seconds
     imu_readings: list[IMUReading] = field(default_factory=list)
+    # Fixed sensor mounting calibration, not a measured world/body pose.
+    # None preserves the coincident sensor/body convention of legacy producers.
+    body_from_camera: np.ndarray | None = None
+
+    def body_pose_from_camera(self, world_from_camera: np.ndarray) -> np.ndarray:
+        """Convert an estimated camera pose to the robot's navigation frame."""
+        if self.body_from_camera is None:
+            return world_from_camera.copy()
+        mount = self.body_from_camera
+        camera_from_body = np.eye(4)
+        camera_from_body[:3, :3] = mount[:3, :3].T
+        camera_from_body[:3, 3] = -mount[:3, :3].T @ mount[:3, 3]
+        return world_from_camera @ camera_from_body
+
+
+def fixed_camera_mount(model, camera_id: int, body_id: int) -> np.ndarray:
+    """Read a fixed camera's body-relative calibration from the compiled model.
+
+    Only a camera attached directly to the navigation body is supported. This
+    avoids substituting simulator world poses for estimated navigation poses.
+    """
+    if int(model.cam_bodyid[camera_id]) != body_id or int(model.cam_mode[camera_id]) != 0:
+        raise ValueError("Navigation requires a fixed camera mounted on the robot root body")
+    mount = np.eye(4)
+    mount[:3, :3] = quat_to_rotation_matrix(model.cam_quat[camera_id])
+    mount[:3, 3] = model.cam_pos[camera_id]
+    return mount
 
 
 @dataclass

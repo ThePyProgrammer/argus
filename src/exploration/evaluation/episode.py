@@ -163,6 +163,7 @@ class ExplorationEpisode:
                                    "exploration_config": asdict(robots[config.robot_ids[0]].exploration.config),
                                    "navigation_target_rule": "reachable_frontier_member_v1",
                                    "route_lifecycle": "invalidate_on_rescan_v1",
+                                   "navigation_pose": "estimated_body_from_camera_mount_v1",
                                    "floor_filter": "per_observation_plane_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:

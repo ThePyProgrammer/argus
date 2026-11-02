@@ -571,7 +571,7 @@ class Coordinator:
                 score_fn = None
                 if self._partitioned:
                     _poses = robot.slam.get_poses()
-                    _current_pose = _poses[-1] if _poses else np.eye(4)
+                    _current_pose = frame.body_pose_from_camera(_poses[-1]) if _poses else np.eye(4)
                     score_fn = lambda centroid, _rid=rid, _cp=_current_pose: (
                             self._partitioner.score_frontier_with_bias(
                                 centroid,
@@ -729,7 +729,7 @@ class Coordinator:
             robot = self._robots[rid]
             poses = robot.slam.get_poses()
             if poses:
-                positions[rid] = poses[-1][:3, 3]
+                positions[rid] = self._frames[rid].body_pose_from_camera(poses[-1])[:3, 3]
             else:
                 positions[rid] = robot.spawn_transform[:3, 3]
         self._partitioner.update_positions(positions)

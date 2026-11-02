@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 
 from src.bridge.env_config import MuJoCoEnvConfig
-from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix, IMUReading
+from src.bridge.sensor_types import SensorFrame, STANDING_QPOS, quat_to_rotation_matrix, IMUReading, fixed_camera_mount
 from src.bridge.depth import clean_metric_depth
 from src.locomotion.controller_dispatch import (
     apply_controller_target,
@@ -55,6 +55,7 @@ class MuJoCoBridge:
         self._angular_vel: float = 0.0
         # Camera ID (added programmatically)
         self._cam_id: int = -1
+        self._body_from_camera: np.ndarray | None = None
         # Registered analytical controller for locomotion
         self._controller = ControllerRegistry.create("analytical_trot")
         # IMU sensor addresses (populated in start() if sensors exist)
@@ -146,6 +147,8 @@ class MuJoCoBridge:
             if self._cam_id < 0 or self._cam_id >= self._model.ncam:
                 raise ValueError(f"Camera id {self._cam_id} is out of range for {self._model.ncam} fixed cameras")
 
+        self._body_from_camera = fixed_camera_mount(
+            self._model, self._cam_id, int(self._model.jnt_bodyid[0]))
         self._step_count = 0
         return self._capture_frame()
 
@@ -264,6 +267,7 @@ class MuJoCoBridge:
             depth=depth,
             ground_truth_pose=pose,
             sim_time=sim_time,
+            body_from_camera=self._body_from_camera.copy(),
         )
 
     def _extract_pose(self) -> np.ndarray:

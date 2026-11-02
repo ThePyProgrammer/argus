@@ -16,7 +16,7 @@ from src.bridge.multi_robot_config import MultiRobotConfig
 from src.bridge.platforms import create_platform
 from src.bridge.platforms.types import RobotCommand, RobotRuntimeStatus, RobotState
 from src.bridge.scene_builder import build_multi_robot_scene, build_two_robot_office_scene
-from src.bridge.sensor_types import SensorFrame, quat_to_rotation_matrix
+from src.bridge.sensor_types import SensorFrame, quat_to_rotation_matrix, fixed_camera_mount
 from src.bridge.depth import clean_metric_depth
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ class MultiRobotBridge:
         self._qpos_starts: dict[str, int] = {}
         self._ctrl_indices: dict[str, list[int]] = {}
         self._cam_ids: dict[str, int] = {}
+        self._camera_mounts: dict[str, np.ndarray] = {}
         self._commands: dict[str, RobotCommand] = {
             rid: RobotCommand.stand() for rid in self._config.robot_ids
         }
@@ -151,6 +152,7 @@ class MultiRobotBridge:
             if cam_id < 0:
                 raise RuntimeError(f"Camera '{cam_name}' not found in model")
             self._cam_ids[robot_id] = cam_id
+            self._camera_mounts[robot_id] = fixed_camera_mount(self._model, cam_id, body_id)
 
         # Set initial standing pose and heading for both robots
         import math
@@ -557,6 +559,7 @@ class MultiRobotBridge:
             depth=depth,
             ground_truth_pose=pose,
             sim_time=sim_time,
+            body_from_camera=self._camera_mounts[robot_id].copy(),
         )
 
     def _extract_pose(self, robot_id: str) -> np.ndarray:

@@ -101,12 +101,42 @@ def test_resolved_heading_and_capture_pose_match_current_physics():
             heading = run.provenance["sample"]["spawn_poses"][run.bridge.robot_ids.index(rid)]["yaw_rad"]
             assert run.bridge.get_body_yaw(rid) == pytest.approx(heading, abs=1e-5)
             frame = run.bridge.get_frame(rid)
+            np.testing.assert_allclose(frame.body_pose_from_camera(frame.ground_truth_pose),
+                                       run.bridge._extract_pose(rid), atol=1e-12)
             before = frame.ground_truth_pose.copy()
             mujoco.mj_forward(run.bridge.mj_model, run.bridge.mj_data)
             camera = run.bridge.mj_model.camera(f"{rid}_cam").id
             np.testing.assert_allclose(before[:3, 3], run.bridge.mj_data.cam_xpos[camera], atol=1e-12)
         assert run.bridge._viewer_handle is None
         assert run.bridge._overview_renderer is None
+
+
+def test_zero_initial_corridor_coverage_is_explained_by_independent_wall_rays():
+    from src.metrics.exploration_coverage import _floor_points
+
+    with episode(horizon=.01) as run:
+        frame = run.bridge.get_frame("robot_a")
+        cal = run.bridge.camera_intrinsics("robot_a")
+        pose = frame.ground_truth_pose
+        points = _floor_points(run.reference)
+        camera = (points - pose[:3, 3]) @ pose[:3, :3]
+        axial = -camera[:, 2]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            u = cal.fx * camera[:, 0] / axial + cal.cx
+            v = cal.cy - cal.fy * camera[:, 1] / axial
+        inside = ((axial > 0) & (u >= .5) & (u < cal.width - .5)
+                  & (v >= .5) & (v < cal.height - .5))
+        assert inside.any()
+        for point in points[inside]:
+            ray = point - pose[:3, 3]
+            ray /= np.linalg.norm(ray)
+            hit = np.array([-1], dtype=np.int32)
+            mujoco.mj_ray(run.bridge.mj_model, run.bridge.mj_data,
+                          pose[:3, 3], ray, None, 1, -1, hit)
+            assert run.bridge.mj_model.geom(int(hit[0])).name == "obstacle_southeast"
+        coverage = run.coverage.snapshot()["per_robot_observed_cells"]
+        assert coverage["robot_a"] == 0
+        assert coverage["robot_b"] > 0
 
 
 def test_recovery_streams_are_owned_and_turn_duration_uses_simulated_time():
