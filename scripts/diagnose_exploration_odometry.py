@@ -66,7 +66,8 @@ def diagnose(input_path: Path, robot_id: str, output: Path, limit: int | None = 
             seed = camera_truth.copy() if index == 0 else np.eye(4)
             if index:
                 seed[:3, 3] = [100., -100., 100.]  # Detect accidental live truth assistance.
-            frame = SensorFrame(np.zeros((*depth.shape, 3), dtype=np.uint8), depth, seed, row["time_s"])
+            frame = SensorFrame(np.zeros((*depth.shape, 3), dtype=np.uint8), depth, seed,
+                                row["time_s"], body_from_camera=mount)
             estimate = pipeline.process_frame(frame)
             body = estimate @ camera_from_body
             frames.append({
@@ -90,6 +91,7 @@ def diagnose(input_path: Path, robot_id: str, output: Path, limit: int | None = 
     report = {"summary": summary, "input_sha256": hashlib.sha256(raw).hexdigest(),
               "fixture_sha256": hashlib.sha256(scene.mjcf_xml.encode()).hexdigest(),
               "camera_intrinsics": vars(intrinsics), "cloud_config_key": "1",
+              "body_from_camera": mount.tolist(),
               "scope": "static-scene camera replay; initial pose seed only; not closed-loop navigation",
               "source_sha256": {name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()
                                 for name in ("src/slam/slam_pipeline.py", "src/slam/surface_odometry.py")},

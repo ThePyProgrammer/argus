@@ -23,11 +23,16 @@ def room_frame(pose, intrinsics, time, seed_pose):
 
 
 @pytest.mark.parametrize("motion", ["stationary", "translation", "rotation", "combined"])
-def test_tracks_room_motion_without_live_ground_truth(motion):
+@pytest.mark.parametrize("mounted", [False, True])
+def test_tracks_room_motion_without_live_ground_truth(motion, mounted):
     intrinsics = CameraIntrinsics.from_fov(96, 72)
     pipeline = SLAMPipeline(intrinsics, cloud_config_key="1")
     errors = []
     angles = []
+    mount = np.eye(4)
+    if mounted:
+        mount[:3, :3] = Rotation.from_rotvec([0., 0., .2]).as_matrix()
+        mount[:3, 3] = [.4, 0., .05]
     for step in range(41):
         fraction = step / 40
         pose = np.eye(4)
@@ -37,14 +42,53 @@ def test_tracks_room_motion_without_live_ground_truth(motion):
             pose[:3, :3] = Rotation.from_rotvec(fraction * np.array([.06, -.08, .04])).as_matrix()
         # Only the first frame supplies the true initial pose. Later truth is
         # deliberately wrong so a simulator-pose fallback cannot pass.
-        seed = np.eye(4)
+        camera_pose = pose @ mount
+        seed = camera_pose.copy()
         if step:
             seed[:3, 3] = [20., -30., 40.]
-        estimate = pipeline.process_frame(room_frame(pose, intrinsics, step * .01, seed))
+        frame = room_frame(camera_pose, intrinsics, step * .01, seed)
+        frame.body_from_camera = mount if mounted else None
+        estimate = frame.body_pose_from_camera(pipeline.process_frame(frame))
         errors.append(np.linalg.norm(estimate[:3, 3] - pose[:3, 3]))
         angles.append(Rotation.from_matrix(estimate[:3, :3].T @ pose[:3, :3]).magnitude())
     assert max(errors) < .02
     assert max(angles) < np.deg2rad(1.)
+
+
+@pytest.mark.parametrize("turn", [-.3, .3])
+@pytest.mark.parametrize("offset", [[.4, 0., .05], [-.3, .1, .1]])
+def test_offset_camera_turn_does_not_translate_stationary_body(turn, offset):
+    """A calibrated camera moves on an arc when the robot turns in place."""
+    intrinsics = CameraIntrinsics.from_fov(96, 72)
+    pipeline = SLAMPipeline(intrinsics, cloud_config_key="1")
+    mount = np.eye(4)
+    # MuJoCo camera axes: right, up, backward. Robot forward is body X.
+    mount[:3, :3] = [[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]]
+    mount[:3, 3] = offset
+    v, u = np.indices((intrinsics.height, intrinsics.width))
+    rays = np.stack(((u - intrinsics.cx) / intrinsics.fx,
+                     -(v - intrinsics.cy) / intrinsics.fy, -np.ones_like(u)), axis=-1)
+    errors = []
+    for step in range(41):
+        body = np.eye(4)
+        body[2, 3] = .3
+        body[:3, :3] = Rotation.from_rotvec([0., 0., turn * step / 40]).as_matrix()
+        camera = body @ mount
+        world_rays = rays @ camera[:3, :3].T
+        # Independent rendering of an infinite wall at world X=2.
+        depth = ((2. - camera[0, 3]) / world_rays[..., 0]).astype(np.float32)
+        seed = camera.copy()
+        if step:
+            seed = np.eye(4)
+            seed[:3, 3] = 100.
+        frame = SensorFrame(np.zeros((*depth.shape, 3), dtype=np.uint8), depth,
+                            seed, step * .01, body_from_camera=mount)
+        estimate = frame.body_pose_from_camera(pipeline.process_frame(frame))
+        assert pipeline.tracking_ok
+        errors.append(np.linalg.norm(estimate[:3, 3] - body[:3, 3]))
+        angle = Rotation.from_matrix(estimate[:3, :3].T @ body[:3, :3]).magnitude()
+        assert angle < np.deg2rad(1.)
+    assert max(errors) < .01
 
 
 def test_pinned_axes_ignore_dashboard_configuration(monkeypatch):

@@ -102,7 +102,12 @@ class SLAMPipeline:
 
         # Align against the last accepted camera frame.
         if self._prev_cloud is not None:
-            result = align_surfaces(registration_cloud, self._prev_cloud, self._voxel_size * 3)
+            mount = frame.body_from_camera
+            # Calibration is fixed, so the body origin has these coordinates
+            # in both camera frames. No live body/world pose is consulted.
+            motion_origin = None if mount is None else -mount[:3, :3].T @ mount[:3, 3]
+            result = align_surfaces(registration_cloud, self._prev_cloud, self._voxel_size * 3,
+                                    motion_origin=motion_origin)
             self.tracking_ok = bool(result.fitness > .3 and result.correspondences >= 100
                                     and result.observable_rank >= 3
                                     and np.isfinite(result.transformation).all())

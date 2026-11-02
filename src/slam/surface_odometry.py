@@ -39,14 +39,17 @@ class SurfaceAlignment:
 
 
 def align_surfaces(source: o3d.geometry.PointCloud, target: o3d.geometry.PointCloud,
-                   max_distance: float) -> SurfaceAlignment:
-    """Estimate target-from-source using small rigid updates about the camera.
+                   max_distance: float, *, motion_origin: np.ndarray | None = None) -> SurfaceAlignment:
+    """Estimate target-from-source about a calibrated motion origin.
 
     A plane constrains only three motion directions. Truncated least squares
     keeps unsupported increments zero instead of amplifying numerical noise.
-    Rotating about a cloud centroid would introduce an unsupported translation
-    when only a wall is visible, so increments use the camera origin.
+    The origin is the robot body origin expressed in target camera coordinates.
+    Its known camera offset accounts for camera motion during body rotation.
+    Without mounting calibration, retain the coincident camera/body convention.
+    A cloud centroid is not a physical motion origin.
     """
+    origin = np.zeros(3) if motion_origin is None else np.asarray(motion_origin, dtype=float)
     points = np.asarray(source.points)
     reference = np.asarray(target.points)
     normals = np.asarray(target.normals)
@@ -62,12 +65,12 @@ def align_surfaces(source: o3d.geometry.PointCloud, target: o3d.geometry.PointCl
         if np.count_nonzero(inliers) < 6:
             break
         p, q, n = current[inliers], reference[indices[inliers]], normals[indices[inliers]]
-        jacobian = np.column_stack((np.cross(p, n), n))
+        jacobian = np.column_stack((np.cross(p - origin, n), n))
         residual = np.einsum("ij,ij->i", q - p, n)
         delta, _, rank, _ = np.linalg.lstsq(jacobian, residual, rcond=SINGULAR_VALUE_RATIO)
         step = np.eye(4)
         step[:3, :3] = Rotation.from_rotvec(delta[:3]).as_matrix()
-        step[:3, 3] = delta[3:]
+        step[:3, 3] = origin + delta[3:] - step[:3, :3] @ origin
         transform = step @ transform
         if np.linalg.norm(delta) < 1e-6:
             break
