@@ -167,6 +167,7 @@ class ExplorationEpisode:
                                    "navigation_pose": "estimated_body_from_camera_mount_v1",
                                    "gait_config": asdict(GaitParams()),
                                    "gait_rule": "bounded_swing_thigh_lift_v1",
+                                   "gait_idle_rule": "standing_pose_phase_reset_v1",
                                    "floor_filter": "per_observation_plane_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:

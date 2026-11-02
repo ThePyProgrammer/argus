@@ -61,9 +61,13 @@ class TrotGaitController:
         # Clamp speed
         speed = min(float(np.sqrt(vx ** 2 + vy ** 2)), p.max_speed)
 
-        # Advance gait phase only when moving
-        if speed > 0.01 or abs(omega) > 0.01:
-            self._phase = (self._phase + p.frequency * dt) % 1.0
+        # Freezing mid-swing leaves a diagonal pair lifted during an idle
+        # command. Put all four feet down and restart from the phase boundary.
+        if speed <= 0.01 and abs(omega) <= 0.01:
+            self._phase = 0.0
+            return np.tile([p.standing_hip, p.standing_thigh, p.standing_calf], 4)
+
+        self._phase = (self._phase + p.frequency * dt) % 1.0
 
         ctrl = np.zeros(12)
 

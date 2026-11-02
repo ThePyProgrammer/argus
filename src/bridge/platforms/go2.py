@@ -33,7 +33,7 @@ class Go2VelocityController:
 
     def compute(self, command: RobotCommand, state: RobotState, dt: float) -> np.ndarray:
         if command.mode in {"stand", "stop", "recover"}:
-            return STANDING_QPOS.copy()
+            return self._gait.compute(0., 0., 0., float(dt))
         vx = float(command.linear[0])
         vy = float(command.linear[1])
         return self._gait.compute(vx, vy, float(command.yaw_rate), float(dt))

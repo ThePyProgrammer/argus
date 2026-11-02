@@ -73,6 +73,20 @@ def test_go2_stand_stop_and_recover_return_standing_pose():
         np.testing.assert_allclose(controller.compute(command, state, dt=0.02), STANDING_QPOS)
 
 
+@pytest.mark.parametrize("mode", ["velocity", "stand", "stop", "recover"])
+def test_go2_idle_modes_clear_suspended_swing_before_restart(mode):
+    platform = Go2Platform()
+    controller = platform.make_controller("robot_a")
+    state = platform.extract_state(None, None, 0, 0.0)
+    walking = RobotCommand.velocity([.4, 0.], 1.)
+    controller.compute(walking, state, dt=.1)
+    np.testing.assert_allclose(controller.compute(RobotCommand(mode=mode), state, dt=.01), STANDING_QPOS)
+
+    fresh = platform.make_controller("robot_a")
+    np.testing.assert_allclose(controller.compute(walking, state, dt=.01),
+                               fresh.compute(walking, state, dt=.01))
+
+
 def test_go2_velocity_controller_returns_twelve_targets():
     platform = Go2Platform()
     controller = platform.make_controller("robot_a")

@@ -73,6 +73,16 @@ class TestStandingPose:
         ctrl.compute(vx=0.0, vy=0.0, omega=0.0, dt=0.02)
         assert ctrl._phase == 0.0
 
+    @pytest.mark.parametrize("moving_time", [.03, .10, .23])
+    @pytest.mark.parametrize("yaw", [-1., 0., 1.])
+    def test_idle_after_walking_places_all_feet_in_standing_pose(self, moving_time, yaw):
+        params = GaitParams()
+        ctrl = TrotGaitController(params)
+        ctrl.compute(.4, 0., yaw, moving_time)
+        standing = np.tile([params.standing_hip, params.standing_thigh, params.standing_calf], 4)
+        for _ in range(18):
+            np.testing.assert_allclose(ctrl.compute(0., 0., 0., .01), standing)
+
 
 # ------------------------------------------------------------------ #
 # Input clamping
