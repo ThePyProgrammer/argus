@@ -173,7 +173,8 @@ class ExplorationLoop:
             min_cluster_size=self._config.min_cluster_size,
         )
         self._goal_selector = GoalSelector(strategy=self._config.goal_strategy)
-        self._path_planner = PathPlanner()
+        self._path_planner = PathPlanner(clearance_radius=self._config.planning_radius(
+            0., self._config.voxel_resolution))
         self._coverage_tracker = CoverageTracker(
             voxel_resolution=self._config.voxel_resolution,
         )
@@ -592,6 +593,12 @@ class ExplorationLoop:
         pose = frame.body_pose_from_camera(camera_pose)
         current_pos = pose[:3, 3].copy()
         self._robot_positions.append(current_pos)
+        # Enclose the fixed camera mount at every heading. Its 3D offset norm
+        # also bounds horizontal reach when the body pitches or rolls.
+        camera_offset = 0. if frame.body_from_camera is None else float(
+            np.linalg.norm(frame.body_from_camera[:3, 3]))
+        self._path_planner.set_clearance_radius(config.planning_radius(
+            camera_offset, config.voxel_resolution))
 
         # b. Stuck detection and recovery
         force_rescan, early_return = self._check_stuck(step, pose, frame.sim_time)

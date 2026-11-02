@@ -46,7 +46,8 @@ class PathPlanner:
     and furniture (robot body is ~30cm wide).
     """
 
-    def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.8):
+    def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.8,
+                 clearance_radius: float = 0.15):
         """Initialize planner.
 
         Args:
@@ -54,12 +55,24 @@ class PathPlanner:
                 Higher values discourage exploration through unknown space.
             inflation_radius: Distance in meters around obstacles where
                 traversal cost is increased. Should be >= robot half-width.
+            clearance_radius: Hard center-to-center obstacle exclusion in meters.
+                Exploration supplies its body/camera envelope plus raster margin.
         """
         self._unknown_cost = unknown_cost
         self._inflation_radius = inflation_radius
         self._inflation_cache: np.ndarray | None = None
         self._inflation_grid_id: int | None = None
         self._inflation_grid: np.ndarray | None = None
+        self._clearance_radius = None
+        self.set_clearance_radius(clearance_radius)
+
+    def set_clearance_radius(self, radius: float) -> None:
+        """Invalidate cached costs whenever fixed calibration changes the envelope."""
+        if not math.isfinite(radius) or radius < 0:
+            raise ValueError("Clearance radius must be finite and nonnegative")
+        if radius != self._clearance_radius:
+            self._clearance_radius = radius
+            self._inflation_cache = None
 
     def _get_inflation_cost(self, grid: OccupancyGrid2D) -> np.ndarray:
         """Voronoi-gradient costmap: paths stay centered in corridors.
@@ -80,7 +93,7 @@ class PathPlanner:
         cost = build_costmap(
             grid.grid,
             resolution=grid.resolution,
-            robot_half_width=0.15,
+            robot_half_width=self._clearance_radius,
             gradient_distance=self._inflation_radius,
         )
 
@@ -93,11 +106,15 @@ class PathPlanner:
         """Cells reachable under the same inflation and 8-neighbor rules as A*."""
         from scipy.ndimage import label
         passable = (grid.grid != CELL_OCCUPIED) & (self._get_inflation_cost(grid) < 1e5)
-        components, _ = label(passable, structure=np.ones((3, 3), dtype=int))
+        # Four-connected components equal eight-connected reachability when
+        # diagonal moves must also have both orthogonal neighbors clear.
+        components, _ = label(passable)
         row, col = grid.world_to_grid(start_world[:2])
         labels = [components[r, c]
                   for r in range(max(0, row - 1), min(grid.height, row + 2))
-                  for c in range(max(0, col - 1), min(grid.width, col + 2)) if passable[r, c]]
+                  for c in range(max(0, col - 1), min(grid.width, col + 2))
+                  if passable[r, c] and (r == row or c == col or
+                                        (passable[row, c] and passable[r, col]))]
         return np.isin(components, labels) & passable
 
     def plan(
@@ -126,16 +143,14 @@ class PathPlanner:
         # The robot's current position is always navigable (it's physically there),
         # even if the grid marks it as OCCUPIED due to ground voxels.
         # Only reject if the GOAL is occupied (can't drive into a wall).
-        if grid.grid[goal_row, goal_col] == CELL_OCCUPIED:
+        inflation_cost = self._get_inflation_cost(grid)
+        if grid.grid[goal_row, goal_col] == CELL_OCCUPIED or inflation_cost[goal_row, goal_col] >= 1e5:
             return None
 
         # Start == goal: return single waypoint
         if start_row == goal_row and start_col == goal_col:
             xy = grid.grid_to_world(start_row, start_col)
             return [np.array([xy[0], xy[1], 0.0], dtype=np.float64)]
-
-        # Compute inflation costmap
-        inflation_cost = self._get_inflation_cost(grid)
 
         # A* search
         # Priority queue: (f_cost, counter, row, col)
@@ -182,6 +197,9 @@ class PathPlanner:
                 extra = float(inflation_cost[nr, nc])
                 if extra >= 1e5:
                     continue  # Lethal zone — treat as impassable
+
+                if dr and dc and (inflation_cost[cr, nc] >= 1e5 or inflation_cost[nr, cc] >= 1e5):
+                    continue  # A diagonal must not cut a blocked corner.
 
                 if cell_val == CELL_UNKNOWN:
                     step_cost = move_cost * self._unknown_cost + extra
@@ -230,9 +248,41 @@ class PathPlanner:
         from src.exploration.path_smoother import smooth_path
         smoothed = smooth_path(path_world, resample_spacing=0.1, smoothing_window=50)
 
-        # Always include the goal
+        # Retain both endpoints before checking the continuous smoothed route.
         if len(path_world) > 0 and len(smoothed) > 0:
+            if not np.array_equal(smoothed[0], path_world[0]):
+                smoothed.insert(0, path_world[0])
             if not np.array_equal(smoothed[-1], path_world[-1]):
                 smoothed.append(path_world[-1])
 
-        return smoothed
+        return smoothed if self.path_is_clear(smoothed, grid) else path_world
+
+    def path_is_clear(self, path: list[np.ndarray], grid: OccupancyGrid2D) -> bool:
+        """Check every touched cell, including corner/boundary contacts, without clamping."""
+        if not path:
+            return False
+        costs = self._get_inflation_cost(grid)
+        points = (np.asarray(path)[:, :2] - grid.origin) / grid.resolution
+        if not np.isfinite(points).all():
+            return False
+        for start, end in zip(points, np.vstack((points[1:], points[-1:]))):
+            delta = end - start
+            crossings = [0., 1.]
+            for axis in range(2):
+                if abs(delta[axis]) > 1e-12:
+                    lo, hi = sorted((start[axis], end[axis]))
+                    crossings.extend((boundary - start[axis]) / delta[axis]
+                                     for boundary in range(math.ceil(lo), math.floor(hi) + 1))
+            crossings = np.unique(crossings)
+            samples = np.r_[crossings, (crossings[:-1] + crossings[1:]) / 2]
+            for t in samples:
+                xy = start + t * delta
+                # Boundary contact includes the cells on both sides. This also
+                # handles diagonal corner touches and lines along cell edges.
+                for col in {math.floor(xy[0] - 1e-9), math.floor(xy[0] + 1e-9)}:
+                    for row in {math.floor(xy[1] - 1e-9), math.floor(xy[1] + 1e-9)}:
+                        if not (0 <= row < grid.height and 0 <= col < grid.width):
+                            return False
+                        if costs[row, col] >= 1e5:
+                            return False
+        return True

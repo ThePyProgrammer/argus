@@ -187,6 +187,7 @@ def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(y
     camera = body @ mount
     frame = _make_sensor_frame(np.array([99., 99., 99.]))  # Not a navigation oracle.
     frame.body_from_camera = mount
+    expected_clearance = loop.config.planning_radius(np.linalg.norm(mount[:3, 3]), loop.config.voxel_resolution)
     monkeypatch.setattr(loop._slam, "process_frame", lambda f: SLAMResult(
         pose=camera, points=np.ones((1, 3)), colors=np.ones((1, 3)), metrics={},
         tracking_status=TrackingStatus.OK))
@@ -197,6 +198,7 @@ def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(y
     plan = MagicMock(side_effect=lambda start, goal, grid: [start, goal])
     monkeypatch.setattr(loop._path_planner, "plan", plan)
     linear, angular, metrics = loop.step_once(frame, 30)
+    assert loop._path_planner._clearance_radius == pytest.approx(expected_clearance)
     assert not metrics.terminated and linear[0] > 0
     assert angular == pytest.approx(0., abs=1e-12)
     np.testing.assert_allclose(plan.call_args.args[0], body[:3, 3], atol=1e-12)

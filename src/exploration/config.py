@@ -25,6 +25,9 @@ class ExplorationConfig:
     linear_speed: float = 0.8  # office-safe speed (2.0 was too fast for furniture)
     angular_speed: float = 1.0
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
+    footprint_radius_m: float = 0.35     # Go2 platform's circular body/leg envelope
+    camera_standoff_m: float = 0.15      # space beyond the fixed camera mount
+    clearance_margin_m: float = 0.05     # additional planning allowance, not an error bound
 
     # Termination and mobility recovery
     max_steps: int = 10000                # safety net step limit
@@ -53,3 +56,14 @@ class ExplorationConfig:
     floor_camera_height_m: float = 0.32    # upright Go2 camera calibration; no scene height oracle
     floor_height_tolerance_m: float = 0.04
     floor_distance_tolerance_m: float = 0.015
+
+    def planning_radius(self, camera_offset_m: float, resolution_m: float) -> float:
+        """All-heading footprint, camera stand-off, and cell raster allowance."""
+        import math
+        values = (self.footprint_radius_m, self.camera_standoff_m,
+                  self.clearance_margin_m, camera_offset_m, resolution_m)
+        if any(not math.isfinite(v) or v < 0 for v in values) or resolution_m == 0:
+            raise ValueError("Clearance dimensions must be finite and nonnegative; resolution must be positive")
+        # One half-diagonal for each of the occupied and traversed cells.
+        return (max(self.footprint_radius_m, camera_offset_m + self.camera_standoff_m)
+                + self.clearance_margin_m + math.sqrt(2) * resolution_m)
