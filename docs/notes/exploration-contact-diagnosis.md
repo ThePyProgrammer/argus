@@ -34,6 +34,8 @@ With both corrections, the seed-101 corridor reaches a one-second horizon with z
 
 ## Remaining limits
 
+The [five-second follow-up](exploration-longer-validation.md) finds a later calf-floor strike after restarting, a column collision in another layout, and substantial localization drift. Two layouts terminate early. The one-second result above establishes only the short reproduction; sustained navigation remains unresolved.
+
 ICP camera-position errors at the first planning frame are about 0.112 m for A and 0.156 m for B. Fixed mount calibration removes the frame mismatch, not localization drift. The planner's 0.15 m hard inflation also warrants review against the platform's 0.35 m footprint radius before claiming obstacle clearance. Longer trajectories, recovery, other speeds, and uneven terrain remain unvalidated by these short contact checks.
 
 Episode provenance records `estimated_body_from_camera_mount_v1`, `bounded_swing_thigh_lift_v1`, and the gait parameters. Earlier navigation traces and coverage results must not be treated as results for this revised baseline.

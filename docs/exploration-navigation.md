@@ -44,6 +44,8 @@ The relevant metrics, exploration, coordination, bridge, SLAM, locomotion, and d
 
 The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contacts and the stale-path failure corrected above. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
 
+The [five-second follow-up](notes/exploration-longer-validation.md) tests the camera/body and swing-lift corrections across all three layouts. Two runs stop early; a calf-floor strike returns after restarting, and another robot hits a column. All layouts show more than 0.5 m peak planar pose error for both robots. Restart handling, localization, and obstacle clearance remain unresolved despite improved short-run behavior.
+
 Episode provenance records the exploration configuration, `reachable_frontier_member_v1`, and `per_observation_plane_v1`. Selection timing now includes reachable-cell filtering and candidate ranking, and excludes A* execution, mapping, and rendering.
 
 ## Mobility recovery
