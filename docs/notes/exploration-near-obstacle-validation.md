@@ -60,3 +60,5 @@ uv run python scripts/diagnose_exploration_contacts.py --scenario cluttered_room
 ```
 
 Generated artifacts are ignored by Git. This is development validation on a fixed seed, not a general tracking or clearance guarantee.
+
+Follow-up: [longer runs and repeatability](exploration-repeatability-validation.md) preserve these five-second histories, verify collector neutrality through the corridor's terminal decision, and identify frontier exhaustion and repeated voxel queries as the next issues.
