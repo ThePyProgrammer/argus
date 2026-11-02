@@ -28,6 +28,18 @@ The comparator accepts smoke exports and contact diagnoses. It checks provenance
 
 The former `all_unreachable` failure at 0.29 simulated seconds is corrected. The [navigation baseline](exploration-navigation.md) now selects reachable frontier cells and separates observed floor before map accumulation. Recovery now measures commanded progress over simulated time. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records development results, remaining contacts, and the stale-path failure now corrected by persistent route invalidation. These checks do not establish long-run exploration performance or compare allocation methods.
 
+## Video replay
+
+Export a measured trace as a top-view MP4 with robot animation, traveled paths, and recorded coverage:
+
+```bash
+uv run --with imageio-ffmpeg python scripts/render_exploration_video.py outputs/exploration-planning/free-space-validation/cluttered-room-final/diagnosis.json --output outputs/exploration-planning/free-space-validation/cluttered-room-final/top-view.mp4
+```
+
+Use one OpenMP thread as above. The default is 25 fps at half speed, with a one-second initial hold and a three-second final hold. Set `--speed 1` for normal playback. Choose a new output name for each export. The script also writes a final-frame PNG and a JSON verification report.
+
+The renderer reconstructs joint motion by replaying saved commands through the current physics and controller. It checks every body position, including the initial state, against the recording with a tolerance of 0.1 micrometers and rejects a mismatch before encoding. Terminal stop commands do not advance physics. Coverage comes directly from saved measurements; the colored trails show travel, not observed floor area. Perception and planning are not rerun, so this is a visualization of an existing run, not a new exploration trial.
+
 ## Lifecycle
 
 ```python
