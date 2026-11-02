@@ -2,6 +2,8 @@
 
 Revision `c493d6c` substantially reduces the reproduced drift. It does not make depth-only localization reliable in every direction. Final planar error remains 0.24 to 0.48 m on the three tested camera trajectories, so navigation validation is still required before allocator comparisons.
 
+Follow-up: the [mounted-camera correction](exploration-body-origin-validation.md) identifies a further cause of that residual error. Defining unsupported motion at the calibrated body origin reduces robot A's final errors to 0.004 to 0.036 m on the same trajectories. The measurements below describe the earlier estimator.
+
 ## Diagnosis
 
 Repeating each robot's initial image 30 times produces negligible drift. Controlled translation and rotation do not: the former point-to-point ICP accumulates 0.21 to 0.62 m position error in the analytical room tests. Matching nearby sampled points on broad surfaces can explain camera rotation as translation.
