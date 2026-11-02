@@ -251,7 +251,9 @@ def test_failed_rescan_discards_route_and_stays_idle_until_success(failure, monk
     detector.return_value = [_make_cluster([0., 3., 0.])]
     planner.side_effect = lambda start, goal, grid: [start, goal]
     linear, angular, metrics = advance(57)
-    assert linear[0] > 0 and angular > 0 and not metrics.terminated
+    # The replacement route is to the left: resume by turning, not walking an arc.
+    np.testing.assert_array_equal(linear, [0., 0.])
+    assert angular > 0 and not metrics.terminated
     assert loop._current_waypoint_runner is not old_runner
     assert loop.measurement_state["goal_id"] is not None
 
@@ -347,7 +349,8 @@ def test_coordinator_keeps_exhausted_robot_idle_while_teammate_moves(absorbing, 
             assert tick.termination_reason is None
         a.frontier_detector.detect.return_value = [_make_cluster([0., 3., 0.])]
         resumed = coordinator.advance(stop_on_termination=absorbing)
-        assert resumed.commands["robot_a"].to_wire()["linear"][0] > 0
+        assert resumed.commands["robot_a"].to_wire()["linear"] == [0., 0.]
+        assert resumed.commands["robot_a"].to_wire()["yaw_rate"] > 0
         assert not resumed.metrics["robot_a"].terminated
         a.frontier_detector.detect.return_value = []
         b.frontier_detector.detect.return_value = []

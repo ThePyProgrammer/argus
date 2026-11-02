@@ -43,6 +43,7 @@ class WaypointRunner:
         linear_speed: float = 0.5,
         angular_speed: float = 1.0,
         arrival_threshold: float = 0.5,
+        heading_tolerance_rad: float | None = None,
     ) -> None:
         """Initialize the waypoint runner.
 
@@ -52,14 +53,21 @@ class WaypointRunner:
             angular_speed: Speed for angular rotation.
             arrival_threshold: Distance (meters) at which a waypoint is
                 considered reached.
+            heading_tolerance_rad: If set, turn in place above this heading
+                error before translating. None retains continuous forward turns.
         """
         if not waypoints:
             raise ValueError("waypoints list must not be empty")
+        if heading_tolerance_rad is not None and (
+            not math.isfinite(heading_tolerance_rad) or not 0 <= heading_tolerance_rad <= math.pi
+        ):
+            raise ValueError("Heading tolerance must be finite and within [0, pi]")
 
         self._waypoints = [np.asarray(w, dtype=np.float64) for w in waypoints]
         self._linear_speed = linear_speed
         self._angular_speed = angular_speed
         self._arrival_threshold = arrival_threshold
+        self._heading_tolerance_rad = heading_tolerance_rad
         self._current_index = 0
 
     def get_velocity(
@@ -132,6 +140,11 @@ class WaypointRunner:
 
         # Proportional control
         angular_vel = np.clip(angle_error * 2.0, -self._angular_speed, self._angular_speed)
+
+        # Exploration must not walk an uncontrolled arc while facing away from
+        # its cleared route. Turning in place also respects an all-heading envelope.
+        if self._heading_tolerance_rad is not None and abs(angle_error) > self._heading_tolerance_rad:
+            return np.zeros(2), float(angular_vel)
 
         # Always drive forward while turning -- quadrupeds can walk and
         # turn simultaneously. Scale down speed when far off heading.

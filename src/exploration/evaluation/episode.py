@@ -174,6 +174,7 @@ class ExplorationEpisode:
                                    "floor_filter": "supported_observation_plane_v2",
                                    "planning_free_space": "observed_floor_and_trajectory_v1",
                                    "planning_clearance": "body_camera_envelope_checked_segments_v1",
+                                   "path_following": "align_heading_before_translation_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:
             bridge.stop()

@@ -277,6 +277,7 @@ class ExplorationLoop:
             waypoints,
             linear_speed=self._config.linear_speed,
             angular_speed=self._config.angular_speed,
+            heading_tolerance_rad=self._config.forward_heading_tolerance_rad,
         )
         self._bootstrap_complete = True
         self._navigation_exhausted = False
@@ -506,6 +507,7 @@ class ExplorationLoop:
                     path,
                     linear_speed=config.linear_speed,
                     angular_speed=config.angular_speed,
+                    heading_tolerance_rad=config.forward_heading_tolerance_rad,
                     arrival_threshold=config.waypoint_arrival_threshold,
                 )
 

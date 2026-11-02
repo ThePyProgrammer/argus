@@ -24,6 +24,7 @@ class ExplorationConfig:
     waypoint_arrival_threshold: float = 0.3   # tighter threshold for continuous gait
     linear_speed: float = 0.8  # office-safe speed (2.0 was too fast for furniture)
     angular_speed: float = 1.0
+    forward_heading_tolerance_rad: float = 0.25  # turn in place before forward travel
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
     footprint_radius_m: float = 0.35     # Go2 platform's circular body/leg envelope
     camera_standoff_m: float = 0.15      # space beyond the fixed camera mount
