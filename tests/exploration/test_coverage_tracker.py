@@ -19,7 +19,7 @@ class TestExplorationConfig:
         assert cfg.rescan_distance_m == 2.0
         assert cfg.rescan_voxel_delta == 500
         assert cfg.max_steps == 10000
-        assert cfg.stuck_threshold_steps == 30
+        assert cfg.stuck_timeout_s == 2.0
         assert cfg.stuck_distance_m == 0.05
         assert cfg.log_interval_steps == 50
         assert cfg.voxel_resolution == 0.05

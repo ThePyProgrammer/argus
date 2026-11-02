@@ -90,7 +90,7 @@ class TestExplorationLoopIntegration:
             log_interval_steps=10,
             rescan_distance_m=0.5,
             rescan_voxel_delta=20,
-            stuck_threshold_steps=100,  # disable stuck detection
+            stuck_timeout_s=100,  # disable stuck detection
         )
 
         loop = ExplorationLoop(
@@ -122,7 +122,7 @@ class TestExplorationLoopIntegration:
             log_interval_steps=20,
             rescan_distance_m=0.5,
             rescan_voxel_delta=20,
-            stuck_threshold_steps=200,  # disable stuck detection
+            stuck_timeout_s=200,  # disable stuck detection
         )
 
         loop = ExplorationLoop(
@@ -146,7 +146,7 @@ class TestExplorationLoopIntegration:
             log_interval_steps=10,
             rescan_distance_m=0.5,
             rescan_voxel_delta=20,
-            stuck_threshold_steps=100,
+            stuck_timeout_s=100,
         )
 
         loop = ExplorationLoop(

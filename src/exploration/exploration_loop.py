@@ -44,6 +44,7 @@ from src.exploration.floor_filter import FloorFilter
 from src.exploration.goal_selector import GoalSelector
 from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
+from src.exploration.progress_monitor import ProgressMonitor
 from src.exploration.skills.executor import SkillExecutionResult, SkillExecutor
 from src.exploration.skills.library import create_default_skill_registry
 from src.exploration.skills.recorder import SkillOutcomeRecorder
@@ -58,8 +59,8 @@ logger = logging.getLogger(__name__)
 class StuckRecovery:
     """Reverse-then-turn recovery when robot is physically stuck.
 
-    When triggered: first reverses for a set number of steps to back away
-    from the obstacle, then turns 90 degrees with randomized direction.
+    When triggered: first reverses for a simulated-time interval to back away
+    from the obstacle, then turns through a fixed angle with randomized direction.
     This gets the robot clear of furniture/walls before choosing a new heading.
     """
 
@@ -68,22 +69,25 @@ class StuckRecovery:
         turn_angle: float = np.pi * 0.75,  # 135 degrees -- bigger turn to escape corners
         angular_speed: float = 1.5,
         reverse_speed: float = 1.0,  # faster reverse
-        reverse_steps: int = 25,     # longer reverse to clear obstacles
+        reverse_duration_s: float = 0.25,
         rng: np.random.Generator | None = None,
     ) -> None:
         self._turn_angle = turn_angle
         self._angular_speed = angular_speed
         self._reverse_speed = reverse_speed
-        self._reverse_steps = reverse_steps
+        if any(not np.isfinite(v) or v <= 0 for v in
+               (turn_angle, angular_speed, reverse_speed, reverse_duration_s)):
+            raise ValueError("Recovery parameters must be finite and positive")
+        self._reverse_duration_s = reverse_duration_s
         self._rng = rng
         self._remaining_turn: float = 0.0
-        self._remaining_reverse: int = 0
+        self._remaining_reverse: float = 0.0
         self._active: bool = False
         self._phase: str = "idle"  # "reverse" or "turn"
 
     def trigger(self) -> None:
         """Start a reverse-then-turn recovery."""
-        self._remaining_reverse = self._reverse_steps
+        self._remaining_reverse = self._reverse_duration_s
         direction = 1.0 if (self._rng.random() if self._rng is not None else np.random.random()) > 0.5 else -1.0
         self._remaining_turn = self._turn_angle * direction
         self._active = True
@@ -95,24 +99,27 @@ class StuckRecovery:
         Returns:
             (vx, vy, omega) while recovery is active, None when done.
         """
+        if not np.isfinite(dt) or dt <= 0:
+            raise ValueError("Recovery interval must be finite and positive")
         if not self._active:
             return None
 
         if self._phase == "reverse":
-            self._remaining_reverse -= 1
-            if self._remaining_reverse <= 0:
+            duration = min(dt, self._remaining_reverse)
+            self._remaining_reverse = max(0.0, self._remaining_reverse - dt)
+            if self._remaining_reverse <= 1e-12:
                 self._phase = "turn"
-            return (-self._reverse_speed, 0.0, 0.0)  # reverse
+            return (-self._reverse_speed * duration / dt, 0.0, 0.0)
 
-        # Turn phase
-        turn = np.sign(self._remaining_turn) * self._angular_speed
-        self._remaining_turn -= turn * dt
-
-        if abs(self._remaining_turn) < 0.1:
+        if abs(self._remaining_turn) <= 1e-12:
             self._active = False
             self._phase = "idle"
             return None
-
+        # Scale the last command to the remaining angle, avoiding overshoot
+        # and sign oscillation for coarse or irregular sensor intervals.
+        turn = float(np.clip(self._remaining_turn / dt,
+                             -self._angular_speed, self._angular_speed))
+        self._remaining_turn -= turn * dt
         return (0.0, 0.0, turn)
 
     @property
@@ -176,15 +183,20 @@ class ExplorationLoop:
         self._current_waypoint_runner: WaypointRunner | None = None
         self._last_rescan_pos = np.zeros(3, dtype=np.float64)
         self._last_voxel_count = 0
-        self._stuck_counter = 0
-        self._stuck_recovery = StuckRecovery(rng=recovery_rng)
+        self._progress = ProgressMonitor(self._config.stuck_timeout_s,
+                                         self._config.stuck_distance_m,
+                                         self._config.stuck_angle_rad)
+        self._last_command = (np.zeros(2), 0.0)
+        self._stuck_recovery = StuckRecovery(
+            rng=recovery_rng, reverse_duration_s=self._config.recovery_reverse_duration_s)
+        if frame_dt is not None and (not np.isfinite(frame_dt) or frame_dt <= 0):
+            raise ValueError("Frame interval must be finite and positive")
         self._frame_dt = frame_dt
         self._previous_sim_time: float | None = None
         self._planning_attempts: list[tuple[str, bool]] = []
         self._selection_latency_ms: list[float] = []
         self._planning_sequence = 0
         self._goal_id: str | None = None
-        self._last_position = np.zeros(3, dtype=np.float64)
         self._last_coverage = 0.0
         self._last_bbox_coverage = 0.0
         self._last_frontier_count = 0
@@ -330,61 +342,39 @@ class ExplorationLoop:
         return pose, current_pos
 
     def _check_stuck(
-        self, step: int, current_pos: np.ndarray,
+        self, step: int, pose: np.ndarray, sim_time: float,
     ) -> tuple[bool, tuple[np.ndarray, float, StepMetrics] | None]:
-        """Run stuck detection and recovery logic.
+        """Check commanded progress; recovery gets its own fresh time window."""
+        if not self._stuck_recovery.is_active:
+            if self._progress.update(pose, sim_time, *self._last_command):
+                logger.warning("[Step %d] No commanded progress for %.2f s. Recovering.",
+                               step, self._config.stuck_timeout_s)
+                self._stuck_recovery.trigger()
+                self._progress.reset()
+                self._current_waypoint_runner = None
+                self._goal_id = None
 
-        Returns:
-            (force_rescan, early_return) where early_return is a full
-            step_once return tuple when recovery is mid-execution, else None.
-        """
-        config = self._config
-
-        if step > 0:
-            dist_moved = float(np.linalg.norm(current_pos - self._last_position))
-            if dist_moved < config.stuck_distance_m:
-                self._stuck_counter += 1
-            else:
-                self._stuck_counter = 0
-
-        force_rescan = False
-
-        # If stuck recovery is active, execute recovery turn instead of normal logic
         if self._stuck_recovery.is_active:
-            dt = self._frame_dt if self._frame_dt is not None else 0.2
-            recovery_cmd = self._stuck_recovery.step(dt)
+            # A recovery cannot trigger on the first observation, so the actual
+            # sensor interval is known before issuing its first command.
+            recovery_cmd = self._stuck_recovery.step(self._frame_dt)
             if recovery_cmd is not None:
                 vx, vy, omega = recovery_cmd
-                early = (
-                    np.array([vx, vy], dtype=np.float64),
-                    omega,
-                    StepMetrics(
-                        frontiers=self._last_frontier_count,
-                        coverage=self._last_coverage,
-                        terminated=False,
-                        voxels=self._octomap.num_occupied,
-                        rescan_triggered=False,
-                    ),
-                )
-                return False, early
-            else:
-                # Recovery just completed -- force rescan for new frontier
-                logger.info(
-                    "[Step %d] Stuck recovery complete. Forcing frontier rescan.",
-                    step,
-                )
-                self._current_waypoint_runner = None
-                force_rescan = True
-
-        if self._stuck_counter >= config.stuck_threshold_steps:
-            logger.warning(
-                "[Step %d] Stuck detected (%d steps). Triggering turn recovery.",
-                step, self._stuck_counter,
-            )
-            self._stuck_recovery.trigger()
-            self._stuck_counter = 0
-
-        return force_rescan, None
+                linear = np.array([vx, vy], dtype=np.float64)
+                self._last_command = (linear.copy(), omega)
+                return False, (linear, omega, StepMetrics(
+                    frontiers=self._last_frontier_count,
+                    coverage=self._last_coverage,
+                    terminated=False,
+                    voxels=self._octomap.num_occupied,
+                    rescan_triggered=False,
+                ))
+            logger.info("[Step %d] Recovery complete. Forcing frontier rescan.", step)
+            self._progress.reset()
+            self._last_command = (np.zeros(2), 0.0)
+            self._current_waypoint_runner = None
+            return True, None
+        return False, None
 
     def _should_rescan(
         self, step: int, current_pos: np.ndarray, force_rescan: bool,
@@ -451,7 +441,7 @@ class ExplorationLoop:
                 robot_position=current_pos,
                 frontiers=frontiers,
                 is_stuck=self._stuck_recovery.is_active,
-                no_progress_steps=self._stuck_counter,
+                no_progress_steps=self._progress.no_progress_steps,
                 blocked_path_count=0,
                 recent_skill_ids=(),
                 recent_termination_reasons=(),
@@ -571,17 +561,18 @@ class ExplorationLoop:
         # a. Update SLAM and OctoMap
         self._planning_attempts = []
         self._selection_latency_ms = []
-        if self._frame_dt is not None:
-            if self._previous_sim_time is not None:
-                elapsed = frame.sim_time - self._previous_sim_time
-                if elapsed <= 0:
-                    raise ValueError("Exploration sensor times must increase")
-                self._frame_dt = elapsed
-            self._previous_sim_time = frame.sim_time
+        if not np.isfinite(frame.sim_time):
+            raise ValueError("Exploration sensor time must be finite")
+        if self._previous_sim_time is not None:
+            elapsed = frame.sim_time - self._previous_sim_time
+            if elapsed <= 0:
+                raise ValueError("Exploration sensor times must increase")
+            self._frame_dt = elapsed
+        self._previous_sim_time = frame.sim_time
         pose, current_pos = self._update_slam(frame)
 
         # b. Stuck detection and recovery
-        force_rescan, early_return = self._check_stuck(step, current_pos)
+        force_rescan, early_return = self._check_stuck(step, pose, frame.sim_time)
         if early_return is not None:
             return early_return
 
@@ -617,8 +608,8 @@ class ExplorationLoop:
                 self._last_frontier_count,
             )
 
-        # g. Update last_position for stuck detection
-        self._last_position = current_pos.copy()
+        # g. Attribute the next pose interval to this command.
+        self._last_command = (linear_vel.copy(), float(angular_vel))
 
         metrics = StepMetrics(
             frontiers=frontier_count,

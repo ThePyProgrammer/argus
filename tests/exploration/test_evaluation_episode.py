@@ -61,6 +61,7 @@ def test_frontier_planning_succeeds_and_trace_is_observer_invariant():
     assert all(r["goal_assignments"] >= 1 for r in result["reliability"]["per_robot"].values())
     assert sum(r["planning_failures"] for r in result["reliability"]["per_robot"].values()) == 0
     assert result["coverage"]["capped_time_s"] == .35
+    assert all(r["recovery_entries"] == 0 for r in result["reliability"]["per_robot"].values())
 
 
 def test_dashboard_cloud_setting_cannot_change_evaluation_maps():
@@ -109,8 +110,8 @@ def test_resolved_heading_and_capture_pose_match_current_physics():
 
 
 def test_recovery_streams_are_owned_and_turn_duration_uses_simulated_time():
-    first = StuckRecovery(reverse_steps=1, rng=np.random.default_rng([101, 2, 0]))
-    second = StuckRecovery(reverse_steps=1, rng=np.random.default_rng([101, 2, 0]))
+    first = StuckRecovery(reverse_duration_s=.01, rng=np.random.default_rng([101, 2, 0]))
+    second = StuckRecovery(reverse_duration_s=.01, rng=np.random.default_rng([101, 2, 0]))
     np.random.seed(99)
     first.trigger()
     np.random.random(1000)

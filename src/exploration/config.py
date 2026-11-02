@@ -26,10 +26,12 @@ class ExplorationConfig:
     angular_speed: float = 1.0
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
 
-    # Termination
+    # Termination and mobility recovery
     max_steps: int = 10000                # safety net step limit
-    stuck_threshold_steps: int = 30       # faster stuck detection
-    stuck_distance_m: float = 0.05        # minimum movement over threshold steps
+    stuck_timeout_s: float = 2.0          # simulation time without commanded progress
+    stuck_distance_m: float = 0.05        # net planar displacement resets the timeout
+    stuck_angle_rad: float = 0.1         # yaw progress for pure rotation commands
+    recovery_reverse_duration_s: float = 0.25
 
     # Frontier detection
     voxel_resolution: float = 0.05        # must match OctoMapBuilder

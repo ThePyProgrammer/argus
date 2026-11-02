@@ -48,12 +48,16 @@ class MockBridge:
 
     def start(self) -> SensorFrame:
         self._step_count = 0
-        return _make_sensor_frame(self._position.copy())
+        frame = _make_sensor_frame(self._position.copy())
+        frame.sim_time = self._step_count * .1
+        return frame
 
     def step(self, action=None) -> SensorFrame:
         self._step_count += 1
         self._position[0] += self._move_per_step
-        return _make_sensor_frame(self._position.copy())
+        frame = _make_sensor_frame(self._position.copy())
+        frame.sim_time = self._step_count * .1
+        return frame
 
     def set_velocity(self, linear: np.ndarray, angular: float) -> None:
         self._velocity_commands.append((linear, angular))
@@ -153,6 +157,36 @@ def test_failed_cell_does_not_discard_other_cells_of_the_same_cluster():
     assert loop.measurement_state["planning_attempts"] == (("1", False), ("2", True))
 
 
+def test_recovery_does_not_accumulate_another_stuck_timeout():
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap(),
+                           ExplorationConfig(stuck_timeout_s=.2, recovery_reverse_duration_s=.1))
+    recovering = []
+    for step in range(29):
+        frame = _make_sensor_frame()
+        frame.sim_time = step * .1
+        linear, _, _ = loop.step_once(frame, step)
+        active = loop.measurement_state["recovering"]
+        recovering.append(active)
+        if active:
+            assert loop._progress.no_progress_steps == 0
+        if step == 3:
+            assert active
+            assert linear[0] < 0  # Recover on the triggering frame.
+    completion = next(i for i in range(4, len(recovering)) if not recovering[i])
+    assert not any(recovering[completion:completion + 3])
+    assert recovering[completion + 3]
+
+
+@pytest.mark.parametrize("timestamp", [0., -.1, float("nan"), float("inf")])
+def test_sensor_clock_must_advance_even_without_explicit_frame_dt(timestamp):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    frame = _make_sensor_frame()
+    loop.step_once(frame, 0)
+    frame.sim_time = timestamp
+    with pytest.raises(ValueError, match="sensor time"):
+        loop.step_once(frame, 1)
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -164,7 +198,7 @@ class TestExplorationLoop:
         """Create a fast test config."""
         defaults = dict(
             max_steps=100,
-            stuck_threshold_steps=5,
+            stuck_timeout_s=0.5,
             rescan_distance_m=0.5,
             rescan_voxel_delta=50,
             log_interval_steps=10,
@@ -297,7 +331,7 @@ class TestExplorationLoop:
         bridge = MockBridge(move_per_step=0.0)  # no movement
         slam = MockSLAM()
         octomap = MockOctoMap()
-        config = self._make_config(max_steps=80, stuck_threshold_steps=5)
+        config = self._make_config(max_steps=80, stuck_timeout_s=0.5)
 
         loop = ExplorationLoop(bridge, slam, octomap, config)
 
@@ -528,13 +562,13 @@ class TestStuckRecovery:
     """Tests for the StuckRecovery turn-in-place mechanism."""
 
     def test_stuck_recovery_triggers(self) -> None:
-        """Stuck detection triggers StuckRecovery after threshold steps."""
+        """Stuck detection triggers StuckRecovery after a simulated-time timeout."""
         bridge = MockBridge(move_per_step=0.0)  # no movement
         slam = MockSLAM()
         octomap = MockOctoMap()
         config = ExplorationConfig(
             max_steps=30,
-            stuck_threshold_steps=5,
+            stuck_timeout_s=0.5,
             rescan_distance_m=0.5,
             rescan_voxel_delta=50,
             log_interval_steps=100,
@@ -551,14 +585,14 @@ class TestStuckRecovery:
                  np.array([2.0, 0.0, 0.0]),
                  np.array([5.0, 0.0, 0.0]),
              ]):
-            # Run enough steps to trigger stuck detection + reverse + turn
+            # Run enough simulated time to trigger recovery.
             frame = bridge.start()
             for step in range(30):
                 linear_vel, angular_vel, metrics = loop.step_once(frame, step)
                 bridge.set_velocity(linear_vel, angular_vel)
                 frame = bridge.step()
 
-            # After stuck_threshold_steps (5), recovery should have been triggered.
+            # After stuck_timeout_s (0.5 seconds), recovery should have been triggered.
             # Recovery is reverse-then-turn: check for reverse (negative linear)
             # OR angular turn commands as evidence of activation.
             recovery_commands = [
