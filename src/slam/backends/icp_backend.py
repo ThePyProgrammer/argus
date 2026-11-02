@@ -18,9 +18,9 @@ from src.slam.slam_pipeline import SLAMPipeline
 class ICPBackend:
     """ICP-based SLAM backend wrapping SLAMPipeline.
 
-    Provides the same point-to-point ICP odometry as before, but through
-    the standard SLAMProtocol interface so it can be swapped with other
-    backends (ORB-SLAM3, OpenVINS, etc.) without changing caller code.
+    Provides point-to-plane ICP odometry through the standard SLAMProtocol
+    interface so it can be swapped with other backends without changing
+    caller code.
     """
 
     CAPABILITIES: dict = {
@@ -62,8 +62,8 @@ class ICPBackend:
             pose=pose,
             points=self._pipeline.last_frame_cloud.copy(),
             colors=self._pipeline._last_frame_colors.copy(),
-            metrics={"fitness": 1.0},
-            tracking_status=TrackingStatus.OK,
+            metrics=dict(self._pipeline.registration_metrics),
+            tracking_status=TrackingStatus.OK if self._pipeline.tracking_ok else TrackingStatus.LOST,
         )
 
     def reset(self) -> None:

@@ -1,11 +1,11 @@
-"""SLAM pipeline using Open3D ICP odometry.
+"""SLAM pipeline using constrained point-to-plane depth odometry.
 
 Processes RGB-D frames to estimate camera poses via frame-to-frame ICP
 alignment and accumulates a global point cloud. Each frame's point cloud
 is aligned to the previous frame and the relative transform is chained
 into a cumulative pose estimate.
 
-No loop closure or pose graph optimization — drift will accumulate over
+No loop closure or pose graph optimization: drift will accumulate over
 long trajectories. Can be replaced with a more sophisticated backend
 (e.g., RTAB-Map, ORB-SLAM3) via the same interface.
 """
@@ -15,6 +15,7 @@ import open3d as o3d
 
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.slam.depth_to_cloud import depth_to_pointcloud
+from src.slam.surface_odometry import align_surfaces, surface_cloud
 
 
 MAX_CLOUD_POINTS = 500_000
@@ -43,6 +44,8 @@ class SLAMPipeline:
         self._current_pose: np.ndarray = np.eye(4)  # cumulative pose
         self._last_frame_cloud: np.ndarray = np.empty((0, 3))
         self._last_frame_colors: np.ndarray = np.empty((0, 3))
+        self.registration_metrics: dict = {}
+        self.tracking_ok = True
 
     def reset(self) -> None:
         """Clear all accumulated state for a fresh start."""
@@ -52,13 +55,16 @@ class SLAMPipeline:
         self._current_pose = np.eye(4)
         self._last_frame_cloud = np.empty((0, 3))
         self._last_frame_colors = np.empty((0, 3))
+        self.registration_metrics = {}
+        self.tracking_ok = True
 
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         """Process one RGB-D frame. Returns ICP-estimated (4,4) pose.
 
         Aligns each frame's point cloud to the previous via ICP and chains
         the relative transforms to produce a cumulative pose estimate.
-        Falls back to ground-truth on the first frame or when ICP fails.
+        Seeds from ground truth on the first frame only. Rejected alignments
+        retain the previous estimate; they do not read a live simulator pose.
 
         Args:
             frame: SensorFrame with rgb, depth, ground_truth_pose, sim_time.
@@ -71,6 +77,11 @@ class SLAMPipeline:
         if not self._slam_poses:
             self._current_pose = frame.ground_truth_pose.copy()
 
+        self._last_frame_cloud = np.empty((0, 3))
+        self._last_frame_colors = np.empty((0, 3))
+        self.registration_metrics = {"fitness": 0., "inlier_rmse": None,
+                                     "observable_rank": 0, "accepted": False}
+        self.tracking_ok = False
         if frame.depth is None:
             self._slam_poses.append(self._current_pose.copy())
             return self._current_pose.copy()
@@ -82,23 +93,40 @@ class SLAMPipeline:
         )
         cloud = cloud.voxel_down_sample(self._voxel_size)
 
-        # Depth filtering: run every 5th frame to reduce CPU load
-        if len(cloud.points) > 50 and len(self._slam_poses) % 5 == 0:
+        # Apply the same preparation to both sides of every alignment.
+        if len(cloud.points) > 50:
             cloud, _ = cloud.remove_statistical_outlier(
                 nb_neighbors=10, std_ratio=2.0,
             )
+        registration_cloud = surface_cloud(cloud)
 
-        # ICP frame-to-frame alignment (skip first frame — no previous cloud yet)
-        if self._prev_cloud is not None and len(cloud.points) > 100:
-            result = o3d.pipelines.registration.registration_icp(
-                cloud,
-                self._prev_cloud,
-                max_correspondence_distance=self._voxel_size * 3,
-                init=np.eye(4),
-                estimation_method=o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-            )
-            if result.fitness > 0.3:
+        # Align against the last accepted camera frame.
+        if self._prev_cloud is not None:
+            result = align_surfaces(registration_cloud, self._prev_cloud, self._voxel_size * 3)
+            self.tracking_ok = bool(result.fitness > .3 and result.correspondences >= 100
+                                    and result.observable_rank >= 3
+                                    and np.isfinite(result.transformation).all())
+            self.registration_metrics = {"fitness": result.fitness, "inlier_rmse": result.inlier_rmse,
+                                         "observable_rank": result.observable_rank,
+                                         "accepted": self.tracking_ok}
+            if self.tracking_ok:
                 self._current_pose = self._current_pose @ result.transformation
+        else:
+            # The initial pose is supplied explicitly, so its map can be
+            # seeded even if that view cannot support subsequent odometry.
+            self.tracking_ok = not self._slam_poses and len(cloud.points) > 0
+            self.registration_metrics["accepted"] = self.tracking_ok
+
+        if not self.tracking_ok:
+            # The previous reference still belongs to the held pose. Do not
+            # advance it or insert an unlocalized cloud after a rejected frame.
+            self._slam_poses.append(self._current_pose.copy())
+            return self._current_pose.copy()
+
+        # Keep exactly the prepared cloud in camera coordinates. Reprojecting
+        # it here previously used the mutable global axis configuration and
+        # discarded filtering, even when this pipeline had a pinned config.
+        self._prev_cloud = registration_cloud
 
         # Transform cloud to world frame using ICP-estimated pose
         cloud.transform(self._current_pose)
@@ -124,10 +152,6 @@ class SLAMPipeline:
                 cap_voxel *= 2
 
         self._slam_poses.append(self._current_pose.copy())
-        self._prev_cloud = depth_to_pointcloud(
-            frame.depth, frame.rgb, self._intrinsics, max_depth=10.0
-        ).voxel_down_sample(self._voxel_size)
-
         return self._current_pose.copy()
 
     @property

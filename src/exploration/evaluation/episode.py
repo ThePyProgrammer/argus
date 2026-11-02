@@ -161,6 +161,7 @@ class ExplorationEpisode:
                        provenance={"sample": sample.to_dict(), "method": "legacy_voronoi",
                                    "recovery_streams": {rid: [seed, 2, i] for i, rid in enumerate(config.robot_ids)},
                                    "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1",
+                                   "odometry_rule": "planar_surface_svd_v1",
                                    "exploration_config": asdict(robots[config.robot_ids[0]].exploration.config),
                                    "navigation_target_rule": "reachable_frontier_member_v1",
                                    "route_lifecycle": "invalidate_on_rescan_v1",
