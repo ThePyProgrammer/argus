@@ -30,6 +30,8 @@ Final full-orientation errors are 0.54, 0.74, and 0.24 degrees respectively. All
 
 The cluttered-room B trajectory retains a separate close-obstacle tracking failure. At its first rejection, 3.09 s, the camera is about 0.14 m from the column face. Fitness is 1 and rank is three, but the alignment does not meet the 100-correspondence acceptance requirement. The prior estimator also rejects 84 frames on this trajectory and finishes with 24.10 cm planar error. The correction therefore improves position without removing this failure. Final orientation error is about 18.8 degrees after tracking loss in both versions.
 
+Follow-up: [bounded registration refinement](exploration-near-obstacle-validation.md) removes the sampling failure at 3.09 s without relaxing acceptance thresholds. The first rejection moves to 3.77 s, about 1.4 cm from the column, where the geometric rank is insufficient. The table above describes the earlier fixed-resolution estimator.
+
 Saved-trajectory replay continues after rejection to expose failures. The real evaluator terminates on lost tracking; these replays do not imply that navigation deliberately continues with a lost pose.
 
 ## Fresh exploration check

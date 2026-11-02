@@ -20,6 +20,8 @@ The ICP backend now uses [constrained surface odometry](notes/exploration-odomet
 
 With mounting calibration, [odometry increments use the body origin](notes/exploration-body-origin-validation.md). This accounts for the camera's arc during turns instead of treating uncertain camera translation as zero. Calibration does not provide a live body pose or resolve all unobserved motion.
 
+[Close-range registration](notes/exploration-near-obstacle-validation.md) can retain finer observed points when the normal map resolution removes too much support. Refinement is bounded and only affects registration. Map density and the overlap, correspondence, and rank requirements remain unchanged; diagnostics report the chosen resolution and reason for any rejection.
+
 ## Floor observations
 
 [FloorFilter](../src/exploration/floor_filter.py) classifies each SLAM frame before its points enter the accumulated obstacle cloud. This avoids treating floor points spread across height bins by pose error and voxelization as obstacles.
