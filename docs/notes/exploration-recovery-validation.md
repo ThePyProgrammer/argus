@@ -39,7 +39,7 @@ Regression tests cover absent frontiers, empty feasible-candidate sets, failed A
 
 A real corridor run with seed 101 reaches 3.1 simulated seconds. Robot A loses its goal at 2.93 seconds and receives zero linear and angular commands on all 17 remaining ticks; robot B continues moving. At 2.95 seconds, the former 0.796 m/s stale-route command is now zero. Pre-failure commands and body trajectories agree with the saved historical run within floating-point tolerance (1e-10), though they are not bitwise identical. The run records four robot-obstacle contact episodes, with no falls or recovery entries. The saved trace is `outputs/exploration-planning/stale-route-validation/branching_corridor-seed-101-3.1s.json`.
 
-Contact, pose, and sensing diagnosis remains necessary before expanding the evaluation matrix. The historical five-second results above are not results for the corrected route lifecycle.
+The [subsequent contact diagnosis](exploration-contact-diagnosis.md) identifies calf-floor strikes, corrects camera/body navigation frames and swing clearance, and explains initial zero coverage through independent wall rays. Longer validation remains necessary before expanding the evaluation matrix. The historical five-second results above are not results for the corrected route lifecycle.
 
 ## Runtime diagnostic
 

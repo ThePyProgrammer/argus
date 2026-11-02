@@ -53,8 +53,9 @@ class SensorFrame:
     Attributes:
         rgb: Color image as (H, W, 3) uint8 array (BGR from OpenCV).
         depth: Depth image as (H, W) float32 in meters, or None if unavailable.
-        ground_truth_pose: 4x4 float64 homogeneous transform (world frame).
+        ground_truth_pose: 4x4 camera-to-world transform for rendered observations.
         sim_time: Simulation timestamp in seconds (computed as step_count * dt).
+        body_from_camera: Optional fixed camera-to-body mounting calibration.
     """
 
     rgb: np.ndarray  # (H, W, 3) uint8
