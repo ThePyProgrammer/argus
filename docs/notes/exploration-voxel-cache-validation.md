@@ -57,3 +57,5 @@ uv run python scripts/compare_exploration_traces.py outputs/exploration-planning
 ```
 
 See the [preceding validation](exploration-repeatability-validation.md) for the original traces and their limits. Generated artifacts are ignored by Git.
+
+Follow-up: [the free-space correction](exploration-free-space-correction.md) implements observed free-space labels, weighted floor support, and unreached goals with exact path endpoints. Its live runs expose camera stand-off and gait-contact limits that remain before the evaluation gate passes.

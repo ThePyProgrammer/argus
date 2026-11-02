@@ -113,6 +113,7 @@ def diagnose(scenario: str, seed: int, horizon: float, output: Path) -> dict:
                 truth = frames[rid].ground_truth_pose
                 yaw = lambda p: float(np.arctan2(p[1, 0], p[0, 0]))
                 report["poses"].append({"robot": rid, "time_s": frames[rid].sim_time,
+                    "registration": dict(getattr(getattr(robot.slam, "_pipeline", None), "registration_metrics", {})),
                     "camera_translation_error_m": float(np.linalg.norm(camera[:3, 3] - truth[:3, 3])),
                     "estimated_body_pose": body.tolist(), "true_body_pose": bodies[rid].tolist(),
                     "camera_x_heading_rad": yaw(camera), "estimated_body_yaw_rad": yaw(body),

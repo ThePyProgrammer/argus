@@ -8,6 +8,8 @@ Cluster centroids remain useful for ranking regions. Navigation targets are actu
 
 Clusters retain nearest, largest, or supplied bias scoring. Within a cluster, cells are ordered by distance from the current estimated position, then row and column. Other cells are tried before discarding a region. Occupied, inflated, and disconnected cells are excluded. Clearance caches are invalidated when grid contents change.
 
+Candidates within the waypoint arrival radius are skipped, and smoothed paths retain the exact selected goal. This prevents repeatedly installing paths that the follower immediately considers complete. The [free-space correction](notes/exploration-free-space-correction.md) records the regression and live validation.
+
 A scan clears the old route and goal before planning. A successful scan installs a new path and executes it on that frame, including the first scan at step 30. An unsuccessful scan leaves a persistent idle state, including frames without rescans. Initial forward movement is allowed only before the first scan; it cannot resume as a fallback after losing a route.
 
 No frontiers, no feasible candidates, failed A* attempts, and scan exceptions all prevent stale-route execution. An idle robot keeps sensing and can resume after a successful rescan or an explicit waypoint command. Its teammate can continue exploring. Recovery cannot turn idle planning failure into movement. Episode provenance records `route_lifecycle: invalidate_on_rescan_v1`.
@@ -26,7 +28,7 @@ With mounting calibration, [odometry increments use the body origin](notes/explo
 
 [FloorFilter](../src/exploration/floor_filter.py) classifies each SLAM frame before its points enter the accumulated obstacle cloud. This avoids treating floor points spread across height bins by pose error and voxelization as obstacles.
 
-The filter estimates local surface normals, considers approximately horizontal planes at the calibrated camera-to-floor distance, and requires at least 40 supporting points with extent in two directions. It prefers the lowest supported plane within the calibration band. Point ordering and candidate ordering are deterministic; it uses no global random state or reference geometry.
+The filter estimates local surface normals, considers approximately horizontal planes at the calibrated camera-to-floor distance, and requires at least 40 supporting points with extent in two directions. It ranks hypotheses by residual-weighted support, preferring lower planes on ties, before deduplication and refinement. This prevents a weak tilted wall/floor edge from displacing a strongly supported floor. Point ordering and candidate ordering are deterministic; it uses no global random state or reference geometry.
 
 | Default | Value |
 | --- | --- |
@@ -38,7 +40,7 @@ The filter estimates local surface normals, considers approximately horizontal p
 
 Only plane inliers are removed. When no supported plane matches the calibration, points remain obstacle observations. `ExplorationConfig.ground_filter=False` bypasses separation. The camera-height calibration must be adapted for another platform or stance; this is a flat-floor Go2 baseline, not a general terrain classifier. Very shallow surfaces within the inlier tolerance are unresolved, and a broad raised surface within the calibration band can be ambiguous when the actual floor is hidden.
 
-Observed floor cells supply free-space evidence to the planning grid. Occupied columns always take precedence, including low obstacles above observed floor. The grid uses one world-to-cell convention for insertion and querying. Coordination and navigation consume the same floor/obstacle projection. Existing inferred-free-space dilation remains a baseline limitation.
+Observed floor cells and the existing estimated-trajectory footprint supply free-space evidence to the planning grid. Unobserved neighbors remain unknown; proximity to a wall or floor sample cannot make them free. Occupied columns always take precedence, including low obstacles above observed floor. The grid uses one world-to-cell convention for insertion and querying. Coordination and navigation consume the same floor/obstacle projection. Trajectory stamping and partially observed maps retain their existing limitations.
 
 Floor observations never define measured coverage. The independent depth-based collector and fixed reference area retain their existing definitions.
 
@@ -46,7 +48,7 @@ Floor observations never define measured coverage. The independent depth-based c
 
 Tests cover occupied ring centroids, alternative cells within one cluster, inflated and disconnected targets, stable ordering, and retained replanned paths. Floor tests cover rigid pose shifts/tilts, wall-dominated scans, missing floor, raised surfaces, low obstacles, and a rendered 6 cm box.
 
-The relevant metrics, exploration, coordination, bridge, SLAM, locomotion, and dashboard integration suites pass 975 tests with 7 skips. The existing subprocess SLAM test module is excluded because this Windows ZeroMQ build does not support IPC. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
+The SLAM, metrics, exploration, coordination, bridge, locomotion, and selected multi-robot integration suites pass 1,054 tests with 7 skips. The existing subprocess SLAM test module is excluded because this Windows ZeroMQ build does not support IPC. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
 
 The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contacts and the stale-path failure corrected above. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
 
