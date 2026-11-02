@@ -157,6 +157,159 @@ def test_failed_cell_does_not_discard_other_cells_of_the_same_cluster():
     assert loop.measurement_state["planning_attempts"] == (("1", False), ("2", True))
 
 
+@pytest.mark.parametrize("failure", ["no_frontiers", "no_candidates", "astar_failure"])
+def test_failed_rescan_discards_route_and_stays_idle_until_success(failure, monkeypatch):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    cluster = _make_cluster([3., 0., 0.])
+    detector = MagicMock(return_value=[cluster])
+    planner = MagicMock(side_effect=lambda start, goal, grid: [start, goal])
+    monkeypatch.setattr(loop.frontier_detector, "detect", detector)
+    monkeypatch.setattr(loop._path_planner, "plan", planner)
+    scan = MagicMock(return_value=True)
+    monkeypatch.setattr(loop, "_should_rescan", scan)
+
+    def advance(step):
+        frame = _make_sensor_frame()
+        frame.sim_time = step * .1
+        return loop.step_once(frame, step)
+
+    linear, _, metrics = advance(30)
+    assert linear[0] > 0 and not metrics.terminated
+    old_runner = loop._current_waypoint_runner
+    if failure == "no_frontiers":
+        detector.return_value = []
+    elif failure == "no_candidates":
+        detector.return_value = [_make_cluster([100., 100., 0.])]
+    else:
+        planner.side_effect = None
+        planner.return_value = None
+
+    linear, angular, metrics = advance(31)
+    np.testing.assert_array_equal(linear, [0., 0.])
+    assert angular == 0 and metrics.terminated
+    assert loop._current_waypoint_runner is None
+    assert loop.measurement_state["goal_id"] is None
+
+    # Even if rescans are delayed, idle must persist beyond the recovery timeout.
+    scan.return_value = False
+    for step in range(32, 57):
+        linear, angular, metrics = advance(step)
+        np.testing.assert_array_equal(linear, [0., 0.])
+        assert angular == 0 and metrics.terminated
+        assert not loop.measurement_state["recovering"]
+
+    scan.return_value = True
+    detector.return_value = [_make_cluster([0., 3., 0.])]
+    planner.side_effect = lambda start, goal, grid: [start, goal]
+    linear, angular, metrics = advance(57)
+    assert linear[0] > 0 and angular > 0 and not metrics.terminated
+    assert loop._current_waypoint_runner is not old_runner
+    assert loop.measurement_state["goal_id"] is not None
+
+
+def test_initial_scan_failure_stops_bootstrap_and_explicit_target_can_resume(monkeypatch):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    monkeypatch.setattr(loop.frontier_detector, "detect", lambda *a, **kw: [])
+    frame = _make_sensor_frame()
+    linear, _, _ = loop.step_once(frame, 29)
+    assert linear[0] > 0  # Initial map acquisition remains supported.
+    frame.sim_time = .1
+    linear, angular, metrics = loop.step_once(frame, 30)
+    np.testing.assert_array_equal(linear, [0., 0.])
+    assert angular == 0 and metrics.terminated
+    loop.set_waypoint_target([np.array([3., 0., 0.])])
+    frame.sim_time = .2
+    linear, _, metrics = loop.step_once(frame, 31)
+    assert linear[0] > 0 and not metrics.terminated
+
+
+def test_scan_exception_cannot_leave_an_executable_route(monkeypatch):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    loop.set_waypoint_target([np.array([3., 0., 0.])])
+    monkeypatch.setattr(loop, "_should_rescan", lambda *a: False)
+    frame = _make_sensor_frame()
+    loop.step_once(frame, 28)
+    frame.sim_time = .1
+    loop.step_once(frame, 29)
+    monkeypatch.setattr(loop.frontier_detector, "detect", MagicMock(side_effect=ValueError("bad map")))
+    monkeypatch.setattr(loop, "_should_rescan", lambda *a: True)
+    frame.sim_time = 1.
+    with pytest.raises(ValueError, match="bad map"):
+        loop.step_once(frame, 30)
+    assert loop._current_waypoint_runner is None
+    monkeypatch.setattr(loop, "_should_rescan", lambda *a: False)
+    frame.sim_time = 3.1  # The old motion command must not trigger recovery.
+    linear, angular, metrics = loop.step_once(frame, 31)
+    np.testing.assert_array_equal(linear, [0., 0.])
+    assert angular == 0 and metrics.terminated
+    assert loop.measurement_state["goal_id"] is None
+    assert not loop.measurement_state["recovering"]
+
+
+@pytest.mark.parametrize("absorbing", [False, True])
+def test_coordinator_keeps_exhausted_robot_idle_while_teammate_moves(absorbing, monkeypatch):
+    from src.bridge.multi_robot_config import MultiRobotConfig
+    from src.coordination.coordinator import Coordinator
+    from src.coordination.robot_instance import RobotInstance
+
+    bridge = MagicMock()
+    bridge.robot_ids = ("robot_a", "robot_b")
+    bridge.get_runtime_status.return_value.disabled = False
+    time = 0.
+
+    def frames():
+        result = {rid: _make_sensor_frame() for rid in bridge.robot_ids}
+        for frame in result.values():
+            frame.sim_time = time
+        return result
+
+    def advance_physics():
+        nonlocal time
+        time += .1
+        return frames()
+
+    bridge.start.side_effect = frames
+    bridge.step.side_effect = advance_physics
+    robots = {}
+    for rid in bridge.robot_ids:
+        slam, octomap = MockSLAM(), MockOctoMap()
+        loop = ExplorationLoop(bridge, slam, octomap)
+        monkeypatch.setattr(loop.frontier_detector, "detect", MagicMock(return_value=[_make_cluster([3., 0., 0.])]))
+        monkeypatch.setattr(loop._path_planner, "plan", lambda start, goal, grid: [start, goal])
+        robots[rid] = RobotInstance(rid, slam, octomap, loop, np.eye(4), MagicMock())
+    a, b = (robots[rid].exploration for rid in bridge.robot_ids)
+    monkeypatch.setattr(a, "_should_rescan", lambda step, *args: step in (30, 31, 34, 35))
+    monkeypatch.setattr(b, "_should_rescan", lambda step, *args: step in (30, 35))
+    coordinator = Coordinator(bridge, robots, MultiRobotConfig(boot_phase_steps=999))
+    for method in ("_setup_subscriptions", "_teardown_subscriptions", "_merge_occupancy_maps"):
+        monkeypatch.setattr(coordinator, method, lambda *a: None)
+    try:
+        coordinator.start()
+        coordinator._step_count = 29
+        first = coordinator.advance(stop_on_termination=absorbing)
+        assert all(c.to_wire()["linear"][0] > 0 for c in first.commands.values())
+        a.frontier_detector.detect.return_value = []
+        for _ in range(3):  # Scan failure, then two frames without a rescan.
+            tick = coordinator.advance(stop_on_termination=absorbing)
+            assert tick.commands["robot_a"].to_wire()["linear"] == [0., 0.]
+            assert tick.commands["robot_a"].to_wire()["yaw_rate"] == 0.
+            assert tick.commands["robot_b"].to_wire()["linear"][0] > 0
+            assert tick.metrics["robot_a"].terminated
+            assert tick.termination_reason is None
+        a.frontier_detector.detect.return_value = [_make_cluster([0., 3., 0.])]
+        resumed = coordinator.advance(stop_on_termination=absorbing)
+        assert resumed.commands["robot_a"].to_wire()["linear"][0] > 0
+        assert not resumed.metrics["robot_a"].terminated
+        a.frontier_detector.detect.return_value = []
+        b.frontier_detector.detect.return_value = []
+        ended = coordinator.advance(stop_on_termination=absorbing)
+        assert all(m.terminated for m in ended.metrics.values())
+        assert ended.termination_reason == ("no_frontiers" if absorbing else None)
+        assert all(c.to_wire()["linear"] == [0., 0.] for c in ended.commands.values())
+    finally:
+        coordinator.close()
+
+
 def test_recovery_does_not_accumulate_another_stuck_timeout():
     loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap(),
                            ExplorationConfig(stuck_timeout_s=.2, recovery_reverse_duration_s=.1))

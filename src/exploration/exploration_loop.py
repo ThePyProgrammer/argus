@@ -181,6 +181,8 @@ class ExplorationLoop:
         # Per-step state (shared between run() and step_once())
         self._robot_positions: list[np.ndarray] = []
         self._current_waypoint_runner: WaypointRunner | None = None
+        self._bootstrap_complete = False
+        self._navigation_exhausted = False
         self._last_rescan_pos = np.zeros(3, dtype=np.float64)
         self._last_voxel_count = 0
         self._progress = ProgressMonitor(self._config.stuck_timeout_s,
@@ -231,6 +233,7 @@ class ExplorationLoop:
     def measurement_state(self) -> dict:
         """Detached decision diagnostics; no evaluator state enters navigation."""
         return {"recovering": self._stuck_recovery.is_active,
+                "navigation_exhausted": self._navigation_exhausted,
                 "goal_id": self._goal_id if self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete else None,
                 "planning_attempts": tuple(self._planning_attempts),
@@ -274,6 +277,9 @@ class ExplorationLoop:
             linear_speed=self._config.linear_speed,
             angular_speed=self._config.angular_speed,
         )
+        self._bootstrap_complete = True
+        self._navigation_exhausted = False
+        self._goal_id = ",".join(format(float(v), ".9g") for v in waypoints[-1])
 
     def skill_trace_jsonl(self) -> str:
         """Return skill-learning decision/outcome traces as JSONL when enabled."""
@@ -345,6 +351,12 @@ class ExplorationLoop:
         self, step: int, pose: np.ndarray, sim_time: float,
     ) -> tuple[bool, tuple[np.ndarray, float, StepMetrics] | None]:
         """Check commanded progress; recovery gets its own fresh time window."""
+        if self._navigation_exhausted:
+            # Includes scans that raised before step_once could record a stop
+            # command. An invalid route must not trigger motion via recovery.
+            self._progress.reset()
+            self._last_command = (np.zeros(2), 0.0)
+            return False, None
         if not self._stuck_recovery.is_active:
             if self._progress.update(pose, sim_time, *self._last_command):
                 logger.warning("[Step %d] No commanded progress for %.2f s. Recovering.",
@@ -413,6 +425,12 @@ class ExplorationLoop:
             (frontier_count, terminated) -- number of frontiers found and
             whether exploration should terminate.
         """
+        # A scan replaces the route. Invalidate it before any operation that
+        # might fail, and stay idle unless this scan installs a valid new path.
+        self._bootstrap_complete = True
+        self._navigation_exhausted = True
+        self._current_waypoint_runner = None
+        self._goal_id = None
         config = self._config
         occupied = self._octomap.get_occupied_voxels()
 
@@ -532,8 +550,7 @@ class ExplorationLoop:
         self._last_coverage = cov
         self._last_bbox_coverage = bbox_cov
         self._last_frontier_count = frontier_count
-        if terminated:
-            self._goal_id = None
+        self._navigation_exhausted = terminated
 
         return frontier_count, terminated
 
@@ -582,7 +599,7 @@ class ExplorationLoop:
         # d. Frontier re-evaluation
         linear_vel = np.zeros(2, dtype=np.float64)
         angular_vel = 0.0
-        terminated = False
+        terminated = self._navigation_exhausted
         frontier_count = self._last_frontier_count
 
         if should_rescan:
@@ -591,13 +608,14 @@ class ExplorationLoop:
             )
 
         # e. Execute navigation
-        if (self._current_waypoint_runner is not None
+        if (not terminated and self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
             # A rescan already replaces the path above. Do not discard the
             # newly planned route on that same frame (including the first scan).
             linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
-        elif self._current_waypoint_runner is None:
-            # No waypoints yet -- just drive forward
+        elif not terminated and not self._bootstrap_complete and self._current_waypoint_runner is None:
+            # Drive forward only for initial map acquisition, never as a
+            # fallback after an unsuccessful scan or an invalidated route.
             linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)
             angular_vel = 0.0
 
