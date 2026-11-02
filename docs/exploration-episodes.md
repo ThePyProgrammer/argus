@@ -18,6 +18,14 @@ uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --s
 
 The saved JSON contains the result, commands, body trajectories, coverage history, episode events, and reliability events such as recovery entries and contacts. Repeat with `--no-collect` and a different output path to check that measurement attachment preserves `commands` and `trajectory`. These are development exports; batch manifests and resume are still unimplemented.
 
+Compare two complete exports with:
+
+```bash
+uv run python scripts/compare_exploration_traces.py collected.json uncollected.json --output comparison.json
+```
+
+The comparator accepts smoke exports and contact diagnoses. It checks provenance, outcome, cadence, commands, body positions, and runtime events using exact numeric equality. It reports the first difference in each field and exits with status 1 on a mismatch or 2 for an unusable export. Timing, memory, coverage, and reliability measurements are excluded. Matching algorithm failures are reported as repeatable failures, not successful navigation. Keep the source revision, environment, and requested horizon fixed separately; this check does not establish those conditions from command equality.
+
 The former `all_unreachable` failure at 0.29 simulated seconds is corrected. The [navigation baseline](exploration-navigation.md) now selects reachable frontier cells and separates observed floor before map accumulation. Recovery now measures commanded progress over simulated time. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records development results, remaining contacts, and the stale-path failure now corrected by persistent route invalidation. These checks do not establish long-run exploration performance or compare allocation methods.
 
 ## Lifecycle
