@@ -10,7 +10,15 @@ uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --s
 
 The script prints a JSON result and closes all simulation resources. It opens no viewer and loads no optional detectors. Horizons must be positive multiples of the sensor interval, currently 0.01 simulated seconds. For repeatability checks on PowerShell, set `$env:OMP_NUM_THREADS = '1'` before launching Python. The validated environment uses MuJoCo 3.6 and one OpenMP thread; cross-platform bitwise equivalence is not claimed.
 
-The former `all_unreachable` failure at 0.29 simulated seconds is corrected. The [navigation baseline](exploration-navigation.md) now selects reachable frontier cells and separates observed floor before map accumulation. Seed 101 reaches a 1-second smoke horizon in all three layouts with zero planning failures or falls. These short runs still enter recovery and do not establish long-run exploration performance or compare allocation methods.
+Save a longer development trace with:
+
+```bash
+uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --seed 101 --horizon 5 --output outputs/exploration-planning/recovery-validation/branching_corridor.json
+```
+
+The saved JSON contains the result, commands, body trajectories, coverage history, episode events, and reliability events such as recovery entries and contacts. Repeat with `--no-collect` and a different output path to check that measurement attachment preserves `commands` and `trajectory`. These are development exports; batch manifests and resume are still unimplemented.
+
+The former `all_unreachable` failure at 0.29 simulated seconds is corrected. The [navigation baseline](exploration-navigation.md) now selects reachable frontier cells and separates observed floor before map accumulation. Recovery now measures commanded progress over simulated time. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records development results and remaining contact and stale-path failures. These checks do not establish long-run exploration performance or compare allocation methods.
 
 ## Lifecycle
 
@@ -33,7 +41,7 @@ The dashboard's `Coordinator.run` now delegates to `start`, `advance`, and `clos
 ## Reproducibility and information boundaries
 
 - Spawn locations and headings come from the resolved fixture sample. The bridge applies those headings before settling.
-- Recovery uses a separate generator per robot, seeded by `[episode_seed, 2, robot_index]`. It uses captured simulation-time intervals for turn duration. The interactive default retains its existing recovery configuration.
+- Recovery uses a separate generator per robot, seeded by `[episode_seed, 2, robot_index]`. Progress timeouts, reversing, and turning use captured simulation time in both evaluation and interactive exploration. See the [mobility recovery contract](exploration-navigation.md#mobility-recovery).
 - Evaluation fixes the depth-to-cloud convention to MuJoCo's camera axes per backend instance. Dashboard configuration cannot change it, and evaluation does not change dashboard settings.
 - Reference geometry enters only the measurement collector. Navigation receives the existing sensor frames and local maps. Map merging collects published outputs; it does not install a shared planning grid in each robot.
 - The current baseline uses ground truth to initialize ICP's camera pose. Body travel is measured separately from MuJoCo body positions. Neither measurement implies localization independence.

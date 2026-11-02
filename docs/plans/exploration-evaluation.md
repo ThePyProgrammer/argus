@@ -20,7 +20,7 @@ PR 4's development lifecycle is implemented: [ExplorationEpisode](../../src/expl
 
 Validation for PR 4: 695 tests pass across the runtime, metrics, SLAM, dashboard integration, and worker checks, with 7 skips. Nine existing subprocess SLAM tests fail because this Windows ZeroMQ build reports no IPC support. Those backend files are unchanged. Real episode tests include 17 cases; the two-episode planning test has a scoped 120-second timeout for offscreen rendering.
 
-The [first-scan failure](../notes/exploration-first-scan-failure.md) is corrected in the [shared navigation baseline](../exploration-navigation.md). Targets are reachable frontier cells, newly planned paths survive the scan frame, and observed floor is separated before obstacle-map accumulation. Seed 101 reaches a 1-second horizon in all three layouts with goals assigned to both robots, zero planning failures, and zero falls. Each robot enters recovery once under the existing detector. Sustained exploration and long-horizon repeatability remain unestablished; validate recovery timing and longer runs before comparing methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
+The [first-scan failure](../notes/exploration-first-scan-failure.md) is corrected in the [shared navigation baseline](../exploration-navigation.md). Targets are reachable frontier cells, newly planned paths survive the scan frame, and observed floor is separated before obstacle-map accumulation. Recovery now measures commanded progress over simulated time instead of requiring 5 cm per sensor frame. The [longer-run diagnostic](../notes/exploration-recovery-validation.md) records the resulting smoke checks and remaining navigation failures, including contacts and stale-path execution after a goal is cleared. Fix those failures and establish long-horizon repeatability before comparing methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
 
 ## 1. Result to produce
 
@@ -270,7 +270,7 @@ The planned core is 186 episodes including pilot and repeatability, before extra
 
 Use pilot variability to select a fixed final sample size before inspecting final results. If ten seeds are inadequate, expand the primary and ablation matrices together to seeds 1001-1030: 450 final episodes and 486 including the listed pilot/repeatability runs. Do not add seeds selectively until a favorable result appears. Three layouts support claims about those layouts, not broad scene generalization.
 
-Start development with a proposed 300 simulated-second horizon. Freeze or revise it using pilot feasibility and throughput. Record actual physics and sensor step durations; do not assume the current recovery code's approximate frame duration is correct.
+Start development with a proposed 300 simulated-second horizon. Freeze or revise it using pilot feasibility and throughput. Record actual physics and sensor step durations; progress and recovery now use captured simulation time.
 
 ```text
 serial wall hours = sum of episode wall seconds / 3600
