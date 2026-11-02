@@ -15,6 +15,61 @@ from src.exploration.occupancy_grid import (
     project_voxels_to_2d,
 )
 from src.exploration.path_planner import PathPlanner
+from src.exploration.frontier_detector import FrontierDetector
+
+
+def test_obstacles_cannot_create_free_space():
+    grid = project_voxels_to_2d(np.array([[.05, .05, .2]]), .1)
+    assert not (grid.grid == CELL_FREE).any()
+    assert grid.grid[grid.world_to_grid(np.array([.15, .05]))] == CELL_UNKNOWN
+
+
+def test_observed_floor_does_not_expand_into_unobserved_cells():
+    floor = np.array([[.05, .05], [.45, .05]])
+    grid = project_voxels_to_2d(np.empty((0, 3)), .1, observed_free_xy=floor)
+    assert int((grid.grid == CELL_FREE).sum()) == 2
+    assert grid.grid[grid.world_to_grid(np.array([.15, .05]))] == CELL_UNKNOWN
+
+
+def test_trajectory_support_preserves_obstacles_and_has_bounded_extent():
+    grid = project_voxels_to_2d(np.array([[.15, .05, .06]]), .1,
+                               robot_positions=np.array([[.05, .05, .3]]))
+    assert grid.grid[grid.world_to_grid(np.array([.05, .05]))] == CELL_FREE
+    assert grid.grid[grid.world_to_grid(np.array([.15, .05]))] == CELL_OCCUPIED
+    assert grid.grid[grid.world_to_grid(np.array([.55, .05]))] == CELL_UNKNOWN
+
+
+def test_enclosed_observed_patch_retains_a_reachable_frontier():
+    # Free-space dilation used to fill this chamber and move every frontier
+    # outside its enclosing wall, even though only the central patch was seen.
+    axis = np.arange(-6, 7) * .1 + .05
+    wall = np.array([[x, y, .5] for x in axis for y in axis
+                     if x in (axis[0], axis[-1]) or y in (axis[0], axis[-1])])
+    floor = np.array([[x, y] for x in axis[5:8] for y in axis[5:8]])
+    start = np.array([.05, .05, .3])
+    grid = project_voxels_to_2d(wall, .1, robot_positions=start[None], observed_free_xy=floor)
+    planner = PathPlanner()
+    reachable = planner.reachable_mask(start, grid)
+    frontiers = FrontierDetector(.1, min_cluster_size=5).detect(wall, grid_2d=grid)
+    candidates = [(int(r), int(c)) for cluster in frontiers for r, c in cluster.voxels if reachable[r, c]]
+    assert candidates
+    target = np.r_[grid.grid_to_world(*candidates[0]), 0.]
+    assert planner.plan(start, target, grid) is not None
+
+
+def test_smoothed_short_path_keeps_goal_outside_arrival_radius():
+    from src.control.waypoint_runner import WaypointRunner
+    grid = OccupancyGrid2D(np.zeros((10, 10), np.int8), .1, np.zeros(2), 10, 10)
+    start, goal = np.array([.08, 0., .3]), np.array([.25, .25, 0.])
+    path = PathPlanner().plan(start, goal, grid)
+    assert path is not None
+    np.testing.assert_array_equal(path[-1], goal)
+    pose = np.eye(4)
+    pose[:3, 3] = start
+    runner = WaypointRunner(path, arrival_threshold=.3)
+    linear, _ = runner.get_velocity(pose)
+    assert not runner.is_complete
+    assert linear[0] > 0
 
 
 # ---------- OccupancyGrid2D tests ----------

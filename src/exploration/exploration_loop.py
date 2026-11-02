@@ -485,8 +485,9 @@ class ExplorationLoop:
             goal = None
             selection_start = time.perf_counter()
             reachable = self._path_planner.reachable_mask(current_pos, grid_2d)
-            candidates = list(self._goal_selector.navigation_candidates(
-                frontiers, pose, grid_2d, reachable, effective_score_fn))
+            candidates = [candidate for candidate in self._goal_selector.navigation_candidates(
+                frontiers, pose, grid_2d, reachable, effective_score_fn)
+                if np.linalg.norm(candidate[:2] - current_pos[:2]) >= config.waypoint_arrival_threshold]
             self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
             for candidate in candidates:
                 planned_path = self._path_planner.plan(current_pos, candidate, grid_2d)

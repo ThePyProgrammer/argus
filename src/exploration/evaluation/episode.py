@@ -164,13 +164,15 @@ class ExplorationEpisode:
                                    "odometry_rule": "body_origin_surface_svd_v2",
                                    "registration_sampling_rule": "bounded_voxel_refinement_v1",
                                    "exploration_config": asdict(robots[config.robot_ids[0]].exploration.config),
-                                   "navigation_target_rule": "reachable_frontier_member_v1",
+                                   "navigation_target_rule": "reachable_unreached_frontier_member_v2",
+                                   "planned_goal": "preserve_exact_endpoint_v1",
                                    "route_lifecycle": "invalidate_on_rescan_v1",
                                    "navigation_pose": "estimated_body_from_camera_mount_v1",
                                    "gait_config": asdict(GaitParams()),
                                    "gait_rule": "bounded_swing_thigh_lift_v1",
                                    "gait_idle_rule": "standing_pose_phase_reset_v1",
-                                   "floor_filter": "per_observation_plane_v1",
+                                   "floor_filter": "supported_observation_plane_v2",
+                                   "planning_free_space": "observed_floor_and_trajectory_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:
             bridge.stop()

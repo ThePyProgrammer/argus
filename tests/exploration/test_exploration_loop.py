@@ -157,6 +157,25 @@ def test_failed_cell_does_not_discard_other_cells_of_the_same_cluster():
     assert loop.measurement_state["planning_attempts"] == (("1", False), ("2", True))
 
 
+@pytest.mark.parametrize("has_distant_cell", [False, True])
+def test_already_reached_frontier_cells_cannot_reinstall_completed_paths(has_distant_cell):
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    cells = [[0, 1]] + ([[0, 10]] if has_distant_cell else [])
+    cluster = FrontierCluster(np.array([.1, 0., 0.]), len(cells), np.array(cells))
+    loop.frontier_detector.detect = lambda *a, **kw: [cluster]
+    plan = MagicMock(side_effect=lambda start, goal, grid: [start, goal])
+    loop._path_planner.plan = plan
+    linear, _, metrics = loop.step_once(_make_sensor_frame(), 30)
+    if has_distant_cell:
+        assert not metrics.terminated and linear[0] > 0
+        plan.assert_called_once()
+        np.testing.assert_allclose(plan.call_args.args[1], [1., 0., 0.])
+    else:
+        assert metrics.terminated and loop.measurement_state["navigation_exhausted"]
+        assert not np.any(linear)
+        plan.assert_not_called()
+
+
 @pytest.mark.parametrize("yaw", [0., np.pi / 2])
 def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(yaw, monkeypatch):
     loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())

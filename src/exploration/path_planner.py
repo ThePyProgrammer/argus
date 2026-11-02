@@ -232,7 +232,7 @@ class PathPlanner:
 
         # Always include the goal
         if len(path_world) > 0 and len(smoothed) > 0:
-            if not np.allclose(smoothed[-1], path_world[-1], atol=0.2):
+            if not np.array_equal(smoothed[-1], path_world[-1]):
                 smoothed.append(path_world[-1])
 
         return smoothed
