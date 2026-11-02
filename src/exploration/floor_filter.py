@@ -34,7 +34,7 @@ class FloorFilter:
     def mask(self, points: np.ndarray, sensor_origin: np.ndarray) -> np.ndarray:
         """Return floor inliers in one SLAM frame, without mutating its cloud.
 
-        Lowest supported planes are preferred over raised horizontal surfaces.
+        Rank eligible planes by residual-weighted support, then by height.
         Calibration bounds detection during large body-height/attitude changes;
         the first benchmark assumes an upright Go2 on approximately level floor.
         """
@@ -59,7 +59,14 @@ class FloorFilter:
                     & (eigenvalues[:, 0] < .1 * eigenvalues[:, 1])
                     & (np.abs(distances - self.camera_height_m) <= self.height_tolerance_m))
         candidates = np.flatnonzero(eligible)
-        candidates = sorted(candidates, key=lambda i: (-float(distances[i]), *centers[i]))
+        # A locally tilted wall/floor edge can appear lower than the actual
+        # floor while fitting only a narrow strip. Weight support by residual
+        # so a tilted plane cannot win by grazing additional obstacle points.
+        # Rank before quantized hypothesis deduplication as well as refinement.
+        candidates = sorted(candidates, key=lambda i: (
+            -float(np.maximum(0., 1. - (((cloud - centers[i]) @ normals[i])
+                                       / self.distance_tolerance_m) ** 2).sum()),
+            -float(distances[i]), *centers[i]))
         tried = set()
         for index in candidates:
             normal, center = normals[index], centers[index]

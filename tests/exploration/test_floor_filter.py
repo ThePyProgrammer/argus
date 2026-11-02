@@ -98,3 +98,23 @@ def test_real_depth_preserves_six_centimeter_obstacle():
     assert obstacle.any() and floor.any()
     assert not mask[obstacle].any()
     assert mask[floor].mean() > .99
+
+
+@pytest.mark.parametrize("robot_id,ticks", [("robot_a", 0), ("robot_b", 2), ("robot_b", 6)])
+def test_rendered_column_edges_do_not_displace_supported_floor(robot_id, ticks):
+    from src.exploration.evaluation.episode import ExplorationEpisode
+    from src.slam.slam_pipeline import SLAMPipeline
+
+    with ExplorationEpisode.from_scenario("cluttered_room", 101, horizon_s=.1) as episode:
+        for _ in range(ticks):
+            episode.advance()
+        frame = episode.bridge.get_frame(robot_id)
+        pipeline = SLAMPipeline(episode.bridge.camera_intrinsics(robot_id), cloud_config_key="1")
+        pipeline.process_frame(frame)
+        points = pipeline.last_frame_cloud
+        mask = FloorFilter().mask(points, frame.ground_truth_pose[:3, 3])
+        floor = np.abs(points[:, 2]) <= .002
+        raised = points[:, 2] > .04
+        assert floor.sum() >= 100
+        assert mask[floor].mean() > .99
+        assert not mask[raised].any()
