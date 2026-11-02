@@ -36,8 +36,8 @@ class OccupancyGrid2D:
 
     def world_to_grid(self, xy: np.ndarray) -> tuple[int, int]:
         """Convert (2,) world XY to grid (row, col), clamped to bounds."""
-        col = int((xy[0] - self.origin[0]) / self.resolution)
-        row = int((xy[1] - self.origin[1]) / self.resolution)
+        col = int(np.floor((xy[0] - self.origin[0]) / self.resolution + 1e-9))
+        row = int(np.floor((xy[1] - self.origin[1]) / self.resolution + 1e-9))
         # Clamp to grid bounds
         row = max(0, min(row, self.height - 1))
         col = max(0, min(col, self.width - 1))
@@ -63,6 +63,7 @@ def project_voxels_to_2d(
     z_max: float = 2.0,
     padding: int = 30,
     robot_positions: np.ndarray | None = None,
+    observed_free_xy: np.ndarray | None = None,
 ) -> OccupancyGrid2D:
     """Project 3D occupied voxels to a 2D occupancy grid for navigation.
 
@@ -80,6 +81,8 @@ def project_voxels_to_2d(
         robot_positions: (M, 3) float64 positions the robot has visited.
             These are stamped as FREE cells with a small dilation radius,
             ensuring the robot's path is always navigable.
+        observed_free_xy: XY samples classified as floor before scan accumulation.
+            Occupied columns take precedence over these free observations.
 
     Returns:
         OccupancyGrid2D with FREE/OCCUPIED/UNKNOWN cells.
@@ -93,37 +96,16 @@ def project_voxels_to_2d(
             height=1,
         )
 
-    # Handle empty input
-    if occupied_voxels.size == 0:
-        return _empty_grid()
-
-    # Filter by height range
+    # Floor separation belongs to individual observations before accumulation.
+    # Never erase the most populated voxel layer: it may be a low obstacle.
+    free_xy = np.empty((0, 2)) if observed_free_xy is None else np.asarray(observed_free_xy)[:, :2]
     mask = (occupied_voxels[:, 2] >= z_min) & (occupied_voxels[:, 2] <= z_max)
-    filtered = occupied_voxels[mask]
-
-    # Ground plane filter: remove the dominant horizontal layer (floor/ground)
-    # The ground plane shows up as many voxels at similar z values.
-    # Bin z values by resolution and remove the most populated bin.
-    if len(filtered) > 50:
-        z_vals = filtered[:, 2]
-        z_bins = np.round(z_vals / resolution).astype(int)
-        unique_bins, counts = np.unique(z_bins, return_counts=True)
-        if len(unique_bins) > 1:
-            # Remove the most populated z-layer (ground plane)
-            dominant_bin = unique_bins[np.argmax(counts)]
-            ground_mask = z_bins != dominant_bin
-            non_ground = filtered[ground_mask]
-            # Only filter if ground was a significant fraction (>30% of voxels)
-            if len(non_ground) > 0 and counts.max() > 0.3 * len(filtered):
-                filtered = non_ground
-
-    if len(filtered) == 0:
+    xy = occupied_voxels[mask, :2]
+    support = np.concatenate((xy, free_xy))
+    if not len(support):
         return _empty_grid()
-
-    # Compute XY bounding box with padding
-    xy = filtered[:, :2]
-    xy_min = xy.min(axis=0) - padding * resolution
-    xy_max = xy.max(axis=0) + padding * resolution
+    xy_min = np.floor(support.min(axis=0) / resolution) * resolution - padding * resolution
+    xy_max = np.ceil(support.max(axis=0) / resolution) * resolution + padding * resolution
 
     cols = int(np.ceil((xy_max[0] - xy_min[0]) / resolution)) + 1
     rows = int(np.ceil((xy_max[1] - xy_min[1]) / resolution)) + 1
@@ -133,9 +115,14 @@ def project_voxels_to_2d(
     # Initialize grid as UNKNOWN
     grid = np.full((rows, cols), CELL_UNKNOWN, dtype=np.int8)
 
+    # Observed floor is free only where no obstacle occupies the same column.
+    free_cells = np.floor((free_xy - origin) / resolution + 1e-9).astype(int)
+    if len(free_cells):
+        grid[free_cells[:, 1], free_cells[:, 0]] = CELL_FREE
+
     # Mark occupied cells
-    grid_cols = np.round((xy[:, 0] - origin[0]) / resolution).astype(int)
-    grid_rows = np.round((xy[:, 1] - origin[1]) / resolution).astype(int)
+    grid_cols = np.floor((xy[:, 0] - origin[0]) / resolution + 1e-9).astype(int)
+    grid_rows = np.floor((xy[:, 1] - origin[1]) / resolution + 1e-9).astype(int)
 
     # Clamp to grid bounds
     grid_cols = np.clip(grid_cols, 0, cols - 1)
@@ -149,8 +136,8 @@ def project_voxels_to_2d(
     # a navigable corridor along the robot's path
     if robot_positions is not None and len(robot_positions) > 0:
         rob_xy = robot_positions[:, :2]
-        rob_cols = np.round((rob_xy[:, 0] - origin[0]) / resolution).astype(int)
-        rob_rows = np.round((rob_xy[:, 1] - origin[1]) / resolution).astype(int)
+        rob_cols = np.floor((rob_xy[:, 0] - origin[0]) / resolution + 1e-9).astype(int)
+        rob_rows = np.floor((rob_xy[:, 1] - origin[1]) / resolution + 1e-9).astype(int)
         rob_cols = np.clip(rob_cols, 0, cols - 1)
         rob_rows = np.clip(rob_rows, 0, rows - 1)
 

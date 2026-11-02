@@ -40,6 +40,7 @@ class StepMetrics:
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector
+from src.exploration.floor_filter import FloorFilter
 from src.exploration.goal_selector import GoalSelector
 from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
@@ -153,6 +154,12 @@ class ExplorationLoop:
         self._config = config or ExplorationConfig()
         self._streaming_viz = streaming_viz
         self._intrinsics = intrinsics
+        self._floor_filter = FloorFilter(
+            camera_height_m=self._config.floor_camera_height_m,
+            height_tolerance_m=self._config.floor_height_tolerance_m,
+            distance_tolerance_m=self._config.floor_distance_tolerance_m,
+        )
+        self._observed_floor_cells: set[tuple[int, int]] = set()
 
         self._frontier_detector = FrontierDetector(
             resolution=self._config.voxel_resolution,
@@ -221,6 +228,20 @@ class ExplorationLoop:
     @property
     def slam_backend_type(self) -> type:
         return type(self._slam)
+
+    @property
+    def observed_floor_xy(self) -> np.ndarray:
+        """Observed floor supports planning free space, never evaluation coverage."""
+        cells = np.asarray(sorted(self._observed_floor_cells), dtype=float).reshape(-1, 2)
+        return (cells + .5) * self._config.voxel_resolution
+
+    def planning_grid(self, occupied=None):
+        """Use the same observed obstacle/floor map for navigation and coordination."""
+        return project_voxels_to_2d(
+            self._octomap.get_occupied_voxels() if occupied is None else occupied,
+            self._config.voxel_resolution, self._config.z_min, self._config.z_max,
+            robot_positions=np.array(self._robot_positions), observed_free_xy=self.observed_floor_xy,
+        )
 
     @property
     def frontier_resolution(self) -> float:
@@ -296,7 +317,14 @@ class ExplorationLoop:
 
         # Insert this frame's cloud directly into OctoMap (not the global accumulator)
         if len(result.points) > 0:
-            self._octomap.insert_scan(result.points, current_pos)
+            points = result.points
+            if self._config.ground_filter:
+                floor = self._floor_filter.mask(points, current_pos)
+                cells = np.unique(np.floor(points[floor, :2] / self._config.voxel_resolution).astype(int), axis=0)
+                self._observed_floor_cells.update(map(tuple, cells))
+                points = points[~floor]
+            if len(points):
+                self._octomap.insert_scan(points, current_pos)
 
         self._robot_positions.append(current_pos)
         return pose, current_pos
@@ -398,13 +426,7 @@ class ExplorationLoop:
         config = self._config
         occupied = self._octomap.get_occupied_voxels()
 
-        grid_2d = project_voxels_to_2d(
-            occupied,
-            config.voxel_resolution,
-            config.z_min,
-            config.z_max,
-            robot_positions=np.array(self._robot_positions),
-        )
+        grid_2d = self.planning_grid(occupied)
 
         frontiers = self._frontier_detector.detect(
             occupied,

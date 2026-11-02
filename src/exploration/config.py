@@ -47,4 +47,7 @@ class ExplorationConfig:
     log_interval_steps: int = 50          # log every N steps
     z_min: float = -100.0                  # auto-adapt: ground plane filtered dynamically
     z_max: float = 100.0
-    ground_filter: bool = True             # remove dominant ground plane from occupancy grid
+    ground_filter: bool = True             # separate observed floor before accumulating scans
+    floor_camera_height_m: float = 0.32    # upright Go2 camera calibration; no scene height oracle
+    floor_height_tolerance_m: float = 0.04
+    floor_distance_tolerance_m: float = 0.015

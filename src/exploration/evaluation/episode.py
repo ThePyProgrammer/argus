@@ -7,6 +7,7 @@ No reference grid or measurement result is supplied to the coordinator.
 from __future__ import annotations
 
 import copy
+from dataclasses import asdict
 import math
 import sys
 import time
@@ -158,7 +159,10 @@ class ExplorationEpisode:
                        coverage_config=CoverageConfig(horizon_s=horizon_s), collect=collect,
                        provenance={"sample": sample.to_dict(), "method": "legacy_voronoi",
                                    "recovery_streams": {rid: [seed, 2, i] for i, rid in enumerate(config.robot_ids)},
-                                   "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1"})
+                                   "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1",
+                                   "exploration_config": asdict(robots[config.robot_ids[0]].exploration.config),
+                                   "navigation_target_rule": "reachable_frontier_member_v1",
+                                   "floor_filter": "per_observation_plane_v1"})
         except BaseException:
             bridge.stop()
             for robot in robots.values():
@@ -270,7 +274,7 @@ class ExplorationEpisode:
             "peak_process_rss_bytes": _peak_process_rss_bytes(), "memory_scope": "process_lifetime",
             "settling_sim_seconds": self.bridge.settled_sim_time,
             "frame_dt": self.bridge.frame_dt, "contact_cadence": "sensor_frames",
-            "allocator_latency_scope": "per_robot_goal_selection",
+            "allocator_latency_scope": "per_robot_frontier_candidate_selection",
             "provenance": self.provenance,
         }
         self._state = "finished"

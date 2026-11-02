@@ -477,14 +477,11 @@ class Coordinator:
 
     def _gather_frontier_cells(self, robot_ids: tuple[str, ...]) -> np.ndarray | None:
         """Gather frontier cells from all robots for heatmap visualization."""
-        from src.exploration.occupancy_grid import project_voxels_to_2d
         all_cells = []
         for rid in robot_ids:
             robot = self._robots[rid]
             occupied = robot.octomap.get_occupied_voxels()
-            if len(occupied) == 0:
-                continue
-            grid_2d = project_voxels_to_2d(occupied, robot.exploration.frontier_resolution)
+            grid_2d = robot.exploration.planning_grid(occupied)
             frontiers = robot.exploration.frontier_detector.detect(
                 occupied, grid_2d=grid_2d,
             )
@@ -740,14 +737,11 @@ class Coordinator:
 
     def _check_repartition(self, robot_ids: tuple[str, ...]) -> None:
         """Check if any robot's region is exhausted and needs re-partition."""
-        from src.exploration.occupancy_grid import project_voxels_to_2d
         for rid in robot_ids:
             robot = self._robots[rid]
             occupied = robot.octomap.get_occupied_voxels()
-            if len(occupied) == 0:
-                continue
             try:
-                grid_2d = project_voxels_to_2d(occupied, robot.exploration.frontier_resolution)
+                grid_2d = robot.exploration.planning_grid(occupied)
             except (ValueError, IndexError):
                 continue
             frontiers = robot.exploration.frontier_detector.detect(

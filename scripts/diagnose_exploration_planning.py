@@ -40,7 +40,7 @@ def inspect_attempt(attempt: dict, directory: Path) -> dict:
     selected_cluster = np.zeros(grid.grid.shape, dtype=bool)
     for cluster in clusters:
         frontier[cluster.voxels[:, 0], cluster.voxels[:, 1]] = True
-        if np.allclose(cluster.centroid, goal):
+        if np.allclose(cluster.centroid, goal) or any(np.array_equal(cell, goal_cell) for cell in cluster.voxels):
             selected_cluster[cluster.voxels[:, 0], cluster.voxels[:, 1]] = True
     candidates = np.argwhere(selected_cluster & reachable)
     alternatives = sorted((tuple(cell) for cell in candidates), key=lambda cell: (
@@ -72,8 +72,7 @@ def inspect_attempt(attempt: dict, directory: Path) -> dict:
     }
     if "occupied_voxels" in attempt:
         voxels = attempt["occupied_voxels"]
-        # Projection marks voxel centers using round, while queries use floor.
-        voxel_cells = np.round((voxels[:, :2] - grid.origin) / grid.resolution).astype(int)
+        voxel_cells = np.floor((voxels[:, :2] - grid.origin) / grid.resolution + 1e-9).astype(int)
         heights = voxels[(voxel_cells[:, 0] == goal_cell[1]) & (voxel_cells[:, 1] == goal_cell[0]), 2]
         bins, counts = np.unique(np.round(voxels[:, 2] / grid.resolution).astype(int), return_counts=True)
         result.update(goal_column_voxel_heights_m=heights.tolist(),
