@@ -18,10 +18,12 @@ class OctoMapBuilder:
     def __init__(self, resolution: float = 0.05):
         self._resolution = resolution
         self._accumulated_cloud = o3d.geometry.PointCloud()
+        self._occupied_cache: np.ndarray | None = None
 
     def reset(self) -> None:
         """Clear all accumulated voxel data for a fresh start."""
         self._accumulated_cloud = o3d.geometry.PointCloud()
+        self._occupied_cache = None
 
     def insert_scan(self, points: np.ndarray, sensor_origin: np.ndarray) -> None:
         """Insert a point cloud scan into the occupancy grid.
@@ -34,6 +36,7 @@ class OctoMapBuilder:
         scan = o3d.geometry.PointCloud()
         scan.points = o3d.utility.Vector3dVector(points.astype(np.float64))
         self._accumulated_cloud += scan
+        self._occupied_cache = None
 
     def get_occupied_voxels(self) -> np.ndarray:
         """Get centers of all occupied voxels.
@@ -41,6 +44,16 @@ class OctoMapBuilder:
         Returns:
             (M, 3) float64 array of voxel centers, or empty (0, 3) if no data.
         """
+        # Preserve the caller-owned array contract while sharing voxelization
+        # across planning, reporting, and count queries for the same scan set.
+        return self._occupied_voxels().copy()
+
+    def _occupied_voxels(self) -> np.ndarray:
+        if self._occupied_cache is None:
+            self._occupied_cache = self._voxelize()
+        return self._occupied_cache
+
+    def _voxelize(self) -> np.ndarray:
         if len(self._accumulated_cloud.points) == 0:
             return np.empty((0, 3))
 
@@ -63,4 +76,4 @@ class OctoMapBuilder:
 
     @property
     def num_occupied(self) -> int:
-        return len(self.get_occupied_voxels())
+        return len(self._occupied_voxels())
