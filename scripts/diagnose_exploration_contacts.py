@@ -21,6 +21,7 @@ from src.exploration.evaluation.scenarios import list_scenarios
 from src.metrics.exploration_coverage import (
     DepthObservation, _floor_points, visible_reference_cells,
 )
+from scripts.diagnose_exploration_planning import inspect_frontier_state
 
 
 def initial_visibility(episode, rid, output):
@@ -116,6 +117,18 @@ def diagnose(scenario: str, seed: int, horizon: float, output: Path) -> dict:
                     "estimated_body_pose": body.tolist(), "true_body_pose": bodies[rid].tolist(),
                     "camera_x_heading_rad": yaw(camera), "estimated_body_yaw_rad": yaw(body),
                     "true_body_yaw_rad": yaw(bodies[rid])})
+        # Terminal diagnostics run after the last control decision. They do not
+        # supply simulator truth or reference geometry to navigation.
+        report["final_planning"] = {}
+        final_poses = {row["robot"]: np.asarray(row["estimated_body_pose"])
+                       for row in report["poses"][-len(ids):]}
+        for rid, robot in episode.coordinator.robots.items():
+            exploration = robot.exploration
+            occupied = robot.octomap.get_occupied_voxels()
+            report["final_planning"][rid] = inspect_frontier_state(
+                exploration.planning_grid(occupied), final_poses[rid][:3, 3], output / f"{rid}-final-planning",
+                min_cluster_size=exploration._config.min_cluster_size, planner=exploration._path_planner,
+                occupied_voxels=occupied, observed_floor_xy=exploration.observed_floor_xy)
         report["episode"] = episode.inspect(include_history=True)
         report["reliability_events"] = episode.reliability.events()
     (output / "diagnosis.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")

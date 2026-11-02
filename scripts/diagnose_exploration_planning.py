@@ -20,6 +20,49 @@ from src.exploration.occupancy_grid import CELL_OCCUPIED, OccupancyGrid2D
 from src.exploration.path_planner import PathPlanner
 
 
+def inspect_frontier_state(grid, start, directory: Path, *, min_cluster_size=5, planner=None,
+                           occupied_voxels=None, observed_floor_xy=None) -> dict:
+    """Inspect terminal navigation geometry without using reference free space."""
+    planner = planner or PathPlanner()
+    costs = planner._get_inflation_cost(grid)
+    reachable = planner.reachable_mask(start, grid)
+    raw = FrontierDetector(grid.resolution, min_cluster_size=1).detect(np.empty((0, 3)), grid_2d=grid)
+    retained = [cluster for cluster in raw if cluster.voxel_count >= min_cluster_size]
+    frontier = np.zeros(grid.grid.shape, dtype=bool)
+    for cluster in retained:
+        frontier[cluster.voxels[:, 0], cluster.voxels[:, 1]] = True
+    cell = grid.world_to_grid(start[:2])
+    if not raw:
+        reason = "no_frontier_cells"
+    elif not retained:
+        reason = "clusters_below_minimum_size"
+    elif not reachable.any():
+        reason = "start_without_passable_neighbors"
+    elif not (frontier & reachable).any():
+        reason = "no_reachable_frontier_cells"
+    else:
+        reason = "reachable_frontier_cells_available"
+    report = {
+        "reason": reason, "start_world": start.tolist(), "start_cell": list(cell),
+        "start_occupancy": int(grid.grid[cell]), "start_inflation_cost": float(costs[cell]),
+        "min_cluster_size": min_cluster_size, "raw_cluster_sizes": [c.voxel_count for c in raw],
+        "retained_clusters": len(retained), "retained_frontier_cells": int(frontier.sum()),
+        "inflated_frontier_cells": int((frontier & (costs >= 1e5)).sum()),
+        "reachable_frontier_cells": int((frontier & reachable).sum()),
+        "free_cells": int((grid.grid == 0).sum()),
+        "reachable_free_cells": int(((grid.grid == 0) & reachable).sum()),
+        "reachable_cells": int(reachable.sum()),
+    }
+    directory.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(directory / "frontiers.npz", grid=grid.grid, origin=grid.origin,
+                        resolution=grid.resolution, start=start, costs=costs,
+                        frontier=frontier, reachable=reachable,
+                        occupied_voxels=np.empty((0, 3)) if occupied_voxels is None else occupied_voxels,
+                        observed_floor_xy=np.empty((0, 2)) if observed_floor_xy is None else observed_floor_xy)
+    (directory / "frontiers.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
+    return report
+
+
 def inspect_attempt(attempt: dict, directory: Path) -> dict:
     grid = attempt["grid"]
     start, goal = attempt["start"], attempt["goal"]

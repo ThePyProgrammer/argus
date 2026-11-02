@@ -5,10 +5,40 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from scripts.diagnose_exploration_planning import inspect_attempt
+from scripts.diagnose_exploration_planning import inspect_attempt, inspect_frontier_state
 from src.exploration.frontier_detector import FrontierDetector
 from src.exploration.occupancy_grid import OccupancyGrid2D
 from src.exploration.path_planner import PathPlanner
+
+
+def test_terminal_diagnosis_distinguishes_trapped_start_from_missing_frontiers(tmp_path):
+    cells = np.full((21, 21), -1, dtype=np.int8)
+    cells[4:17, 4:17] = 0
+    cells[9:12, 9:12] = 100
+    grid = OccupancyGrid2D(cells, .1, np.zeros(2), 21, 21)
+    before = cells.copy()
+    blocked = inspect_frontier_state(grid, np.array([1.05, 1.05, 0.]), tmp_path / "blocked")
+    assert blocked["retained_frontier_cells"] > 0
+    assert blocked["reason"] == "start_without_passable_neighbors"
+    assert blocked["reachable_cells"] == 0
+    available = inspect_frontier_state(grid, np.array([.55, .55, 0.]), tmp_path / "available")
+    assert available["reason"] == "reachable_frontier_cells_available"
+    assert available["reachable_frontier_cells"] > 0
+    np.testing.assert_array_equal(cells, before)
+    with np.load(tmp_path / "blocked" / "frontiers.npz", allow_pickle=False) as saved:
+        np.testing.assert_array_equal(saved["grid"], cells)
+
+
+def test_terminal_diagnosis_reports_cluster_filter_and_no_frontiers(tmp_path):
+    cells = np.full((9, 9), -1, dtype=np.int8)
+    cells[4, 4] = 0
+    grid = OccupancyGrid2D(cells, .1, np.zeros(2), 9, 9)
+    small = inspect_frontier_state(grid, np.array([.45, .45, 0.]), tmp_path / "small")
+    assert small["reason"] == "clusters_below_minimum_size"
+    assert small["raw_cluster_sizes"] == [1]
+    cells[:] = 0
+    empty = inspect_frontier_state(grid, np.array([.45, .45, 0.]), tmp_path / "empty")
+    assert empty["reason"] == "no_frontier_cells"
 
 
 def test_ring_frontier_has_reachable_cells_despite_occupied_centroid(tmp_path):
