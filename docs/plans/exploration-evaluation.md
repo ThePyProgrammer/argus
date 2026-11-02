@@ -20,9 +20,7 @@ PR 4's development lifecycle is implemented: [ExplorationEpisode](../../src/expl
 
 Validation for PR 4: 695 tests pass across the runtime, metrics, SLAM, dashboard integration, and worker checks, with 7 skips. Nine existing subprocess SLAM tests fail because this Windows ZeroMQ build reports no IPC support. Those backend files are unchanged. Real episode tests include 17 cases; the two-episode planning test has a scoped 120-second timeout for offscreen rendering.
 
-Development finding: `branching_corridor`, seed 101, currently terminates with `all_unreachable` at 0.29 simulated seconds, on the first frontier scan. The failure is retained and scored through the requested horizon. Successful navigation and long-horizon repeatability are not established. Diagnose this shared baseline issue before comparing allocation methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
-
-The [first-scan diagnosis](../notes/exploration-first-scan-failure.md) now confirms that both selected cluster centroids are occupied, although all 94 and 312 cells in those clusters are reachable under the current planner's rules. Paths to actual frontier cells succeed on the unchanged grids. The floor-removal threshold also stays inactive, retaining near-floor and below-floor voxels. Next: correct target selection and validate floor separation across the shared baselines.
+The [first-scan failure](../notes/exploration-first-scan-failure.md) is corrected in the [shared navigation baseline](../exploration-navigation.md). Targets are reachable frontier cells, newly planned paths survive the scan frame, and observed floor is separated before obstacle-map accumulation. Seed 101 reaches a 1-second horizon in all three layouts with goals assigned to both robots, zero planning failures, and zero falls. Each robot enters recovery once under the existing detector. Sustained exploration and long-horizon repeatability remain unestablished; validate recovery timing and longer runs before comparing methods. PR 5's batch CLI, persistent manifests, and resume support remain unimplemented.
 
 ## 1. Result to produce
 
@@ -198,7 +196,7 @@ Budget roughly 20-31 focused working days. The critical path is reference geomet
 
 **Gate:** Same inputs on the same supported environment reproduce spawn state and decision traces within declared numerical tolerances. Running an episode alone or after another episode gives equivalent results. Evaluation collectors do not alter commands.
 
-Development gate passes for short episodes and the current first-scan failure, with MuJoCo 3.6 and one OpenMP thread. Longer successful episodes must pass the same checks after the baseline navigation issue is resolved.
+Development gate passes for short episodes and successful first-scan planning, with MuJoCo 3.6 and one OpenMP thread. Longer successful episodes must pass the same checks before the study.
 
 ### PR 5: Add `eval-exploration` and artifacts
 

@@ -10,7 +10,7 @@ uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --s
 
 The script prints a JSON result and closes all simulation resources. It opens no viewer and loads no optional detectors. Horizons must be positive multiples of the sensor interval, currently 0.01 simulated seconds. For repeatability checks on PowerShell, set `$env:OMP_NUM_THREADS = '1'` before launching Python. The validated environment uses MuJoCo 3.6 and one OpenMP thread; cross-platform bitwise equivalence is not claimed.
 
-The development smoke case above currently ends with `all_unreachable` at 0.29 simulated seconds. The [diagnosis](notes/exploration-first-scan-failure.md) confirms occupied cluster centroids despite reachable frontier cells, plus floor voxels retained by the occupancy projection. This is a retained algorithm failure, not a successful exploration result. Correct target selection and floor separation before running a performance campaign. This case terminates before the initial Voronoi partition, so it cannot compare allocation methods.
+The former `all_unreachable` failure at 0.29 simulated seconds is corrected. The [navigation baseline](exploration-navigation.md) now selects reachable frontier cells and separates observed floor before map accumulation. Seed 101 reaches a 1-second smoke horizon in all three layouts with zero planning failures or falls. These short runs still enter recovery and do not establish long-run exploration performance or compare allocation methods.
 
 ## Lifecycle
 
@@ -52,7 +52,7 @@ The dashboard's `Coordinator.run` now delegates to `start`, `advance`, and `clos
 
 Go2 falls use the existing platform height threshold, below 0.16 m. A fall is counted but does not itself disable that controller. Recovery entries include both exploration stuck recovery and platform recovery states.
 
-Contacts and body states are sampled at sensor cadence, currently every five physics steps. Brief contacts between samples can be missed. Planning attempts and selection latency are recorded at decision time; goal and recovery state transitions are sampled at the next sensor boundary. Allocator timing currently measures each robot's goal-selector invocation, excluding path planning, mapping, and rendering. Joint allocation will need its own timing boundary.
+Contacts and body states are sampled at sensor cadence, currently every five physics steps. Brief contacts between samples can be missed. Planning attempts and selection latency are recorded at decision time; goal and recovery state transitions are sampled at the next sensor boundary. Selection timing includes reachable-cell filtering and candidate ranking, excluding A* execution, mapping, and rendering. Joint allocation will need its own timing boundary.
 
 The result records total wall duration through measurement completion, measured-interval wall duration, real-time factor, sensor cadence, and the OS process RSS high-water mark. Memory scope is explicitly `process_lifetime`; it is not isolated episode memory when multiple episodes share a process. Batch process isolation belongs to the runner milestone.
 
@@ -60,6 +60,6 @@ The [measurement contract](exploration-measurements.md) defines visibility, AUC,
 
 ## Validation
 
-Real offscreen tests compare commands, body trajectories, and coverage across repeated short episodes, intervening seeds, and collector attachment. A longer test reaches the first frontier scan and preserves its failure with and without collection. Additional tests check fixture geometry after robot insertion, capture poses, heading application, owned recovery randomness, dashboard-setting isolation, disabled robots, backend loss, and cleanup after injected failures.
+Real offscreen tests compare commands, body trajectories, and coverage across repeated short episodes, intervening seeds, and collector attachment. A longer test passes the first frontier scan with successful goal assignments, with and without collection. Additional tests check fixture geometry after robot insertion, capture poses, heading application, owned recovery randomness, dashboard-setting isolation, disabled robots, backend loss, and cleanup after injected failures.
 
 These checks establish development lifecycle behavior. Successful navigation, long-horizon repeatability, the candidate methods, and the frozen study remain gates in the [execution plan](plans/exploration-evaluation.md).
