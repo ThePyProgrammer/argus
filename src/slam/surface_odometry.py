@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation
 # These are numerical conditioning rules, not a pose-accuracy guarantee.
 PLANAR_VARIANCE_RATIO = .01
 SINGULAR_VALUE_RATIO = .01
+MIN_CORRESPONDENCES = 100
 
 
 def surface_cloud(cloud: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
@@ -27,6 +28,27 @@ def surface_cloud(cloud: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
     valid = (values[:, 1] > 1e-10) & (values[:, 0] < PLANAR_VARIANCE_RATIO * values[:, 1])
     result.normals = o3d.utility.Vector3dVector(vectors[:, :, 0])
     return result.select_by_index(np.flatnonzero(valid).tolist())
+
+
+def registration_cloud(observation: o3d.geometry.PointCloud, map_cloud: o3d.geometry.PointCloud,
+                       voxel_size: float) -> tuple[o3d.geometry.PointCloud, float]:
+    """Preserve close-range support without increasing map density.
+
+    Refine at most three times from the original observed points. A twofold
+    support margin allows some correspondence loss while retaining the same
+    minimum acceptance count. No points are synthesized or duplicated.
+    """
+    result = surface_cloud(map_cloud)
+    resolution = voxel_size
+    for _ in range(3):
+        if len(result.points) >= 2 * MIN_CORRESPONDENCES or len(observation.points) < MIN_CORRESPONDENCES:
+            break
+        resolution *= .5
+        finer = observation.voxel_down_sample(resolution)
+        if len(finer.points) > 50:
+            finer, _ = finer.remove_statistical_outlier(nb_neighbors=10, std_ratio=2.)
+        result = surface_cloud(finer)
+    return result, resolution
 
 
 @dataclass(frozen=True)

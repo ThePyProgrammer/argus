@@ -15,7 +15,7 @@ import open3d as o3d
 
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.slam.depth_to_cloud import depth_to_pointcloud
-from src.slam.surface_odometry import align_surfaces, surface_cloud
+from src.slam.surface_odometry import MIN_CORRESPONDENCES, align_surfaces, registration_cloud
 
 
 MAX_CLOUD_POINTS = 500_000
@@ -80,25 +80,30 @@ class SLAMPipeline:
         self._last_frame_cloud = np.empty((0, 3))
         self._last_frame_colors = np.empty((0, 3))
         self.registration_metrics = {"fitness": 0., "inlier_rmse": None,
-                                     "observable_rank": 0, "accepted": False}
+                                     "observable_rank": 0, "accepted": False,
+                                     "correspondences": 0, "source_points": 0,
+                                     "target_points": len(self._prev_cloud.points) if self._prev_cloud is not None else 0,
+                                     "registration_voxel_m": None, "rejection_reason": "missing_depth"}
         self.tracking_ok = False
         if frame.depth is None:
             self._slam_poses.append(self._current_pose.copy())
             return self._current_pose.copy()
 
         # Convert depth to point cloud in camera frame
-        cloud = depth_to_pointcloud(
+        observation = depth_to_pointcloud(
             frame.depth, frame.rgb, self._intrinsics, max_depth=10.0,
             **({"cloud_config_key": self._cloud_config_key} if self._cloud_config_key is not None else {}),
         )
-        cloud = cloud.voxel_down_sample(self._voxel_size)
+        cloud = observation.voxel_down_sample(self._voxel_size)
 
         # Apply the same preparation to both sides of every alignment.
         if len(cloud.points) > 50:
             cloud, _ = cloud.remove_statistical_outlier(
                 nb_neighbors=10, std_ratio=2.0,
             )
-        registration_cloud = surface_cloud(cloud)
+        surfaces, registration_voxel = registration_cloud(observation, cloud, self._voxel_size)
+        self.registration_metrics.update(source_points=len(surfaces.points),
+                                         registration_voxel_m=registration_voxel)
 
         # Align against the last accepted camera frame.
         if self._prev_cloud is not None:
@@ -106,14 +111,22 @@ class SLAMPipeline:
             # Calibration is fixed, so the body origin has these coordinates
             # in both camera frames. No live body/world pose is consulted.
             motion_origin = None if mount is None else -mount[:3, :3].T @ mount[:3, 3]
-            result = align_surfaces(registration_cloud, self._prev_cloud, self._voxel_size * 3,
+            result = align_surfaces(surfaces, self._prev_cloud, self._voxel_size * 3,
                                     motion_origin=motion_origin)
-            self.tracking_ok = bool(result.fitness > .3 and result.correspondences >= 100
-                                    and result.observable_rank >= 3
-                                    and np.isfinite(result.transformation).all())
-            self.registration_metrics = {"fitness": result.fitness, "inlier_rmse": result.inlier_rmse,
-                                         "observable_rank": result.observable_rank,
-                                         "accepted": self.tracking_ok}
+            reason = None
+            if result.correspondences < MIN_CORRESPONDENCES:
+                reason = "insufficient_correspondences"
+            elif not (result.fitness > .3):
+                reason = "low_overlap"
+            elif result.observable_rank < 3:
+                reason = "insufficient_rank"
+            elif not np.isfinite(result.transformation).all():
+                reason = "nonfinite_transform"
+            self.tracking_ok = reason is None
+            self.registration_metrics.update(fitness=result.fitness, inlier_rmse=result.inlier_rmse,
+                                             observable_rank=result.observable_rank,
+                                             correspondences=result.correspondences,
+                                             accepted=self.tracking_ok, rejection_reason=reason)
             if self.tracking_ok:
                 self._current_pose = self._current_pose @ result.transformation
         else:
@@ -121,6 +134,7 @@ class SLAMPipeline:
             # seeded even if that view cannot support subsequent odometry.
             self.tracking_ok = not self._slam_poses and len(cloud.points) > 0
             self.registration_metrics["accepted"] = self.tracking_ok
+            self.registration_metrics["rejection_reason"] = None if self.tracking_ok else "missing_initial_reference"
 
         if not self.tracking_ok:
             # The previous reference still belongs to the held pose. Do not
@@ -131,7 +145,7 @@ class SLAMPipeline:
         # Keep exactly the prepared cloud in camera coordinates. Reprojecting
         # it here previously used the mutable global axis configuration and
         # discarded filtering, even when this pipeline had a pinned config.
-        self._prev_cloud = registration_cloud
+        self._prev_cloud = surfaces
 
         # Transform cloud to world frame using ICP-estimated pose
         cloud.transform(self._current_pose)
