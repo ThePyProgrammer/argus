@@ -2,6 +2,8 @@
 
 The corrected baseline is not ready for allocator comparisons. Two layouts stop early, a calf-floor contact returns after restarting, and substantial localization error remains even in the layout that reaches the horizon.
 
+Follow-up: the [idle/restart correction](exploration-restart-validation.md) removes the reproduced calf-floor contact in physics replay and adds phase-sensitive regressions. The results below describe the earlier revision; localization and obstacle-clearance failures remain open.
+
 ## Conditions
 
 Revision `0bfa63d27466e2771047496bd6b0499b4e6eea31`, seed 101, two Go2 robots, five-second requested horizon, 100 Hz control/sensing, ICP and legacy Voronoi allocation. Camera/body conversion and bounded swing lift are enabled. Controller and planner settings were held fixed across layouts.
@@ -49,7 +51,7 @@ The corridor's first 100 commands, 101 body-position samples, and first-second p
 
 ## Next work
 
-1. Reduce the recorded corridor command sequence to a restart regression, inspect joint-target transitions, and correct the calf strike while preserving forward progress.
+1. Completed in the [idle/restart correction](exploration-restart-validation.md): reduce the corridor sequence to a physics regression and correct the calf strike while preserving forward progress. A new full closed-loop run is still required.
 2. Isolate ICP drift with stationary and known-motion camera sequences. Record registration quality and pose increments before changing the estimator or introducing a separately labeled pose-assisted diagnostic.
 3. Capture the planning grid, route, and body footprint at the column collision. Assess the current 0.15 m inflation against the platform's 0.35 m footprint radius without assuming inflation alone caused the collision.
 4. Repeat these development checks after corrections, then verify longer closed-loop repeatability before implementing the comparison campaign.
