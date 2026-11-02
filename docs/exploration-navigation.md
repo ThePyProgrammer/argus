@@ -8,7 +8,9 @@ Cluster centroids remain useful for ranking regions. Navigation targets are actu
 
 Clusters retain nearest, largest, or supplied bias scoring. Within a cluster, cells are ordered by distance from the current estimated position, then row and column. Other cells are tried before discarding a region. Occupied, inflated, and disconnected cells are excluded. Clearance caches are invalidated when grid contents change.
 
-A scan replaces the current path. The new path is retained and executed on that frame, including the first scan at step 30. Previously, the periodic rescan branch immediately discarded it.
+A scan clears the old route and goal before planning. A successful scan installs a new path and executes it on that frame, including the first scan at step 30. An unsuccessful scan leaves a persistent idle state, including frames without rescans. Initial forward movement is allowed only before the first scan; it cannot resume as a fallback after losing a route.
+
+No frontiers, no feasible candidates, failed A* attempts, and scan exceptions all prevent stale-route execution. An idle robot keeps sensing and can resume after a successful rescan or an explicit waypoint command. Its teammate can continue exploring. Recovery cannot turn idle planning failure into movement. Episode provenance records `route_lifecycle: invalidate_on_rescan_v1`.
 
 ## Floor observations
 
@@ -34,9 +36,9 @@ Floor observations never define measured coverage. The independent depth-based c
 
 Tests cover occupied ring centroids, alternative cells within one cluster, inflated and disconnected targets, stable ordering, and retained replanned paths. Floor tests cover rigid pose shifts/tilts, wall-dominated scans, missing floor, raised surfaces, low obstacles, and a rendered 6 cm box.
 
-The relevant metrics, exploration, coordination, bridge, SLAM, and dashboard integration suites pass 726 tests with 7 skips. The existing subprocess SLAM test module is excluded because this Windows ZeroMQ build does not support IPC. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
+The relevant metrics, exploration, coordination, bridge, SLAM, and dashboard integration suites pass 733 tests with 7 skips. The existing subprocess SLAM test module is excluded because this Windows ZeroMQ build does not support IPC. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
 
-The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contact and stale-path failures. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
+The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contacts and the stale-path failure corrected above. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
 
 Episode provenance records the exploration configuration, `reachable_frontier_member_v1`, and `per_observation_plane_v1`. Selection timing now includes reachable-cell filtering and candidate ranking, and excludes A* execution, mapping, and rendering.
 

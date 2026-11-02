@@ -2,7 +2,7 @@
 
 ## Scope
 
-Development checks for the recovery change in `8de4f22`. Two Go2 robots use the existing ICP/Voronoi baseline, seed 101, a 5-second horizon, and 0.01-second sensor intervals. Runs use Windows, MuJoCo 3.6, and `OMP_NUM_THREADS=1`.
+Historical development checks for the recovery change in `8de4f22`, before the route-lifecycle correction below. Two Go2 robots use the existing ICP/Voronoi baseline, seed 101, a 5-second horizon, and 0.01-second sensor intervals. Runs use Windows, MuJoCo 3.6, and `OMP_NUM_THREADS=1`.
 
 This checks the [mobility recovery correction](../exploration-navigation.md#mobility-recovery), not an allocation improvement. The 726-test regression passes with 7 skips; the known Windows IPC test module is excluded. The real 0.35-second observer-invariance test passes without recovery. Long-horizon repeatability is still untested.
 
@@ -29,9 +29,17 @@ The saved corridor trace also shows a stale-path execution bug:
 | A | 2.93 s | 2.95 s, 0.796 m/s |
 | B | 3.69 s | 3.71 s, 0.800 m/s |
 
-Code inspection explains the behavior: `_evaluate_frontiers` clears `_goal_id` on an unsuccessful scan but retains `_current_waypoint_runner`. `step_once` resets its local termination flag on the next frame. The coordinator stops the robot only on frames whose metrics report termination. A later frame can therefore execute the retained route. This is independent of the recovery timing correction; the trace does not prove it caused the recorded contacts.
+Code inspection explained the old behavior: `_evaluate_frontiers` clears `_goal_id` on an unsuccessful scan but retains `_current_waypoint_runner`. `step_once` resets its local termination flag on the next frame. The coordinator stops the robot only on frames whose metrics report termination. A later frame can therefore execute the retained route. This is independent of the recovery timing correction; the trace does not prove it caused the recorded contacts.
 
-Next, invalidate routes when planning loses a feasible goal and keep that robot idle until a successful rescan. Add a regression with one exhausted robot and one still exploring. Then inspect contact events against estimated poses, body trajectories, and planning clearance before expanding the evaluation matrix. Increasing the recovery timeout further would not address this failure.
+## Stale-route correction
+
+Scans now invalidate the route before planning. Failure leaves a persistent idle state until a new route is installed. Bootstrap movement cannot restart after the first scan, and recovery cannot move a robot whose navigation is exhausted. An explicit waypoint command can also resume navigation.
+
+Regression tests cover absent frontiers, empty feasible-candidate sets, failed A* calls, scan exceptions, delayed rescans, idle periods longer than the recovery timeout, and successful replanning. A two-robot coordinator test checks both interactive and absorbing evaluation modes: one robot stays idle while its teammate moves, and both exhausted robots produce the expected team termination. The relevant suite passes 733 tests with 7 skips, excluding the known Windows IPC module.
+
+A real corridor run with seed 101 reaches 3.1 simulated seconds. Robot A loses its goal at 2.93 seconds and receives zero linear and angular commands on all 17 remaining ticks; robot B continues moving. At 2.95 seconds, the former 0.796 m/s stale-route command is now zero. Pre-failure commands and body trajectories agree with the saved historical run within floating-point tolerance (1e-10), though they are not bitwise identical. The run records four robot-obstacle contact episodes, with no falls or recovery entries. The saved trace is `outputs/exploration-planning/stale-route-validation/branching_corridor-seed-101-3.1s.json`.
+
+Contact, pose, and sensing diagnosis remains necessary before expanding the evaluation matrix. The historical five-second results above are not results for the corrected route lifecycle.
 
 ## Runtime diagnostic
 
@@ -46,4 +54,4 @@ $env:OMP_NUM_THREADS = '1'
 uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --seed 101 --horizon 5 --output outputs/exploration-planning/recovery-validation/branching_corridor.json
 ```
 
-Repeat for `cluttered_room` and `connected_rooms`. The smoke export records command/body histories and reliability events. The original development traces under `outputs/exploration-planning/recovery-validation/*-seed-101-5s.json` also contain per-frame estimated positions and goal/recovery states captured by a local diagnostic driver. Generated traces are ignored by Git. They are development artifacts, not a frozen study manifest.
+This command uses the current checkout. To reproduce the historical table, use revision `8de4f22` with a local diagnostic driver, or `cc7c7dd` for the same navigation behavior plus the smoke export. Repeat for `cluttered_room` and `connected_rooms`. The smoke export records command/body histories and reliability events. The original development traces under `outputs/exploration-planning/recovery-validation/*-seed-101-5s.json` also contain per-frame estimated positions and goal/recovery states captured by a local diagnostic driver. Generated traces are ignored by Git. They are development artifacts, not a frozen study manifest.
