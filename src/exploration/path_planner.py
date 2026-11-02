@@ -59,6 +59,7 @@ class PathPlanner:
         self._inflation_radius = inflation_radius
         self._inflation_cache: np.ndarray | None = None
         self._inflation_grid_id: int | None = None
+        self._inflation_grid: np.ndarray | None = None
 
     def _get_inflation_cost(self, grid: OccupancyGrid2D) -> np.ndarray:
         """Voronoi-gradient costmap: paths stay centered in corridors.
@@ -71,7 +72,8 @@ class PathPlanner:
             (H, W) float array. 0 = free, >0 = cost, 1e6 = impassable.
         """
         grid_id = id(grid.grid)
-        if self._inflation_grid_id == grid_id and self._inflation_cache is not None:
+        if (self._inflation_grid_id == grid_id and self._inflation_cache is not None
+                and self._inflation_grid is not None and np.array_equal(self._inflation_grid, grid.grid)):
             return self._inflation_cache
 
         from src.exploration.costmap import build_costmap
@@ -84,7 +86,19 @@ class PathPlanner:
 
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
+        self._inflation_grid = grid.grid.copy()
         return cost
+
+    def reachable_mask(self, start_world: np.ndarray, grid: OccupancyGrid2D) -> np.ndarray:
+        """Cells reachable under the same inflation and 8-neighbor rules as A*."""
+        from scipy.ndimage import label
+        passable = (grid.grid != CELL_OCCUPIED) & (self._get_inflation_cost(grid) < 1e5)
+        components, _ = label(passable, structure=np.ones((3, 3), dtype=int))
+        row, col = grid.world_to_grid(start_world[:2])
+        labels = [components[r, c]
+                  for r in range(max(0, row - 1), min(grid.height, row + 2))
+                  for c in range(max(0, col - 1), min(grid.width, col + 2)) if passable[r, c]]
+        return np.isin(components, labels) & passable
 
     def plan(
         self,

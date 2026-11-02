@@ -86,3 +86,35 @@ class GoalSelector:
             return self.select(frontiers, robot_pose)
         best = max(frontiers, key=lambda c: score_fn(c.centroid.astype(np.float64)))
         return best.centroid.astype(np.float64)
+
+    def navigation_candidates(self, frontiers, robot_pose, grid, reachable, score_fn=None):
+        """Rank clusters as before, but navigate to reachable cells within them.
+
+        A centroid describes a cluster; it need not belong to free space. Try
+        other cells of a cluster before exhausting it. Ties use world geometry
+        and cell indices, independent of detector traversal order.
+        """
+        position = robot_pose[:3, 3]
+        def rank(cluster):
+            if score_fn is not None:
+                primary = -float(score_fn(cluster.centroid))
+            elif self._strategy == "largest":
+                primary = -cluster.voxel_count
+            else:
+                primary = float(np.linalg.norm(cluster.centroid - position))
+            return primary, *map(float, cluster.centroid)
+
+        seen = set()
+        for cluster in sorted(frontiers, key=rank):
+            candidates = []
+            for row, col in cluster.voxels:
+                row, col = int(row), int(col)
+                if (row, col) in seen or not grid.is_free(row, col) or not reachable[row, col]:
+                    continue
+                xy = grid.grid_to_world(row, col)
+                candidates.append((float(np.linalg.norm(xy - position[:2])), row, col, xy))
+            for _, row, col, xy in sorted(candidates, key=lambda item: item[:3]):
+                if (row, col) in seen:
+                    continue
+                seen.add((row, col))
+                yield np.array([xy[0], xy[1], 0.], dtype=np.float64)

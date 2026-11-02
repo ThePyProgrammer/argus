@@ -16,6 +16,7 @@ from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import ExplorationResult
 from src.exploration.exploration_loop import ExplorationLoop, StuckRecovery
 from src.exploration.frontier_detector import FrontierCluster
+from src.exploration.occupancy_grid import OccupancyGrid2D
 from src.slam.protocol import SLAMResult, TrackingStatus
 
 
@@ -124,8 +125,32 @@ def _make_cluster(centroid: list[float], count: int = 10) -> FrontierCluster:
     return FrontierCluster(
         centroid=np.array(centroid, dtype=np.float64),
         voxel_count=count,
-        voxels=np.zeros((count, 3), dtype=int),
+        voxels=np.tile([round(centroid[1] / .1), round(centroid[0] / .1)], (count, 1)),
     )
+
+
+@pytest.fixture(autouse=True)
+def policy_test_grid(monkeypatch):
+    # These tests mock frontier detection and A*. Give their synthetic clusters
+    # valid free cells; projection/clearance are tested independently.
+    monkeypatch.setattr("src.exploration.exploration_loop.project_voxels_to_2d",
+                        lambda *a, **kw: OccupancyGrid2D(np.zeros((128, 128), np.int8),
+                                                       .1, np.array([-.05, -.05]), 128, 128))
+
+
+def test_failed_cell_does_not_discard_other_cells_of_the_same_cluster():
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+    cluster = FrontierCluster(np.array([2., 0., 0.]), 2, np.array([[0, 20], [0, 21]]))
+    loop.frontier_detector.detect = lambda *a, **kw: [cluster]
+    attempts = []
+    def plan(start, goal, grid):
+        attempts.append(goal.copy())
+        return None if len(attempts) == 1 else [start, goal]
+    loop._path_planner.plan = plan
+    _, _, metrics = loop.step_once(_make_sensor_frame(), 30)
+    assert len(attempts) == 2
+    assert not metrics.terminated
+    assert loop.measurement_state["planning_attempts"] == (("1", False), ("2", True))
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +388,8 @@ def test_skill_learning_disabled_preserves_baseline_score_fn() -> None:
 
     assert metrics.frontiers == 1
     assert observed["called"] is True
+    assert loop._current_waypoint_runner is not None
+    assert loop.measurement_state["goal_id"] is not None
 
 
 def test_skill_learning_enabled_records_decision_trace() -> None:
@@ -430,7 +457,7 @@ def test_skill_learning_shadow_mode_records_without_changing_baseline_bias() -> 
     trace_lines = loop.skill_trace_jsonl().splitlines()
     assert metrics.frontiers == 2
     assert selected_goals
-    assert selected_goals[0][0] == 5.0
+    assert selected_goals[0][0] == pytest.approx(5.0)
     assert trace_lines
 
 

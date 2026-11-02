@@ -452,36 +452,20 @@ class ExplorationLoop:
         if not frontiers:
             terminated = True
         else:
-            # Try to find a reachable frontier
-            remaining = list(frontiers)
+            # Cluster centroids rank regions; actual frontier cells are targets.
             goal = None
-
-            while remaining:
-                selection_start = time.perf_counter()
-                if effective_score_fn is not None:
-                    candidate = self._goal_selector.select_with_bias(
-                        remaining, pose, effective_score_fn,
-                    )
-                else:
-                    candidate = self._goal_selector.select(remaining, pose)
-                self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
-                if candidate is None:
-                    break
-
-                planned_path = self._path_planner.plan(
-                    current_pos, candidate, grid_2d,
-                )
+            selection_start = time.perf_counter()
+            reachable = self._path_planner.reachable_mask(current_pos, grid_2d)
+            candidates = list(self._goal_selector.navigation_candidates(
+                frontiers, pose, grid_2d, reachable, effective_score_fn))
+            self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
+            for candidate in candidates:
+                planned_path = self._path_planner.plan(current_pos, candidate, grid_2d)
                 self._planning_sequence += 1
                 self._planning_attempts.append((str(self._planning_sequence), planned_path is not None))
                 if planned_path is not None:
-                    goal = candidate
-                    path = planned_path
+                    goal, path = candidate, planned_path
                     break
-
-                remaining = [
-                    f for f in remaining
-                    if not np.allclose(f.centroid, candidate)
-                ]
 
             if goal is None or path is None:
                 terminated = True
@@ -596,15 +580,9 @@ class ExplorationLoop:
         # e. Execute navigation
         if (self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete):
-            # Mid-path replanning: check if upcoming path is still clear
-            # every 10 steps using the occupancy grid (not depth camera)
-            if step % 10 == 0 and should_rescan:
-                # Path may be blocked by newly discovered obstacles
-                # Force a rescan which will replan if needed
-                self._current_waypoint_runner = None
-
-            if self._current_waypoint_runner is not None:
-                linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
+            # A rescan already replaces the path above. Do not discard the
+            # newly planned route on that same frame (including the first scan).
+            linear_vel, angular_vel = self._current_waypoint_runner.get_velocity(pose)
         elif self._current_waypoint_runner is None:
             # No waypoints yet -- just drive forward
             linear_vel = np.array([config.linear_speed * 0.5, 0.0], dtype=np.float64)

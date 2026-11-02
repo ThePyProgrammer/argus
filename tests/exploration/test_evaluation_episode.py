@@ -48,17 +48,18 @@ def test_collector_attachment_and_episode_order_preserve_commands_and_motion():
 
 
 @pytest.mark.timeout(120)
-def test_frontier_planning_trace_is_repeatable_and_failure_is_retained():
+def test_frontier_planning_succeeds_and_trace_is_observer_invariant():
     observed = run_episode(horizon=.35)
     unobserved = run_episode(horizon=.35, collect=False)
     assert observed["commands"] == unobserved["commands"]
     assert observed["trajectory"] == unobserved["trajectory"]
     result = observed["result"]
     assert result["valid"]
-    assert result["termination_reason"] == "all_unreachable"
-    assert result["elapsed_s"] == pytest.approx(.29)
+    assert result["termination_reason"] == "horizon"
+    assert result["elapsed_s"] == pytest.approx(.35)
     assert result["reliability"]["allocator_calls"] > 0
-    assert sum(r["planning_failures"] for r in result["reliability"]["per_robot"].values()) > 0
+    assert all(r["goal_assignments"] >= 1 for r in result["reliability"]["per_robot"].values())
+    assert sum(r["planning_failures"] for r in result["reliability"]["per_robot"].values()) == 0
     assert result["coverage"]["capped_time_s"] == .35
 
 
