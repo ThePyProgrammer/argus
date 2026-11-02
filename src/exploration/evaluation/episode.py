@@ -25,6 +25,7 @@ from src.exploration.config import ExplorationConfig
 from src.exploration.evaluation.scenarios import DEFAULTS, load_scenario
 from src.metrics.exploration_coverage import CoverageCollector, CoverageConfig, DepthObservation
 from src.metrics.exploration_metrics import ContactClassifier, ReliabilityCollector, RobotMetricState
+from src.locomotion.gait_params import GaitParams
 
 
 def _benchmark_model(scene, positions):
@@ -164,6 +165,8 @@ class ExplorationEpisode:
                                    "navigation_target_rule": "reachable_frontier_member_v1",
                                    "route_lifecycle": "invalidate_on_rescan_v1",
                                    "navigation_pose": "estimated_body_from_camera_mount_v1",
+                                   "gait_config": asdict(GaitParams()),
+                                   "gait_rule": "bounded_swing_thigh_lift_v1",
                                    "floor_filter": "per_observation_plane_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:

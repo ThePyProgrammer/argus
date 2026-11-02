@@ -23,6 +23,17 @@ class GaitParams:
     swing_height: float = 0.15
     """Foot lift amplitude during swing phase (joint-angle scale, not meters)."""
 
+    swing_thigh_min: float = 0.60
+    """Limit extra thigh reduction during lift to preserve Go2 knee clearance.
+
+    A stride may itself request a lower angle; in that case no additional
+    thigh reduction is applied. This preserves the phase-boundary targets.
+    Calibrated on level-floor development runs, not a terrain safety bound.
+    """
+
+    swing_thigh_turn_margin: float = 0.05
+    """Extra knee-clearance angle, reaching this margin at 1 rad/s of turning."""
+
     stride_length: float = 0.4
     """Max forward stride per step at full speed (joint-angle scale)."""
 

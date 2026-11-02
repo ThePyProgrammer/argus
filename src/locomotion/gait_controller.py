@@ -132,15 +132,19 @@ class TrotGaitController:
             # Parabolic foot lift at mid-swing
             lift = p.swing_height * 4.0 * swing_progress * (1.0 - swing_progress)
 
-            # Thigh: decrease angle = lift upper leg forward/up
-            thigh = p.standing_thigh - lift * 3.0
-
             # Calf: tuck MORE (more negative) for ground clearance
             calf = p.standing_calf - lift * 2.0
 
             # Move leg from back to front position
             stride_offset = half_stride * (1.0 - 2.0 * swing_progress)
-            thigh += stride_offset
+            stride_thigh = p.standing_thigh + stride_offset
+            # Reducing the thigh angle straightens the upper leg toward the
+            # floor. Limit that extra reduction so foot lift does not lower
+            # the knee/calf into the floor. Keep the stride endpoints intact.
+            # Turning rolls the body and reduces the inner leg's clearance.
+            thigh_limit = p.swing_thigh_min + p.swing_thigh_turn_margin * min(abs(omega), 1.0)
+            available_lift = max(0.0, stride_thigh - thigh_limit)
+            thigh = stride_thigh - min(lift * 3.0, available_lift)
 
         else:
             # STANCE: foot on ground, sweep leg backward to push body.
