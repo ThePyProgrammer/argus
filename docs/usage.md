@@ -104,6 +104,14 @@ uv run python scripts/run_exploration_smoke.py --scenario branching_corridor --s
 
 This exercises the current coordinator and measurement collectors. The batch evaluation command and allocator comparison are not available yet.
 
+For each live validation attempt, use the diagnostic-and-video workflow with a new output directory:
+
+```bash
+uv run --with imageio-ffmpeg python scripts/validate_exploration.py --scenario cluttered_room --seed 101 --horizon 10 --output outputs/exploration-planning/my-validation/attempt-01
+```
+
+On PowerShell, set `$env:OMP_NUM_THREADS = '1'` first. Every recorded outcome, including an early algorithm failure, gets `top-view.mp4`, a preview PNG, and a replay-verification report. `validation.json` records completion or the phase that failed. Existing attempts are never overwritten.
+
 ## Code map
 
 | Path | Responsibility |
