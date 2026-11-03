@@ -6,13 +6,30 @@ The shared navigation path now selects reachable frontier cells and separates fl
 
 Cluster centroids remain useful for ranking regions. Navigation targets are actual free cells belonging to a cluster and reachable under the planner's existing inflation and eight-neighbor rules.
 
-Clusters retain nearest, largest, or supplied bias scoring. Within a cluster, cells are ordered by distance from the current estimated position, then row and column. Other cells are tried before discarding a region. Occupied, inflated, and disconnected cells are excluded. Clearance caches are invalidated when grid contents change.
+Clusters retain nearest, largest, or supplied bias scoring. Within a cluster, cells are ordered by distance from the current estimated position, then row and column. Other cells are tried before discarding a region. Occupied, inflated, and disconnected cells are excluded. Clearance caches are invalidated when grid contents or the configured envelope change.
 
 Candidates within the waypoint arrival radius are skipped, and smoothed paths retain the exact selected goal. This prevents repeatedly installing paths that the follower immediately considers complete. The [free-space correction](notes/exploration-free-space-correction.md) records the regression and live validation.
 
 A scan clears the old route and goal before planning. A successful scan installs a new path and executes it on that frame, including the first scan at step 30. An unsuccessful scan leaves a persistent idle state, including frames without rescans. Initial forward movement is allowed only before the first scan; it cannot resume as a fallback after losing a route.
 
 No frontiers, no feasible candidates, failed A* attempts, and scan exceptions all prevent stale-route execution. An idle robot keeps sensing and can resume after a successful rescan or an explicit waypoint command. Its teammate can continue exploring. Recovery cannot turn idle planning failure into movement. Episode provenance records `route_lifecycle: invalidate_on_rescan_v1`.
+
+## Body and camera clearance
+
+Exploration supplies a circular obstacle exclusion envelope that covers the configured footprint and the camera at every heading. Its radius is:
+
+```text
+max(footprint radius, camera mount offset norm + camera stand-off)
+    + clearance margin + grid resolution / sqrt(2)
+```
+
+Defaults are a 0.35 m Go2 footprint radius, 0.15 m camera stand-off, and 0.05 m planning margin. The mount comes from fixed calibration, not a simulator world pose. Its full 3D offset norm bounds horizontal camera reach during body tilt. The raster allowance encloses an occupied cell's half-diagonal. At the evaluation's 0.1 m resolution and Go2 mount, the center-to-center exclusion is about 0.674 m. A missing mount retains the legacy coincident camera/body convention.
+
+Goal filtering and A* share this envelope. Diagonal moves require both orthogonal neighbors to be passable. Smoothed paths retain both endpoints and are checked across every touched grid cell, including boundaries and corner contacts. Each continuous segment is also checked against the exclusion disks around occupied-cell centers. This avoids reserving an additional traversed-cell margin while still rejecting a segment that approaches an obstacle between waypoints. A failed check uses the unsmoothed A* route. The existing start-cell escape exception remains: an occupied or inflated start can step directly to a passable neighbor; it cannot make an inflated goal valid.
+
+This is a conservative planning constraint on the observed map. It can reject narrow passages. The margin is not a bound on localization error, and the footprint is a platform configuration rather than a proof about every articulated pose. Unknown obstacles, stale observations, and departures from a planned route remain limitations. Tracking acceptance thresholds and the coverage reference are unchanged. Episode provenance records `planning_clearance: body_camera_envelope_continuous_segments_v2`.
+
+Exploration turns in place when heading error to the route exceeds `forward_heading_tolerance_rad`, default 0.25 radians. It resumes forward travel after alignment. This applies to both planned paths and explicit exploration waypoint targets. Small heading corrections retain simultaneous steering and forward motion. The [clearance validation](notes/exploration-camera-clearance-validation.md) records why clearance inflation alone was insufficient. Episode provenance records `path_following: align_heading_before_translation_v1`.
 
 ## Camera and body frames
 
@@ -48,13 +65,15 @@ Floor observations never define measured coverage. The independent depth-based c
 
 Tests cover occupied ring centroids, alternative cells within one cluster, inflated and disconnected targets, stable ordering, and retained replanned paths. Floor tests cover rigid pose shifts/tilts, wall-dominated scans, missing floor, raised surfaces, low obstacles, and a rendered 6 cm box.
 
-The SLAM, metrics, exploration, coordination, bridge, locomotion, and selected multi-robot integration suites pass 1,054 tests with 7 skips. The existing subprocess SLAM test module is excluded because this Windows ZeroMQ build does not support IPC. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
+The preceding free-space correction passed 1,054 tests with seven skips across SLAM, metrics, exploration, coordination, bridge, locomotion, and selected integration tests. The existing subprocess SLAM module was excluded because this Windows ZeroMQ build does not support IPC. The current clearance correction passes 489 navigation, control, coordination, and selected integration tests with four skips. Real episode tests preserve command and body-trajectory equality with measurement collection enabled and disabled.
+
+The [clearance validation](notes/exploration-camera-clearance-validation.md) records no contacts, falls, or tracking rejections in its three final checks. The corridor reaches five seconds; connected rooms and the cluttered room stop early with inflated starts. The cluttered room reaches only 37.7% coverage at 5.54 s, so sustained ten-second exploration and the original tracking-failure horizon remain unvalidated. Persistent floor misclassification and execution-time clearance remain blockers.
 
 The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contacts and the stale-path failure corrected above. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
 
 The [five-second follow-up](notes/exploration-longer-validation.md) tests the camera/body and swing-lift corrections across all three layouts. Two runs stop early; a calf-floor strike returns after restarting, and another robot hits a column. All layouts show more than 0.5 m peak planar pose error for both robots. The subsequent [idle/restart correction](notes/exploration-restart-validation.md) removes the reproduced floor strike in physics replay: idle commands now return all legs to standing and reset the gait phase. Localization, obstacle clearance, and a fresh full closed-loop validation remain unresolved.
 
-Episode provenance records the exploration configuration, `reachable_frontier_member_v1`, and `per_observation_plane_v1`. Selection timing now includes reachable-cell filtering and candidate ranking, and excludes A* execution, mapping, and rendering.
+Episode provenance records the exploration configuration and explicit versions for frontier targets, floor filtering, clearance, and route following. Selection timing includes reachable-cell filtering and candidate ranking, and excludes A* execution, mapping, and rendering.
 
 ## Mobility recovery
 
