@@ -10,7 +10,9 @@ The collectors are wired into [headless development episodes](exploration-episod
 
 `DepthObservation.from_frame(frame, intrinsics)` copies depth, calibration, capture time, and the camera-to-world transform into immutable storage. Moving the simulator or reusing a frame buffer cannot change an earlier observation. Legacy colorized depth is rejected.
 
-MuJoCo cameras look along negative Z, with positive X right and positive Y up. Images use downward rows, pixel centers at `(column + 0.5, row + 0.5)`, and principal points at `(width / 2, height / 2)`. Depth is distance along the camera axis in meters, not Euclidean ray length. MuJoCo 3.6 already returns metric depth; the bridges preserve sub-meter readings and replace invalid, far-plane, and over-20-meter readings with zero.
+MuJoCo cameras look along negative Z, with positive X right and positive Y up. Images use downward rows, integer pixel-center coordinates `(column, row)`, and centered principal points at `((width - 1) / 2, (height - 1) / 2)`. This convention matches Open3D depth unprojection. Depth is distance along the camera axis in meters, not Euclidean ray length. MuJoCo 3.6 already returns metric depth; the bridges preserve sub-meter readings and replace invalid, far-plane, and over-20-meter readings with zero.
+
+`floor-depth-support-v2` uses these integer centers. Version 1 used half-integer centers with principal points larger by 0.5. Shifting both preserves the physical coverage rays and four-pixel support rule, apart from boundary rounding. SLAM previously combined integer centers with those larger principal points, creating a half-pixel bias. Episode provenance now records `camera_calibration: integer_pixel_centers_v2`. Old calibration values must be converted before using them with v2; changing only the principal point in the old collector is incorrect. New navigation traces can differ, so cross-revision coverage differences are not allocator effects.
 
 A floor point counts only when:
 

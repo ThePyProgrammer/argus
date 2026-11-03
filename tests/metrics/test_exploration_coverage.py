@@ -88,7 +88,7 @@ def test_oblique_render_matches_floor_despite_pixel_depth_gradient(reference):
     assert obs.depth.max() - obs.depth.min() > 1
     cal = obs.calibration
     rows, cols = np.indices(obs.depth.shape)
-    factor = np.sqrt(1 + ((cols + .5 - cal.cx) / cal.fx)**2 + ((rows + .5 - cal.cy) / cal.fy)**2)
+    factor = np.sqrt(1 + ((cols - cal.cx) / cal.fx)**2 + ((rows - cal.cy) / cal.fy)**2)
     wrong = replace(obs, depth=obs.depth * factor)
     assert visible_reference_cells(reference, wrong).sum() < visible.sum() / 4
 
@@ -119,7 +119,7 @@ def test_out_of_view_behind_camera_and_range(reference):
 def test_pixel_support_is_conservative_at_depth_edges(reference):
     obs = observation()
     depth = obs.depth.copy()
-    # Center cell (x=.125, y=.125) projects to (33.43,22.57), using columns 32/33 and rows 22/23.
+    # Center cell (x=.125, y=.125) projects to (32.93,22.07), using columns 32/33 and rows 22/23.
     depth[22, 32] = 1
     visible = visible_reference_cells(reference, replace(obs, depth=depth))
     assert not visible[4, 4]

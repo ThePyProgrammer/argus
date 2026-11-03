@@ -17,7 +17,7 @@ import numpy as np
 from src.metrics.exploration_reference import ReferenceGrid
 
 
-COVERAGE_VERSION = "floor-depth-support-v1"
+COVERAGE_VERSION = "floor-depth-support-v2"
 TERMINATION_REASONS = frozenset({
     "horizon", "no_frontiers", "all_unreachable", "all_robots_failed", "algorithm_error",
 })
@@ -36,6 +36,7 @@ def _readonly(value: np.ndarray) -> np.ndarray:
 
 @dataclass(frozen=True)
 class CameraCalibration:
+    """Intrinsics with integer coordinates at pixel centers, as in Open3D."""
     fx: float
     fy: float
     cx: float
@@ -130,14 +131,15 @@ def _visible(points: np.ndarray, floor_z: float, observation: DepthObservation,
     u = cal.fx * camera[:, 0] / axial + cal.cx
     v = cal.cy - cal.fy * camera[:, 1] / axial
     # Four surrounding pixel centers must all see the floor. This intentionally
-    # rejects the outer half-pixel border and ambiguous silhouettes.
-    inside = (u >= .5) & (u < cal.width - .5) & (v >= .5) & (v < cal.height - .5)
+    # rejects the outer half-pixel border and ambiguous silhouettes. Intrinsics
+    # use integer pixel centers, shared with SLAM's depth unprojection.
+    inside = (u >= 0) & (u < cal.width - 1) & (v >= 0) & (v < cal.height - 1)
     candidates, u, v = candidates[inside], u[inside], v[inside]
-    col, row = np.floor(u - .5).astype(int), np.floor(v - .5).astype(int)
+    col, row = np.floor(u).astype(int), np.floor(v).astype(int)
     supported = np.ones(len(candidates), dtype=bool)
     for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-        x = (col + dx + .5 - cal.cx) / cal.fx
-        y = -(row + dy + .5 - cal.cy) / cal.fy
+        x = (col + dx - cal.cx) / cal.fx
+        y = -(row + dy - cal.cy) / cal.fy
         world_ray_z = pose[2, 0] * x + pose[2, 1] * y - pose[2, 2]
         expected = np.zeros(len(x))
         downward = world_ray_z < 0

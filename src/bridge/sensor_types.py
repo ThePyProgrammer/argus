@@ -114,11 +114,16 @@ class CameraIntrinsics:
 
     @classmethod
     def from_fov(cls, width: int, height: int, fov_degrees: float = 70.0) -> "CameraIntrinsics":
-        """Create intrinsics from vertical field-of-view angle."""
+        """Create centered intrinsics with integer coordinates at pixel centers.
+
+        MuJoCo's symmetric viewport spans pixel edges at -0.5 and size-0.5.
+        Open3D indexes depth samples at integer coordinates, so its principal
+        point is (size-1)/2 rather than size/2.
+        """
         import math
         fov_rad = math.radians(fov_degrees)
         fx = height / (2.0 * math.tan(fov_rad / 2.0))
-        return cls(fx=fx, fy=fx, cx=width / 2.0, cy=height / 2.0, width=width, height=height)
+        return cls(fx=fx, fy=fx, cx=(width - 1) / 2.0, cy=(height - 1) / 2.0, width=width, height=height)
 
 
 @runtime_checkable

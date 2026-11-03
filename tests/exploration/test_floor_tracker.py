@@ -70,3 +70,23 @@ def test_late_floor_acquisition_removes_raw_floor_but_preserves_shared_voxel_obs
 def test_stateless_detector_still_rejects_unverified_low_camera_view():
     # History solves this ambiguity; the bootstrap calibration is not widened.
     assert not FloorFilter().mask(floor_patch(), np.array([0, 0, .26])).any()
+
+
+def test_rendered_initial_plane_does_not_tilt_into_distant_low_obstacles():
+    from src.exploration.evaluation.episode import ExplorationEpisode
+    from src.slam.slam_pipeline import SLAMPipeline
+
+    with ExplorationEpisode.from_scenario("connected_rooms", 101, horizon_s=.1) as episode:
+        frame = episode.bridge.get_frame("robot_a")
+        pipeline = SLAMPipeline(episode.bridge.camera_intrinsics("robot_a"), cloud_config_key="1")
+        pipeline.process_frame(frame)
+        tracker = FloorTracker()
+        tracker.mask(pipeline.last_frame_cloud, frame.ground_truth_pose[:3, 3])
+        assert tracker.plane is not None
+        # Test extrapolation without fitting another plane. A biased initial
+        # calibration used to classify points at a distant wall base as floor.
+        floor = np.c_[np.full(20, 6.), np.linspace(-1, 1, 20), np.zeros(20)]
+        raised = floor + [0, 0, .05]
+        mask = tracker.mask(np.vstack((floor, raised)), np.array([5, 0, .27]))
+        assert mask[:20].all()
+        assert not mask[20:].any()
