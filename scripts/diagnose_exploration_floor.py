@@ -25,7 +25,7 @@ import numpy as np
 from scripts.diagnose_exploration_contacts import diagnose
 from src.exploration.evaluation.episode import ExplorationEpisode
 from src.exploration.evaluation.scenarios import list_scenarios
-from src.exploration.floor_filter import FloorFilter
+from src.exploration.floor_filter import FloorFilter, FloorTracker
 
 
 def floor_support(points, mask, estimated_camera, true_camera):
@@ -51,7 +51,7 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
     (output / "run.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     rows, worst = [], {}
     active = None
-    original_advance, original_mask = ExplorationEpisode.advance, FloorFilter.mask
+    original_advance, original_mask = ExplorationEpisode.advance, FloorTracker.mask
 
     def advance(episode):
         nonlocal active
@@ -70,6 +70,9 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
         np.testing.assert_allclose(origin, estimated[:3, 3], atol=1e-12, rtol=0)
         actual, counts = floor_support(points, mask, estimated, frame.ground_truth_pose)
         row = {"robot": rid, "time_s": frame.sim_time, **counts}
+        plane = filter_.plane
+        row["floor_plane_after"] = None if plane is None else {
+            "normal": plane[0].tolist(), "offset": plane[1]}
         rows.append(row)
         missed = counts["missed_floor_points"]
         if missed >= 40 and missed > worst.get(rid, 0):
@@ -84,7 +87,7 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
         return mask
 
     try:
-        with patch.object(ExplorationEpisode, "advance", advance), patch.object(FloorFilter, "mask", observe):
+        with patch.object(ExplorationEpisode, "advance", advance), patch.object(FloorTracker, "mask", observe):
             report = diagnose(scenario, seed, horizon, output)
     finally:
         manifest["source_unchanged"] = all(hashlib.sha256((ROOT / p).read_bytes()).hexdigest() == h

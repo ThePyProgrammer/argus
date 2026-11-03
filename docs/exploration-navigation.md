@@ -43,7 +43,7 @@ With mounting calibration, [odometry increments use the body origin](notes/explo
 
 ## Floor observations
 
-[FloorFilter](../src/exploration/floor_filter.py) classifies each SLAM frame before its points enter the accumulated obstacle cloud. This avoids treating floor points spread across height bins by pose error and voxelization as obstacles.
+[FloorTracker](../src/exploration/floor_filter.py) classifies each SLAM frame before its points enter the accumulated obstacle cloud. Each robot retains its own observed floor plane across frames. This avoids treating floor points spread across height bins by pose error and voxelization as obstacles.
 
 The filter estimates local surface normals, considers approximately horizontal planes at the calibrated camera-to-floor distance, and requires at least 40 supporting points with extent in two directions. It ranks hypotheses by residual-weighted support, preferring lower planes on ties, before deduplication and refinement. This prevents a weak tilted wall/floor edge from displacing a strongly supported floor. Point ordering and candidate ordering are deterministic; it uses no global random state or reference geometry.
 
@@ -55,7 +55,9 @@ The filter estimates local surface normals, considers approximately horizontal p
 | Maximum tilt relative to estimated world up | 25 degrees |
 | Minimum secondary-axis RMS spread | 0.08 m |
 
-Only plane inliers are removed. When no supported plane matches the calibration, points remain obstacle observations. `ExplorationConfig.ground_filter=False` bypasses separation. The camera-height calibration must be adapted for another platform or stance; this is a flat-floor Go2 baseline, not a general terrain classifier. Very shallow surfaces within the inlier tolerance are unresolved, and a broad raised surface within the calibration band can be ambiguous when the actual floor is hidden.
+These requirements bootstrap the plane. Once acquired, its distance band classifies narrow views and survives camera-height changes during walking. Broad matching support can refine it. First acquisition also removes matching raw observations already in the obstacle cloud, preserving raised points that share a voxel with floor. Episode provenance records `floor_filter: tracked_supported_plane_v3`.
+
+Only plane inliers are removed. Before acquisition, unsupported points remain obstacle observations. `ExplorationConfig.ground_filter=False` bypasses separation. The camera-height calibration must be adapted for another platform or stance; this is a flat-floor Go2 baseline, not a general terrain classifier. Very shallow surfaces within the inlier tolerance are unresolved, and a broad raised surface within the calibration band can be ambiguous when the actual floor is hidden. Calibration and accumulated pose error can bias the tracked plane. The [floor-history validation](notes/exploration-floor-history-validation.md) records the results and remaining calibration issue.
 
 Observed floor cells and the existing estimated-trajectory footprint supply free-space evidence to the planning grid. Unobserved neighbors remain unknown; proximity to a wall or floor sample cannot make them free. Occupied columns always take precedence, including low obstacles above observed floor. The grid uses one world-to-cell convention for insertion and querying. Coordination and navigation consume the same floor/obstacle projection. Trajectory stamping and partially observed maps retain their existing limitations.
 

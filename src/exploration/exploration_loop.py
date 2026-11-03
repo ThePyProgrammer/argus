@@ -40,7 +40,7 @@ class StepMetrics:
 from src.exploration.config import ExplorationConfig
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector
-from src.exploration.floor_filter import FloorFilter
+from src.exploration.floor_filter import FloorFilter, FloorTracker
 from src.exploration.goal_selector import GoalSelector
 from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
@@ -161,11 +161,11 @@ class ExplorationLoop:
         self._config = config or ExplorationConfig()
         self._streaming_viz = streaming_viz
         self._intrinsics = intrinsics
-        self._floor_filter = FloorFilter(
+        self._floor_filter = FloorTracker(FloorFilter(
             camera_height_m=self._config.floor_camera_height_m,
             height_tolerance_m=self._config.floor_height_tolerance_m,
             distance_tolerance_m=self._config.floor_distance_tolerance_m,
-        )
+        ))
         self._observed_floor_cells: set[tuple[int, int]] = set()
 
         self._frontier_detector = FrontierDetector(
@@ -339,7 +339,12 @@ class ExplorationLoop:
         if len(result.points) > 0:
             points = result.points
             if self._config.ground_filter:
+                acquiring_floor = self._floor_filter.plane is None
                 floor = self._floor_filter.mask(points, current_pos)
+                if acquiring_floor and self._floor_filter.plane is not None:
+                    normal, offset = self._floor_filter.plane
+                    self._octomap.remove_plane_inliers(
+                        normal, offset, self._config.floor_distance_tolerance_m)
                 cells = np.unique(np.floor(points[floor, :2] / self._config.voxel_resolution).astype(int), axis=0)
                 self._observed_floor_cells.update(map(tuple, cells))
                 points = points[~floor]

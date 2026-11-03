@@ -48,6 +48,25 @@ class OctoMapBuilder:
         # across planning, reporting, and count queries for the same scan set.
         return self._occupied_voxels().copy()
 
+    def remove_plane_inliers(self, normal: np.ndarray, offset: float, tolerance: float) -> int:
+        """Reclassify raw observations after an observed floor becomes available.
+
+        Filter before voxelization: a low obstacle and floor can share a voxel,
+        so removing a voxel by its center height would erase valid obstacles.
+        """
+        normal = np.asarray(normal, dtype=float)
+        if (normal.shape != (3,) or not np.isfinite(normal).all()
+                or not np.isclose(np.linalg.norm(normal), 1.)
+                or not np.isfinite(offset) or not np.isfinite(tolerance) or tolerance <= 0):
+            raise ValueError("Plane requires a unit normal, finite offset, and positive tolerance")
+        points = np.asarray(self._accumulated_cloud.points)
+        remove = np.abs(points @ normal - offset) <= tolerance
+        count = int(remove.sum())
+        if count:
+            self._accumulated_cloud = self._accumulated_cloud.select_by_index(np.flatnonzero(~remove).tolist())
+            self._occupied_cache = None
+        return count
+
     def _occupied_voxels(self) -> np.ndarray:
         if self._occupied_cache is None:
             self._occupied_cache = self._voxelize()

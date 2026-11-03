@@ -115,6 +115,9 @@ class MockOctoMap:
         self._insert_count += 1
         self._voxel_count += 10
 
+    def remove_plane_inliers(self, normal, offset, tolerance):
+        return 0
+
     def get_occupied_voxels(self) -> np.ndarray:
         rng = np.random.default_rng(self._voxel_count)
         return rng.random((self._voxel_count, 3)) * 5.0

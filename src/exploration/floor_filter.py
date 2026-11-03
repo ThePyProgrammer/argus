@@ -92,3 +92,49 @@ class FloorFilter:
             result[valid] = np.abs((cloud - center) @ normal) <= self.distance_tolerance_m
             return result
         return result
+
+
+class FloorTracker:
+    """Reuse an observed floor plane through gait-height changes and narrow views.
+
+    Bootstrap uses the full stateless filter. Once established, the plane lives
+    in the estimated map frame and can classify sparse observations without
+    pretending each frame independently established a floor. Broad matching
+    support may refine it; raised surfaces cannot initialize or move the plane.
+    This is a flat-floor assumption, not a general terrain classifier.
+    """
+
+    def __init__(self, config: FloorFilter | None = None):
+        self.config = config or FloorFilter()
+        self._plane: tuple[np.ndarray, float] | None = None
+
+    @property
+    def plane(self) -> tuple[np.ndarray, float] | None:
+        return None if self._plane is None else (self._plane[0].copy(), self._plane[1])
+
+    def _refine(self, support: np.ndarray) -> None:
+        if len(support) < self.config.min_support:
+            return
+        center = support.mean(axis=0)
+        _, spread, axes = np.linalg.svd(support - center, full_matrices=False)
+        if spread[1] / math.sqrt(len(support)) < self.config.min_axis_spread_m:
+            return
+        normal = axes[-1]
+        if normal[2] < 0:
+            normal = -normal
+        if normal[2] < math.cos(math.radians(self.config.max_tilt_degrees)):
+            return
+        self._plane = normal.copy(), float(normal @ center)
+
+    def mask(self, points: np.ndarray, sensor_origin: np.ndarray) -> np.ndarray:
+        points = np.asarray(points, dtype=float)
+        if self._plane is None:
+            mask = self.config.mask(points, sensor_origin)
+        else:
+            normal, offset = self._plane
+            mask = (np.isfinite(points).all(axis=1)
+                    & (np.abs(points @ normal - offset) <= self.config.distance_tolerance_m))
+        # Refinement uses only already accepted floor points, never a competing
+        # raised plane or a sparse strip. The returned mask is not expanded.
+        self._refine(points[mask])
+        return mask
