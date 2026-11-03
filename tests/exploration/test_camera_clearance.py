@@ -17,7 +17,7 @@ def test_envelope_contains_camera_standoff_at_every_heading_and_body_tilt():
     config = ExplorationConfig()
     offset = np.array([.4, 0., .05])
     radius = config.planning_radius(np.linalg.norm(offset), .1)
-    assert radius == pytest.approx(.7445342436522365)
+    assert radius == pytest.approx(.6738235655335818)
     for yaw in np.linspace(-np.pi, np.pi, 25):
         camera_xy = .4 * np.array([np.cos(yaw), np.sin(yaw)])
         assert np.linalg.norm(camera_xy) + config.camera_standoff_m < radius
@@ -73,6 +73,18 @@ def test_segment_boundary_and_out_of_bounds_are_not_clamped_clear():
     planner = PathPlanner()
     assert not planner.path_is_clear([np.array([1., .1, 0]), np.array([1., .9, 0])], room)
     assert not planner.path_is_clear([np.array([-.1, .5, 0]), np.array([.5, .5, 0])], room)
+
+
+def test_segment_clearance_is_checked_between_points_inside_a_passable_cell():
+    room = grid([[100, 0], [0, 0]], resolution=1.)
+    planner = PathPlanner(clearance_radius=.6)
+    start, end = np.array([1.01, .01, 0.]), np.array([1.01, .99, 0.])
+    assert planner._get_inflation_cost(room)[0, 1] < 1e5
+    # Both endpoints are outside the exclusion disk. The middle passes only
+    # 0.51 m from its center, despite staying in one passable grid cell.
+    assert np.linalg.norm(start[:2] - [.5, .5]) > .6
+    assert np.linalg.norm(end[:2] - [.5, .5]) > .6
+    assert not planner.path_is_clear([start, end], room)
 
 
 @pytest.mark.parametrize("value", [-.1, float("nan"), float("inf")])

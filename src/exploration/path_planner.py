@@ -9,6 +9,7 @@ import heapq
 import math
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 from src.exploration.occupancy_grid import CELL_FREE, CELL_OCCUPIED, CELL_UNKNOWN, OccupancyGrid2D
 
@@ -63,6 +64,7 @@ class PathPlanner:
         self._inflation_cache: np.ndarray | None = None
         self._inflation_grid_id: int | None = None
         self._inflation_grid: np.ndarray | None = None
+        self._obstacle_tree: cKDTree | None = None
         self._clearance_radius = None
         self.set_clearance_radius(clearance_radius)
 
@@ -100,6 +102,8 @@ class PathPlanner:
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
         self._inflation_grid = grid.grid.copy()
+        occupied_centers = np.argwhere(grid.grid == CELL_OCCUPIED)[:, ::-1] + .5
+        self._obstacle_tree = cKDTree(occupied_centers) if len(occupied_centers) else None
         return cost
 
     def reachable_mask(self, start_world: np.ndarray, grid: OccupancyGrid2D) -> np.ndarray:
@@ -258,7 +262,7 @@ class PathPlanner:
         return smoothed if self.path_is_clear(smoothed, grid) else path_world
 
     def path_is_clear(self, path: list[np.ndarray], grid: OccupancyGrid2D) -> bool:
-        """Check every touched cell, including corner/boundary contacts, without clamping."""
+        """Check touched cells and continuous distance to occupied-cell centers."""
         if not path:
             return False
         costs = self._get_inflation_cost(grid)
@@ -267,6 +271,18 @@ class PathPlanner:
             return False
         for start, end in zip(points, np.vstack((points[1:], points[-1:]))):
             delta = end - start
+            if self._obstacle_tree is not None:
+                radius = self._clearance_radius / grid.resolution
+                length = float(np.linalg.norm(delta))
+                indices = self._obstacle_tree.query_ball_point(
+                    (start + end) / 2, length / 2 + radius + 1e-9)
+                if indices:
+                    obstacles = self._obstacle_tree.data[indices]
+                    fractions = np.zeros(len(indices)) if length < 1e-12 else np.clip(
+                        (obstacles - start) @ delta / length**2, 0., 1.)
+                    closest = start + fractions[:, None] * delta
+                    if np.any(np.linalg.norm(obstacles - closest, axis=1) <= radius + 1e-9):
+                        return False
             crossings = [0., 1.]
             for axis in range(2):
                 if abs(delta[axis]) > 1e-12:

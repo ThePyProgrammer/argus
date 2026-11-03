@@ -65,6 +65,7 @@ class ExplorationConfig:
                   self.clearance_margin_m, camera_offset_m, resolution_m)
         if any(not math.isfinite(v) or v < 0 for v in values) or resolution_m == 0:
             raise ValueError("Clearance dimensions must be finite and nonnegative; resolution must be positive")
-        # One half-diagonal for each of the occupied and traversed cells.
+        # Enclose each occupied cell. Continuous segment checks handle the
+        # traversed positions without reserving another whole cell's extent.
         return (max(self.footprint_radius_m, camera_offset_m + self.camera_standoff_m)
-                + self.clearance_margin_m + math.sqrt(2) * resolution_m)
+                + self.clearance_margin_m + resolution_m / math.sqrt(2))
