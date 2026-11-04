@@ -100,7 +100,8 @@ class FloorTracker:
     Bootstrap uses the full stateless filter. Once established, the plane lives
     in the estimated map frame and can classify sparse observations without
     pretending each frame independently established a floor. Fresh supported
-    detections may replace it when the implied height at the camera agrees.
+    detections may replace it when the implied height at the camera agrees and
+    they explain the current observations better than the retained plane.
     This is a flat-floor assumption, not a general terrain classifier.
     """
 
@@ -143,10 +144,17 @@ class FloorTracker:
             new_normal, new_offset = candidate
             old_height = float(sensor_origin @ normal - offset)
             new_height = float(sensor_origin @ new_normal - new_offset)
+            valid = points[np.isfinite(points).all(axis=1)]
+            tolerance = self.config.distance_tolerance_m
+            old_support = float(np.maximum(0., 1. - ((valid @ normal - offset) / tolerance) ** 2).sum())
+            new_support = float(np.maximum(0., 1. - ((valid @ new_normal - new_offset) / tolerance) ** 2).sum())
             # A small attitude error produces a large distant-plane residual.
             # Compare heights at the current camera, not distant map points.
             # This still rejects a competing raised plane beyond the inlier band.
-            if abs(new_height - old_height) <= self.config.distance_tolerance_m:
+            # Height calibration can exclude the real floor during a gait dip
+            # while accepting a tilted edge. Rank against history as well as
+            # other fresh candidates; ties retain the established plane.
+            if abs(new_height - old_height) <= tolerance and new_support > old_support:
                 self.reacquired = int((fresh & ~historical).sum()) >= self.config.min_support
                 self._plane = candidate
                 return fresh

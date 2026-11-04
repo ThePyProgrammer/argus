@@ -100,6 +100,26 @@ def test_camera_height_change_cannot_promote_a_competing_raised_plane():
     assert tracker.plane[1] == 0
 
 
+def test_gait_dip_cannot_replace_strong_floor_with_a_weaker_tilted_obstacle():
+    tracker = FloorTracker()
+    floor = floor_patch()
+    tracker.mask(floor, np.array([0, 0, .32]))
+    x, y = np.meshgrid(np.linspace(2, 4, 12), np.linspace(-1, 1, 12))
+    obstacle = np.c_[x.ravel(), y.ravel(), -.01 + np.tan(np.deg2rad(2)) * x.ravel()]
+    points = np.vstack((floor, obstacle, [[np.nan, 0, 0]]))
+    origin = np.array([0, 0, .279])
+    # The actual floor is just outside bootstrap calibration. A tilted raised
+    # surface intersects its band at the camera and becomes a false proposal.
+    fresh = FloorFilter().mask(points, origin)
+    assert not fresh[:len(floor)].all()
+    assert fresh[len(floor):-1].any()
+    for _ in range(3):
+        mask = tracker.mask(points, origin)
+        assert mask[:len(floor)].all()
+        assert not mask[len(floor):].any()
+        assert not tracker.reacquired
+
+
 def test_rendered_initial_plane_does_not_tilt_into_distant_low_obstacles():
     from src.exploration.evaluation.episode import ExplorationEpisode
     from src.slam.slam_pipeline import SLAMPipeline
