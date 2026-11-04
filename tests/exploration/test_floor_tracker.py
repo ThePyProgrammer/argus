@@ -72,6 +72,34 @@ def test_stateless_detector_still_rejects_unverified_low_camera_view():
     assert not FloorFilter().mask(floor_patch(), np.array([0, 0, .26])).any()
 
 
+def test_fresh_broad_floor_recovers_from_attitude_drift_without_erasing_raised_plane():
+    tracker = FloorTracker()
+    tracker.mask(floor_patch(), np.array([0, 0, .32]))
+    shifted = floor_patch() + [2, 0, 0]
+    shifted[:, 2] = -np.tan(np.deg2rad(2)) * shifted[:, 0]
+    # Adjacent surfaces, each with locally planar depth support.
+    raised = shifted + [0, 3, .06]
+    mask = tracker.mask(np.vstack((shifted, raised)), np.array([0, 0, .32]))
+    assert mask[:len(shifted)].all()
+    assert not mask[len(shifted):].any()
+    assert tracker.reacquired
+    tracker.mask(shifted[:10], np.array([0, 0, .26]))
+    assert not tracker.reacquired  # One observation's event, not persistent state.
+
+
+def test_camera_height_change_cannot_promote_a_competing_raised_plane():
+    tracker = FloorTracker()
+    floor = floor_patch()
+    tracker.mask(floor, np.array([0, 0, .32]))
+    raised = floor + [0, 0, .06]
+    # Height calibration alone would accept this plane during a high stance.
+    assert FloorFilter().mask(raised, np.array([0, 0, .38])).all()
+    for _ in range(3):
+        assert not tracker.mask(raised, np.array([0, 0, .38])).any()
+        assert not tracker.reacquired
+    assert tracker.plane[1] == 0
+
+
 def test_rendered_initial_plane_does_not_tilt_into_distant_low_obstacles():
     from src.exploration.evaluation.episode import ExplorationEpisode
     from src.slam.slam_pipeline import SLAMPipeline

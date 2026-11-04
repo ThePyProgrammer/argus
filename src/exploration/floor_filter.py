@@ -99,20 +99,21 @@ class FloorTracker:
 
     Bootstrap uses the full stateless filter. Once established, the plane lives
     in the estimated map frame and can classify sparse observations without
-    pretending each frame independently established a floor. Broad matching
-    support may refine it; raised surfaces cannot initialize or move the plane.
+    pretending each frame independently established a floor. Fresh supported
+    detections may replace it when the implied height at the camera agrees.
     This is a flat-floor assumption, not a general terrain classifier.
     """
 
     def __init__(self, config: FloorFilter | None = None):
         self.config = config or FloorFilter()
         self._plane: tuple[np.ndarray, float] | None = None
+        self.reacquired = False
 
     @property
     def plane(self) -> tuple[np.ndarray, float] | None:
         return None if self._plane is None else (self._plane[0].copy(), self._plane[1])
 
-    def _refine(self, support: np.ndarray) -> None:
+    def _fit(self, support: np.ndarray) -> tuple[np.ndarray, float] | None:
         if len(support) < self.config.min_support:
             return
         center = support.mean(axis=0)
@@ -124,17 +125,31 @@ class FloorTracker:
             normal = -normal
         if normal[2] < math.cos(math.radians(self.config.max_tilt_degrees)):
             return
-        self._plane = normal.copy(), float(normal @ center)
+        return normal.copy(), float(normal @ center)
 
     def mask(self, points: np.ndarray, sensor_origin: np.ndarray) -> np.ndarray:
         points = np.asarray(points, dtype=float)
+        self.reacquired = False
+        fresh = self.config.mask(points, sensor_origin)
+        candidate = self._fit(points[fresh])
         if self._plane is None:
-            mask = self.config.mask(points, sensor_origin)
-        else:
-            normal, offset = self._plane
-            mask = (np.isfinite(points).all(axis=1)
-                    & (np.abs(points @ normal - offset) <= self.config.distance_tolerance_m))
-        # Refinement uses only already accepted floor points, never a competing
-        # raised plane or a sparse strip. The returned mask is not expanded.
-        self._refine(points[mask])
-        return mask
+            self._plane = candidate
+            return fresh
+
+        normal, offset = self._plane
+        historical = (np.isfinite(points).all(axis=1)
+                      & (np.abs(points @ normal - offset) <= self.config.distance_tolerance_m))
+        if candidate is not None:
+            new_normal, new_offset = candidate
+            old_height = float(sensor_origin @ normal - offset)
+            new_height = float(sensor_origin @ new_normal - new_offset)
+            # A small attitude error produces a large distant-plane residual.
+            # Compare heights at the current camera, not distant map points.
+            # This still rejects a competing raised plane beyond the inlier band.
+            if abs(new_height - old_height) <= self.config.distance_tolerance_m:
+                self.reacquired = int((fresh & ~historical).sum()) >= self.config.min_support
+                self._plane = candidate
+                return fresh
+        # Narrow views and gait-height dips reuse history without refitting a
+        # truncated strip of inliers. Such a fit can drift onto wall-base points.
+        return historical

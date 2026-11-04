@@ -24,6 +24,32 @@ from src.slam.protocol import SLAMResult, TrackingStatus
 # Mock helpers
 # ---------------------------------------------------------------------------
 
+
+def test_reacquired_floor_removes_stale_raw_observations_but_keeps_low_obstacle():
+    from src.slam.octomap_builder import OctoMapBuilder
+
+    x, y = np.meshgrid(np.linspace(-1, 1, 24), np.linspace(-1, 1, 24))
+    initial = np.c_[x.ravel(), y.ravel(), np.zeros(x.size)]
+    tilted = initial + [2, 0, 0]
+    tilted[:, 2] = -np.tan(np.deg2rad(2)) * tilted[:, 0]
+    obstacle = tilted[:1] + [0, 0, .06]
+    frame = _make_sensor_frame(np.array([0, 0, .32]))
+    slam = MagicMock()
+    slam.process_frame.side_effect = [
+        SLAMResult(frame.ground_truth_pose.copy(), points, np.zeros_like(points))
+        for points in (initial, np.vstack((tilted[:20], obstacle)), tilted)
+    ]
+    builder = OctoMapBuilder(.1)
+    loop = ExplorationLoop(MockBridge(), slam, builder)
+    loop._update_slam(frame)
+    loop._update_slam(frame)  # A sparse tilted strip cannot establish a new floor.
+    assert builder.num_occupied > 1
+    loop._update_slam(frame)
+    assert loop._floor_filter.reacquired
+    reference = OctoMapBuilder(.1)
+    reference.insert_scan(obstacle, frame.ground_truth_pose[:3, 3])
+    np.testing.assert_allclose(builder.get_occupied_voxels(), reference.get_occupied_voxels())
+
 def _make_sensor_frame(position: np.ndarray | None = None) -> SensorFrame:
     """Create a minimal SensorFrame with a given position."""
     pose = np.eye(4, dtype=np.float64)

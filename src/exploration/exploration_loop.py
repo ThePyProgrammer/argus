@@ -341,7 +341,7 @@ class ExplorationLoop:
             if self._config.ground_filter:
                 acquiring_floor = self._floor_filter.plane is None
                 floor = self._floor_filter.mask(points, current_pos)
-                if acquiring_floor and self._floor_filter.plane is not None:
+                if (acquiring_floor or self._floor_filter.reacquired) and self._floor_filter.plane is not None:
                     normal, offset = self._floor_filter.plane
                     self._octomap.remove_plane_inliers(
                         normal, offset, self._config.floor_distance_tolerance_m)

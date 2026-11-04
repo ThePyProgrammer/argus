@@ -70,6 +70,7 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
         np.testing.assert_allclose(origin, estimated[:3, 3], atol=1e-12, rtol=0)
         actual, counts = floor_support(points, mask, estimated, frame.ground_truth_pose)
         row = {"robot": rid, "time_s": frame.sim_time, **counts}
+        row["floor_reacquired"] = filter_.reacquired
         plane = filter_.plane
         row["floor_plane_after"] = None if plane is None else {
             "normal": plane[0].tolist(), "offset": plane[1]}
