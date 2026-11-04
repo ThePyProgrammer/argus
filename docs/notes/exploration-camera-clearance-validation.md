@@ -1,5 +1,7 @@
 # Camera clearance and route following
 
+Follow-up: [floor history](exploration-floor-history-validation.md) and [camera calibration](exploration-camera-calibration-validation.md) address two mapping issues. Their videos and results retain the unsuccessful attempts. Floor reacquisition under pose drift and execution-time clearance remain unresolved.
+
 The preceding cluttered-room run lost tracking at 9.07 s with robot A's camera 2.16 cm from a column. Its 110 matched points had observable rank two, below the unchanged minimum of three. The camera sits 40 cm ahead of the body, while the former hard planning radius was only 15 cm.
 
 ## Correction
