@@ -1,5 +1,7 @@
 # Camera calibration validation
 
+Follow-up: [ranked floor reacquisition](exploration-floor-reacquisition-validation.md) addresses the retained-plane failures below and records fresh videos. Motion clearance remains an open navigation gate.
+
 SLAM used integer pixel coordinates with a principal point defined for half-integer coordinates. The resulting half-pixel bias tilted reconstructed floors. A tracked floor plane could then classify distant wall-base points as floor.
 
 ## Correction
