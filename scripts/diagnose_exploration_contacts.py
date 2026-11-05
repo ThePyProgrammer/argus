@@ -7,6 +7,7 @@ enter the coordinator, local map, planner, or velocity controller.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import sys
@@ -53,11 +54,24 @@ def initial_visibility(episode, rid, output):
                 episode.reference, DepthObservation.from_frame(frame, cal)).sum())}
 
 
+@contextmanager
+def _recorded_episode(scenario, seed, horizon, output, report):
+    """Preserve raw measurements and partial traces even on infrastructure errors."""
+    episode = ExplorationEpisode.from_scenario(scenario, seed, horizon_s=horizon)
+    try:
+        with episode:
+            yield episode
+    finally:
+        report["episode"] = episode.inspect(include_history=True)
+        report["reliability_events"] = episode.reliability.events() if episode.reliability is not None else []
+        (output / "diagnosis.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
+
+
 def diagnose(scenario: str, seed: int, horizon: float, output: Path) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     report = {"initial": {}, "first_contacts": [], "poses": [], "first_plans": []}
     seen_contacts = set()
-    with ExplorationEpisode.from_scenario(scenario, seed, horizon_s=horizon) as episode:
+    with _recorded_episode(scenario, seed, horizon, output, report) as episode:
         model = episode.bridge.mj_model
         ids = episode.bridge.robot_ids
         feet = {f"{rid}_{leg}" for rid in ids for leg in ("FL", "FR", "RL", "RR")}
@@ -130,9 +144,6 @@ def diagnose(scenario: str, seed: int, horizon: float, output: Path) -> dict:
                 exploration.planning_grid(occupied), final_poses[rid][:3, 3], output / f"{rid}-final-planning",
                 min_cluster_size=exploration._config.min_cluster_size, planner=exploration._path_planner,
                 occupied_voxels=occupied, observed_floor_xy=exploration.observed_floor_xy)
-        report["episode"] = episode.inspect(include_history=True)
-        report["reliability_events"] = episode.reliability.events()
-    (output / "diagnosis.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
     return report
 
 
