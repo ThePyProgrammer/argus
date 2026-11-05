@@ -24,7 +24,8 @@ from src.coordination.robot_instance import RobotInstance
 from src.exploration.config import ExplorationConfig
 from src.exploration.evaluation.scenarios import DEFAULTS, load_scenario
 from src.metrics.exploration_coverage import CoverageCollector, CoverageConfig, DepthObservation
-from src.metrics.exploration_metrics import ContactClassifier, ReliabilityCollector, RobotMetricState
+from src.metrics.exploration_metrics import ReliabilityCollector, RobotMetricState
+from src.metrics.contact_metrics import ContactCatalog, PhysicsContactCollector
 from src.locomotion.gait_params import GaitParams
 
 
@@ -53,7 +54,7 @@ def _benchmark_model(scene, positions):
     return mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"), assets)
 
 
-def _contacts(bridge: MultiRobotBridge) -> ContactClassifier:
+def _contacts(bridge: MultiRobotBridge) -> ContactCatalog:
     model = bridge.mj_model
     owners = {rid: [] for rid in bridge.robot_ids}
     for geom in range(model.ngeom):
@@ -67,7 +68,13 @@ def _contacts(bridge: MultiRobotBridge) -> ContactClassifier:
     if any(not geoms for geoms in owners.values()):
         raise ValueError("Benchmark contact ownership requires Go2 root bodies")
     feet = [model.geom(f"{rid}_{foot}").id for rid in owners for foot in ("FL", "FR", "RL", "RR")]
-    return ContactClassifier(model, owners, floor_geom_ids=[model.geom("floor").id], foot_geom_ids=feet)
+    leg_bodies = {model.body(f"{rid}_{leg}_{part}").id
+                  for rid in owners for leg in ("FL", "FR", "RL", "RR")
+                  for part in ("hip", "thigh", "calf")}
+    legs = [g for geoms in owners.values() for g in geoms
+            if int(model.geom_bodyid[g]) in leg_bodies and g not in feet]
+    return ContactCatalog(model, owners, floor_geom_ids=[model.geom("floor").id],
+                          foot_geom_ids=feet, leg_geom_ids=legs)
 
 
 def _peak_process_rss_bytes() -> int | None:
@@ -110,6 +117,7 @@ class ExplorationEpisode:
         self.provenance = copy.deepcopy(provenance or {})
         self.coverage = None
         self.reliability = None
+        self.contacts = None
         self._classifier = None
         self._state = "new"
         self._result = None
@@ -199,7 +207,12 @@ class ExplorationEpisode:
                 ids = tuple(self.coordinator.robots)
                 self.coverage = CoverageCollector(self.reference, ids, start_sim_time=self._origin, config=self.config)
                 self.reliability = ReliabilityCollector(ids, start_sim_time=self._origin)
-                self._classifier = _contacts(self.bridge)
+                catalog = _contacts(self.bridge)
+                self._classifier = catalog.legacy_classifier
+                # Sensor frames use a post-settling clock; mjData.time includes boot.
+                self.contacts = PhysicsContactCollector(catalog, start_sim_time=float(self.bridge.mj_data.time))
+                self.contacts.validate_integrator(self.bridge.mj_model)
+                self.bridge.add_physics_step_observer(self.contacts.observe_step)
             self._state = "running"
             self._capture(frames)
             return self.inspect()
@@ -278,16 +291,20 @@ class ExplorationEpisode:
 
     def _finish(self, reason: str) -> None:
         wall = time.perf_counter()
+        if self.contacts is not None:
+            self.contacts.finish()
         self._result = {
             "valid": True, "termination_reason": reason, "elapsed_s": self._elapsed,
             "coverage": self.coverage.finalize(reason) if self.collect else None,
             "reliability": self.reliability.summary() if self.collect else None,
+            "contact_measurements": self.contacts.summary() if self.collect else None,
             "wall_seconds": wall - self._wall_start,
             "measurement_wall_seconds": wall - self._measurement_wall_start,
             "real_time_factor": self._elapsed / max(wall - self._measurement_wall_start, 1e-12),
             "peak_process_rss_bytes": _peak_process_rss_bytes(), "memory_scope": "process_lifetime",
             "settling_sim_seconds": self.bridge.settled_sim_time,
-            "frame_dt": self.bridge.frame_dt, "contact_cadence": "sensor_frames",
+            "frame_dt": self.bridge.frame_dt, "contact_cadence": "physics_steps" if self.collect else None,
+            "legacy_contact_cadence": "sensor_frames", "fall_cadence": "sensor_frames",
             "allocator_latency_scope": "per_robot_frontier_candidate_selection",
             "provenance": self.provenance,
         }
@@ -304,10 +321,15 @@ class ExplorationEpisode:
         state = {"state": self._state, "elapsed_s": self._elapsed, "result": self._result}
         if include_history:
             state.update(commands=self._commands, events=self._events, steps=self._steps,
-                         trajectory=self._trajectory)
+                         trajectory=self._trajectory,
+                         contact_samples=self.contacts.samples() if self.contacts is not None else None,
+                         contact_measurements=self.contacts.summary() if self.contacts is not None else None)
         return copy.deepcopy(state)
 
     def close(self) -> None:
+        if self.contacts is not None:
+            self.bridge.remove_physics_step_observer(self.contacts.observe_step)
+            self.contacts.finish()
         self.coordinator.close()
         if self._state in {"new", "running"}:
             self._state = "closed"

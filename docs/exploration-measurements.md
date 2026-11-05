@@ -45,6 +45,82 @@ Unseen cells have infinite first-observation time and contribute zero. A capture
 
 ## Reliability
 
+### Physics-step contacts
+
+`result.contact_measurements` is the detailed contact report (`physics-geom-contact-v1`).
+It distinguishes `foot_floor`, `leg_floor`, `body_floor`, `robot_obstacle`,
+`robot_robot`, and `robot_self`. The compiled geometry catalog retains geometry
+and body IDs/names, robot ownership, and foot/leg/body labels; unnamed shapes
+remain identifiable by ID. Go2 hip, thigh, and calf shapes are legs, excluding
+the explicitly named foot shapes. Obstacle contacts retain the robot part in
+that catalog. These labels describe location, not severity.
+
+The bridge invokes a passive observer after **every ordinary physics step**,
+before the existing sensor-frame `mj_forward`. Boot settling is excluded. The
+observer copies each robot-involving manifold point, including support,
+self-contact, and positive-distance margins, with its original geometry order,
+contact index, distance, world position, contact frame, and six-component
+force/torque wrench. Indices are local to that sample, not persistent contact IDs.
+The capture uses [MuJoCo `mj_contactForce`](https://mujoco.readthedocs.io/en/stable/APIreference/APIfunctions.html#mj-contactforce)
+without another forward pass or a change to controls. Euler, implicit, and
+implicitfast integrators are supported. RK4 is rejected before stepping because
+its internal-stage forces cannot be treated as one force sample for the interval.
+
+`inspect(include_history=True).contact_samples` retains every interval, including
+empty ones, and its raw points. The standard diagnostic JSON therefore exports
+the raw measurements as well as the summary. `contact_measurements` also appears
+in the history so interrupted/invalid episodes can be inspected after cleanup.
+The origin is the raw MuJoCo time immediately after settling (normally 0.4 s);
+exported elapsed times start at zero, matching the sensor timeline. Each force
+sample represents the step's `[start, end)` interval, not the refreshed camera
+state at its end. At the benchmark defaults this gives five 0.002 s samples per
+0.01 s camera frame. Events shorter than a physics step can still be unresolved.
+
+Touching requires distance <= 0. Positive-distance margin records remain raw but
+do not contribute to touching events. Each unordered geometry pair has its own
+event, so a calf-floor touch cannot merge with a body-floor touch. Multiple
+manifold points for that pair contribute the sum of nonnegative normal forces
+(`wrench[0]`); tangential forces and torques remain in the raw data. Peak force
+is the maximum of those per-step sums. Normal impulse is `sum(force * step_dt)`
+in N s. Touch duration counts each touching interval once, irrespective of point
+count. Brief absent intervals can join one event but add no duration or impulse.
+After 0.2 s of observed absence, a recurrence starts another event. The span from
+first touch to last touching interval is exported separately from touch duration.
+
+An event already present at the measurement origin is `left_censored`. An event
+without a complete clearance interval before recording stops is `right_censored`.
+Finalization never fabricates extra samples through the requested horizon. These
+flags prevent a truncated observation from being called an incidental brush.
+
+### Descriptive severity policy
+
+`go2-descriptive-contact-v1` records the following development thresholds in every
+report. Rules are evaluated in this order:
+
+| Label | Rule |
+| --- | --- |
+| `expected_support` | Foot-floor contact; all raw forces remain available, including unusually large ones. This label does not certify safe support. |
+| `forceful_contact` | Non-support peak normal force >= 100 N **or** normal impulse >= 2 N s. |
+| `sustained_contact` | Remaining non-support contact with touching duration >= 0.1 s. |
+| `incidental_leg_contact` | Leg-floor event observed in full, touching duration <= 0.05 s, peak normal force < 20 N, and normal impulse < 0.5 N s. |
+| `unclassified_contact` | All other events, including short censored leg contacts. |
+
+These are explicit reporting conventions for this simulated Go2 baseline, not
+validated damage thresholds or evidence that an impact caused harm. A forceful
+event can also be sustained; duration remains available even when the forceful
+label takes precedence. Penetration is retained as a diagnostic and does not
+determine severity: [MuJoCo models soft contacts](https://mujoco.readthedocs.io/en/stable/computation/index.html#soft-contact-model).
+Freeze or explicitly revise the policy before comparing experiments; retain the
+raw records for rescoring. No comparative experiment is justified by these
+development thresholds alone.
+
+The policy is **report-only**. It never stops motion, changes a command, or
+declares an episode failure. Falls remain separate transitions from the existing
+platform state at sensor cadence (Go2 body height below 0.16 m), rather than an
+inference from contact force. A fall and a contact event can both be reported.
+
+### Legacy sensor-frame counters
+
 [ReliabilityCollector](../src/metrics/exploration_metrics.py) receives body states at increasing simulation times. It uses body XY displacement between samples, excluding the initial position and vertical motion. The caller must sample consistently; discrete distances can miss motion between samples.
 
 | Measurement | Counting rule |
@@ -59,12 +135,20 @@ Unseen cells have infinite first-observation time and contribute zero. A capture
 
 `ContactClassifier` takes explicit robot geom ownership, foot geoms, and floor geoms from the compiled scene. Obstacle bodies group composite geoms; separate world geoms retain distinct identities. Proximity warnings are not contact measurements. Debouncing starts at the first sample reporting absence, so event counts depend on the declared contact sampling cadence.
 
+For compatibility, `result.reliability.contact_episodes` and the old reliability
+contact events retain those broad categories and sensor cadence, identified by
+`legacy_contact_cadence`. They must not be interpreted as impact counts. Use
+`result.contact_measurements.episodes_by_kind`, `episodes_by_severity`, and
+`episodes` for the new measurements. These per-geometry counts are deliberately
+not numerically interchangeable with legacy robot/object counts.
+
 The collector returns detached event records and summaries. The episode runtime supplies wall time, process memory, real-time factor, state classification, and event sampling. Development smoke results exist; no comparative benchmark has been run.
 
 ## Validation
 
 ```bash
 uv run pytest tests/metrics/test_exploration_coverage.py tests/metrics/test_exploration_metrics.py tests/bridge/test_metric_depth.py
+uv run pytest tests/metrics/test_contact_metrics.py tests/bridge/test_multi_bridge.py tests/exploration/test_evaluation_episode.py
 ```
 
 Tests use real offscreen MuJoCo renders for close and oblique floor views, wall occlusion, and robot occlusion. Analytical timelines verify union, overlap, AUC, threshold timing, and absorbing failures. Real MuJoCo contacts verify foot exclusions, body-floor contact, and robot-robot contact. Other tests cover immutable captures, input rejection, and event transitions. Development episode tests verify command-trace invariance with and without collection; longer successful runs remain a gate in the [execution plan](plans/exploration-evaluation.md).

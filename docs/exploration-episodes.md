@@ -80,7 +80,20 @@ The dashboard's `Coordinator.run` now delegates to `start`, `advance`, and `clos
 
 Go2 falls use the existing platform height threshold, below 0.16 m. A fall is counted but does not itself disable that controller. Recovery entries include both exploration stuck recovery and platform recovery states.
 
-Contacts and body states are sampled at sensor cadence, currently every five physics steps. Brief contacts between samples can be missed. Planning attempts and selection latency are recorded at decision time; goal and recovery state transitions are sampled at the next sensor boundary. Selection timing includes reachable-cell filtering and candidate ranking, excluding A* execution, mapping, and rendering. Joint allocation will need its own timing boundary.
+Detailed contacts are sampled at every physics step and reported under
+`result.contact_measurements`; `inspect(include_history=True).contact_samples`
+contains the raw records. This separates support, leg-floor, body-floor, obstacle,
+and robot-robot contact, with measured duration, peak normal force, and normal
+impulse. The versioned severity policy is descriptive and does not terminate an
+episode. The [measurement contract](exploration-measurements.md#physics-step-contacts)
+defines timing, censoring, thresholds, and raw-data interpretation.
+
+Body states, falls, and the legacy broad contact counters in `result.reliability`
+remain at sensor cadence, currently every five physics steps. Planning attempts
+and selection latency are recorded at decision time; goal and recovery state
+transitions are sampled at the next sensor boundary. Selection timing includes
+reachable-cell filtering and candidate ranking, excluding A* execution, mapping,
+and rendering. Joint allocation will need its own timing boundary.
 
 The result records total wall duration through measurement completion, measured-interval wall duration, real-time factor, sensor cadence, and the OS process RSS high-water mark. Memory scope is explicitly `process_lifetime`; it is not isolated episode memory when multiple episodes share a process. Batch process isolation belongs to the runner milestone.
 

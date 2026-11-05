@@ -283,7 +283,7 @@ def _prepare_fake_one_robot_bridge(target: np.ndarray) -> tuple[MultiRobotBridge
     bridge._platform = _FakeOneActuatorPlatform()
     bridge._controllers = {"robot_a": controller}
     bridge._model = types.SimpleNamespace(opt=types.SimpleNamespace(timestep=0.002))
-    bridge._data = types.SimpleNamespace(qpos=np.zeros(3), ctrl=np.array([9.0], dtype=np.float64))
+    bridge._data = types.SimpleNamespace(qpos=np.zeros(3), ctrl=np.array([9.0], dtype=np.float64), time=0.)
     bridge._dt = 0.02
     bridge._qpos_starts = {"robot_a": 0}
     bridge._ctrl_indices = {"robot_a": [0]}
@@ -354,6 +354,39 @@ def test_multi_bridge_applies_fake_non_go2_one_actuator_target(monkeypatch):
 
 
 # ---------- MockMultiRobotBridge tests ----------
+
+
+def test_physics_observer_sees_each_substep_before_frame_refresh(monkeypatch):
+    bridge, _ = _prepare_fake_one_robot_bridge(np.array([.42]))
+    bridge._config.sim_steps_per_frame = 5
+    observed = []
+
+    def step(model, data):
+        data.time += .002
+        data.contact_force = 8. if data.time < .005 else 0.
+
+    def forward(model, data):
+        data.contact_force = -999.  # Would overwrite the substep's solved force.
+
+    def observer(model, data, start, end):
+        observed.append((start, end, data.contact_force))
+
+    monkeypatch.setitem(sys.modules, "mujoco", types.SimpleNamespace(mj_step=step, mj_forward=forward))
+    monkeypatch.setattr(MultiRobotBridge, "_capture_frame", lambda self, rid: None)
+    bridge.add_physics_step_observer(observer)
+    with pytest.raises(ValueError):
+        bridge.add_physics_step_observer(observer)
+    bridge.step()
+    assert len(observed) == 5
+    np.testing.assert_allclose([row[:2] for row in observed], [[i * .002, (i + 1) * .002] for i in range(5)])
+    assert [row[2] for row in observed] == [8., 8., 0., 0., 0.]
+    assert bridge._data.contact_force == -999.
+    bridge.remove_physics_step_observer(observer)
+    bridge.step()
+    assert len(observed) == 5
+    bridge.add_physics_step_observer(observer)
+    bridge.stop()
+    assert bridge._physics_step_observers == []
 
 
 def test_mock_multi_bridge_start_returns_both_frames(mock_multi_bridge):

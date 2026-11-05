@@ -42,6 +42,7 @@ class MultiRobotBridge:
         self._viewer_handle: Any = None
         self._step_count: int = 0
         self._dt: float = 0.0
+        self._physics_step_observers: list[Callable] = []
         self._platform = create_platform(
             self._config.platform,
             **({"model_dir": self._config.model_dir} if self._config.platform == "go2" else {}),
@@ -244,7 +245,12 @@ class MultiRobotBridge:
 
         # Step physics
         for _ in range(self._config.sim_steps_per_frame):
+            step_start = float(self._data.time)
             mujoco.mj_step(self._model, self._data)
+            # Read the step's solved contact forces before frame-end mj_forward
+            # replaces them. Observers must only read model/data; errors propagate.
+            for observer in tuple(self._physics_step_observers):
+                observer(self._model, self._data, step_start, float(self._data.time))
         # mj_step integrates qpos after its last forward pass. Refresh camera
         # transforms and contacts to match the state stamped on this frame.
         mujoco.mj_forward(self._model, self._data)
@@ -385,8 +391,19 @@ class MultiRobotBridge:
     def get_last_frame(self, robot_id: str) -> SensorFrame:
         return self.get_frame(robot_id)
 
+    def add_physics_step_observer(self, observer: Callable) -> None:
+        """Attach a passive observer to ordinary steps (never boot settling)."""
+        if not callable(observer) or observer in self._physics_step_observers:
+            raise ValueError("A unique callable physics observer is required")
+        self._physics_step_observers.append(observer)
+
+    def remove_physics_step_observer(self, observer: Callable) -> None:
+        if observer in self._physics_step_observers:
+            self._physics_step_observers.remove(observer)
+
     def stop(self) -> None:
         """Clean up MuJoCo resources."""
+        self._physics_step_observers.clear()
         resources = list(self._renderers.values())
         self._renderers.clear()
         if self._overview_renderer is not None:

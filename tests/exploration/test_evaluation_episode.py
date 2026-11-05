@@ -2,13 +2,14 @@
 
 import json
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import mujoco
 import numpy as np
 import pytest
 
 from src.coordination.transport import _topic_registry
-from src.exploration.evaluation.episode import ExplorationEpisode, _benchmark_model
+from src.exploration.evaluation.episode import ExplorationEpisode, _benchmark_model, _contacts
 from src.exploration.evaluation.scenarios import load_scenario
 from src.exploration.exploration_loop import StuckRecovery
 from src.exploration.exploration_loop import StepMetrics
@@ -43,6 +44,17 @@ def test_collector_attachment_and_episode_order_preserve_commands_and_motion():
     assert first["result"]["coverage"]["sensor_frames"] == {"robot_a": 5, "robot_b": 5}
     assert first["result"]["wall_seconds"] >= first["result"]["measurement_wall_seconds"] > 0
     assert first["result"]["peak_process_rss_bytes"] > 0
+    contacts = first["result"]["contact_measurements"]
+    assert contacts == repeated["result"]["contact_measurements"]
+    assert contacts["physics_steps"] == 20  # Four frames, five physics samples each.
+    assert contacts["elapsed_s"] == pytest.approx(.04)
+    assert contacts["time_origin_sim_s"] == pytest.approx(.4)
+    assert first["contact_samples"][0]["start_elapsed_s"] == 0
+    assert first["contact_samples"][-1]["end_elapsed_s"] == pytest.approx(.04)
+    assert unobserved["contact_samples"] is None
+    assert unobserved["result"]["contact_measurements"] is None
+    assert contacts["episodes_by_kind"]["foot_floor"] > 0
+    assert first["result"]["contact_cadence"] == "physics_steps"
     assert before_callbacks == {key: list(value) for key, value in _topic_registry.items() if value}
     json.dumps(first, allow_nan=False)
 
@@ -93,6 +105,23 @@ def test_inserted_scene_preserves_environment_geometry(scenario_id):
         j = combined.geom(name).id
         for field in ("geom_type", "geom_pos", "geom_quat", "geom_size", "geom_contype", "geom_conaffinity", "geom_friction"):
             np.testing.assert_array_equal(getattr(environment, field)[i], getattr(combined, field)[j])
+
+
+def test_go2_catalog_distinguishes_feet_calf_and_base_collision_shapes():
+    scene = load_scenario("connected_rooms")
+    positions = {p.robot_id: (p.x, p.y, p.z) for p in scene.sample(101).spawn_poses}
+    model = _benchmark_model(scene, positions)
+    catalog = _contacts(SimpleNamespace(mj_model=model, robot_ids=tuple(positions)))
+    floor = model.geom("floor").id
+    for rid in positions:
+        foot = model.geom(f"{rid}_RR").id
+        calf_body = model.body(f"{rid}_RR_calf").id
+        calf_geoms = [g for g in range(model.ngeom) if model.geom_bodyid[g] == calf_body and g != foot]
+        assert calf_geoms
+        assert catalog.kind(foot, floor) == "foot_floor"
+        assert all(catalog.kind(g, floor) == "leg_floor" for g in calf_geoms)
+        base_geoms = [g for g in range(model.ngeom) if model.geom_bodyid[g] == model.body(f"{rid}_base").id]
+        assert base_geoms and all(catalog.kind(g, floor) == "body_floor" for g in base_geoms)
 
 
 def test_resolved_heading_and_capture_pose_match_current_physics():
@@ -162,6 +191,8 @@ def test_control_exception_is_an_absorbing_algorithm_outcome():
         assert state["result"]["termination_reason"] == "algorithm_error"
         assert state["elapsed_s"] == 0
         assert run.bridge.mj_model is None
+        assert state["result"]["contact_measurements"]["physics_steps"] == 0
+        assert not run.bridge._physics_step_observers
         assert run.inspect(include_history=True)["events"][0]["kind"] == "exploration_error"
         with pytest.raises(RuntimeError):
             run.advance()
@@ -263,3 +294,19 @@ def test_fractional_sensor_horizon_is_rejected_and_closed():
         run.start()
     assert not run.inspect()["result"]["valid"]
     assert run.bridge.mj_model is None
+
+
+def test_contact_observer_failure_retains_prior_samples_and_detaches_on_close():
+    with episode() as run:
+        run.advance()
+        def fail(*args):
+            raise RuntimeError("contact capture failed")
+        run.bridge.add_physics_step_observer(fail)
+        with pytest.raises(RuntimeError, match="contact capture failed"):
+            run.advance()
+        saved = run.inspect(include_history=True)
+        assert saved["result"]["termination_reason"] == "infrastructure_error"
+        assert saved["contact_measurements"]["physics_steps"] == 6
+        assert len(saved["contact_samples"]) == 6
+        assert not run.bridge._physics_step_observers
+        assert run.bridge.mj_model is None
