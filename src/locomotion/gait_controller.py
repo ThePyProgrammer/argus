@@ -35,6 +35,10 @@ class TrotGaitController:
     def __init__(self, params: GaitParams | None = None) -> None:
         self._params = params or GaitParams()
         self._phase: float = 0.0  # 0.0 to 1.0
+        self._active_yaw: float | None = None
+        rate = self._params.command_yaw_acceleration
+        if not np.isfinite(rate) or rate <= 0:
+            raise ValueError("Gait yaw acceleration limit must be finite and positive")
 
     def compute(
         self, vx: float, vy: float, omega: float, dt: float,
@@ -65,7 +69,17 @@ class TrotGaitController:
         # command. Put all four feet down and restart from the phase boundary.
         if speed <= 0.01 and abs(omega) <= 0.01:
             self._phase = 0.0
+            self._active_yaw = None
             return np.tile([p.standing_hip, p.standing_thigh, p.standing_calf], 4)
+
+        # A yaw reversal must not replace hip abduction and differential stride
+        # in one frame while the legs are mid-swing. Limit the yaw used by the
+        # gait; explicit idle above remains immediate. Crossing zero during an
+        # active reversal must not reset the phase or put the robot in idle.
+        if self._active_yaw is not None:
+            limit = p.command_yaw_acceleration * dt
+            omega = self._active_yaw + float(np.clip(omega - self._active_yaw, -limit, limit))
+        self._active_yaw = omega
 
         self._phase = (self._phase + p.frequency * dt) % 1.0
 

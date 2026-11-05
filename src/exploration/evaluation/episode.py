@@ -179,6 +179,7 @@ class ExplorationEpisode:
                                    "gait_config": asdict(GaitParams()),
                                    "gait_rule": "bounded_swing_thigh_lift_v1",
                                    "gait_idle_rule": "standing_pose_phase_reset_v1",
+                                   "gait_transition_rule": "bounded_active_yaw_slew_v1",
                                    "floor_filter": "ranked_plane_reacquisition_v5",
                                    "camera_calibration": "integer_pixel_centers_v2",
                                    "planning_free_space": "observed_floor_and_trajectory_v1",

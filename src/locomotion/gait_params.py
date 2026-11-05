@@ -43,6 +43,13 @@ class GaitParams:
     max_speed: float = 1.0
     """Velocity cap in m/s."""
 
+    command_yaw_acceleration: float = 8.0
+    """Maximum yaw-command change during an active gait, in rad/s per second.
+
+    Initial motion starts at the requested yaw; explicit idle still returns
+    the standing pose immediately and clears the yaw-transition state.
+    """
+
     standing_hip: float = 0.0
     """Standing hip abduction angle (radians)."""
 
