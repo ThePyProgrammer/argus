@@ -111,8 +111,10 @@ remain local under the ignored output directory.
 
 ## Remaining limitations
 
-The leg still touches the floor; gait correction is separate work. The reporting
-thresholds require calibration before making physical safety claims. Falls
+The leg still touches the floor in this measurement-only validation. The later
+[gait transition correction](calf-contact-transition-validation.md) resolves
+that reproduced contact under Issue #2, including a fresh five-second live run.
+The reporting thresholds require calibration before making physical safety claims. Falls
 retain the existing sensor-cadence height classifier, and sub-physics-step
 contacts remain unresolved. Raw histories are retained in memory until export,
 so storage and memory grow with run duration. This one live case and the unit
