@@ -64,6 +64,7 @@ class PathPlanner:
         self._inflation_cache: np.ndarray | None = None
         self._inflation_grid_id: int | None = None
         self._inflation_grid: np.ndarray | None = None
+        self._inflation_resolution: float | None = None
         self._obstacle_tree: cKDTree | None = None
         self._clearance_radius = None
         self.set_clearance_radius(clearance_radius)
@@ -88,6 +89,7 @@ class PathPlanner:
         """
         grid_id = id(grid.grid)
         if (self._inflation_grid_id == grid_id and self._inflation_cache is not None
+                and self._inflation_resolution == grid.resolution
                 and self._inflation_grid is not None and np.array_equal(self._inflation_grid, grid.grid)):
             return self._inflation_cache
 
@@ -102,6 +104,7 @@ class PathPlanner:
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
         self._inflation_grid = grid.grid.copy()
+        self._inflation_resolution = grid.resolution
         occupied_centers = np.argwhere(grid.grid == CELL_OCCUPIED)[:, ::-1] + .5
         self._obstacle_tree = cKDTree(occupied_centers) if len(occupied_centers) else None
         return cost
@@ -262,10 +265,16 @@ class PathPlanner:
         return smoothed if self.path_is_clear(smoothed, grid) else path_world
 
     def path_is_clear(self, path: list[np.ndarray], grid: OccupancyGrid2D) -> bool:
-        """Check touched cells and continuous distance to occupied-cell centers."""
+        """Check raw occupied cells and continuous center-to-obstacle clearance.
+
+        The radius already includes the occupied cell's half diagonal. Rejecting
+        every touched *inflated* cell as well would add a second, position-dependent
+        raster allowance. Continuous distance handles clearance between waypoints;
+        raw-cell checks retain occupied-cell, corner-touch, and map-boundary rules.
+        """
         if not path:
             return False
-        costs = self._get_inflation_cost(grid)
+        self._get_inflation_cost(grid)
         points = (np.asarray(path)[:, :2] - grid.origin) / grid.resolution
         if not np.isfinite(points).all():
             return False
@@ -299,6 +308,6 @@ class PathPlanner:
                     for row in {math.floor(xy[1] - 1e-9), math.floor(xy[1] + 1e-9)}:
                         if not (0 <= row < grid.height and 0 <= col < grid.width):
                             return False
-                        if costs[row, col] >= 1e5:
+                        if grid.grid[row, col] == CELL_OCCUPIED:
                             return False
         return True

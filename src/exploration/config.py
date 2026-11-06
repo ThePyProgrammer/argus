@@ -26,7 +26,7 @@ class ExplorationConfig:
     angular_speed: float = 1.0
     forward_heading_tolerance_rad: float = 0.25  # turn in place before forward travel
     path_simplify_interval: float = 0.5       # waypoints ~0.5m apart for smoother paths
-    footprint_radius_m: float = 0.35     # Go2 platform's circular body/leg envelope
+    footprint_radius_m: float = 0.35     # nominal platform radius, not an articulated bound alone
     camera_standoff_m: float = 0.15      # space beyond the fixed camera mount
     clearance_margin_m: float = 0.05     # additional planning allowance, not an error bound
 
@@ -59,7 +59,13 @@ class ExplorationConfig:
     floor_distance_tolerance_m: float = 0.015
 
     def planning_radius(self, camera_offset_m: float, resolution_m: float) -> float:
-        """All-heading footprint, camera stand-off, and cell raster allowance."""
+        """All-heading footprint, camera stand-off, and one cell raster allowance.
+
+        The default Go2 camera-plus-stand-off circle also contains the articulated
+        collision geometry within the offline audit's declared knee range. The
+        nominal 0.35 m footprint alone does not establish that guarantee. Changes
+        to the mount, stand-off, geometry, or gait range require a new audit.
+        """
         import math
         values = (self.footprint_radius_m, self.camera_standoff_m,
                   self.clearance_margin_m, camera_offset_m, resolution_m)

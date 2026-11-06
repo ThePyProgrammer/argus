@@ -93,3 +93,71 @@ def test_invalid_clearance_is_rejected(value):
         PathPlanner(clearance_radius=value)
     with pytest.raises(ValueError):
         ExplorationConfig(camera_standoff_m=value).planning_radius(.4, .1)
+
+
+@pytest.mark.parametrize("resolution", [.05, .1])
+def test_corner_segments_use_one_raster_allowance(resolution):
+    cells = np.zeros((70, 70), np.int8)
+    cells[35, 35] = 100
+    room = grid(cells, resolution)
+    radius = ExplorationConfig().planning_radius(np.linalg.norm([.4, 0, .05]), resolution)
+    planner = PathPlanner(clearance_radius=radius)
+    corner = room.grid_to_world(35, 35)
+    for distance, clear in ((radius + .05, False), (np.sqrt(2) * (radius + .01), True)):
+        start = np.r_[corner + [-distance, 0], 0]
+        end = np.r_[corner + [0, distance], 0]
+        # Endpoints are clear; the diagonal segment passes distance/sqrt(2)
+        # from the corner's occupied-cell center.
+        assert np.linalg.norm(start[:2] - corner) > radius
+        assert planner.path_is_clear([start, end], room) == clear
+
+
+@pytest.mark.parametrize("resolution", [.05, .1])
+def test_safe_segment_in_touched_inflated_cell_is_not_double_inflated(resolution):
+    cells = np.zeros((70, 70), np.int8)
+    cells[35, 35] = 100
+    room = grid(cells, resolution)
+    radius = ExplorationConfig().planning_radius(np.linalg.norm([.4, 0, .05]), resolution)
+    planner = PathPlanner(clearance_radius=radius)
+    costs = planner._get_inflation_cost(room)
+    obstacle = room.grid_to_world(35, 35)
+    examples = 0
+    for angle in np.linspace(0, 2 * np.pi, 101):
+        direction = np.array([np.cos(angle), np.sin(angle)])
+        start = np.r_[obstacle + direction * (radius + .001), 0]
+        end = np.r_[obstacle + direction * (radius + .002), 0]
+        if costs[room.world_to_grid(start)] >= 1e5:
+            examples += 1
+            assert planner.path_is_clear([start, end], room)
+    assert examples > 0  # Previously rejected despite exact clearance > radius.
+
+
+@pytest.mark.parametrize("resolution", [.05, .1])
+def test_narrow_corridor_reachability_planning_and_segment_checks_agree(resolution):
+    radius = ExplorationConfig().planning_radius(np.linalg.norm([.4, 0, .05]), resolution)
+    for half_gap_cells, clear in ((int(np.ceil(radius / resolution)), True),
+                                  (int(np.floor(radius / resolution)), False)):
+        cells = np.zeros((2 * half_gap_cells + 11, 50), np.int8)
+        cells[5, :] = cells[5 + 2 * half_gap_cells, :] = 100
+        room = grid(cells, resolution)
+        middle = 5 + half_gap_cells
+        start = np.r_[room.grid_to_world(middle, 5), 0]
+        end = np.r_[room.grid_to_world(middle, 44), 0]
+        planner = PathPlanner(clearance_radius=radius)
+        assert planner.path_is_clear([start, end], room) == clear
+        assert bool(planner.reachable_mask(start, room)[middle, 44]) == clear
+        path = planner.plan(start, end, room)
+        assert (path is not None) == clear
+        if clear:
+            assert planner.path_is_clear(path, room)
+            # Adding a second half-cell diagonal would incorrectly close this gap.
+            assert half_gap_cells * resolution < radius + resolution / np.sqrt(2)
+
+
+def test_reusing_cells_at_another_resolution_rebuilds_metric_inflation():
+    cells = np.zeros((30, 30), np.int8)
+    cells[15, 15] = 100
+    fine, coarse = grid(cells, .05), grid(cells, .1)
+    planner = PathPlanner(clearance_radius=.6)
+    assert planner._get_inflation_cost(fine)[15, 23] >= 1e5
+    assert planner._get_inflation_cost(coarse)[15, 23] < 1e5

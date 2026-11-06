@@ -206,12 +206,18 @@ def test_already_reached_frontier_cells_cannot_reinstall_completed_paths(has_dis
 
 
 @pytest.mark.parametrize("yaw", [0., np.pi / 2])
-def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(yaw, monkeypatch):
-    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap())
+@pytest.mark.parametrize("resolution", [.05, .1])
+@pytest.mark.parametrize("tilt", [False, True])
+def test_navigation_uses_estimated_body_pose_while_mapping_keeps_camera_origin(yaw, resolution, tilt, monkeypatch):
+    from scipy.spatial.transform import Rotation
+    loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap(),
+                           config=ExplorationConfig(voxel_resolution=resolution))
     mount = np.array([[0., 0., -1., .4], [-1., 0., 0., 0.],
                       [0., 1., 0., .05], [0., 0., 0., 1.]])
     body = np.eye(4)
     body[:2, :2] = [[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]
+    if tilt:
+        body[:3, :3] = Rotation.from_euler("xyz", [.2, -.3, yaw]).as_matrix()
     body[2, 3] = .3
     camera = body @ mount
     frame = _make_sensor_frame(np.array([99., 99., 99.]))  # Not a navigation oracle.

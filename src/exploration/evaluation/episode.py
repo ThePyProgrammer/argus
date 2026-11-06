@@ -183,7 +183,7 @@ class ExplorationEpisode:
                                    "floor_filter": "ranked_plane_reacquisition_v5",
                                    "camera_calibration": "integer_pixel_centers_v2",
                                    "planning_free_space": "observed_floor_and_trajectory_v1",
-                                   "planning_clearance": "body_camera_envelope_continuous_segments_v2",
+                                   "planning_clearance": "body_camera_envelope_single_raster_v3",
                                    "path_following": "align_heading_before_translation_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:
