@@ -31,6 +31,19 @@ This is a conservative planning constraint on the observed map. It can reject na
 
 Exploration turns in place when heading error to the route exceeds `forward_heading_tolerance_rad`, default 0.25 radians. It resumes forward travel after alignment. This applies to both planned paths and explicit exploration waypoint targets. Small heading corrections retain simultaneous steering and forward motion. The [clearance validation](notes/exploration-camera-clearance-validation.md) records why clearance inflation alone was insufficient. Episode provenance records `path_following: align_heading_before_translation_v1`.
 
+The Go2 gait limits changes in its active yaw command to 8 rad/s per second.
+This bounds the abrupt hip-abduction and differential-stride changes during a
+turn-to-walk transition that reproduced a rear-calf floor strike. It introduces
+a short yaw response delay; translation commands and constant-command targets
+retain their existing behavior. Explicit idle returns the standing pose and
+clears both phase and yaw history immediately. The first moving command starts
+at its requested yaw. Crossing zero yaw during an active reversal keeps the
+gait phase running. This is a development transition limit, not an attitude-aware
+whole-leg clearance guarantee. Episode provenance records
+`gait_transition_rule: bounded_active_yaw_slew_v1`. The
+[calf-contact validation](notes/calf-contact-transition-validation.md) records
+the replay, regression tests, live results, and remaining limitations.
+
 ## Camera and body frames
 
 Navigation converts the SLAM camera estimate to a body estimate using fixed mounting calibration. Planning starts, waypoint steering, progress detection, free-space trajectories, and Voronoi allocation use that body estimate. Floor classification and obstacle insertion keep the camera origin. The [contact diagnosis](notes/exploration-contact-diagnosis.md) explains the former 90-degree steering mismatch, the gait-clearance correction, and remaining limits.
