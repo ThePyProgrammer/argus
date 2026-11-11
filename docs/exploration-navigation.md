@@ -1,5 +1,9 @@
 # Exploration navigation baseline
 
+For the complete sensor-to-command pipeline, coordinate frames, map representations,
+team information sharing, and the separate evaluation path, start with
+[How data moves through the current exploration experiment](exploration-data-flow.md).
+
 The shared navigation path now selects reachable frontier cells and separates floor observations before building the obstacle map. These corrections address the [first-scan failure](notes/exploration-first-scan-failure.md) and apply equally to interactive exploration and evaluation.
 
 ## Frontier targets

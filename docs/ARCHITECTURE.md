@@ -1,5 +1,12 @@
 # Architecture
 
+> For the current exploration validation pipeline, read
+> [the experimental data-flow guide](exploration-data-flow.md). In that path,
+> ICP receives ground truth only for its initial pose; subsequent mapping and
+> navigation use estimated poses. Team merging does not correct those poses or
+> feed a shared planning map back to the robots. The general ground-truth fusion
+> descriptions below should not be read as that experiment's active wiring.
+
 > Argus is a local, simulation-first multi-robot perception workbench: MuJoCo runs simulated Unitree Go2 robots, Python coordinates exploration and perception pipelines, FastAPI streams state over WebSockets, and a React/Three.js dashboard renders command-and-control, maps, detections, metrics, and pipeline editing.
 
 ## Overview
