@@ -180,10 +180,13 @@ class ExplorationEpisode:
                                    "gait_rule": "bounded_swing_thigh_lift_v1",
                                    "gait_idle_rule": "standing_pose_phase_reset_v1",
                                    "gait_transition_rule": "bounded_active_yaw_slew_v1",
+                                   "gait_stride_rule": "signed_longitudinal_stride_v1",
                                    "floor_filter": "ranked_plane_reacquisition_v5",
                                    "camera_calibration": "integer_pixel_centers_v2",
                                    "planning_free_space": "observed_floor_and_trajectory_v1",
                                    "planning_clearance": "body_camera_envelope_single_raster_v3",
+                                   "execution_clearance": "observed_pose_swept_stop_v1",
+                                   "execution_geometry": "all_joint_rotations_static_calibration_v1",
                                    "path_following": "align_heading_before_translation_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})
         except BaseException:
@@ -264,7 +267,9 @@ class ExplorationEpisode:
         try:
             tick = self.coordinator.advance(stop_on_termination=True)
             self._commands.append({"elapsed_s": tick.decision_sim_time - self._origin,
-                                   "commands": {rid: command.to_wire() for rid, command in tick.commands.items()}})
+                                   "commands": {rid: command.to_wire() for rid, command in tick.commands.items()},
+                                   "motion_clearance": {rid: robot.exploration.measurement_state["motion_clearance"]
+                                                        for rid, robot in self.coordinator.robots.items()}})
             for rid, metrics in tick.metrics.items():
                 robot = self.coordinator.robots[rid]
                 diagnostic = robot.exploration.measurement_state

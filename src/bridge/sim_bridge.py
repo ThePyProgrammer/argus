@@ -149,6 +149,10 @@ class MuJoCoBridge:
 
         self._body_from_camera = fixed_camera_mount(
             self._model, self._cam_id, int(self._model.jnt_bodyid[0]))
+        from src.bridge.platforms.go2_geometry import audit_go2_envelope
+        self._collision_radius = audit_go2_envelope(
+            self._model, robot_id="", calf_range=None,
+            camera_name=self._model.camera(self._cam_id).name)["collision_radius_bound_m"]
         self._step_count = 0
         return self._capture_frame()
 
@@ -268,6 +272,7 @@ class MuJoCoBridge:
             ground_truth_pose=pose,
             sim_time=sim_time,
             body_from_camera=self._body_from_camera.copy(),
+            collision_radius_m=self._collision_radius,
         )
 
     def _extract_pose(self) -> np.ndarray:

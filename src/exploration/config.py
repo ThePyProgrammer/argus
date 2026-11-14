@@ -29,6 +29,12 @@ class ExplorationConfig:
     footprint_radius_m: float = 0.35     # nominal platform radius, not an articulated bound alone
     camera_standoff_m: float = 0.15      # space beyond the fixed camera mount
     clearance_margin_m: float = 0.05     # additional planning allowance, not an error bound
+    motion_horizon_s: float = 0.30       # hold command, then include a stopping tail
+    motion_reaction_s: float = 0.10      # motion persists before braking takes effect
+    motion_braking_mps2: float = 1.0     # development model, requires physical validation
+    motion_drift_mps: float = 0.05       # transverse tracking allowance over projection
+    motion_observation_max_age_s: float = 0.15
+    motion_pose_max_gap_s: float = 0.15
 
     # Termination and mobility recovery
     max_steps: int = 10000                # safety net step limit
@@ -58,7 +64,8 @@ class ExplorationConfig:
     floor_height_tolerance_m: float = 0.04
     floor_distance_tolerance_m: float = 0.015
 
-    def planning_radius(self, camera_offset_m: float, resolution_m: float) -> float:
+    def planning_radius(self, camera_offset_m: float, resolution_m: float,
+                        collision_radius_m: float = 0.) -> float:
         """All-heading footprint, camera stand-off, and one cell raster allowance.
 
         The default Go2 camera-plus-stand-off circle also contains the articulated
@@ -68,10 +75,10 @@ class ExplorationConfig:
         """
         import math
         values = (self.footprint_radius_m, self.camera_standoff_m,
-                  self.clearance_margin_m, camera_offset_m, resolution_m)
+                  self.clearance_margin_m, camera_offset_m, resolution_m, collision_radius_m)
         if any(not math.isfinite(v) or v < 0 for v in values) or resolution_m == 0:
             raise ValueError("Clearance dimensions must be finite and nonnegative; resolution must be positive")
         # Enclose each occupied cell. Continuous segment checks handle the
         # traversed positions without reserving another whole cell's extent.
-        return (max(self.footprint_radius_m, camera_offset_m + self.camera_standoff_m)
+        return (max(self.footprint_radius_m, collision_radius_m, camera_offset_m + self.camera_standoff_m)
                 + self.clearance_margin_m + resolution_m / math.sqrt(2))

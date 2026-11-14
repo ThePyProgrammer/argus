@@ -66,6 +66,9 @@ class SensorFrame:
     # Fixed sensor mounting calibration, not a measured world/body pose.
     # None preserves the coincident sensor/body convention of legacy producers.
     body_from_camera: np.ndarray | None = None
+    # Static collision-geometry calibration: contains all joint/body rotations.
+    # This is a model dimension, not a live simulator position or joint estimate.
+    collision_radius_m: float | None = None
 
     def body_pose_from_camera(self, world_from_camera: np.ndarray) -> np.ndarray:
         """Convert an estimated camera pose to the robot's navigation frame."""

@@ -20,6 +20,21 @@ from src.exploration.occupancy_grid import OccupancyGrid2D
 from src.slam.protocol import SLAMResult, TrackingStatus
 
 
+@pytest.fixture(autouse=True)
+def isolate_goal_and_recovery_proposals(monkeypatch):
+    """These existing fixtures test proposal logic with synthetic maps/poses.
+
+    The real execution gate and all command paths are tested separately in
+    test_motion_clearance_integration.py; fake map geometry here is not a
+    physically meaningful clearance fixture.
+    """
+    from src.control.motion_clearance import MotionClearanceGuard, ClearanceDecision
+    def accept(guard, linear, angular, **state):
+        guard.last = ClearanceDecision(np.asarray(linear), angular, "clear", 1., stopping_clear=True)
+        return guard.last
+    monkeypatch.setattr(MotionClearanceGuard, "filter", accept)
+
+
 # ---------------------------------------------------------------------------
 # Mock helpers
 # ---------------------------------------------------------------------------

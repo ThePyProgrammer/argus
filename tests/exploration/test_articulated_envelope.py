@@ -34,6 +34,21 @@ def test_continuous_articulated_bound_includes_all_collision_primitives(model):
     assert not full["contained"]
 
 
+def test_unrestricted_calibration_covers_soft_limit_overshoot_and_changed_gait(model):
+    report = audit_go2_envelope(model, calf_range=None)
+    assert report["calf_range_rad"] is None
+    assert .65 < report["collision_radius_bound_m"] < .67
+    data = mujoco.MjData(model)
+    root = model.body("robot_a_base").id
+    for hip, thigh, calf in product((-1., 1.), (-2., 2.), (-np.pi, -1.5, 0., np.pi)):
+        data.qpos[7:] = np.tile([hip, thigh, calf], 4)
+        mujoco.mj_forward(model, data)
+        for row in report["geometries"]:
+            g = row["geom_id"]
+            actual = np.linalg.norm(data.geom_xpos[g]-data.xpos[root]) + primitive_radius(model, g) + model.geom_margin[g]
+            assert actual <= row["root_radius_bound_m"] + 1e-12
+
+
 @pytest.mark.parametrize("lower,upper", [(-2.7227, -1.5), (-2., 2.), (4., 9.)])
 def test_analytic_extrema_bound_dense_independent_rotation_samples(lower, upper):
     a, b = np.array([.06, -.0955, -.213]), np.array([.02, .005, -.148])

@@ -121,8 +121,10 @@ class TrotGaitController:
         p = self._params
         is_swing = phase < 0.5  # first half = swing, second half = stance
 
-        # Velocity scaling factor (0 to 1)
-        v_scale = min(speed / p.max_speed, 1.0) if p.max_speed > 0 else 0.0
+        # Signed longitudinal stride scaling (-1 to 1).
+        # Preserve longitudinal direction. Using speed magnitude here made
+        # negative vx (including recovery reverse) produce a forward stride.
+        v_scale = float(np.clip(vx / p.max_speed, -1., 1.)) if p.max_speed > 0 else 0.0
 
         # Determine leg properties
         is_left = leg_idx in [0, 2]  # FL=0, RL=2 are left legs

@@ -112,6 +112,7 @@ class MultiRobotBridge:
             self._model = mujoco.MjModel.from_xml_string(xml_str, assets)
         self._data = mujoco.MjData(self._model)
         self._dt = self._model.opt.timestep * self._config.sim_steps_per_frame
+        self._collision_radii = {}
 
         # Discover per-robot indices via mj_name2id
         for robot_id in self._config.robot_ids:
@@ -154,6 +155,10 @@ class MultiRobotBridge:
                 raise RuntimeError(f"Camera '{cam_name}' not found in model")
             self._cam_ids[robot_id] = cam_id
             self._camera_mounts[robot_id] = fixed_camera_mount(self._model, cam_id, body_id)
+            if self._platform.metadata.name == "go2":
+                from src.bridge.platforms.go2_geometry import audit_go2_envelope
+                self._collision_radii[robot_id] = audit_go2_envelope(
+                    self._model, robot_id, calf_range=None)["collision_radius_bound_m"]
 
         # Set initial standing pose and heading for both robots
         import math
@@ -577,6 +582,7 @@ class MultiRobotBridge:
             ground_truth_pose=pose,
             sim_time=sim_time,
             body_from_camera=self._camera_mounts[robot_id].copy(),
+            collision_radius_m=self._collision_radii.get(robot_id),
         )
 
     def _extract_pose(self, robot_id: str) -> np.ndarray:

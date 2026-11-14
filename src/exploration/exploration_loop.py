@@ -126,6 +126,12 @@ class StuckRecovery:
     def is_active(self) -> bool:
         return self._active
 
+    def cancel(self) -> None:
+        """Cancel an unsafe proposal; a clearance rejection is not progress."""
+        self._active = False
+        self._phase = "idle"
+        self._remaining_turn = self._remaining_reverse = 0.
+
 
 class ExplorationLoop:
     """Autonomous exploration loop orchestrator.
@@ -159,6 +165,11 @@ class ExplorationLoop:
         self._slam = slam
         self._octomap = octomap
         self._config = config or ExplorationConfig()
+        from src.control.motion_clearance import MotionClearanceGuard
+        self._motion_guard = MotionClearanceGuard(self._config)
+        self._last_observation_time = None
+        self._navigation_pose = np.eye(4)
+        self._execution_radius = self._config.planning_radius(0., self._config.voxel_resolution)
         self._streaming_viz = streaming_viz
         self._intrinsics = intrinsics
         self._floor_filter = FloorTracker(FloorFilter(
@@ -239,7 +250,12 @@ class ExplorationLoop:
                 and not self._current_waypoint_runner.is_complete else None,
                 "planning_attempts": tuple(self._planning_attempts),
                 "selection_latency_ms": tuple(self._selection_latency_ms),
-                "tracking_status": self.last_tracking_status}
+                "tracking_status": self.last_tracking_status,
+                "motion_clearance": {"reason": self._motion_guard.last.reason,
+                                     "scale": self._motion_guard.last.scale,
+                                     "clearance_m": self._motion_guard.last.clearance_m,
+                                     "stopping_clear": self._motion_guard.last.stopping_clear,
+                                     "radius_m": self._execution_radius}}
 
     @property
     def slam_backend_type(self) -> type:
@@ -337,6 +353,8 @@ class ExplorationLoop:
 
         # Insert this frame's cloud directly into OctoMap (not the global accumulator)
         if len(result.points) > 0:
+            if self.last_tracking_status == "ok":
+                self._last_observation_time = frame.sim_time
             points = result.points
             if self._config.ground_filter:
                 acquiring_floor = self._floor_filter.plane is None
@@ -567,6 +585,31 @@ class ExplorationLoop:
     # ------------------------------------------------------------------
 
     def step_once(
+        self, frame: SensorFrame, step: int,
+        score_fn: Callable[[np.ndarray], float] | None = None,
+    ) -> tuple[np.ndarray, float, StepMetrics]:
+        """Gate every exploration command, including bootstrap and recovery."""
+        linear, angular, metrics = self._step_once_proposal(frame, step, score_fn)
+        calibrated = (frame.body_from_camera is not None and frame.collision_radius_m is not None
+                      and np.isfinite(frame.collision_radius_m) and frame.collision_radius_m > 0)
+        decision = self._motion_guard.filter(
+            linear, angular, pose=self._navigation_pose, sim_time=frame.sim_time,
+            observation_time=self._last_observation_time, grid=self.planning_grid(),
+            radius=self._execution_radius, calibration_valid=calibrated,
+            tracking_ok=self.last_tracking_status == "ok")
+        if decision.scale == 0 and (np.linalg.norm(linear) > .01 or abs(angular) > .01):
+            # A rejected route/recovery must not keep issuing the same motion or
+            # trigger blind reverse from the lack of commanded progress.
+            self._current_waypoint_runner = None
+            self._goal_id = None
+            self._progress.reset()
+            self._stuck_recovery.cancel()
+            if decision.reason != "initial_velocity_observation":
+                self._bootstrap_complete = True
+        self._last_command = (decision.linear.copy(), float(decision.angular))
+        return decision.linear, decision.angular, metrics
+
+    def _step_once_proposal(
         self,
         frame: SensorFrame,
         step: int,
@@ -598,14 +641,17 @@ class ExplorationLoop:
         # Mapping and floor filtering use the camera origin. Navigation uses
         # the body origin and forward axis, derived only from fixed calibration.
         pose = frame.body_pose_from_camera(camera_pose)
+        self._navigation_pose = pose.copy()
         current_pos = pose[:3, 3].copy()
         self._robot_positions.append(current_pos)
         # Enclose the fixed camera mount at every heading. Its 3D offset norm
         # also bounds horizontal reach when the body pitches or rolls.
         camera_offset = 0. if frame.body_from_camera is None else float(
             np.linalg.norm(frame.body_from_camera[:3, 3]))
-        self._path_planner.set_clearance_radius(config.planning_radius(
-            camera_offset, config.voxel_resolution))
+        calibrated_radius = frame.collision_radius_m or 0.
+        self._execution_radius = config.planning_radius(
+            camera_offset, config.voxel_resolution, calibrated_radius)
+        self._path_planner.set_clearance_radius(self._execution_radius)
 
         # b. Stuck detection and recovery
         force_rescan, early_return = self._check_stuck(step, pose, frame.sim_time)

@@ -194,7 +194,7 @@ def test_step_records_stop_as_last_command_when_robot_was_disabled(monkeypatch):
     bridge._platform = _FakeAgibotLikePlatform()
     bridge._controllers = {"robot_a": controller}
     bridge._model = types.SimpleNamespace(opt=types.SimpleNamespace(timestep=0.002))
-    bridge._data = types.SimpleNamespace(qpos=np.zeros(3), ctrl=np.zeros(1))
+    bridge._data = types.SimpleNamespace(qpos=np.zeros(3), ctrl=np.zeros(1), time=0.0)
     bridge._dt = 0.02
     bridge._qpos_starts = {"robot_a": 0}
     bridge._ctrl_indices = {"robot_a": [0]}
