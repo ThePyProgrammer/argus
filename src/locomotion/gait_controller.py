@@ -14,6 +14,7 @@ other, creating a yaw torque through asymmetric ground reaction forces.
 import numpy as np
 
 from src.locomotion.gait_params import GaitParams
+from src.locomotion.command_filter import filter_gait_command
 
 
 class TrotGaitController:
@@ -36,6 +37,9 @@ class TrotGaitController:
         self._params = params or GaitParams()
         self._phase: float = 0.0  # 0.0 to 1.0
         self._active_yaw: float | None = None
+        self._restart_remaining: float = 0.0
+        if not np.isfinite(self._params.restart_settle_s) or self._params.restart_settle_s < 0:
+            raise ValueError("Gait restart settling interval must be finite and nonnegative")
         rate = self._params.command_yaw_acceleration
         if not np.isfinite(rate) or rate <= 0:
             raise ValueError("Gait yaw acceleration limit must be finite and positive")
@@ -65,21 +69,13 @@ class TrotGaitController:
         # Clamp speed
         speed = min(float(np.sqrt(vx ** 2 + vy ** 2)), p.max_speed)
 
-        # Freezing mid-swing leaves a diagonal pair lifted during an idle
-        # command. Put all four feet down and restart from the phase boundary.
-        if speed <= 0.01 and abs(omega) <= 0.01:
+        # Put every leg down immediately. A brief idle must not lift a new
+        # diagonal pair before the standing transition has had time to respond.
+        vx, vy, omega, self._active_yaw, self._restart_remaining = filter_gait_command(
+            vx, vy, omega, dt, self._active_yaw, self._restart_remaining, p)
+        if self._active_yaw is None:
             self._phase = 0.0
-            self._active_yaw = None
             return np.tile([p.standing_hip, p.standing_thigh, p.standing_calf], 4)
-
-        # A yaw reversal must not replace hip abduction and differential stride
-        # in one frame while the legs are mid-swing. Limit the yaw used by the
-        # gait; explicit idle above remains immediate. Crossing zero during an
-        # active reversal must not reset the phase or put the robot in idle.
-        if self._active_yaw is not None:
-            limit = p.command_yaw_acceleration * dt
-            omega = self._active_yaw + float(np.clip(omega - self._active_yaw, -limit, limit))
-        self._active_yaw = omega
 
         self._phase = (self._phase + p.frequency * dt) % 1.0
 

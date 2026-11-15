@@ -12,6 +12,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from src.exploration.occupancy_grid import CELL_OCCUPIED, CELL_UNKNOWN
+from src.locomotion.command_filter import filter_gait_command
+from src.locomotion.gait_params import GaitParams
 
 
 @dataclass
@@ -32,40 +34,42 @@ def _approach(value, target, maximum_change):
 
 
 def project_motion(position, yaw, velocity, yaw_rate, linear, angular, *,
-                   active_yaw, config, control_dt, immediate_response=False):
+                   active_yaw, config, control_dt, immediate_response=False, restart_wait=0.):
     """Predict commanded motion, delayed response, and a coast/braking tail.
 
     Active gait yaw follows the same 8 rad/s/s slew as the default Go2 gait.
-    First motion initializes at requested yaw; explicit idle resets the gait's
-    target immediately but leaves measured physical velocity to coast and brake.
+    First motion initializes at requested yaw. Interrupted motion includes the
+    gait's standing interval before restart, using the same command filter.
+    Explicit idle leaves measured physical velocity to coast and brake.
     The circular all-joint envelope handles rotation at every intermediate angle.
     """
-    from src.locomotion.gait_params import GaitParams
+    params = GaitParams()
     idle = np.linalg.norm(linear) <= .01 and abs(angular) <= .01
     hold = 0. if idle else config.motion_horizon_s
     speed = max(float(np.linalg.norm(velocity)), float(np.linalg.norm(linear)))
-    rate = GaitParams().command_yaw_acceleration
+    rate = params.command_yaw_acceleration
     duration = hold + config.motion_reaction_s + max(
         speed / config.motion_braking_mps2, max(abs(yaw_rate), abs(angular)) / rate)
     dt = min(.02, max(.001, control_dt))
     count = max(1, math.ceil(duration / dt))
     dt = max(duration, dt) / count
     xy, vel = np.array(position, dtype=float), np.array(velocity, dtype=float)
-    filtered = 0. if idle else (angular if active_yaw is None else active_yaw)
+    filtered = active_yaw
     points, times = [xy.copy()], [0.]
     for i in range(count):
         t = i * dt
         if t < hold:
-            filtered += float(np.clip(angular - filtered, -rate * dt, rate * dt))
+            vx, vy, target_yaw, filtered, restart_wait = filter_gait_command(
+                *linear, angular, dt, filtered, restart_wait, params)
             target = np.array([[math.cos(yaw), -math.sin(yaw)],
-                               [math.sin(yaw), math.cos(yaw)]]) @ linear
+                               [math.sin(yaw), math.cos(yaw)]]) @ [vx, vy]
             # Pose differences capture initial lateral drift and residual motion.
             if immediate_response:
                 vel = target.copy()
             elif t < config.motion_reaction_s:
                 target = vel
             vel = _approach(vel, target, config.motion_braking_mps2 * dt)
-            yaw_rate += float(np.clip(filtered - yaw_rate, -rate * dt, rate * dt))
+            yaw_rate += float(np.clip(target_yaw - yaw_rate, -rate * dt, rate * dt))
         elif t >= hold + config.motion_reaction_s:
             vel = _approach(vel, np.zeros(2), config.motion_braking_mps2 * dt)
             yaw_rate += float(np.clip(-yaw_rate, -rate * dt, rate * dt))
@@ -86,14 +90,21 @@ class MotionClearanceGuard:
                 raise ValueError(f"{name} must be finite and positive")
         self._poses = deque()
         self._active_yaw = None
+        self._restart_remaining = 0.
         self.last = ClearanceDecision(np.zeros(2), 0., "not_observed")
+
+    def _remember_command(self, linear, angular, dt):
+        _, _, _, self._active_yaw, self._restart_remaining = filter_gait_command(
+            *linear, angular, float(np.clip(dt, .001, 1.)), self._active_yaw,
+            self._restart_remaining, GaitParams())
 
     def filter(self, linear, angular, *, pose, sim_time, observation_time, grid,
                radius, calibration_valid, tracking_ok):
         linear = np.asarray(linear, dtype=float)
         pose = np.asarray(pose, dtype=float)
+        control_dt = .01
         def stop(reason):
-            self._active_yaw = None
+            self._remember_command(np.zeros(2), 0., control_dt)
             self.last = ClearanceDecision(np.zeros(2), 0., reason)
             return self.last
         if (pose.shape != (4, 4) or linear.shape != (2,) or not np.isfinite(pose).all()
@@ -104,6 +115,8 @@ class MotionClearanceGuard:
         yaw = math.atan2(pose[1, 0], pose[0, 0])
         previous = self._poses[-1] if self._poses else None
         gap = sim_time - previous[0] if previous else .01
+        if gap > 0:
+            control_dt = gap
         if previous and gap <= 0:
             return stop("stale_pose")
         self._poses.append((sim_time, xy, yaw))
@@ -174,7 +187,7 @@ class MotionClearanceGuard:
         def project(v, omega, immediate=False):
             return project_motion(xy, yaw, velocity, yaw_rate, v, omega,
                                   active_yaw=self._active_yaw, config=self.config, control_dt=gap,
-                                  immediate_response=immediate)
+                                  immediate_response=immediate, restart_wait=self._restart_remaining)
         stopped, stop_times = project(np.zeros(2), 0.)
         stopping_clear, stop_reason, stop_clearance = check(stopped, stop_times)
         if not stopping_clear:
@@ -192,14 +205,7 @@ class MotionClearanceGuard:
                 path, times = project(v, omega, immediate=True)
                 clear, reason, clearance = check(path, times)
             if clear:
-                if np.linalg.norm(v) <= .01 and abs(omega) <= .01:
-                    self._active_yaw = None
-                elif self._active_yaw is None:
-                    self._active_yaw = omega
-                else:
-                    from src.locomotion.gait_params import GaitParams
-                    limit = GaitParams().command_yaw_acceleration * gap
-                    self._active_yaw += float(np.clip(omega-self._active_yaw, -limit, limit))
+                self._remember_command(v, omega, gap)
                 self.last = ClearanceDecision(v, omega, "clear" if scale == 1 else "slowed", scale,
                                               clearance, True, path)
                 return self.last

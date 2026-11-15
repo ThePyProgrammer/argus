@@ -152,3 +152,30 @@ def test_pose_jump_outside_declared_model_stops():
 def test_invalid_motion_model_parameters_are_rejected(name):
     with pytest.raises(ValueError):
         MotionClearanceGuard(replace(ExplorationConfig(), **{name:0.}))
+
+
+def test_guard_tracks_the_executed_gaits_restart_and_yaw_state():
+    from src.locomotion.gait_controller import TrotGaitController
+    guard, gait, grid = MotionClearanceGuard(ExplorationConfig()), TrotGaitController(), room()
+    schedule = [(0., 0.)] + [(0., -1.)] * 5 + [(0., 0.)] + [(.8, 1.)] * 20
+    for index, (speed, yaw) in enumerate(schedule):
+        decision = evaluate(guard, grid, (speed, 0.), yaw, time=index*.01)
+        gait.compute(*decision.linear, decision.angular, .01)
+        if gait._active_yaw is None:
+            assert guard._active_yaw is None
+        else:
+            assert guard._active_yaw == pytest.approx(gait._active_yaw)
+        assert guard._restart_remaining == pytest.approx(gait._restart_remaining)
+
+
+def test_projection_includes_restart_standing_time_without_erasing_momentum():
+    args = dict(position=[0., 0.], yaw=0., velocity=[0., 0.], yaw_rate=0.,
+                linear=np.array([.8, 0.]), angular=0., active_yaw=None,
+                config=ExplorationConfig(), control_dt=.01, immediate_response=True)
+    waiting, times = project_motion(**args, restart_wait=.08)
+    first, _ = project_motion(**args)
+    assert np.allclose(waiting[times <= .08], 0.)
+    assert first[5, 0] > 0.
+    args.update(velocity=[.4, 0.], immediate_response=False)
+    coasting, times = project_motion(**args, restart_wait=.08)
+    assert coasting[5, 0] > .01

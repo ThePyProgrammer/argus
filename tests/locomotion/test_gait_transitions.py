@@ -16,8 +16,14 @@ from src.locomotion.gait_controller import TrotGaitController
 from src.locomotion.gait_params import GaitParams
 
 
+class ResetEveryIdleGait(TrotGaitController):
+    """Frozen pre-restart-fix behavior for causal physics comparisons."""
+    def __init__(self, params=GaitParams()):
+        super().__init__(replace(params, restart_settle_s=0.))
+
+
 def instantaneous_gait():
-    return TrotGaitController(replace(GaitParams(), command_yaw_acceleration=1e9))
+    return ResetEveryIdleGait(replace(GaitParams(), command_yaw_acceleration=1e9))
 
 
 @pytest.fixture
@@ -41,6 +47,7 @@ def run_schedule(monkeypatch):
             minimum_height, maximum_tilt = start[2], 0.
             for duration, speed, yaw in schedule:
                 phase_start = bridge.get_body_position("robot_a")
+                phase_start_yaw = bridge.get_body_yaw("robot_a")
                 for _ in range(round(duration / bridge.frame_dt)):
                     bridge.set_velocity("robot_a", np.array([speed, 0.]), yaw)
                     bridge.step()
@@ -52,6 +59,9 @@ def run_schedule(monkeypatch):
                     "displacement": bridge.get_body_position("robot_a") - start,
                     "min_height": minimum_height, "max_tilt": maximum_tilt,
                     "final_phase_displacement": bridge.get_body_position("robot_a") - phase_start,
+                    "final_phase_yaw_change": np.arctan2(
+                        np.sin(bridge.get_body_yaw("robot_a") - phase_start_yaw),
+                        np.cos(bridge.get_body_yaw("robot_a") - phase_start_yaw)),
                     "yaw": bridge.get_body_yaw("robot_a")}
         finally:
             bridge.stop()
@@ -112,7 +122,7 @@ def test_yaw_slew_uses_simulated_time_and_reaches_requested_yaw(dt):
     assert gait._active_yaw == 1.
 
 
-def test_reversal_crossing_zero_keeps_gait_phase_but_explicit_idle_resets():
+def test_reversal_crossing_zero_keeps_phase_but_idle_stands_and_delays_restart():
     gait = TrotGaitController()
     gait.compute(0., 0., .08, .01)
     targets = gait.compute(0., 0., -.08, .01)
@@ -121,9 +131,62 @@ def test_reversal_crossing_zero_keeps_gait_phase_but_explicit_idle_resets():
     standing = np.tile([0., .9, -1.8], 4)
     assert not np.array_equal(targets, standing)
     np.testing.assert_array_equal(gait.compute(0., 0., 0., .01), standing)
-    assert gait._active_yaw is None and gait._phase == 0
+    assert gait._active_yaw is None and gait._phase == 0.
+    for _ in range(7):
+        np.testing.assert_array_equal(gait.compute(0., 0., -1., .01), standing)
     gait.compute(0., 0., -1., .01)
     assert gait._active_yaw == -1.
+    assert gait._phase == pytest.approx(.03)
+
+
+@pytest.mark.parametrize("dt", [.005, .01, .02])
+@pytest.mark.parametrize("hold_idle", [False, True])
+def test_restart_wait_counts_simulated_time_and_does_not_extend_itself(dt, hold_idle):
+    gait = TrotGaitController()
+    gait.compute(.4, 0., 1., .07)
+    standing = np.tile([0., .9, -1.8], 4)
+    count = round(GaitParams().restart_settle_s / dt)
+    np.testing.assert_array_equal(gait.compute(0., 0., 0., dt), standing)
+    for _ in range(count - 1):
+        command = (0., 0., 0.) if hold_idle else (.4, 0., 1.)
+        np.testing.assert_array_equal(gait.compute(*command, dt), standing)
+        assert gait._phase == 0.
+        assert gait._active_yaw is None
+    assert not np.array_equal(gait.compute(.4, 0., 1., dt), standing)
+    assert gait._restart_remaining == pytest.approx(0.)
+
+
+def test_reduced_idle_restart_reproduces_contact_without_settling(run_schedule):
+    # A 10 ms idle requests standing but leaves the body rolling when the next
+    # diagonal pair lifts. The longer standing interval removes the contact.
+    schedule = [(.47, 0., -1.), (.01, 0., 0.), (.5, 0., 1.)]
+    previous = run_schedule(schedule, ResetEveryIdleGait)
+    contact, = previous["contacts"]
+    assert contact["kind"] == "leg_floor"
+    assert contact["touch_duration_s"] == pytest.approx(.028)
+    corrected = run_schedule(schedule)
+    assert not corrected["contacts"]
+    assert corrected["final_phase_yaw_change"] >= .9 * previous["final_phase_yaw_change"]
+
+
+@pytest.mark.parametrize("duration", [.47, .79])
+@pytest.mark.parametrize("idle", [.01, .03, .10, .18])
+@pytest.mark.parametrize("sign", [-1., 1.])
+def test_restart_turns_preserve_clearance_and_progress(run_schedule, duration, idle, sign):
+    schedule = [(duration, 0., -sign), (idle, 0., 0.), (1., 0., sign)]
+    result = run_schedule(schedule)
+    previous = run_schedule(schedule, ResetEveryIdleGait)
+    assert not result["contacts"], result
+    assert result["min_height"] > .2
+    assert result["max_tilt"] < .3
+    assert sign * result["final_phase_yaw_change"] > .1
+    assert sign * result["final_phase_yaw_change"] >= .9 * sign * previous["final_phase_yaw_change"]
+
+
+@pytest.mark.parametrize("interval", [-1., np.nan, np.inf])
+def test_invalid_restart_interval_is_rejected(interval):
+    with pytest.raises(ValueError, match="restart"):
+        TrotGaitController(replace(GaitParams(), restart_settle_s=interval))
 
 
 @pytest.mark.parametrize("limit", [0, -1, np.nan, np.inf])
