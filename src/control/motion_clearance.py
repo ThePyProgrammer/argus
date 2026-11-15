@@ -34,7 +34,7 @@ def _approach(value, target, maximum_change):
 
 
 def project_motion(position, yaw, velocity, yaw_rate, linear, angular, *,
-                   active_yaw, config, control_dt, immediate_response=False, restart_wait=0.):
+                   active_yaw, config, control_dt, immediate_response=False, restart_wait=0., settled=False):
     """Predict commanded motion, delayed response, and a coast/braking tail.
 
     Active gait yaw follows the same 8 rad/s/s slew as the default Go2 gait.
@@ -48,7 +48,8 @@ def project_motion(position, yaw, velocity, yaw_rate, linear, angular, *,
     hold = 0. if idle else config.motion_horizon_s
     speed = max(float(np.linalg.norm(velocity)), float(np.linalg.norm(linear)))
     rate = params.command_yaw_acceleration
-    duration = hold + max(config.motion_settling_s, config.motion_reaction_s + max(
+    settling = 0. if idle and settled else config.motion_settling_s
+    duration = hold + max(settling, config.motion_reaction_s + max(
         speed / config.motion_braking_mps2, max(abs(yaw_rate), abs(angular)) / rate))
     dt = min(.02, max(.001, control_dt))
     count = max(1, math.ceil(duration / dt))
@@ -91,12 +92,14 @@ class MotionClearanceGuard:
         self._poses = deque()
         self._active_yaw = None
         self._restart_remaining = 0.
+        self._idle_elapsed = 0.
         self.last = ClearanceDecision(np.zeros(2), 0., "not_observed")
 
     def _remember_command(self, linear, angular, dt):
         _, _, _, self._active_yaw, self._restart_remaining = filter_gait_command(
             *linear, angular, float(np.clip(dt, .001, 1.)), self._active_yaw,
             self._restart_remaining, GaitParams())
+        self._idle_elapsed = self._idle_elapsed + dt if self._active_yaw is None else 0.
 
     def filter(self, linear, angular, *, pose, sim_time, observation_time, grid,
                radius, calibration_valid, tracking_ok):
@@ -105,6 +108,12 @@ class MotionClearanceGuard:
         control_dt = .01
         def stop(reason):
             self._remember_command(np.zeros(2), 0., control_dt)
+            if reason in {"invalid_state", "stale_pose", "missing_geometry_calibration",
+                          "tracking_lost", "stale_observation", "motion_model_exceeded",
+                          "initial_velocity_observation"}:
+                # Invalid or repeated timestamps cannot establish a physically
+                # completed settling interval. Require fresh idle history again.
+                self._idle_elapsed = 0.
             self.last = ClearanceDecision(np.zeros(2), 0., reason)
             return self.last
         if (pose.shape != (4, 4) or linear.shape != (2,) or not np.isfinite(pose).all()
@@ -142,6 +151,8 @@ class MotionClearanceGuard:
         yaw_rate = math.atan2(math.sin(yaw - yaw0), math.cos(yaw - yaw0)) / dt
         if np.linalg.norm(velocity) > 2. or abs(yaw_rate) > 5.:
             return stop("motion_model_exceeded")
+        settled = (self._idle_elapsed >= self.config.motion_settling_s
+                   and np.linalg.norm(velocity) < .01 and abs(yaw_rate) < .1)
         occupied = np.argwhere(grid.grid == CELL_OCCUPIED)
         centers = grid.origin + (occupied[:, ::-1] + .5) * grid.resolution
         tree = cKDTree(centers) if len(centers) else None
@@ -187,7 +198,8 @@ class MotionClearanceGuard:
         def project(v, omega, immediate=False):
             return project_motion(xy, yaw, velocity, yaw_rate, v, omega,
                                   active_yaw=self._active_yaw, config=self.config, control_dt=gap,
-                                  immediate_response=immediate, restart_wait=self._restart_remaining)
+                                  immediate_response=immediate, restart_wait=self._restart_remaining,
+                                  settled=settled)
         stopped, stop_times = project(np.zeros(2), 0.)
         stopping_clear, stop_reason, stop_clearance = check(stopped, stop_times)
         if not stopping_clear:

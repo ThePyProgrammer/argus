@@ -189,3 +189,37 @@ def test_idle_projection_keeps_posture_settling_after_translation_brakes():
     # Do not shorten the safety horizon just because the velocity model has
     # stopped: real leg repositioning can still translate the body.
     np.testing.assert_allclose(path[-1], path[-20])
+
+
+def test_settled_idle_does_not_repeat_a_posture_transition_but_restart_checks_it():
+    grid = room((0, .55))
+    guard = MotionClearanceGuard(ExplorationConfig())
+    for index in range(110):
+        decision = evaluate(guard, grid, time=index*.01)
+        if index == 1:
+            assert decision.reason == "stopping_obstacle_clearance"
+    assert decision.stopping_clear
+    assert decision.reason == "clear"
+    # Do not turn the idle exemption into permission to move inside the
+    # required transition envelope, even after a long stationary observation.
+    restart = evaluate(guard, grid, angular=1., time=1.10)
+    assert restart.angular == 0.
+    assert restart.reason == "obstacle_clearance"
+    assert restart.stopping_clear
+
+
+def test_idle_history_does_not_hide_current_measured_momentum():
+    grid = room((0, .7))
+    guard = MotionClearanceGuard(ExplorationConfig())
+    for index in range(110):
+        evaluate(guard, grid, time=index*.01)
+    moving = evaluate(guard, grid, time=1.10, body=pose(x=.10))
+    assert not moving.stopping_clear
+
+
+def test_stale_frames_cannot_accumulate_a_settled_idle_exemption():
+    grid = room((0, .55))
+    guard = primed(grid)
+    for _ in range(150):
+        assert evaluate(guard, grid, time=0.).reason == "stale_pose"
+    assert not evaluate(guard, grid, time=.01).stopping_clear
