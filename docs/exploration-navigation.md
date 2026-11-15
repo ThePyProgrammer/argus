@@ -98,11 +98,32 @@ The [Issue #3 geometry audit](notes/exploration-geometry-envelope-validation.md)
 
 The remaining work is tracked separately:
 
-- [#4: execution clearance](https://github.com/ThePyProgrammer/argus/issues/4): check swept motion using estimated/sensed inputs, including the active gait's yaw response delay, stopping behavior, body drift, and an explicit policy for leaving #3's certified joint range.
+The [development execution guard](notes/exploration-motion-clearance-validation.md)
+now checks every exploration command against observed occupancy and a modeled
+stopping tail. Planning and execution use an unrestricted all-joint collision
+bound (0.658494 m before margin/raster allowance), avoiding an online assumption
+about #3's knee interval. Missing calibration or stale state stops motion.
+The affected suite passed 775 tests with seven skips. This implementation does
+not establish arbitrary-drift safety, accurate maps, or successful recovery;
+live validation and limitations are recorded in that note.
+
+Fresh guarded runs reached 10 s in clutter (36.7320% coverage) and 5 s in
+connected rooms (76.5202%). Sampled camera stand-off remained above 0.15 m,
+but each run recorded a rear-calf floor contact. Clutter stopped issuing motion
+well before its horizon and repeatedly replanned nominally reachable routes.
+Issue #4 remains open for restart/stopping dynamics; #5 owns bounded recovery
+from execution rejection. The validation note preserves both videos, exact
+contact severity, and offline reproductions. These are not clean safety passes.
+
+- [#4: execution clearance](https://github.com/ThePyProgrammer/argus/issues/4): validate the new swept-motion guard's physical response, stopping behavior, clearance and progress with estimated maps.
 - [#5: blocked-start recovery](https://github.com/ThePyProgrammer/argus/issues/5): replan and recover without bypassing the execution clearance check or stopping a productive teammate.
 - [#6: pose and map error](https://github.com/ThePyProgrammer/argus/issues/6): separate localization drift from floor/map errors and establish limits across development seeds and longer runs using the corrected gait.
 
-Use #3's declared geometry range in #4, and implement #4's checks before enabling #5's recovery motion. Diagnose #6 alongside that work. The severity thresholds remain development defaults; the contact fixes and geometry certificate do not establish general collision safety or readiness for allocator comparisons.
+Runtime uses #3's derivation extended to unrestricted knee rotation. Keep #4's
+checks on every #5 recovery proposal and diagnose #6 alongside that work. The
+severity thresholds remain development defaults; the contact fixes and geometry
+certificate do not establish general collision safety or readiness for allocator
+comparisons.
 
 The original one-second checks resolved the first-scan failure but triggered recovery on every robot. The simulated-time correction below removes that false trigger. The [longer-run diagnostic](notes/exploration-recovery-validation.md) records subsequent contacts and the stale-path failure corrected above. Sustained exploration, controller safety, and long-horizon repeatability remain gates before the comparison campaign.
 

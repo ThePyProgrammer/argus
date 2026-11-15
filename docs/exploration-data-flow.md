@@ -1,6 +1,6 @@
 # How data moves through the current Argus exploration experiment
 
-Checked against the implementation on November 11, 2026, after Issue #3.
+Updated November 14, 2026 for the development execution guard in Issue #4.
 This guide describes `ExplorationEpisode.from_scenario()` and
 `scripts/validate_exploration.py`. Optional dashboard pipelines can be configured
 differently. The [evaluation plan](plans/exploration-evaluation.md) also contains
@@ -63,7 +63,11 @@ flowchart TD
     A --> R
     R --> U["Waypoint follower: body-frame speed and yaw commands"]
     B --> U
-    U --> J["Trot gait: 12 joint position targets"]
+    U --> GU["Execution guard: predicted motion and stopping clearance"]
+    M --> GU
+    B --> GU
+    CAL["Fixed all-joint collision envelope"] --> GU
+    GU --> J["Trot gait: 12 joint position targets"]
     J --> W
 ```
 
@@ -77,6 +81,7 @@ appear in the scan.
 
 The bridge packages a [SensorFrame](../src/bridge/sensor_types.py) containing RGB,
 depth, simulated capture time, the fixed camera-to-body mounting calibration,
+an all-joint collision-radius calibration derived from the Go2 model,
 and the true camera pose. The true pose's presence in that container does not
 mean every consumer is allowed to use it for navigation.
 
@@ -205,14 +210,23 @@ costs, followed by smoothing and continuous segment checks.
 
 **Unknown cells are currently traversable at a penalty in A*.** A free frontier
 goal does not imply that every cell along its route was directly observed free.
-This policy and the existing blocked-start/fallback behavior matter when designing
-the execution checks in #4 and recovery in #5.
+The execution guard rejects predicted center travel through unknown cells, so
+such a route can be rejected during execution. Resolving repeated blocked routes
+without unsafe motion remains part of #5.
 
 The follower uses the estimated body pose to output forward/lateral velocity
-and yaw rate. It turns in place when heading error is too large. The Go2 gait
-converts that command into 12 joint position targets, including the active-yaw
+and yaw rate. It turns in place when heading error is too large. Every exploration
+proposal, including bootstrap and recovery, then passes through a
+[motion guard](../src/control/motion_clearance.py). It estimates velocity from
+recent body-pose estimates and checks predicted motion plus a reaction/braking
+tail against observed obstacles. It can reduce or stop commands. Missing static
+geometry calibration, stale observations, tracking loss, and unsupported lateral
+commands stop motion. The Go2 gait converts accepted commands into 12 joint
+position targets, including the active-yaw
 slew limit introduced for #2. MuJoCo applies actuator forces and advances the
-robot. Actual motion can differ from the requested motion because of dynamics,
+robot. The guard's dynamics and drift allowances are development assumptions;
+they do not bound arbitrary localization or actuator error. Actual motion can
+differ from the requested motion because of dynamics,
 tracking error, or contact; the next observation closes the loop.
 
 ## What is shared between robots
@@ -350,16 +364,19 @@ Several different errors can interrupt this chain:
 - Floor misclassification creates false obstacles or false free-space evidence
   even when pose estimation is adequate (#6).
 - A cleared path does not constrain the actual swept motion during a turn,
-  stop, bootstrap movement, or recovery (#4).
+  stop, bootstrap movement, or recovery. The new guard checks a motion model,
+  whose agreement with actual execution still needs validation (#4).
 - A robot can become blocked under inflation and need a checked replan or
   recovery, even if the obstacle observations are correct (#5).
 
 #1 made contact measurements more informative. #2 corrected a specific gait
 transition defect. #3 verified the current body/camera envelope within a declared
 joint range. Those changes support the study; they do not yet establish safe,
-sustained exploration or an allocation advantage. #4 is the next connection to
-build: using the available state and obstacle representation to check the
-movement actually being commanded.
+sustained exploration or an allocation advantage. The development #4 guard now
+connects the observed map and estimated motion to command acceptance. It uses a
+larger unrestricted joint envelope instead of assuming #3's knee range remains
+satisfied. See the [execution validation](notes/exploration-motion-clearance-validation.md)
+for evidence and remaining limitations.
 
 ## A practical reading order
 
@@ -373,4 +390,4 @@ movement actually being commanded.
 Use the [navigation guide](exploration-navigation.md) for current control behavior,
 the [measurement contract](exploration-measurements.md) for scoring details, and
 the [geometry audit](notes/exploration-geometry-envelope-validation.md) for the
-conditional envelope that #4 must respect.
+conditional envelope and the subsequent unrestricted runtime bound.
