@@ -32,7 +32,8 @@ class ExplorationConfig:
     motion_horizon_s: float = 0.30       # hold command, then include a stopping tail
     motion_reaction_s: float = 0.10      # motion persists before braking takes effect
     motion_braking_mps2: float = 1.0     # development model, requires physical validation
-    motion_drift_mps: float = 0.05       # transverse tracking allowance over projection
+    motion_settling_s: float = 1.0      # include posture settling after the stop request
+    motion_drift_mps: float = 0.20       # empirical posture/velocity uncertainty allowance
     motion_observation_max_age_s: float = 0.15
     motion_pose_max_gap_s: float = 0.15
 

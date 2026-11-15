@@ -185,7 +185,7 @@ class ExplorationEpisode:
                                    "camera_calibration": "integer_pixel_centers_v2",
                                    "planning_free_space": "observed_floor_and_trajectory_v1",
                                    "planning_clearance": "body_camera_envelope_single_raster_v3",
-                                   "execution_clearance": "observed_pose_swept_stop_restart_v2",
+                                   "execution_clearance": "observed_pose_swept_stop_settling_v3",
                                    "execution_geometry": "all_joint_rotations_static_calibration_v1",
                                    "path_following": "align_heading_before_translation_v1",
                                    "recovery_rule": "commanded_progress_sim_time_v1"})

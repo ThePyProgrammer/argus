@@ -53,7 +53,7 @@ class GaitParams:
     restart_settle_s: float = 0.08
     """Minimum standing-command interval after interrupting an active gait.
 
-    A stop is immediate; a subsequent restart waits for the remainder of this
+    The standing target is immediate; a restart waits for the remainder of this
     interval. Initial motion and uninterrupted active commands have no delay.
     This is a development dynamics allowance, not a sensed stability guarantee.
     """

@@ -63,8 +63,8 @@ def test_near_wall_rejects_motion_without_shrinking_geometry():
     grid = room((0, .45))
     result = evaluate(primed(grid), grid, (.8, 0.))
     assert not result.linear.any()
-    assert result.reason == "obstacle_clearance"
-    assert result.stopping_clear
+    assert result.reason == "stopping_obstacle_clearance"
+    assert not result.stopping_clear
 
 
 def test_explicit_idle_does_not_erase_measured_momentum():
@@ -148,7 +148,7 @@ def test_pose_jump_outside_declared_model_stops():
     assert result.reason == "motion_model_exceeded"
 
 
-@pytest.mark.parametrize("name", ["motion_horizon_s", "motion_reaction_s", "motion_braking_mps2"])
+@pytest.mark.parametrize("name", ["motion_horizon_s", "motion_reaction_s", "motion_braking_mps2", "motion_settling_s"])
 def test_invalid_motion_model_parameters_are_rejected(name):
     with pytest.raises(ValueError):
         MotionClearanceGuard(replace(ExplorationConfig(), **{name:0.}))
@@ -179,3 +179,13 @@ def test_projection_includes_restart_standing_time_without_erasing_momentum():
     args.update(velocity=[.4, 0.], immediate_response=False)
     coasting, times = project_motion(**args, restart_wait=.08)
     assert coasting[5, 0] > .01
+
+
+def test_idle_projection_keeps_posture_settling_after_translation_brakes():
+    config = ExplorationConfig()
+    path, times = project_motion([0., 0.], 0., [.1, 0.], 0., np.zeros(2), 0.,
+                                 active_yaw=None, config=config, control_dt=.01)
+    assert times[-1] >= config.motion_settling_s
+    # Do not shorten the safety horizon just because the velocity model has
+    # stopped: real leg repositioning can still translate the body.
+    np.testing.assert_allclose(path[-1], path[-20])

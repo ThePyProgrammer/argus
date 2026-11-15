@@ -48,8 +48,8 @@ def project_motion(position, yaw, velocity, yaw_rate, linear, angular, *,
     hold = 0. if idle else config.motion_horizon_s
     speed = max(float(np.linalg.norm(velocity)), float(np.linalg.norm(linear)))
     rate = params.command_yaw_acceleration
-    duration = hold + config.motion_reaction_s + max(
-        speed / config.motion_braking_mps2, max(abs(yaw_rate), abs(angular)) / rate)
+    duration = hold + max(config.motion_settling_s, config.motion_reaction_s + max(
+        speed / config.motion_braking_mps2, max(abs(yaw_rate), abs(angular)) / rate))
     dt = min(.02, max(.001, control_dt))
     count = max(1, math.ceil(duration / dt))
     dt = max(duration, dt) / count
@@ -84,7 +84,7 @@ class MotionClearanceGuard:
     def __init__(self, config):
         self.config = config
         for name in ("motion_horizon_s", "motion_reaction_s", "motion_braking_mps2",
-                     "motion_drift_mps", "motion_observation_max_age_s", "motion_pose_max_gap_s"):
+                     "motion_settling_s", "motion_drift_mps", "motion_observation_max_age_s", "motion_pose_max_gap_s"):
             value = getattr(config, name)
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")

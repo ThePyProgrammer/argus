@@ -82,6 +82,11 @@ def test_go2_idle_modes_clear_suspended_swing_before_restart(mode):
     controller.compute(walking, state, dt=.1)
     np.testing.assert_allclose(controller.compute(RobotCommand(mode=mode), state, dt=.01), STANDING_QPOS)
 
+    # The stop takes effect immediately; an early restart must finish the
+    # 80 ms standing interval before a new swing begins.
+    for _ in range(7):
+        np.testing.assert_allclose(controller.compute(walking, state, dt=.01), STANDING_QPOS)
+
     fresh = platform.make_controller("robot_a")
     np.testing.assert_allclose(controller.compute(walking, state, dt=.01),
                                fresh.compute(walking, state, dt=.01))
