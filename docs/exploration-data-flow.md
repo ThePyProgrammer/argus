@@ -1,6 +1,6 @@
 # How data moves through the current Argus exploration experiment
 
-Updated November 14, 2026 for the development execution guard in Issue #4.
+Updated November 15, 2026 for execution guarding and restart/stopping dynamics.
 This guide describes `ExplorationEpisode.from_scenario()` and
 `scripts/validate_exploration.py`. Optional dashboard pipelines can be configured
 differently. The [evaluation plan](plans/exploration-evaluation.md) also contains
@@ -228,6 +228,16 @@ robot. The guard's dynamics and drift allowances are development assumptions;
 they do not bound arbitrary localization or actuator error. Actual motion can
 differ from the requested motion because of dynamics,
 tracking error, or contact; the next observation closes the loop.
+
+After an active gait is interrupted, the controller requests standing immediately
+and waits out an 80 ms standing-command interval before restarting. Initial motion
+has no added wait. The predictor shares that command-transition logic and retains
+a one-second settling tail with a calibrated drift allowance for body motion
+during leg repositioning. After a full standing interval and low observed motion,
+remaining idle no longer invents another posture transition; a new movement still
+gets the full check. These are distinct from the planning geometry radius;
+see [restart and stopping validation](notes/exploration-restart-settling-validation.md)
+for the measured limits and effect on available motion.
 
 ## What is shared between robots
 

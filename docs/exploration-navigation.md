@@ -29,11 +29,11 @@ max(footprint radius, camera mount offset norm + camera stand-off)
 
 Defaults are a nominal 0.35 m Go2 footprint radius, 0.15 m camera stand-off, and 0.05 m planning margin. The mount comes from fixed calibration, not a simulator world pose. Its full 3D offset norm bounds horizontal camera reach during body tilt. The raster allowance encloses an occupied cell's half-diagonal. With the Go2 mount, the center-to-center exclusion is 0.638468 m at 0.05 m resolution and 0.673824 m at 0.10 m resolution. A missing mount retains the legacy coincident camera/body convention; it does not inherit the Go2 containment certificate below.
 
-Goal filtering and A* share this envelope. Diagonal moves require both orthogonal neighbors to be passable. Smoothed paths retain both endpoints and reject touched raw occupied cells, including boundaries and corner contacts. Each continuous segment is checked against the exclusion disks around occupied-cell centers. Inflated cells are not treated as additional obstacles in that continuous check: doing so previously added a position-dependent raster allowance. Out-of-bounds points remain invalid. A failed check uses the unsmoothed A* route. The existing start-cell escape exception remains: an occupied or inflated start can step directly to a passable neighbor; it cannot make an inflated goal valid. That exception and fallback are not a safe-execution guarantee; #4 and #5 still need to address them.
+Goal filtering and A* share this envelope. Diagonal moves require both orthogonal neighbors to be passable. Smoothed paths retain both endpoints and reject touched raw occupied cells, including boundaries and corner contacts. Each continuous segment is checked against the exclusion disks around occupied-cell centers. Inflated cells are not treated as additional obstacles in that continuous check: doing so previously added a position-dependent raster allowance. Out-of-bounds points remain invalid. A failed check uses the unsmoothed A* route. The existing start-cell escape exception remains: an occupied or inflated start can step directly to a passable neighbor; it cannot make an inflated goal valid. Neither exception bypasses #4's execution guard. Bounded recovery when execution rejects the resulting route remains under #5.
 
 The [articulated geometry audit](notes/exploration-geometry-envelope-validation.md) verifies the existing camera-inclusive physical circle (0.553113 m) against a 0.549220 m continuous bound on all 23 collision primitives, including contact margins. It permits any body attitude and hip/thigh rotation, with calf joints in [-2.7227, -1.5] radians. Default gait targets and the sampled corrected replay lie within that knee interval. The nominal 0.35 m radius alone fails even for standing calf geometry; more extended knees can exceed the camera-inclusive circle too. The certificate is conditional and does not monitor joint states online. Changing geometry, mounting, stand-off, or gait range requires another audit.
 
-This remains a conservative planning constraint on the observed map and can reject narrow passages. The margin is not a bound on localization error. Unknown obstacles, stale observations, departures from a planned route, and motion outside the certified joint range remain execution concerns under #4. Tracking acceptance thresholds and the coverage reference are unchanged. Episode provenance records `planning_clearance: body_camera_envelope_single_raster_v3`.
+This remains a conservative planning constraint on the observed map and can reject narrow passages. The margin is not a bound on localization error. The current execution guard stops on stale observations, checks projected motion, and replaces the conditional joint bound with the unrestricted sphere described below. Unknown obstacles and pose/map error remain limitations. Tracking acceptance thresholds and the coverage reference are unchanged. Episode provenance records `planning_clearance: body_camera_envelope_single_raster_v3`.
 
 Exploration turns in place when heading error to the route exceeds `forward_heading_tolerance_rad`, default 0.25 radians. It resumes forward travel after alignment. This applies to both planned paths and explicit exploration waypoint targets. Small heading corrections retain simultaneous steering and forward motion. The [clearance validation](notes/exploration-camera-clearance-validation.md) records why clearance inflation alone was insufficient. Episode provenance records `path_following: align_heading_before_translation_v1`.
 
@@ -42,8 +42,9 @@ This bounds the abrupt hip-abduction and differential-stride changes during a
 turn-to-walk transition that reproduced a rear-calf floor strike. It introduces
 a short yaw response delay; translation commands and constant-command targets
 retain their existing behavior. Explicit idle returns the standing pose and
-clears both phase and yaw history immediately. The first moving command starts
-at its requested yaw. Crossing zero yaw during an active reversal keeps the
+clears both phase and yaw history immediately. After idle interrupts motion,
+the gait waits for a total 80 ms standing-command interval before restarting.
+The first moving gait target starts at its requested yaw. Crossing zero yaw during an active reversal keeps the
 gait phase running. This is a development transition limit, not an attitude-aware
 whole-leg clearance guarantee. Episode provenance records
 `gait_transition_rule: bounded_active_yaw_slew_v1`. The
@@ -96,8 +97,6 @@ The subsequent [contact measurement validation](notes/contact-severity-validatio
 
 The [Issue #3 geometry audit](notes/exploration-geometry-envelope-validation.md) establishes conditional articulated containment and tests corners, diagonals, narrow passages, and body/camera frame consistency at both 0.05 and 0.10 m resolution. The existing circle is retained, and continuous segment checks no longer add an extra traversed-cell allowance. Validation passed 537 distinct tests with four skips across the affected suite and one added fixture. A fresh connected-room seed-101 run reached 5.00 s with 74.909693% coverage and zero non-foot contacts, falls, recovery entries, or planning failures. All 500 commands and 501 trajectory samples exactly match the preceding gait-corrected run; this case shows preserved behavior, not a coverage gain.
 
-The remaining work is tracked separately:
-
 The [development execution guard](notes/exploration-motion-clearance-validation.md)
 now checks every exploration command against observed occupancy and a modeled
 stopping tail. Planning and execution use an unrestricted all-joint collision
@@ -107,15 +106,34 @@ The affected suite passed 775 tests with seven skips. This implementation does
 not establish arbitrary-drift safety, accurate maps, or successful recovery;
 live validation and limitations are recorded in that note.
 
-Fresh guarded runs reached 10 s in clutter (36.7320% coverage) and 5 s in
+The initial guarded runs reached 10 s in clutter (36.7320% coverage) and 5 s in
 connected rooms (76.5202%). Sampled camera stand-off remained above 0.15 m,
 but each run recorded a rear-calf floor contact. Clutter stopped issuing motion
 well before its horizon and repeatedly replanned nominally reachable routes.
-Issue #4 remains open for restart/stopping dynamics; #5 owns bounded recovery
-from execution rejection. The validation note preserves both videos, exact
-contact severity, and offline reproductions. These are not clean safety passes.
+These historical failures led to the restart/stopping correction below. The
+validation note preserves both videos, exact contact severity, and offline
+reproductions. Those initial attempts are not clean safety passes.
 
-- [#4: execution clearance](https://github.com/ThePyProgrammer/argus/issues/4): validate the new swept-motion guard's physical response, stopping behavior, clearance and progress with estimated maps.
+The [restart and stopping follow-up](notes/exploration-restart-settling-validation.md)
+completes [#4's development execution-clearance scope](https://github.com/ThePyProgrammer/argus/issues/4).
+An 80 ms standing interval removes the reproduced restart contacts. The shared
+gait/guard command filter models that interval and active yaw slew. A one-second
+posture-settling horizon with 0.20 m/s growing drift allowance covers 75 physical
+stopping fixtures. Settled idle is recognized after one second of standing and
+low estimated velocity; every new movement still reserves the full tail.
+The affected suite passes **900 tests with seven skips**.
+
+The latest connected-room run reaches **5.00/5.00 s, 77.1523% coverage**, and the
+latest clutter run reaches **10.00/10.00 s, 31.2745% coverage**, both with zero
+non-foot contacts or falls and verified videos. Minimum sampled static-obstacle
+camera stand-off is 0.71833 m and 0.57511 m respectively. These sampled distances
+are not continuous-time clearance certificates. Clutter A stops moving after
+3.22 s, B never moves, and candidate selection repeats 1654 times despite zero
+failed A* attempts. The larger stopping reserve improves the measured contact
+outcome while reducing clutter coverage; sustained exploration is still unresolved.
+
+The remaining work is tracked separately:
+
 - [#5: blocked-start recovery](https://github.com/ThePyProgrammer/argus/issues/5): replan and recover without bypassing the execution clearance check or stopping a productive teammate.
 - [#6: pose and map error](https://github.com/ThePyProgrammer/argus/issues/6): separate localization drift from floor/map errors and establish limits across development seeds and longer runs using the corrected gait.
 

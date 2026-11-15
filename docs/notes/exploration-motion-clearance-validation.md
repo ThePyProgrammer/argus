@@ -3,6 +3,10 @@
 November 14, 2026. This is a development guard, not a general collision-safety
 certificate. Live results and the remaining acceptance work are recorded below.
 
+The [November 15 follow-up](exploration-restart-settling-validation.md) records
+the restart correction and the expanded physical stopping envelope. The parameters
+and failed attempts below describe the original `1646b07` guard revision.
+
 ## Runtime changes
 
 All `ExplorationLoop.step_once` proposals pass through `MotionClearanceGuard`:
