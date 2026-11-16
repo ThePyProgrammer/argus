@@ -88,11 +88,17 @@ class BlockedNavigation:
     def next_action(self, now):
         if self.state != "blocked" or now + 1e-9 < self.ready_at:
             return None
-        if self.replans < self.config.blocked_max_replans and self.replans - self.last_recovery_replans < 2:
+        # Reserve a route check after every permitted recovery. A small custom
+        # replan budget reduces the recovery count rather than moving with no
+        # remaining chance to use the resulting pose or observations.
+        recovery_limit = min(self.config.blocked_max_recoveries, self.config.blocked_max_replans - 1)
+        reserved_replans = recovery_limit - self.recoveries
+        if (self.replans < self.config.blocked_max_replans - reserved_replans
+                and self.replans - self.last_recovery_replans < 2):
             self.replans += 1
             self.state, self.reason = "replanning", "retry_route"
             return "replan"
-        if self.recoveries >= self.config.blocked_max_recoveries:
+        if self.recoveries >= recovery_limit:
             self.fail("retry_budget_exhausted")
             return None
         self.recoveries += 1
