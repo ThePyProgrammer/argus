@@ -95,6 +95,17 @@ class MotionClearanceGuard:
         self._idle_elapsed = 0.
         self.last = ClearanceDecision(np.zeros(2), 0., "not_observed")
 
+    def preview(self, linear, angular, **state):
+        """Evaluate a candidate without consuming observation or gait history.
+
+        The selected proposal must still pass filter on the actual guard. This
+        avoids treating multiple alternatives at one timestamp as stale poses.
+        """
+        import copy
+        candidate = copy.copy(self)
+        candidate._poses = self._poses.copy()
+        return candidate.filter(linear, angular, **state)
+
     def _remember_command(self, linear, angular, dt):
         _, _, _, self._active_yaw, self._restart_remaining = filter_gait_command(
             *linear, angular, float(np.clip(dt, .001, 1.)), self._active_yaw,

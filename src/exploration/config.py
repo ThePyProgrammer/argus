@@ -43,6 +43,15 @@ class ExplorationConfig:
     stuck_distance_m: float = 0.05        # net planar displacement resets the timeout
     stuck_angle_rad: float = 0.1         # yaw progress for pure rotation commands
     recovery_reverse_duration_s: float = 0.25
+    blocked_timeout_s: float = 12.0      # includes settling, replanning, and recovery
+    blocked_retry_s: float = 1.0
+    blocked_max_replans: int = 4
+    blocked_max_recoveries: int = 2
+    planning_candidate_limit: int = 32
+    recovery_motion_timeout_s: float = 1.5
+    recovery_distance_m: float = 0.10
+    recovery_angle_rad: float = 0.35
+    navigation_resume_distance_m: float = 0.15
 
     # Frontier detection
     voxel_resolution: float = 0.05        # must match OctoMapBuilder

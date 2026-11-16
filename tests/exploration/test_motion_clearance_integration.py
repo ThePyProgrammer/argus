@@ -30,7 +30,7 @@ def test_every_exploration_motion_path_uses_estimated_pose_and_guard(monkeypatch
     if source == "waypoint":
         loop.set_waypoint_target([np.array([2., 0., 0.])])
     elif source == "recovery":
-        loop._stuck_recovery.trigger()
+        loop._blocked.start_recovery((-.2, 0., 0.), pose(), .05)
     linear, angular, metrics = loop.step_once(frame(.05), 1)
     decision = loop.measurement_state["motion_clearance"]
     assert loop._path_planner._clearance_radius == pytest.approx(
@@ -39,7 +39,7 @@ def test_every_exploration_motion_path_uses_estimated_pose_and_guard(monkeypatch
         assert not linear.any() and angular == 0
         assert decision["reason"] == "stopping_obstacle_clearance"
         assert loop._current_waypoint_runner is None
-        assert not loop._stuck_recovery.is_active
+        assert not loop.measurement_state["recovering"]
     else:
         assert linear[0] < 0 if source == "recovery" else linear[0] > 0
         assert decision["stopping_clear"]

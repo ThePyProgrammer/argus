@@ -215,7 +215,8 @@ def test_already_reached_frontier_cells_cannot_reinstall_completed_paths(has_dis
         plan.assert_called_once()
         np.testing.assert_allclose(plan.call_args.args[1], [1., 0., 0.])
     else:
-        assert metrics.terminated and loop.measurement_state["navigation_exhausted"]
+        assert not metrics.terminated
+        assert loop.measurement_state["navigation"]["state"] == "blocked"
         assert not np.any(linear)
         plan.assert_not_called()
 
@@ -285,22 +286,23 @@ def test_failed_rescan_discards_route_and_stays_idle_until_success(failure, monk
 
     linear, angular, metrics = advance(31)
     np.testing.assert_array_equal(linear, [0., 0.])
-    assert angular == 0 and metrics.terminated
+    assert angular == 0 and metrics.terminated == (failure == "no_frontiers")
     assert loop._current_waypoint_runner is None
     assert loop.measurement_state["goal_id"] is None
 
     # Even if rescans are delayed, idle must persist beyond the recovery timeout.
     scan.return_value = False
-    for step in range(32, 57):
+    for step in range(32, 40):
         linear, angular, metrics = advance(step)
         np.testing.assert_array_equal(linear, [0., 0.])
-        assert angular == 0 and metrics.terminated
+        assert angular == 0 and metrics.terminated == (failure == "no_frontiers")
         assert not loop.measurement_state["recovering"]
 
     scan.return_value = True
     detector.return_value = [_make_cluster([0., 3., 0.])]
     planner.side_effect = lambda start, goal, grid: [start, goal]
-    linear, angular, metrics = advance(57)
+    for step in range(40, 48):
+        linear, angular, metrics = advance(step)
     # The replacement route is to the left: resume by turning, not walking an arc.
     np.testing.assert_array_equal(linear, [0., 0.])
     assert angular > 0 and not metrics.terminated
@@ -414,22 +416,22 @@ def test_coordinator_keeps_exhausted_robot_idle_while_teammate_moves(absorbing, 
 
 def test_recovery_does_not_accumulate_another_stuck_timeout():
     loop = ExplorationLoop(MockBridge(), MockSLAM(), MockOctoMap(),
-                           ExplorationConfig(stuck_timeout_s=.2, recovery_reverse_duration_s=.1))
-    recovering = []
-    for step in range(29):
+                           ExplorationConfig(stuck_timeout_s=.2))
+    loop.frontier_detector.detect = lambda *a, **kw: [_make_cluster([3., 0., 0.])]
+    loop._path_planner.plan = lambda *a: None
+    states = []
+    for step in range(150):
         frame = _make_sensor_frame()
         frame.sim_time = step * .1
-        linear, _, _ = loop.step_once(frame, step)
-        active = loop.measurement_state["recovering"]
-        recovering.append(active)
-        if active:
+        loop.step_once(frame, step)
+        state = loop.measurement_state["navigation"]["state"]
+        states.append(state)
+        if state in {"blocked", "recovering", "replanning", "failed"}:
             assert loop._progress.no_progress_steps == 0
-        if step == 3:
-            assert active
-            assert linear[0] < 0  # Recover on the triggering frame.
-    completion = next(i for i in range(4, len(recovering)) if not recovering[i])
-    assert not any(recovering[completion:completion + 3])
-    assert recovering[completion + 3]
+    assert states[3] == "blocked"  # Settle before bounded replanning/recovery.
+    assert "recovering" in states
+    assert states[-1] == "failed"
+    assert loop.measurement_state["navigation"]["recovery_attempts"] <= 2
 
 
 @pytest.mark.parametrize("timestamp", [0., -.1, float("nan"), float("inf")])
@@ -556,7 +558,7 @@ class TestExplorationLoop:
              patch.object(loop._path_planner, "plan", return_value=None):
             result = loop.run()
 
-        assert result.terminated_reason == "all_unreachable"
+        assert result.terminated_reason == "navigation_failed"
 
     def test_max_steps(self) -> None:
         """Loop terminates when max_steps reached."""
@@ -801,7 +803,8 @@ def test_skill_learning_enabled_unreachable_frontier_records_failure_outcome() -
 
     records = [json.loads(line) for line in loop.skill_trace_jsonl().splitlines()]
     outcome = records[-1]["outcome"]
-    assert metrics.terminated is True
+    assert metrics.terminated is False
+    assert loop.measurement_state["navigation"]["state"] == "blocked"
     assert metrics.frontiers == 1
     assert records[-1]["decision"]["selected_skill_id"] != "baseline"
     assert outcome["termination"] == "failure"
@@ -842,7 +845,7 @@ class TestStuckRecovery:
              ]):
             # Run enough simulated time to trigger recovery.
             frame = bridge.start()
-            for step in range(30):
+            for step in range(120):
                 linear_vel, angular_vel, metrics = loop.step_once(frame, step)
                 bridge.set_velocity(linear_vel, angular_vel)
                 frame = bridge.step()

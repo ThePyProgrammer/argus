@@ -270,6 +270,48 @@ def test_disabled_robot_stays_stopped_while_survivor_continues():
         assert run.coverage.snapshot()["sensor_frames"] == {"robot_a": 1, "robot_b": 3}
 
 
+def test_navigation_failure_is_local_and_teammate_reaches_horizon():
+    with episode() as run:
+        trapped = run.coordinator.robots["robot_a"].exploration
+        trapped._blocked.fail("no_safe_recovery")
+        while run.inspect()["state"] == "running":
+            run.advance()
+        state = run.inspect(include_history=True)
+        assert state["result"]["termination_reason"] == "horizon"
+        assert state["result"]["elapsed_s"] == .04
+        for command in state["commands"]:
+            assert command["commands"]["robot_a"]["linear"] == [0., 0.]
+            assert command["commands"]["robot_a"]["yaw_rate"] == 0.
+        assert any(abs(c["commands"]["robot_b"]["linear"][0]) > 0 for c in state["commands"])
+
+
+def test_recovery_time_uses_shared_physics_clock_and_horizon():
+    with episode() as run:
+        run.advance()  # Establish velocity history first.
+        for robot in run.coordinator.robots.values():
+            loop = robot.exploration
+            loop._blocked.block("fixture_route_blocked", .01)
+            loop._blocked.start_recovery((-.2, 0., 0.), loop._navigation_pose, .01)
+        while run.inspect()["state"] == "running":
+            run.advance()
+        state = run.inspect(include_history=True)
+        assert state["result"]["termination_reason"] == "horizon"
+        assert state["elapsed_s"] == .04
+        assert len(state["commands"]) == 4
+        assert state["result"]["contact_measurements"]["physics_steps"] == 20
+        assert any(n["state"] == "recovering" for c in state["commands"] for n in c["navigation"].values())
+
+
+def test_all_navigation_failures_are_reported_as_failure_not_exhaustion():
+    with episode() as run:
+        for robot in run.coordinator.robots.values():
+            robot.exploration._blocked.fail("no_safe_recovery")
+        state = run.advance()
+        assert state["result"]["termination_reason"] == "navigation_failed"
+        assert state["elapsed_s"] == 0.
+        assert all(n["reason"] == "no_safe_recovery" for n in state["result"]["navigation"].values())
+
+
 def test_cleanup_continues_after_a_resource_fails():
     run = episode()
     run.start()

@@ -19,7 +19,7 @@ from src.metrics.exploration_reference import ReferenceGrid
 
 COVERAGE_VERSION = "floor-depth-support-v2"
 TERMINATION_REASONS = frozenset({
-    "horizon", "no_frontiers", "all_unreachable", "all_robots_failed", "algorithm_error",
+    "horizon", "no_frontiers", "all_unreachable", "all_robots_failed", "algorithm_error", "navigation_failed",
 })
 
 

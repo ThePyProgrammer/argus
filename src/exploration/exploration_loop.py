@@ -15,6 +15,7 @@ Supports two modes:
 
 import logging
 import time
+from itertools import islice
 from dataclasses import dataclass
 from typing import Callable, TYPE_CHECKING
 
@@ -38,6 +39,7 @@ class StepMetrics:
     rescan_triggered: bool
     error: str | None = None
 from src.exploration.config import ExplorationConfig
+from src.exploration.blocked_navigation import BlockedNavigation
 from src.exploration.coverage_tracker import CoverageTracker, ExplorationResult
 from src.exploration.frontier_detector import FrontierDetector
 from src.exploration.floor_filter import FloorFilter, FloorTracker
@@ -167,6 +169,8 @@ class ExplorationLoop:
         self._config = config or ExplorationConfig()
         from src.control.motion_clearance import MotionClearanceGuard
         self._motion_guard = MotionClearanceGuard(self._config)
+        self._blocked = BlockedNavigation(self._config)
+        self._recovery_checks = {}
         self._last_observation_time = None
         self._navigation_pose = np.eye(4)
         self._execution_radius = self._config.planning_radius(0., self._config.voxel_resolution)
@@ -184,7 +188,7 @@ class ExplorationLoop:
             min_cluster_size=self._config.min_cluster_size,
         )
         self._goal_selector = GoalSelector(strategy=self._config.goal_strategy)
-        self._path_planner = PathPlanner(clearance_radius=self._config.planning_radius(
+        self._path_planner = PathPlanner(allow_unknown=False, clearance_radius=self._config.planning_radius(
             0., self._config.voxel_resolution))
         self._coverage_tracker = CoverageTracker(
             voxel_resolution=self._config.voxel_resolution,
@@ -201,8 +205,6 @@ class ExplorationLoop:
                                          self._config.stuck_distance_m,
                                          self._config.stuck_angle_rad)
         self._last_command = (np.zeros(2), 0.0)
-        self._stuck_recovery = StuckRecovery(
-            rng=recovery_rng, reverse_duration_s=self._config.recovery_reverse_duration_s)
         if frame_dt is not None and (not np.isfinite(frame_dt) or frame_dt <= 0):
             raise ValueError("Frame interval must be finite and positive")
         self._frame_dt = frame_dt
@@ -244,7 +246,8 @@ class ExplorationLoop:
     @property
     def measurement_state(self) -> dict:
         """Detached decision diagnostics; no evaluator state enters navigation."""
-        return {"recovering": self._stuck_recovery.is_active,
+        return {"recovering": self._blocked.state == "recovering",
+                "navigation": {**self._blocked.snapshot(), "recovery_checks": dict(self._recovery_checks)},
                 "navigation_exhausted": self._navigation_exhausted,
                 "goal_id": self._goal_id if self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete else None,
@@ -297,6 +300,7 @@ class ExplorationLoop:
         )
         self._bootstrap_complete = True
         self._navigation_exhausted = False
+        self._blocked = BlockedNavigation(self._config)
         self._goal_id = ",".join(format(float(v), ".9g") for v in waypoints[-1])
 
     def skill_trace_jsonl(self) -> str:
@@ -373,44 +377,21 @@ class ExplorationLoop:
 
     def _check_stuck(
         self, step: int, pose: np.ndarray, sim_time: float,
-    ) -> tuple[bool, tuple[np.ndarray, float, StepMetrics] | None]:
-        """Check commanded progress; recovery gets its own fresh time window."""
+    ) -> None:
+        """Enter the bounded blocked policy when accepted motion makes no progress."""
         if self._navigation_exhausted:
             # Includes scans that raised before step_once could record a stop
             # command. An invalid route must not trigger motion via recovery.
             self._progress.reset()
             self._last_command = (np.zeros(2), 0.0)
-            return False, None
-        if not self._stuck_recovery.is_active:
-            if self._progress.update(pose, sim_time, *self._last_command):
-                logger.warning("[Step %d] No commanded progress for %.2f s. Recovering.",
-                               step, self._config.stuck_timeout_s)
-                self._stuck_recovery.trigger()
-                self._progress.reset()
-                self._current_waypoint_runner = None
-                self._goal_id = None
-
-        if self._stuck_recovery.is_active:
-            # A recovery cannot trigger on the first observation, so the actual
-            # sensor interval is known before issuing its first command.
-            recovery_cmd = self._stuck_recovery.step(self._frame_dt)
-            if recovery_cmd is not None:
-                vx, vy, omega = recovery_cmd
-                linear = np.array([vx, vy], dtype=np.float64)
-                self._last_command = (linear.copy(), omega)
-                return False, (linear, omega, StepMetrics(
-                    frontiers=self._last_frontier_count,
-                    coverage=self._last_coverage,
-                    terminated=False,
-                    voxels=self._octomap.num_occupied,
-                    rescan_triggered=False,
-                ))
-            logger.info("[Step %d] Recovery complete. Forcing frontier rescan.", step)
+            return
+        if self._progress.update(pose, sim_time, *self._last_command):
+            logger.warning("[Step %d] No commanded progress for %.2f s. Blocking.",
+                           step, self._config.stuck_timeout_s)
+            self._blocked.block("commanded_no_progress", sim_time)
             self._progress.reset()
-            self._last_command = (np.zeros(2), 0.0)
             self._current_waypoint_runner = None
-            return True, None
-        return False, None
+            self._goal_id = None
 
     def _should_rescan(
         self, step: int, current_pos: np.ndarray, force_rescan: bool,
@@ -482,7 +463,7 @@ class ExplorationLoop:
                 previous_coverage_pct=self._last_coverage,
                 robot_position=current_pos,
                 frontiers=frontiers,
-                is_stuck=self._stuck_recovery.is_active,
+                is_stuck=self._blocked.since is not None,
                 no_progress_steps=self._progress.no_progress_steps,
                 blocked_path_count=0,
                 recent_skill_ids=(),
@@ -504,15 +485,21 @@ class ExplorationLoop:
                 effective_score_fn = skill_execution.score_fn if skill_execution.score_fn is not None else score_fn
 
         if not frontiers:
-            terminated = True
+            if self._path_planner.start_is_blocked(current_pos, grid_2d):
+                self._blocked.block("blocked_start", self._previous_sim_time or 0.)
+            else:
+                terminated = True
+                self._blocked.state, self._blocked.reason = "exhausted", "no_frontiers"
+                self._blocked.since = None
         else:
             # Cluster centroids rank regions; actual frontier cells are targets.
             goal = None
             selection_start = time.perf_counter()
             reachable = self._path_planner.reachable_mask(current_pos, grid_2d)
-            candidates = [candidate for candidate in self._goal_selector.navigation_candidates(
+            candidates = list(islice((candidate for candidate in self._goal_selector.navigation_candidates(
                 frontiers, pose, grid_2d, reachable, effective_score_fn)
-                if np.linalg.norm(candidate[:2] - current_pos[:2]) >= config.waypoint_arrival_threshold]
+                if np.linalg.norm(candidate[:2] - current_pos[:2]) >= config.waypoint_arrival_threshold),
+                config.planning_candidate_limit))
             self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
             for candidate in candidates:
                 planned_path = self._path_planner.plan(current_pos, candidate, grid_2d)
@@ -523,8 +510,11 @@ class ExplorationLoop:
                     break
 
             if goal is None or path is None:
-                terminated = True
+                reason = ("blocked_start" if self._path_planner.start_is_blocked(current_pos, grid_2d)
+                          else "no_reachable_route")
+                self._blocked.block(reason, self._previous_sim_time or 0.)
             else:
+                self._blocked.installed(pose)
                 self._goal_id = ",".join(format(float(v), ".9g") for v in goal)
                 self._current_waypoint_runner = WaypointRunner(
                     path,
@@ -590,24 +580,57 @@ class ExplorationLoop:
     ) -> tuple[np.ndarray, float, StepMetrics]:
         """Gate every exploration command, including bootstrap and recovery."""
         linear, angular, metrics = self._step_once_proposal(frame, step, score_fn)
-        calibrated = (frame.body_from_camera is not None and frame.collision_radius_m is not None
-                      and np.isfinite(frame.collision_radius_m) and frame.collision_radius_m > 0)
         decision = self._motion_guard.filter(
-            linear, angular, pose=self._navigation_pose, sim_time=frame.sim_time,
-            observation_time=self._last_observation_time, grid=self.planning_grid(),
-            radius=self._execution_radius, calibration_valid=calibrated,
-            tracking_ok=self.last_tracking_status == "ok")
+            linear, angular, **self._guard_state(frame))
         if decision.scale == 0 and (np.linalg.norm(linear) > .01 or abs(angular) > .01):
             # A rejected route/recovery must not keep issuing the same motion or
             # trigger blind reverse from the lack of commanded progress.
             self._current_waypoint_runner = None
             self._goal_id = None
             self._progress.reset()
-            self._stuck_recovery.cancel()
             if decision.reason != "initial_velocity_observation":
                 self._bootstrap_complete = True
+                self._blocked.execution_rejections += 1
+                if self._blocked.state == "recovering":
+                    self._blocked.recovery_outcome = "execution_rejected"
+                self._blocked.block("execution_" + decision.reason, frame.sim_time)
+        metrics.terminated = self._navigation_exhausted or self._blocked.state == "failed"
         self._last_command = (decision.linear.copy(), float(decision.angular))
         return decision.linear, decision.angular, metrics
+
+    def _guard_state(self, frame):
+        return dict(pose=self._navigation_pose, sim_time=frame.sim_time,
+                    observation_time=self._last_observation_time, grid=self.planning_grid(),
+                    radius=self._execution_radius,
+                    calibration_valid=(frame.body_from_camera is not None
+                        and frame.collision_radius_m is not None
+                        and np.isfinite(frame.collision_radius_m) and frame.collision_radius_m > 0),
+                    tracking_ok=self.last_tracking_status == "ok")
+
+    def _blocked_proposal(self, frame):
+        """Bounded motion choices; preview does not authorize later execution."""
+        action = self._blocked.next_action(frame.sim_time)
+        if action == "recover":
+            # A second attempt prefers a different primitive. Unsupported lateral
+            # motion is never proposed. No map cells or dimensions are changed.
+            candidates = [(-.2, 0., 0.), (0., 0., .5), (0., 0., -.5), (.2, 0., 0.)]
+            if self._blocked.recoveries > 1:
+                candidates = candidates[1:] + candidates[:1]
+            state = self._guard_state(frame)
+            self._recovery_checks = {}
+            for command in candidates:
+                result = self._motion_guard.preview(np.array(command[:2]), command[2], **state)
+                self._recovery_checks[str(command)] = result.reason
+                if result.scale > 0:
+                    self._blocked.start_recovery(command, self._navigation_pose, frame.sim_time)
+                    break
+            else:
+                self._blocked.recovery_outcome = "no_safe_motion"
+                self._blocked.fail("no_safe_recovery")
+        if self._blocked.state == "recovering":
+            command = self._blocked.command
+            return np.array(command[:2]), command[2]
+        return np.zeros(2), 0.
 
     def _step_once_proposal(
         self,
@@ -653,13 +676,27 @@ class ExplorationLoop:
             camera_offset, config.voxel_resolution, calibrated_radius)
         self._path_planner.set_clearance_radius(self._execution_radius)
 
+        self._blocked.observe(pose, frame.sim_time)
+        if self._blocked.state in {"blocked", "recovering", "failed"}:
+            self._current_waypoint_runner = None
+            self._goal_id = None
+            self._progress.reset()
+            linear, angular = self._blocked_proposal(frame)
+            return linear, angular, StepMetrics(
+                self._last_frontier_count, self._last_coverage,
+                self._blocked.state == "failed", self._octomap.num_occupied, False)
+
+        retry = self._blocked.state == "replanning"
+
         # b. Stuck detection and recovery
-        force_rescan, early_return = self._check_stuck(step, pose, frame.sim_time)
-        if early_return is not None:
-            return early_return
+        self._check_stuck(step, pose, frame.sim_time)
+        if self._blocked.state == "blocked":
+            return np.zeros(2), 0., StepMetrics(
+                self._last_frontier_count, self._last_coverage, False,
+                self._octomap.num_occupied, False)
 
         # c. Check re-evaluation trigger
-        should_rescan = self._should_rescan(step, current_pos, force_rescan)
+        should_rescan = retry or self._should_rescan(step, current_pos, False)
 
         # d. Frontier re-evaluation
         linear_vel = np.zeros(2, dtype=np.float64)
@@ -723,7 +760,9 @@ class ExplorationLoop:
 
             if metrics.terminated and step >= 50:
                 # Determine specific termination reason from frontier state
-                if metrics.frontiers == 0:
+                if self._blocked.state == "failed":
+                    terminated_reason = "navigation_failed"
+                elif metrics.frontiers == 0:
                     terminated_reason = "no_frontiers"
                 else:
                     terminated_reason = "all_unreachable"

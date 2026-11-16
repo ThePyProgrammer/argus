@@ -624,7 +624,10 @@ class Coordinator:
             elif not step_metrics:
                 reason = "all_robots_failed"
             elif all(m.terminated for m in step_metrics.values()):
-                reason = "no_frontiers" if all(m.frontiers == 0 for m in step_metrics.values()) else "all_unreachable"
+                failed = any(self._robots[rid].exploration.measurement_state.get(
+                    "navigation", {}).get("state") == "failed" for rid in step_metrics)
+                reason = ("navigation_failed" if failed else
+                          "no_frontiers" if all(m.frontiers == 0 for m in step_metrics.values()) else "all_unreachable")
             if reason is not None:
                 for rid in robot_ids:
                     self._bridge.stop_robot(rid)

@@ -9,7 +9,7 @@ from scripts import validate_exploration as workflow
 from scripts import diagnose_exploration_contacts as diagnosis
 
 
-@pytest.mark.parametrize("outcome", ["horizon", "algorithm_error", "all_unreachable"])
+@pytest.mark.parametrize("outcome", ["horizon", "algorithm_error", "all_unreachable", "navigation_failed"])
 def test_recorded_outcome_is_rendered_before_completion(tmp_path, monkeypatch, outcome):
     output = tmp_path / "attempt"
     monkeypatch.setattr(workflow, "check_encoder", lambda: None)

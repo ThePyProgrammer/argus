@@ -167,7 +167,7 @@ class ExplorationEpisode:
             return cls(coordinator, bridge, scene.compiled_reference(),
                        coverage_config=CoverageConfig(horizon_s=horizon_s), collect=collect,
                        provenance={"sample": sample.to_dict(), "method": "legacy_voronoi",
-                                   "recovery_streams": {rid: [seed, 2, i] for i, rid in enumerate(config.robot_ids)},
+                                   "recovery_candidates": "deterministic_guarded_primitives_v1",
                                    "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1",
                                    "odometry_rule": "body_origin_surface_svd_v2",
                                    "registration_sampling_rule": "bounded_voxel_refinement_v1",
@@ -188,7 +188,7 @@ class ExplorationEpisode:
                                    "execution_clearance": "observed_pose_swept_stop_settled_idle_v4",
                                    "execution_geometry": "all_joint_rotations_static_calibration_v1",
                                    "path_following": "align_heading_before_translation_v1",
-                                   "recovery_rule": "commanded_progress_sim_time_v1"})
+                                   "recovery_rule": "bounded_guarded_replanning_v2"})
         except BaseException:
             bridge.stop()
             for robot in robots.values():
@@ -269,7 +269,9 @@ class ExplorationEpisode:
             self._commands.append({"elapsed_s": tick.decision_sim_time - self._origin,
                                    "commands": {rid: command.to_wire() for rid, command in tick.commands.items()},
                                    "motion_clearance": {rid: robot.exploration.measurement_state["motion_clearance"]
-                                                        for rid, robot in self.coordinator.robots.items()}})
+                                                        for rid, robot in self.coordinator.robots.items()},
+                                   "navigation": {rid: robot.exploration.measurement_state.get("navigation", {})
+                                                  for rid, robot in self.coordinator.robots.items()}})
             for rid, metrics in tick.metrics.items():
                 robot = self.coordinator.robots[rid]
                 diagnostic = robot.exploration.measurement_state
@@ -313,6 +315,8 @@ class ExplorationEpisode:
             "legacy_contact_cadence": "sensor_frames", "fall_cadence": "sensor_frames",
             "allocator_latency_scope": "per_robot_frontier_candidate_selection",
             "provenance": self.provenance,
+            "navigation": {rid: robot.exploration.measurement_state.get("navigation", {})
+                           for rid, robot in self.coordinator.robots.items()},
         }
         self._state = "finished"
         self.close()
