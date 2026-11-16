@@ -49,6 +49,7 @@ class ExplorationConfig:
     blocked_max_recoveries: int = 2
     planning_candidate_limit: int = 32
     recovery_motion_timeout_s: float = 1.5
+    recovery_reverse_speed_mps: float = 0.60  # lower reverse commands can stall the gait
     recovery_distance_m: float = 0.10
     recovery_angle_rad: float = 0.35
     navigation_resume_distance_m: float = 0.15

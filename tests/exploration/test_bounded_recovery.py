@@ -196,3 +196,17 @@ def test_blocked_deadline_counts_waiting_and_recovery_time(monkeypatch):
     _, _, metrics = tick(loop, 70)
     assert metrics.terminated
     assert loop.measurement_state["navigation"]["reason"] == "blocked_timeout"
+
+
+@pytest.mark.parametrize("command,wrong_pose", [
+    ((-.6, 0., 0.), pose(.2, 0.)),
+    ((-.6, 0., 0.), pose(0., .2)),
+    ((0., 0., .5), pose(yaw=-.5)),
+])
+def test_wrong_way_recovery_motion_is_not_progress(command, wrong_pose):
+    from src.exploration.blocked_navigation import BlockedNavigation
+    state = BlockedNavigation(ExplorationConfig())
+    state.block("fixture_blocked", 0.)
+    state.start_recovery(command, pose(), 1.)
+    state.observe(wrong_pose, 2.5)
+    assert state.state == "blocked" and state.recovery_outcome == "no_progress"

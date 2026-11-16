@@ -8,7 +8,8 @@ class BlockedNavigation:
     def __init__(self, config):
         self.config = config
         for name in ("blocked_timeout_s", "blocked_retry_s", "recovery_motion_timeout_s",
-                     "recovery_distance_m", "recovery_angle_rad", "navigation_resume_distance_m"):
+                     "recovery_distance_m", "recovery_angle_rad", "navigation_resume_distance_m",
+                     "recovery_reverse_speed_mps"):
             if not math.isfinite(getattr(config, name)) or getattr(config, name) <= 0:
                 raise ValueError(f"{name} must be finite and positive")
         for name in ("blocked_max_replans", "blocked_max_recoveries", "planning_candidate_limit"):
@@ -69,13 +70,17 @@ class BlockedNavigation:
                 self.recovery_outcome = "timeout"
             self.fail("blocked_timeout")
         if self.state == "recovering":
-            distance = np.linalg.norm(pose[:2, 3] - self.motion_pose[:2, 3])
+            displacement = pose[:2, 3] - self.motion_pose[:2, 3]
             yaw = math.atan2(pose[1, 0], pose[0, 0])
             start_yaw = math.atan2(self.motion_pose[1, 0], self.motion_pose[0, 0])
-            angle = abs(math.atan2(math.sin(yaw-start_yaw), math.cos(yaw-start_yaw)))
+            angle = math.atan2(math.sin(yaw-start_yaw), math.cos(yaw-start_yaw))
             translating = abs(self.command[0]) > .01
-            progress = (distance >= self.config.recovery_distance_m if translating
-                        else angle >= self.config.recovery_angle_rad)
+            # Wrong-way motion and lateral drift cannot establish a successful
+            # retreat, nor can rotation opposite to the requested turn.
+            directed_distance = (displacement @ np.array([math.cos(start_yaw), math.sin(start_yaw)])
+                                 * np.sign(self.command[0]))
+            progress = (directed_distance >= self.config.recovery_distance_m if translating
+                        else angle * np.sign(self.command[2]) >= self.config.recovery_angle_rad)
             if progress or now - self.motion_start >= self.config.recovery_motion_timeout_s:
                 self.recovery_outcome = "progress" if progress else "no_progress"
                 self.block("recovery_" + self.recovery_outcome, now)

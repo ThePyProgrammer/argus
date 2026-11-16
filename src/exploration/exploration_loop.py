@@ -613,7 +613,8 @@ class ExplorationLoop:
         if action == "recover":
             # A second attempt prefers a different primitive. Unsupported lateral
             # motion is never proposed. No map cells or dimensions are changed.
-            candidates = [(-.2, 0., 0.), (0., 0., .5), (0., 0., -.5), (.2, 0., 0.)]
+            candidates = [(-self._config.recovery_reverse_speed_mps, 0., 0.),
+                          (0., 0., .5), (0., 0., -.5), (.2, 0., 0.)]
             if self._blocked.recoveries > 1:
                 candidates = candidates[1:] + candidates[:1]
             state = self._guard_state(frame)
