@@ -210,3 +210,18 @@ def test_wrong_way_recovery_motion_is_not_progress(command, wrong_pose):
     state.start_recovery(command, pose(), 1.)
     state.observe(wrong_pose, 2.5)
     assert state.state == "blocked" and state.recovery_outcome == "no_progress"
+
+
+def test_turning_drift_cannot_reset_budget_or_count_toward_later_walking():
+    from src.exploration.blocked_navigation import BlockedNavigation
+    state = BlockedNavigation(ExplorationConfig())
+    state.block("fixture_blocked", 0.)
+    state.replans = 2
+    state.installed(pose())
+    state.observe(pose(.20, yaw=.5), 1., navigation_translation=False)
+    assert state.since == 0. and state.replans == 2
+    state.observe(pose(.21, yaw=.5), 1.1, navigation_translation=True)
+    assert state.since == 0. and state.reason == "route_installed"
+    state.observe(pose(.36, yaw=.5), 2., navigation_translation=True)
+    assert state.since is None and state.replans == 0
+    assert state.reason == "navigation_progress"

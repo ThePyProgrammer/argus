@@ -677,7 +677,8 @@ class ExplorationLoop:
             camera_offset, config.voxel_resolution, calibrated_radius)
         self._path_planner.set_clearance_radius(self._execution_radius)
 
-        self._blocked.observe(pose, frame.sim_time)
+        self._blocked.observe(pose, frame.sim_time,
+                              navigation_translation=np.linalg.norm(self._last_command[0]) > .01)
         if self._blocked.state in {"blocked", "recovering", "failed"}:
             self._current_waypoint_runner = None
             self._goal_id = None

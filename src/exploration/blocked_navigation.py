@@ -54,17 +54,21 @@ class BlockedNavigation:
         self.state, self.reason = "navigating", "route_installed"
         self.navigation_anchor = pose[:2, 3].copy()
 
-    def observe(self, pose, now):
+    def observe(self, pose, now, *, navigation_translation=False):
         if self.state == "failed":
             return
         # Only translation on a successfully installed navigation route resets
         # the budget. Recovery travel, a new goal, or turning cannot do so.
         if (self.state == "navigating" and self.since is not None
-                and self.navigation_anchor is not None
-                and np.linalg.norm(pose[:2, 3] - self.navigation_anchor) >= self.config.navigation_resume_distance_m):
-            self.since = None
-            self.replans = self.recoveries = self.last_recovery_replans = 0
-            self.reason = "navigation_progress"
+                and self.navigation_anchor is not None):
+            if not navigation_translation:
+                # Turning and standing can translate the body during gait/posture
+                # changes. Exclude that drift from a later walking interval too.
+                self.navigation_anchor = pose[:2, 3].copy()
+            elif np.linalg.norm(pose[:2, 3] - self.navigation_anchor) >= self.config.navigation_resume_distance_m:
+                self.since = None
+                self.replans = self.recoveries = self.last_recovery_replans = 0
+                self.reason = "navigation_progress"
         if self.since is not None and now - self.since >= self.config.blocked_timeout_s:
             if self.state == "recovering":
                 self.recovery_outcome = "timeout"

@@ -24,11 +24,12 @@ from tests.exploration.test_motion_clearance_integration import frame
 
 
 @pytest.mark.timeout(90)
-@pytest.mark.parametrize("trapped", [False, True])
-def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, trapped):
+@pytest.mark.parametrize("case", ["escape", "trap", "long_turn"])
+def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
     monkeypatch.setattr(mujoco, "Renderer", lambda *a, **kw: SimpleNamespace(close=lambda: None))
     monkeypatch.setattr(MultiRobotBridge, "_capture_frame", lambda *a: None)
     positions = {"robot_a": (0., 0., .3)}
+    trapped = case == "trap"
     wall_distance = .7 if trapped else 1.5
     def model():
         xml, assets = build_multi_robot_scene(Go2Platform(), positions)
@@ -50,15 +51,20 @@ def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, trapped):
             p = bridge._extract_pose("robot_a")
             return p, p[:3, 3].copy()
         monkeypatch.setattr(loop, "_update_slam", observe)
+        frontier_revealed = False
         def frontiers(*a, **kw):
             # Initially only a frontier across the wall is observed. Retreat
             # exposes a reachable frontier on this side; no obstacles are erased.
-            goal = np.array([-2., 0., 0.] if loop._blocked.recovery_outcome == "progress" else [2., 0., 0.])
+            newly_visible = [-2., 0., 0.] if case == "long_turn" else [0., 2., 0.]
+            goal = np.array(newly_visible if frontier_revealed else [2., 0., 0.])
             return [FrontierCluster(goal, 1, np.array([grid.world_to_grid(goal[:2])]))]
         monkeypatch.setattr(loop.frontier_detector, "detect", frontiers)
         recovery_start = None
         minimum_reverse = 0.
-        for i in range(1200):
+        for i in range(1201):
+            # Scripted visibility is tied to the physical test pose, independently
+            # of the policy's success label. Once observed, the frontier persists.
+            frontier_revealed |= bridge.get_body_position("robot_a")[0] < -.08
             sensor = frame(i * bridge.frame_dt)
             sensor.collision_radius_m = bridge._collision_radii["robot_a"]
             linear, angular, metrics = loop.step_once(sensor, i + 30)
@@ -82,6 +88,9 @@ def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, trapped):
         if trapped:
             assert nav["state"] == "failed" and nav["reason"] == "no_safe_recovery"
             assert recovery_start is None
+        elif case == "long_turn":
+            assert minimum_reverse <= -.10
+            assert nav["state"] == "failed" and nav["reason"] == "blocked_timeout"
         else:
             assert minimum_reverse <= -.10
             assert nav["recovery_outcome"] == "progress"
