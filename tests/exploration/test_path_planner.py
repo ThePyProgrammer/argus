@@ -18,6 +18,31 @@ from src.exploration.path_planner import PathPlanner
 from src.exploration.frontier_detector import FrontierDetector
 
 
+def test_observed_only_routes_reject_unknown_shortcuts_and_smoothing():
+    cells = np.zeros((20, 20), dtype=np.int8)
+    cells[:, 9:11] = CELL_UNKNOWN
+    grid = OccupancyGrid2D(cells, .1, np.zeros(2), 20, 20)
+    start, goal = np.array([.5, 1.]), np.array([1.5, 1.])
+    planner = PathPlanner(allow_unknown=False)
+    assert planner.plan(start, goal, grid) is None
+    assert not planner.reachable_mask(start, grid)[10, 15]
+    assert not planner.path_is_clear([start, goal], grid)
+    # New free-space observations restore a route; no obstacle is erased.
+    cells[:, 9:11] = CELL_FREE
+    assert planner.plan(start, goal, grid) is not None
+
+
+def test_blocked_start_classification_does_not_assume_physical_presence_is_safe():
+    cells = np.zeros((20, 20), dtype=np.int8)
+    cells[10, 10] = CELL_OCCUPIED
+    grid = OccupancyGrid2D(cells, .1, np.zeros(2), 20, 20)
+    planner = PathPlanner(clearance_radius=.3)
+    assert planner.start_is_blocked(np.array([1., 1.]), grid)
+    assert planner.start_is_blocked(np.array([1.2, 1.]), grid)
+    assert planner.start_is_blocked(np.array([-1., 1.]), grid)
+    assert not planner.start_is_blocked(np.array([.5, 1.]), grid)
+
+
 def test_obstacles_cannot_create_free_space():
     grid = project_voxels_to_2d(np.array([[.05, .05, .2]]), .1)
     assert not (grid.grid == CELL_FREE).any()

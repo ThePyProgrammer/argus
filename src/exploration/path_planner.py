@@ -48,7 +48,7 @@ class PathPlanner:
     """
 
     def __init__(self, unknown_cost: float = 5.0, inflation_radius: float = 0.8,
-                 clearance_radius: float = 0.15):
+                 clearance_radius: float = 0.15, allow_unknown: bool = True):
         """Initialize planner.
 
         Args:
@@ -60,6 +60,7 @@ class PathPlanner:
                 Exploration supplies its body/camera envelope plus raster margin.
         """
         self._unknown_cost = unknown_cost
+        self._allow_unknown = allow_unknown
         self._inflation_radius = inflation_radius
         self._inflation_cache: np.ndarray | None = None
         self._inflation_grid_id: int | None = None
@@ -100,6 +101,8 @@ class PathPlanner:
             robot_half_width=self._clearance_radius,
             gradient_distance=self._inflation_radius,
         )
+        if not self._allow_unknown:
+            cost[grid.grid == CELL_UNKNOWN] = 1e6
 
         self._inflation_cache = cost
         self._inflation_grid_id = grid_id
@@ -124,6 +127,15 @@ class PathPlanner:
                                         (passable[row, c] and passable[r, col]))]
         return np.isin(components, labels) & passable
 
+    def start_is_blocked(self, start_world, grid):
+        """Classify the current cell without assuming physical presence is clearance."""
+        xy = (np.asarray(start_world[:2]) - grid.origin) / grid.resolution
+        if np.any(xy < 0) or xy[0] >= grid.width or xy[1] >= grid.height:
+            return True
+        row, col = grid.world_to_grid(start_world[:2])
+        return bool(grid.grid[row, col] == CELL_OCCUPIED
+                    or self._get_inflation_cost(grid)[row, col] >= 1e5)
+
     def plan(
         self,
         start_world: np.ndarray,
@@ -147,9 +159,8 @@ class PathPlanner:
         start_row, start_col = grid.world_to_grid(start_xy)
         goal_row, goal_col = grid.world_to_grid(goal_xy)
 
-        # The robot's current position is always navigable (it's physically there),
-        # even if the grid marks it as OCCUPIED due to ground voxels.
-        # Only reject if the GOAL is occupied (can't drive into a wall).
+        # Legacy adjacent-cell start escape is only a route-search convention;
+        # it never establishes executable clearance. Exploration guards motion.
         inflation_cost = self._get_inflation_cost(grid)
         if grid.grid[goal_row, goal_col] == CELL_OCCUPIED or inflation_cost[goal_row, goal_col] >= 1e5:
             return None
@@ -308,6 +319,7 @@ class PathPlanner:
                     for row in {math.floor(xy[1] - 1e-9), math.floor(xy[1] + 1e-9)}:
                         if not (0 <= row < grid.height and 0 <= col < grid.width):
                             return False
-                        if grid.grid[row, col] == CELL_OCCUPIED:
+                        if (grid.grid[row, col] == CELL_OCCUPIED or
+                                (not self._allow_unknown and grid.grid[row, col] == CELL_UNKNOWN)):
                             return False
         return True
