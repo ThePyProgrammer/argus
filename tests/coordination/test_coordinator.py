@@ -400,6 +400,7 @@ class TestExplorationLoopStepOnce:
     def test_step_once_returns_rescan_triggered(self):
         """step_once processes a frame and returns metrics with rescan_triggered."""
         from src.exploration.exploration_loop import ExplorationLoop
+        from src.exploration.occupancy_grid import OccupancyGrid2D
 
         mock_bridge = MagicMock()
         mock_slam = _MockSLAM()
@@ -412,7 +413,8 @@ class TestExplorationLoopStepOnce:
 
         # Call at step 35 (past min_scan_step=30) to trigger rescan
         with patch.object(loop._frontier_detector, "detect", return_value=[]), \
-             patch("src.exploration.exploration_loop.project_voxels_to_2d", return_value=MagicMock()):
+             patch("src.exploration.exploration_loop.project_voxels_to_2d", return_value=
+                   OccupancyGrid2D(np.zeros((20, 20), np.int8), .1, np.array([-1., -1.]), 20, 20)):
             linear, angular, metrics = loop.step_once(frame, 35)
 
         assert isinstance(linear, np.ndarray)
