@@ -39,7 +39,7 @@ AUC = sum(max(0, T - team_first[cell])) / (T * reference_cell_count)
 
 Unseen cells have infinite first-observation time and contribute zero. A capture at `T` can improve final coverage but contributes no AUC. Threshold time is the first capture reaching the configured fraction, initially 90%; failure produces null threshold time and a capped score of `T`.
 
-`stop_robot` freezes one robot's measurements while its teammate can continue. `finalize` accepts horizon completion or an explicit algorithm termination: no frontiers, all unreachable, all robots failed, or algorithm error. Early termination holds the last observation set through `T`. No-frontier status does not imply complete coverage. Finalization rejects subsequent measurements. Infrastructure failures belong in the future runner's invalid-attempt records.
+`stop_robot` freezes one robot's measurements while its teammate can continue. `finalize` accepts horizon completion or an explicit algorithm termination: no frontiers, all unreachable, all robots failed, navigation failed after bounded replanning/recovery, or algorithm error. Early termination holds the last observation set through `T`. No-frontier status does not imply complete coverage. Finalization rejects subsequent measurements. Infrastructure failures belong in the future runner's invalid-attempt records.
 
 `write_observations(path)` saves robot IDs, the reference mask, and per-robot first-observation times in NPZ without pickle. Outside-reference and unseen cells contain infinity. Final summaries include the metric version, reference hash, configuration, frame counts, and termination reason. The runner will save summaries and fixed-cadence snapshots alongside these arrays.
 

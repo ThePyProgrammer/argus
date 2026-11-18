@@ -16,7 +16,7 @@ Candidates within the waypoint arrival radius are skipped, and smoothed paths re
 
 A scan clears the old route and goal before planning. A successful scan installs a new path and executes it on that frame, including the first scan at step 30. An unsuccessful scan leaves a persistent idle state, including frames without rescans. Initial forward movement is allowed only before the first scan; it cannot resume as a fallback after losing a route.
 
-No frontiers, no feasible candidates, failed A* attempts, and scan exceptions all prevent stale-route execution. An idle robot keeps sensing and can resume after a successful rescan or an explicit waypoint command. Its teammate can continue exploring. Recovery cannot turn idle planning failure into movement. Episode provenance records `route_lifecycle: invalidate_on_rescan_v1`.
+No frontiers, no feasible candidates, failed A* attempts, and scan exceptions all prevent stale-route execution. An idle robot keeps sensing and can resume after a successful rescan or an explicit waypoint command. Its teammate can continue exploring. Blocked planning and execution enter the bounded recovery policy described below; every recovery proposal still passes the execution guard. Episode provenance records `route_lifecycle: invalidate_on_rescan_v1`.
 
 ## Body and camera clearance
 
@@ -29,7 +29,7 @@ max(footprint radius, camera mount offset norm + camera stand-off)
 
 Defaults are a nominal 0.35 m Go2 footprint radius, 0.15 m camera stand-off, and 0.05 m planning margin. The mount comes from fixed calibration, not a simulator world pose. Its full 3D offset norm bounds horizontal camera reach during body tilt. The raster allowance encloses an occupied cell's half-diagonal. With the Go2 mount, the center-to-center exclusion is 0.638468 m at 0.05 m resolution and 0.673824 m at 0.10 m resolution. A missing mount retains the legacy coincident camera/body convention; it does not inherit the Go2 containment certificate below.
 
-Goal filtering and A* share this envelope. Diagonal moves require both orthogonal neighbors to be passable. Smoothed paths retain both endpoints and reject touched raw occupied cells, including boundaries and corner contacts. Each continuous segment is checked against the exclusion disks around occupied-cell centers. Inflated cells are not treated as additional obstacles in that continuous check: doing so previously added a position-dependent raster allowance. Out-of-bounds points remain invalid. A failed check uses the unsmoothed A* route. The existing start-cell escape exception remains: an occupied or inflated start can step directly to a passable neighbor; it cannot make an inflated goal valid. Neither exception bypasses #4's execution guard. Bounded recovery when execution rejects the resulting route remains under #5.
+Goal filtering and A* share this envelope. Diagonal moves require both orthogonal neighbors to be passable. Smoothed paths retain both endpoints and reject touched raw occupied cells, including boundaries and corner contacts. Each continuous segment is checked against the exclusion disks around occupied-cell centers. Inflated cells are not treated as additional obstacles in that continuous check: doing so previously added a position-dependent raster allowance. Out-of-bounds points remain invalid. A failed check uses the unsmoothed A* route. The existing start-cell escape exception remains: an occupied or inflated start can step directly to a passable neighbor; it cannot make an inflated goal valid. Neither exception bypasses #4's execution guard. The bounded recovery policy handles rejection of that exception explicitly. Exploration disallows unknown center cells in route search and smoothing, matching the execution guard; the generic planner retains its optional unknown-space mode.
 
 The [articulated geometry audit](notes/exploration-geometry-envelope-validation.md) verifies the existing camera-inclusive physical circle (0.553113 m) against a 0.549220 m continuous bound on all 23 collision primitives, including contact margins. It permits any body attitude and hip/thigh rotation, with calf joints in [-2.7227, -1.5] radians. Default gait targets and the sampled corrected replay lie within that knee interval. The nominal 0.35 m radius alone fails even for standing calf geometry; more extended knees can exceed the camera-inclusive circle too. The certificate is conditional and does not monitor joint states online. Changing geometry, mounting, stand-off, or gait range requires another audit.
 
@@ -123,8 +123,8 @@ stopping fixtures. Settled idle is recognized after one second of standing and
 low estimated velocity; every new movement still reserves the full tail.
 The affected suite passes **900 tests with seven skips**.
 
-The latest connected-room run reaches **5.00/5.00 s, 77.1523% coverage**, and the
-latest clutter run reaches **10.00/10.00 s, 31.2745% coverage**, both with zero
+The baseline before bounded recovery reaches **5.00/5.00 s, 77.1523% coverage** in
+connected rooms and **10.00/10.00 s, 31.2745% coverage** in clutter, both with zero
 non-foot contacts or falls and verified videos. Minimum sampled static-obstacle
 camera stand-off is 0.71833 m and 0.57511 m respectively. These sampled distances
 are not continuous-time clearance certificates. Clutter A stops moving after
@@ -132,7 +132,9 @@ are not continuous-time clearance certificates. Clutter A stops moving after
 failed A* attempts. The larger stopping reserve improves the measured contact
 outcome while reducing clutter coverage; sustained exploration is still unresolved.
 
-The remaining work is tracked separately:
+The bounded policy and its evidence are recorded in
+[Issue #5 validation](notes/exploration-bounded-recovery-validation.md).
+The related scopes are tracked separately:
 
 - [#5: blocked-start recovery](https://github.com/ThePyProgrammer/argus/issues/5): replan and recover without bypassing the execution clearance check or stopping a productive teammate.
 - [#6: pose and map error](https://github.com/ThePyProgrammer/argus/issues/6): separate localization drift from floor/map errors and establish limits across development seeds and longer runs using the corrected gait.
@@ -155,8 +157,46 @@ The former detector required 5 cm of movement on every frame. At the evaluation 
 
 Recovery now requires two simulated seconds without 5 cm of net planar displacement while translation is commanded. Pure rotation commands instead require 0.1 radians of yaw progress. Idle commands reset the window. Vertical gait motion and small back-and-forth movement do not count as progress. Turning while walking still requires translation, so spinning against an obstacle cannot continually reset the timeout.
 
-Both interactive exploration and evaluation use increasing sensor timestamps. Recovery reverses for 0.25 simulated seconds, then commands a 135-degree turn at up to 1.5 rad/s. The final command is bounded by the remaining duration or angle. Recovery clears the old route, suspends progress detection, and forces a rescan when complete. A new progress window prevents immediate retriggering.
+Both interactive exploration and evaluation use increasing sensor timestamps. A
+planning failure with remaining frontiers, a blocked start, an execution
+rejection, or commanded motion without progress enters `blocked`. The robot
+stops, keeps sensing, and waits at least the configured settling interval before
+`replanning`. Successful route installation enters `navigating`; it does not by
+itself reset the failure budget.
 
-Configuration uses `stuck_timeout_s`, `stuck_distance_m`, `stuck_angle_rad`, and `recovery_reverse_duration_s`. The old `stuck_threshold_steps` field is removed. Episode provenance identifies this behavior as `commanded_progress_sim_time_v1`.
+Each blockage permits four replans and two recovery attempts, with at most 32
+A* candidates per scan and a twelve-second deadline that includes all waiting,
+planning, and recovery time. The policy reserves a route check after each
+recovery within that same budget; it cannot spend the last replan before the
+last recovery. It previews reverse at 0.60 m/s, turns at +/-0.50 rad/s, and
+forward at 0.20 m/s using copies of the existing guard state. The second recovery prefers
+a turn. A selected proposal is checked again by the actual guard on every
+sensor frame; previews never consume pose, gait, or settling history.
+
+Recovery ends after 0.10 m estimated translation in the commanded direction,
+0.35 rad estimated rotation in the commanded direction,
+or 1.5 seconds. An accepted command without observed motion reports
+`no_progress`. A rejection stops and invalidates that recovery immediately.
+After settling, another bounded replan can use newly observed free space.
+Only 0.15 m of net displacement during accepted translation commands on an
+installed navigation route resets the blockage budget. Turning and standing
+reset the progress anchor, excluding their drift from subsequent walking.
+Recovery motion and assigning a goal cannot reset the budget.
+
+No safe candidate produces `failed: no_safe_recovery`, with each candidate's
+guard reason retained. Retry exhaustion or the deadline also produce explicit
+failures. Failed robots remain stopped and sensing until an explicit target
+resets the policy. This describes infeasibility under the observed map, current
+clearance model, and finite primitive set, not proof that no physical escape
+exists. No obstacle removal, body-radius reduction, or clearance exception is
+used. A productive teammate continues. If all active robots terminate and any
+has failed navigation, evaluation ends with `navigation_failed`, preserving
+actual time and measured coverage rather than reporting frontier exhaustion.
+
+Configuration records all retry, duration, and progress thresholds. Episode
+provenance identifies `bounded_commanded_replanning_v4`; command records and final
+results include navigation states, reasons, retry counts, and recovery outcomes.
+The legacy `StuckRecovery` helper remains for compatibility tests but is no
+longer used by the live exploration loop.
 
 These checks use estimated motion, not physical contact or goal progress. Pose drift can hide a blockage; movement without useful exploration can satisfy the mobility threshold. The two-second window is a development default, not a tuned safety guarantee.

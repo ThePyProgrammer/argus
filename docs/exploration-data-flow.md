@@ -208,11 +208,11 @@ necessarily a safe destination. Cells within the waypoint-arrival distance are
 skipped. A* plans toward the selected member, using obstacle inflation and soft
 costs, followed by smoothing and continuous segment checks.
 
-**Unknown cells are currently traversable at a penalty in A*.** A free frontier
-goal does not imply that every cell along its route was directly observed free.
-The execution guard rejects predicted center travel through unknown cells, so
-such a route can be rejected during execution. Resolving repeated blocked routes
-without unsafe motion remains part of #5.
+**Exploration routes now require observed center cells**, including smoothed
+segments. This matches the execution guard's unknown-center restriction. A
+static route still does not certify dynamic stopping clearance. Planning failure
+and execution rejection enter the bounded blocked/replanning/recovering/failed
+policy described in the [navigation guide](exploration-navigation.md).
 
 The follower uses the estimated body pose to output forward/lateral velocity
 and yaw rate. It turns in place when heading error is too large. Every exploration
