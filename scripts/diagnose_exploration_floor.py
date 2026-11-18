@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 
 from scripts.diagnose_exploration_contacts import diagnose
+from scripts.pose_map_archive import ScanArchive
 from src.exploration.evaluation.episode import ExplorationEpisode
 from src.exploration.evaluation.scenarios import list_scenarios
 from src.exploration.floor_filter import FloorFilter, FloorTracker
@@ -40,16 +41,21 @@ def floor_support(points, mask, estimated_camera, true_camera):
     }
 
 
-def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
+def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path, *, record_scans=False):
     output.mkdir(parents=True, exist_ok=True)
     sources = {str(p.relative_to(ROOT)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted((ROOT / "src").rglob("*.py"))}
+    for name in ("diagnose_exploration_floor.py", "diagnose_exploration_contacts.py",
+                 "pose_map_archive.py", "validate_exploration.py", "render_exploration_video.py"):
+        sources["scripts/" + name] = hashlib.sha256((ROOT / "scripts" / name).read_bytes()).hexdigest()
     manifest = dict(revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     source_sha256=sources, scenario=scenario, seed=seed, horizon_s=horizon,
-                    omp_num_threads=os.environ.get("OMP_NUM_THREADS"),
+                    omp_num_threads=os.environ.get("OMP_NUM_THREADS"), record_scans=record_scans,
                     versions={p: importlib.metadata.version(p) for p in ("numpy", "scipy", "mujoco", "open3d")})
     (output / "run.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     rows, worst = [], {}
+    archive = ScanArchive(output / "scans") if record_scans else None
+    completed = False
     active = None
     original_advance, original_mask = ExplorationEpisode.advance, FloorTracker.mask
 
@@ -69,6 +75,9 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
         estimated = robot.get_pose()
         np.testing.assert_allclose(origin, estimated[:3, 3], atol=1e-12, rtol=0)
         actual, counts = floor_support(points, mask, estimated, frame.ground_truth_pose)
+        if archive is not None:
+            archive.append(rid, frame.sim_time, points, mask, estimated, frame.ground_truth_pose,
+                           filter_.config, robot.octomap.resolution)
         row = {"robot": rid, "time_s": frame.sim_time, **counts}
         row["floor_reacquired"] = filter_.reacquired
         plane = filter_.plane
@@ -90,7 +99,10 @@ def diagnose_floor(scenario: str, seed: int, horizon: float, output: Path):
     try:
         with patch.object(ExplorationEpisode, "advance", advance), patch.object(FloorTracker, "mask", observe):
             report = diagnose(scenario, seed, horizon, output)
+            completed = True
     finally:
+        if archive is not None:
+            archive.finish(complete=completed)
         manifest["source_unchanged"] = all(hashlib.sha256((ROOT / p).read_bytes()).hexdigest() == h
                                            for p, h in sources.items())
         (output / "run.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

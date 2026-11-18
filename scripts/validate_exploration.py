@@ -22,11 +22,12 @@ def check_encoder():
     imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def validate(scenario: str, seed: int, horizon: float, output: Path):
+def validate(scenario: str, seed: int, horizon: float, output: Path, *, record_scans=False):
     """Keep failed algorithm outcomes and render them just like horizon completions."""
     check_encoder()  # Fail before an expensive simulation if export is unavailable.
     output.mkdir(parents=True, exist_ok=False)
-    status = {"scenario": scenario, "seed": seed, "horizon_s": horizon, "phase": "simulation"}
+    status = {"scenario": scenario, "seed": seed, "horizon_s": horizon,
+              "record_scans": record_scans, "phase": "simulation"}
     status_path = output / "validation.json"
 
     def save():
@@ -34,7 +35,8 @@ def validate(scenario: str, seed: int, horizon: float, output: Path):
 
     save()
     try:
-        report = diagnose_floor(scenario, seed, horizon, output)
+        report = diagnose_floor(scenario, seed, horizon, output,
+                                **({"record_scans": True} if record_scans else {}))
         status.update(phase="video", termination_reason=report["episode"]["result"]["termination_reason"])
         save()
         # This also verifies the reconstructed body trace before encoding.
@@ -56,8 +58,9 @@ def main():
     parser.add_argument("--seed", type=int, default=101)
     parser.add_argument("--horizon", type=float, default=10)
     parser.add_argument("--output", type=Path, required=True, help="New attempt directory")
+    parser.add_argument("--record-scans", action="store_true", help="Archive accepted clouds for offline pose/map diagnosis")
     args = parser.parse_args()
-    report = validate(args.scenario, args.seed, args.horizon, args.output)
+    report = validate(args.scenario, args.seed, args.horizon, args.output, record_scans=args.record_scans)
     print(json.dumps(report["episode"]["result"], indent=2, allow_nan=False))
 
 
