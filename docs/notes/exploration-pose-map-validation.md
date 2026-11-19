@@ -1,6 +1,6 @@
 # Pose, floor, and map diagnosis — Issue #6
 
-November 18, 2026. This follows the
+November 18–19, 2026. This follows the
 [bounded recovery validation](exploration-bounded-recovery-validation.md).
 
 ## Baseline observations
@@ -26,6 +26,27 @@ Reproduce this offline scoring with `scripts/replay_pose_map.py ATTEMPT --output
 REPORT.json`. Without a scan archive it explicitly reports replay unavailable.
 The initial reports are local under
 `outputs/exploration-planning/pose-map-diagnosis/baseline-{clutter,connected}.json`.
+
+An additional offline probe (`scripts/probe_terminal_clearance.py`) holds the
+saved terminal observed grid fixed and constructs a stationary, settled guard
+history, then substitutes estimated versus recorded true body pose. For A,
+nearest occupied-cell-center distance changes from **1.036185 m** to
+**1.042370 m**; both turn proposals change from rejection to acceptance. B's
+distance changes from **0.964153 m** to **0.964155 m**, and all four recovery
+proposals remain rejected. The planning radius stays **0.779205 m**.
+
+This is decision sensitivity to millimetric pose changes near a threshold,
+despite small overall pose error. It is not an exact reconstruction of live
+velocity/gait history, a corrected historical map, or proof that an escape
+would succeed. It supplies no true pose to live control and does not justify
+weakening clearance. Preserve this distinction when interpreting the matrix.
+
+The first 100 archived clutter-A scans were checked separately while the run
+continued: zero mask disagreements, maximum retained-point placement error
+**3.520 mm**, and fixed-lattice IoU **0.76865** for the estimated/filter branch.
+The large voxel-label difference at small metric error illustrates sensitivity
+to cell boundaries; it is not evidence of equally large physical displacement.
+This partial check is exploratory and does not replace the complete replay.
 
 ## Controlled diagnostic replay
 
@@ -79,6 +100,28 @@ preservation guarantee. Report full distributions and observed maxima rather
 than promoting passing these comparisons to a safety claim. No tracking,
 floor, geometry, or guard thresholds are relaxed for this work.
 
+Point samples and repeated frames are dependent observations. Their percentiles
+describe this recorded stream, not independent trials or confidence bounds.
+
+## Test evidence
+
+The focused archive, replay, diagnostic-label, and video-workflow suite passes
+**15 tests**, including exact commands/body-trace/coverage equality with scan
+recording enabled versus disabled in a short real episode.
+
+The expanded suite reports **1,083 passed, seven skipped, nine failed**
+(`pose-map-diagnosis/regression-01.log`). Every failure is in the existing
+subprocess-bridge tests using Unix `ipc:///tmp/...` addresses: this Windows
+ZeroMQ build reports `zmq.has('ipc') == False`. Neither that implementation nor
+its tests differs from the previous revision. This is retained as a platform
+limitation, not silently counted as a passing full suite. The initial focused
+test invocation also hit sandbox temporary-directory permissions; its fresh
+rerun outside the sandbox passed.
+
+The transport limitation is tracked independently in
+[Issue #7](https://github.com/ThePyProgrammer/argus/issues/7), without machine
+identifiers or hardware details.
+
 ## Development matrix
 
 The matrix below is fixed before inspecting its fresh results. Every attempt
@@ -106,3 +149,23 @@ errors, contact severity, falls, clearance rejections, recovery outcomes, and
 its verified video. Early failure remains a failure; it is not evidence of
 successful exploration or of the entire requested horizon. Generated artifacts
 remain local. Issue #6 stays open while the matrix and analysis are incomplete.
+
+## Completed attempts
+
+| Attempt | Actual/requested time | Coverage | Outcome | Verified body samples |
+| --- | --- | --- | --- | --- |
+| [Clutter 101](../../outputs/exploration-planning/pose-map-diagnosis/scans-clutter-s101-h16-01/top-view.mp4) | 13.26/16 s | 31.4379% | `navigation_failed` | 1,327 |
+| [Corridor 101](../../outputs/exploration-planning/pose-map-diagnosis/scans-corridor-s101-h8-01/top-view.mp4) | 8.00/8 s | 68.6756% | Horizon; recovery unresolved | 801 |
+
+Both attempts at `3dc52b6` retain unchanged source hashes, zero non-foot
+contacts/falls, and zero verified body replay error. Clutter exactly matches all
+1,327 command records (including terminal stop), body samples, and the complete
+coverage result of `recovery/final-clutter-live-03`. This establishes recording
+neutrality over the full 13.26-second failed episode. A makes two retreats and
+exhausts its budget; B remains stopped with `no_safe_recovery`.
+
+Corridor travels 1.01173 m as a team. At the horizon A is in its second recovery,
+with a prior `no_progress` outcome; B has installed a route after one recovery,
+but has not reset its blockage budget through resumed navigation progress.
+Reaching eight seconds therefore does not establish successful escape or
+sustained exploration. Full archived scan comparisons are still pending.

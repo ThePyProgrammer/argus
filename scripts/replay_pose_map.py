@@ -7,6 +7,7 @@ estimate unseen surfaces, or prove physical obstacle occupancy.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -44,7 +45,7 @@ def classification(mask, actual):
 
 
 class RetainedMap:
-    """Keep point provenance through the same historical plane cleanup rule."""
+    """Keep replay-owned immutable points through historical plane cleanup."""
     def __init__(self):
         self.rows = []
 
@@ -53,7 +54,7 @@ class RetainedMap:
             normal, offset = plane
             for row in self.rows:
                 row[2] &= np.abs(row[0] @ normal - offset) > tolerance
-        self.rows.append([points.copy(), actual.copy(), ~mask.copy()])
+        self.rows.append([points, actual, ~mask.copy()])
 
     def retained(self):
         if not self.rows:
@@ -67,12 +68,11 @@ def voxel_keys(points, resolution):
     return np.unique(np.floor(points / resolution).astype(np.int64), axis=0)
 
 
-def compare_map(mapped, actual, reference, resolution):
+def compare_map(mapped, actual, reference, resolution, reference_tree, reference_keys):
     keys = voxel_keys(mapped, resolution)
-    reference_keys = voxel_keys(reference, resolution)
     a, b = set(map(tuple, keys)), set(map(tuple, reference_keys))
-    distances = (cKDTree(reference).query(mapped, workers=1)[0]
-                 if len(mapped) and len(reference) else np.empty(0))
+    distances = (reference_tree.query(mapped, workers=1)[0]
+                 if len(mapped) and reference_tree is not None else np.empty(0))
     return {"retained_samples": len(mapped),
             "retained_true_floor_samples": int((np.abs(actual[:, 2]) <= .002).sum()),
             "paired_placement_error_m": distribution(np.linalg.norm(mapped - actual, axis=1)),
@@ -88,7 +88,9 @@ def replay(scans, config=FloorFilter(), resolution=.1, placement_budget_m=.05):
     maps = {key: RetainedMap() for key in ("estimated", "known", "estimated_oracle_floor", "known_oracle_floor")}
     frames = []
     for scan in scans:
-        points, estimated, truth = scan["points"], scan["estimated"], scan["truth"]
+        # Branches share immutable geometry but retain independent masks. Own
+        # this copy so a streaming caller may reuse its input buffer safely.
+        points, estimated, truth = scan["points"].copy(), scan["estimated"], scan["truth"]
         actual = corrected_points(points, estimated, truth)
         row = {"time_s": scan["time_s"], "points": len(points),
             "camera_translation_error_m": float(np.linalg.norm(estimated[:3, 3]-truth[:3, 3])),
@@ -109,10 +111,13 @@ def replay(scans, config=FloorFilter(), resolution=.1, placement_budget_m=.05):
         maps["known_oracle_floor"].insert(actual, actual, oracle)
         frames.append(row)
     reference, _ = maps["known_oracle_floor"].retained()
+    reference_tree = cKDTree(reference) if len(reference) else None
+    reference_keys = voxel_keys(reference, resolution)
     return {"frames": frames, "placement_budget_m": placement_budget_m,
             "placement_samples_above_budget": sum(r["placement_samples_above_budget"] for r in frames),
             "recorded_mask_disagreements": sum(r["recorded_mask_disagreements"] for r in frames),
-            "maps": {key: compare_map(*value.retained(), reference, resolution) for key, value in maps.items()}}
+            "maps": {key: compare_map(*value.retained(), reference, resolution, reference_tree, reference_keys)
+                     for key, value in maps.items()}}
 
 
 def summarize_existing(directory):
@@ -150,6 +155,12 @@ def main():
     result = diagnosis["episode"]["result"]
     config = result["provenance"]["exploration_config"]
     report["episode"] = {key: result[key] for key in ("elapsed_s", "termination_reason", "coverage", "contact_measurements", "reliability", "navigation")}
+    report["guard_decisions"] = {rid: dict(Counter(c["motion_clearance"][rid]["reason"]
+        for c in diagnosis["episode"]["commands"])) for rid in diagnosis["initial"]}
+    report["reported_guard_clearance_m"] = {rid: distribution([
+        c["motion_clearance"][rid]["clearance_m"] for c in diagnosis["episode"]["commands"]
+        if c["motion_clearance"][rid]["clearance_m"] is not None]) for rid in diagnosis["initial"]}
+    report["guard_clearance_scope"] = "Reported model margins only; absent values do not establish physical clearance."
     report["diagnostic_budgets"] = {
         "pose_and_observation_placement_m": config["clearance_margin_m"],
         "floor_inlier_band_m": config["floor_distance_tolerance_m"],

@@ -69,13 +69,16 @@ def read_scans(directory, robot):
         if hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
             raise ValueError(f"Scan archive checksum mismatch: {path}")
         with np.load(path, allow_pickle=False) as data:
-            if len(data["times"]) != entry["frames"]:
+            # NpzFile decompresses a member on every lookup. Load each member
+            # once per chunk rather than re-reading the entire cloud per frame.
+            arrays = {key: data[key] for key in data.files}
+            if len(arrays["times"]) != entry["frames"]:
                 raise ValueError("Scan frame count mismatch")
-            for i, time_s in enumerate(data["times"]):
+            for i, time_s in enumerate(arrays["times"]):
                 if time_s <= previous:
                     raise ValueError("Scan archive timestamps are not increasing")
                 previous = time_s
-                start, end = data["offsets"][i:i+2]
-                yield dict(time_s=float(time_s), points=data["points"][start:end].copy(),
-                    mask=data["masks"][start:end].copy(), estimated=data["estimated"][i].copy(),
-                    truth=data["truth"][i].copy())
+                start, end = arrays["offsets"][i:i+2]
+                yield dict(time_s=float(time_s), points=arrays["points"][start:end].copy(),
+                    mask=arrays["masks"][start:end].copy(), estimated=arrays["estimated"][i].copy(),
+                    truth=arrays["truth"][i].copy())
