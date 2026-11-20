@@ -139,8 +139,16 @@ The related scopes are tracked separately:
 - [#5: blocked-start recovery](https://github.com/ThePyProgrammer/argus/issues/5): replan and recover without bypassing the execution clearance check or stopping a productive teammate.
 - [#6: pose and map error](https://github.com/ThePyProgrammer/argus/issues/6): separate localization drift from floor/map errors and establish limits across development seeds and longer runs using the corrected gait.
 
+The [pose/map validation](notes/exploration-pose-map-validation.md) records
+controlled scan replay, separate pose and floor/map measurements, and a
+three-layout, two-seed development matrix. It verifies that diagnostic recording
+preserves commands over complete 8-second and 13.26-second episodes. Accepted
+tracking can still produce observation-placement errors beyond the existing
+50 mm planning-margin comparison. That comparison is not a certified uncertainty
+allowance, and the observed navigation failures remain explicit.
+
 Runtime uses #3's derivation extended to unrestricted knee rotation. Keep #4's
-checks on every #5 recovery proposal and diagnose #6 alongside that work. The
+checks on every #5 recovery proposal and retain #6's measured limitations. The
 severity thresholds remain development defaults; the contact fixes and geometry
 certificate do not establish general collision safety or readiness for allocator
 comparisons.
