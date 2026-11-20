@@ -129,6 +129,19 @@ uses `scripts/validate_exploration.py`, a new output directory, and the correcte
 gait/guard/recovery runtime. Runtime and instrumentation sources stay unchanged
 through each simulation and video export. Start at most two attempts together.
 
+For a fresh reproduction, choose an unused directory and the scenario/seed/
+horizon from the matrix. For example (do not overwrite preserved attempts):
+
+```powershell
+$env:OMP_NUM_THREADS = '1'
+.venv/Scripts/python.exe -u scripts/validate_exploration.py --scenario branching_corridor --seed 101 --horizon 8 --record-scans --output outputs/exploration-planning/pose-map-diagnosis/NEW-ATTEMPT
+.venv/Scripts/python.exe scripts/replay_pose_map.py outputs/exploration-planning/pose-map-diagnosis/NEW-ATTEMPT --output outputs/exploration-planning/pose-map-diagnosis/NEW-ATTEMPT/pose-map-report.json
+```
+
+Replay is offline and must use the completed archive for full-episode claims.
+The terminal pose-sensitivity probe is also offline:
+`scripts/probe_terminal_clearance.py ATTEMPT --output REPORT.json`.
+
 | Layout | Seed | Requested horizon |
 | --- | --- | --- |
 | Cluttered room | 101 | 16 s |
@@ -144,6 +157,14 @@ connected-room 101 attempt compares its first five seconds with the saved
 five-second baseline. A short real-episode unit fixture already checks exact
 command, trajectory, and coverage equality with recording on versus off.
 
+After the recorded connected-room 101 attempt completes, add a separate
+eight-second unrecorded control in `neutrality-connected-s101-h8-01`. This is
+outside the fixed six-case characterization matrix and does not replace an
+attempt. It strengthens neutrality evidence with a full-length comparison
+containing continued navigation as well as a blocked teammate, alongside the
+13.26-second clutter failure comparison. Use the same wrapper and preserve its
+verified video; the only requested change is omission of `--record-scans`.
+
 Every completed attempt must report actual duration, coverage, pose/map/floor
 errors, contact severity, falls, clearance rejections, recovery outcomes, and
 its verified video. Early failure remains a failure; it is not evidence of
@@ -156,6 +177,9 @@ remain local. Issue #6 stays open while the matrix and analysis are incomplete.
 | --- | --- | --- | --- | --- |
 | [Clutter 101](../../outputs/exploration-planning/pose-map-diagnosis/scans-clutter-s101-h16-01/top-view.mp4) | 13.26/16 s | 31.4379% | `navigation_failed` | 1,327 |
 | [Corridor 101](../../outputs/exploration-planning/pose-map-diagnosis/scans-corridor-s101-h8-01/top-view.mp4) | 8.00/8 s | 68.6756% | Horizon; recovery unresolved | 801 |
+| [Connected rooms 101](../../outputs/exploration-planning/pose-map-diagnosis/scans-connected-s101-h8-01/top-view.mp4) | 8.00/8 s | 80.6442% | Horizon; A navigating, B blocked | 801 |
+| [Clutter 102](../../outputs/exploration-planning/pose-map-diagnosis/scans-clutter-s102-h16-01/top-view.mp4) | 12.43/16 s | 72.5654% | `navigation_failed`; both retry budgets exhausted | 1,244 |
+| [Corridor 102](../../outputs/exploration-planning/pose-map-diagnosis/scans-corridor-s102-h10-01/top-view.mp4) | 10.00/10 s | 15.9970% | Horizon; A failed, B has not reset blockage budget | 1,001 |
 
 Both attempts at `3dc52b6` retain unchanged source hashes, zero non-foot
 contacts/falls, and zero verified body replay error. Clutter exactly matches all
@@ -168,4 +192,106 @@ Corridor travels 1.01173 m as a team. At the horizon A is in its second recovery
 with a prior `no_progress` outcome; B has installed a route after one recovery,
 but has not reset its blockage budget through resumed navigation progress.
 Reaching eight seconds therefore does not establish successful escape or
-sustained exploration. Full archived scan comparisons are still pending.
+sustained exploration. Full archived scan comparisons follow below.
+
+Connected-room 101 at `f9a8e6b` also retains unchanged source hashes and zero
+non-foot contacts/falls or body replay error. Its first 500 commands, 501 body
+samples, and five-second coverage prefix exactly match the uninstrumented
+five-second baseline. Team travel is 1.99782 m. B becomes blocked at 5.52 s
+and has two replans but no recovery by the eight-second horizon, while A
+continues navigating. The longer run exposes a limitation absent from the
+shorter baseline. These attempts contain only expected foot-support contact
+episodes; measured non-foot force and impulse are zero.
+
+The two completed seed-102 attempts also retain unchanged sources, zero
+non-foot contacts/falls, and zero video replay error. Clutter travels 1.37619 m;
+both robots use four replans and two recovery attempts. A's last recovery is
+rejected during execution; B's last recovery reports `no_progress`. Corridor
+travels 0.86896 m; A reports `no_safe_recovery`, while B has installed a route
+after two retreats but retains its blockage budget at the horizon. Their
+minimum sampled camera clearances are 0.61942 m and 0.65408 m respectively.
+
+Initial measured coverage differs by seed: clutter starts at 14.6569% / 37.7288%
+for seeds 101 / 102, and corridor at 47.7679% / 0%. These are development cases
+with different initial conditions, not paired evidence of an algorithmic
+coverage improvement.
+
+## Full clutter-101 replay
+
+Both robots replay all 1,327 archived scan frames with **zero recorded-mask
+disagreements**. Both have zero missed true-floor samples and zero removed
+samples above 4 cm, in both estimated-pose and known-pose tracker branches.
+No true-floor samples remain in either accumulated tracker map.
+
+| Robot | Retained-point placement median / p95 / maximum | Maximum nearest reference-surface distance | Observations above 50 mm |
+| --- | --- | --- | --- |
+| A | 2.809 / 24.711 / 51.860 mm | 50.670 mm | 13,476 / 15,284,711 |
+| B | 0.0252 / 0.0470 / 0.1417 mm | 0.1172 mm | 0 / 4,554,821 |
+
+A therefore exceeds the fixed placement reporting threshold despite its
+7.142 mm peak planar body error. Attitude and translation errors affect distant
+observations differently from the body origin. Correcting floor labels alone
+leaves the maximum placement error unchanged. Known-pose placement removes
+paired pose-placement error by construction; it is not a live localization fix.
+
+Of the samples between 4 and 40 mm above the diagnostic floor, the estimated
+tracker removes 93,651 for A and 60,983 for B. The known-pose tracker removes
+93,635 and 60,983 respectively. These include near-floor surface/wall-base
+samples, not counts of distinct erased obstacles. Their persistence with known
+poses separates the floor-band limitation from pose drift. With known poses,
+the floor tracker leaves 11 fewer fixed-grid cells for A than diagnostic floor
+labels; B's occupied-cell set is unchanged.
+
+Estimated-map fixed-grid IoU is 0.77474 for A and 0.75610 for B. In particular,
+B's submillimetric metric error with that voxel IoU reinforces that cell-label
+overlap alone is a poor measure of physical displacement. Complete per-frame
+and four-branch map results are saved in the attempt's `pose-map-report.json`.
+
+## Full corridor-101 replay
+
+Both robots replay all 800 accepted scan frames with zero recorded-mask
+disagreements. Estimated-pose and known-pose branches both report zero missed
+floor samples and zero removed samples above 4 cm; neither tracker map retains
+true-floor samples.
+
+| Robot | Peak planar / vertical / attitude error | Retained-point placement p95 / maximum | Observations above 50 mm |
+| --- | --- | --- | --- |
+| A | 21.932 mm / 3.480 mm / 0.1628 degrees | 21.702 / 22.096 mm | 0 / 1,671,131 |
+| B | 1.997 mm / 2.850 mm / 0.0929 degrees | 8.377 / 9.609 mm | 0 / 16,530,960 |
+
+B's maximum over all input points, before filtering, is 9.622 mm. For A,
+774 of 799 post-initialization registrations have observable rank five; the
+other 25 have rank six. All are accepted, with minimum post-seed fitness
+0.9355. This is consistent with weaker geometric constraints, but rank alone
+does not prove which errors caused the accumulated drift. B has rank six in
+all 799 post-seed registrations. Clutter-101 has rank six for both robots in
+all 1,326 post-seed registrations, yet A exceeds the point-placement threshold.
+Neither acceptance nor numerical rank is a pose-accuracy certificate.
+
+The estimated tracker removes 29,119 / 90,588 samples in the 4–40 mm band for
+A / B; known-pose tracking removes 29,113 / 90,568. Known-pose tracker occupancy
+matches the diagnostic floor-label map for A and lacks five fixed-grid cells
+for B. Estimated-map IoU is 0.53295 / 0.74518, with maximum nearest reference
+surface distance 21.667 / 8.568 mm. Metric distance and cell overlap again
+answer different questions.
+
+The minimum sampled camera-to-static-obstacle distance is 0.56484 m in
+clutter-101 and 0.65785 m in corridor-101. These compare the diagnostic true
+camera point with static axis-aligned walls/obstacles at saved sensor times;
+they exclude other robots and are not continuous articulated-body guarantees.
+Clutter B has 100 initial stopping-envelope rejections; corridor A has 13.
+Clean physical contact counts do not erase those modeled clearance failures.
+
+## Full connected-room-101 replay
+
+Both 800-frame archives have zero recorded-mask disagreements, missed floor
+samples, removed samples above 4 cm, and retained true-floor samples. The
+maximum planar errors are 3.188 mm for A and 0.807 mm for B; maximum observation
+placement errors are 25.662 mm and 6.229 mm. Neither robot exceeds the 50 mm
+reporting threshold. Retained-point placement p95 is 18.165 mm / 4.121 mm,
+while maximum nearest reference-surface distance is 21.998 mm / 6.012 mm.
+
+Estimated tracking removes 88,916 / 71,341 samples in the 4–40 mm band;
+known-pose tracking removes 88,883 / 71,279. Fixed-grid IoU is 0.47991 / 0.51806,
+again much more sensitive to cell boundaries than the metric displacement.
+The minimum sampled camera-to-static-obstacle distance is 0.71833 m.
