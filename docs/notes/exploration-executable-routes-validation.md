@@ -45,3 +45,39 @@ Use `scripts/validate_exploration.py` with new directories, hold runtime sources
 unchanged through video export, and link every attempt's verified video. Report
 actual/requested duration, initial/final coverage, movement, recovery, contact
 severity, pose/floor diagnostics, and unresolved clearance rejections.
+
+## Implementation and regression evidence
+
+Runtime `15bc2a9` implements the preview and endpoint ranking. A rejected
+geometric route now produces `no_executable_route` with per-candidate reasons,
+instead of being installed and immediately rejected during execution. Backward
+following aligns the rear toward the same geometric path and caps its speed at
+the existing 0.60 m/s recovery proposal. Forward behavior remains available;
+the admitted mode requiring fewer forecast steps is preferred, with forward
+as the deterministic tie-breaker.
+
+The terminal fixture rejects the first geometrically valid turning route and
+admits a later backward route without changing any observed cells. The real
+physics fixtures demonstrate retreat followed by accepted navigation in both
+lateral and backward escape cases, a stopped trap, and expiration of a forced
+forward-only long turn. All four have zero non-foot contacts. The long-turn
+fixture deliberately retains the old follower to keep testing turning drift;
+normal selection now escapes that fixture backward.
+
+On November 21, 2026, the affected suite passes **1,109 tests with nine skips**
+in **291.74 seconds**, including the SLAM suite. Command:
+
+```powershell
+$env:OMP_NUM_THREADS = '1'
+.venv/Scripts/python.exe -m pytest tests/exploration tests/control tests/coordination tests/bridge tests/metrics/test_exploration_coverage.py tests/locomotion/test_gait_controller.py tests/locomotion/test_gait_clearance.py tests/locomotion/test_gait_transitions.py tests/locomotion/test_locomotion.py tests/slam -q -p no:cacheprovider --basetemp=outputs/exploration-planning/executable-routes/test-regression-02
+```
+
+The first broad run hit Windows sandbox temporary-directory access errors and
+could not finish pytest cleanup. A separate run exposed an outdated assertion
+that every geometric route must receive a goal assignment. The updated fixture
+requires either an admitted preview and assignment or explicit rejection of
+every preview with `no_executable_route`. Exact collector-on/off command and
+body-state equality remains required and passes. The final suite ran outside
+the sandbox with a fresh temporary directory. Logs remain in
+`outputs/exploration-planning/executable-routes/`; the unsupported IPC transport
+tests remain skipped, not presented as native IPC validation.

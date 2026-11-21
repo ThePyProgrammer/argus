@@ -60,7 +60,7 @@ def test_collector_attachment_and_episode_order_preserve_commands_and_motion():
 
 
 @pytest.mark.timeout(120)
-def test_frontier_planning_succeeds_and_trace_is_observer_invariant():
+def test_frontier_route_previews_and_trace_are_observer_invariant():
     observed = run_episode(horizon=.35)
     unobserved = run_episode(horizon=.35, collect=False)
     assert observed["commands"] == unobserved["commands"]
@@ -70,7 +70,17 @@ def test_frontier_planning_succeeds_and_trace_is_observer_invariant():
     assert result["termination_reason"] == "horizon"
     assert result["elapsed_s"] == pytest.approx(.35)
     assert result["reliability"]["allocator_calls"] > 0
-    assert all(r["goal_assignments"] >= 1 for r in result["reliability"]["per_robot"].values())
+    for rid, reliability in result["reliability"]["per_robot"].items():
+        checks = [check for row in observed['commands']
+                  for check in row['navigation'][rid]['route_checks']]
+        assert checks  # This horizon includes the first actual planning scan.
+        if reliability['goal_assignments']:
+            assert any(check['admissible'] for check in checks)
+        else:
+            # Geometric success alone no longer installs an unexecutable route.
+            assert not any(check['admissible'] for check in checks)
+            assert result['navigation'][rid]['state'] == 'blocked'
+            assert result['navigation'][rid]['reason'] == 'no_executable_route'
     assert sum(r["planning_failures"] for r in result["reliability"]["per_robot"].values()) == 0
     assert result["coverage"]["capped_time_s"] == .35
     assert all(r["recovery_entries"] == 0 for r in result["reliability"]["per_robot"].values())
