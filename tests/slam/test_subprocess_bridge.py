@@ -1,6 +1,6 @@
 """Tests for SubprocessSLAMBridge -- ZMQ IPC communication with C++ SLAM backends.
 
-Uses mock subprocess + real ZMQ inproc sockets where possible to verify
+Uses mock subprocess + real ZMQ loopback TCP sockets where possible to verify
 the wire protocol (msgpack header + raw numpy multipart).
 """
 
@@ -53,7 +53,7 @@ class TestStartProcess:
     @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
     def test_start_creates_zmq_pair_and_spawns(self, mock_popen):
         mock_popen.return_value = MagicMock()
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_start")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
 
@@ -63,7 +63,8 @@ class TestStartProcess:
             mock_popen.assert_called_once()
             cmd = mock_popen.call_args[0][0]
             assert "--zmq" in cmd
-            assert "ipc:///tmp/test_bridge_start" in cmd
+            assert bridge.endpoint in cmd
+            assert "*" not in bridge.endpoint
         finally:
             bridge.shutdown()
 
@@ -77,7 +78,7 @@ class TestSendFrameMultipart:
         mock_proc.poll.return_value = None
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_mp")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
 
@@ -117,7 +118,7 @@ class TestSendFrameResult:
         mock_popen.return_value = mock_proc
 
         expected_pose = np.diag([1.0, 2.0, 3.0, 1.0])
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_result")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
             bridge._socket.send_multipart = MagicMock()
@@ -148,7 +149,7 @@ class TestTimeout:
         mock_proc.poll.return_value = None
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_timeout")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
             bridge._socket.send_multipart = MagicMock()
@@ -175,7 +176,7 @@ class TestZMQError:
         mock_proc.poll.return_value = None
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_zmqerr")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
             bridge._socket.send_multipart = MagicMock(
@@ -197,6 +198,7 @@ class TestKillProcess:
     """Test 6: _kill_process() terminates subprocess and cleans up IPC socket file."""
 
     @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
+    @pytest.mark.skipif(not zmq.has("ipc"), reason="ZeroMQ IPC unavailable")
     def test_kill_cleans_socket(self, mock_popen):
         mock_proc = MagicMock()
         mock_popen.return_value = mock_proc
@@ -215,6 +217,7 @@ class TestKillProcess:
             mock_proc.kill.assert_called_once()
             assert not os.path.exists(sock_path)
         finally:
+            bridge.shutdown()
             # Ensure cleanup even if test fails
             if os.path.exists(sock_path):
                 os.unlink(sock_path)
@@ -223,15 +226,23 @@ class TestKillProcess:
 class TestUniqueEndpoint:
     """Test 7: IPC endpoint uses unique path with PID to prevent address collisions."""
 
-    def test_default_endpoint_contains_pid(self):
+    @patch("src.slam.backends.subprocess_bridge.zmq.has", return_value=True)
+    def test_default_endpoint_contains_pid(self, _has):
         bridge = _make_bridge()
         assert str(os.getpid()) in bridge.endpoint
         assert bridge.endpoint.startswith("ipc:///tmp/slam_bridge_")
 
-    def test_two_bridges_have_different_endpoints(self):
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
+    def test_two_bridges_have_different_endpoints(self, mock_popen):
         a = _make_bridge()
         b = _make_bridge()
-        assert a.endpoint != b.endpoint
+        try:
+            a.start()
+            b.start()
+            assert a.endpoint != b.endpoint
+        finally:
+            a.shutdown()
+            b.shutdown()
 
 
 class TestIMUPacking:
@@ -243,7 +254,7 @@ class TestIMUPacking:
         mock_proc.poll.return_value = None
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_imu")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
 
@@ -284,7 +295,7 @@ class TestNoIMU:
         mock_proc.poll.return_value = None
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_noimu1")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         try:
             bridge.start()
 
@@ -314,7 +325,7 @@ class TestShutdown:
         mock_proc = MagicMock()
         mock_popen.return_value = mock_proc
 
-        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/test_bridge_shutdown")
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
         bridge.start()
         assert bridge.alive is True
 
@@ -325,3 +336,124 @@ class TestShutdown:
         assert bridge._ctx is None
         assert bridge._process is None
         mock_proc.kill.assert_called_once()
+
+class TestPortableTransport:
+    @patch("src.slam.backends.subprocess_bridge.zmq.has", return_value=False)
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
+    def test_default_falls_back_to_bound_loopback(self, popen, _has):
+        bridge = _make_bridge(args=["--config", "calibration.yaml"])
+        assert bridge.endpoint == "tcp://127.0.0.1:*"
+        try:
+            bridge.start()
+            assert bridge.endpoint.startswith("tcp://127.0.0.1:")
+            assert "*" not in bridge.endpoint
+            assert popen.call_args.args[0] == [
+                "/usr/bin/true", "--zmq", bridge.endpoint,
+                "--config", "calibration.yaml",
+            ]
+        finally:
+            bridge.shutdown()
+
+    @patch("src.slam.backends.subprocess_bridge.zmq.has", return_value=False)
+    @patch("src.slam.backends.subprocess_bridge.zmq.Context")
+    def test_explicit_unsupported_ipc_is_actionable(self, context, _has):
+        bridge = _make_bridge(ipc_endpoint="ipc:///tmp/explicit_slam")
+        with pytest.raises(ValueError, match="tcp://127.0.0.1"):
+            bridge.start()
+        context.assert_not_called()
+        assert not bridge.alive
+
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
+    def test_bind_failure_closes_resources(self, popen):
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
+        context = zmq.Context()
+        socket = context.socket(zmq.PAIR)
+        with patch("src.slam.backends.subprocess_bridge.zmq.Context", return_value=context), \
+             patch.object(context, "socket", return_value=socket), \
+             patch.object(socket, "bind", side_effect=zmq.ZMQError("bind failed")):
+            with pytest.raises(zmq.ZMQError, match="bind failed"):
+                bridge.start()
+        assert socket.closed and context.closed
+        assert bridge._socket is None and bridge._ctx is None
+        assert not bridge.alive
+        popen.assert_not_called()
+
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen", side_effect=OSError("spawn failed"))
+    def test_spawn_failure_closes_resources(self, popen):
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*")
+        context = zmq.Context()
+        socket = context.socket(zmq.PAIR)
+        with patch("src.slam.backends.subprocess_bridge.zmq.Context", return_value=context), \
+             patch.object(context, "socket", return_value=socket):
+            with pytest.raises(OSError, match="spawn failed"):
+                bridge.start()
+        assert socket.closed and context.closed
+        assert bridge._socket is None and bridge._ctx is None
+        assert not bridge.alive
+        bridge.shutdown()
+
+    @pytest.mark.skipif(not zmq.has("ipc"), reason="ZeroMQ IPC unavailable")
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen", side_effect=OSError("spawn failed"))
+    def test_spawn_failure_removes_ipc_file(self, popen):
+        bridge = _make_bridge()
+        with pytest.raises(OSError, match="spawn failed"):
+            bridge.start()
+        assert not os.path.exists(bridge.endpoint.removeprefix("ipc://"))
+        assert bridge._socket is None and bridge._ctx is None
+
+    def test_failed_bind_does_not_unlink_unowned_ipc_file(self, tmp_path):
+        path = tmp_path / "unowned.sock"
+        path.write_text("owned by another process")
+        bridge = _make_bridge(ipc_endpoint=f"ipc://{path}")
+        with patch("src.slam.backends.subprocess_bridge.zmq.has", return_value=True), \
+             patch("zmq.Socket.bind", side_effect=zmq.ZMQError("bind failed")):
+            with pytest.raises(zmq.ZMQError):
+                bridge.start()
+        bridge.shutdown()
+        assert path.read_text() == "owned by another process"
+
+    def test_tcp_round_trip_with_real_worker(self):
+        import sys
+        worker = '''
+import sys, msgpack, numpy as np, zmq
+ctx = zmq.Context()
+sock = ctx.socket(zmq.PAIR)
+sock.setsockopt(zmq.RCVTIMEO, 5000)
+sock.connect(sys.argv[1])
+parts = sock.recv_multipart()
+header = msgpack.unpackb(parts[0])
+assert header['rgb_shape'] == [2, 3, 3]
+assert len(parts[1]) == 18 and len(parts[2]) == 24
+sock.send(msgpack.packb({'pose': np.eye(4).tobytes(), 'status': 'ok', 'time_ms': 2.0}))
+sock.close()
+ctx.term()
+'''
+        real_popen = subprocess.Popen
+        def spawn(cmd, **kwargs):
+            return real_popen([sys.executable, "-c", worker, cmd[2]], **kwargs)
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*", hang_timeout_ms=5000)
+        try:
+            with patch("src.slam.backends.subprocess_bridge.subprocess.Popen", side_effect=spawn):
+                bridge.start()
+            result = bridge.send_frame(
+                np.zeros((2, 3, 3), dtype=np.uint8),
+                np.ones((2, 3), dtype=np.float32), 1.0,
+            )
+            assert result is not None
+            np.testing.assert_array_equal(result.pose, np.eye(4))
+            assert result.tracking_status == TrackingStatus.OK
+            assert bridge._process.wait(timeout=5) == 0
+        finally:
+            bridge.shutdown()
+
+    @patch("src.slam.backends.subprocess_bridge.subprocess.Popen")
+    def test_unconnected_worker_times_out_on_send(self, popen):
+        popen.return_value.poll.return_value = None
+        bridge = _make_bridge(ipc_endpoint="tcp://127.0.0.1:*", hang_timeout_ms=50)
+        try:
+            bridge.start()
+            assert bridge.send_frame(np.zeros((1, 1, 3)), np.zeros((1, 1)), 0) is None
+            assert not bridge.alive
+            popen.return_value.kill.assert_called_once()
+        finally:
+            bridge.shutdown()

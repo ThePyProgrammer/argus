@@ -1,8 +1,11 @@
-"""Generic subprocess bridge for C++ SLAM backends via ZMQ IPC.
+"""Generic subprocess bridge for C++ SLAM backends via ZMQ PAIR sockets.
 
 Spawns a C++ binary, communicates via ZMQ PAIR socket with msgpack
 headers and raw numpy byte arrays. Handles crash detection (process
 exit), hang detection (5s timeout), and IPC socket cleanup.
+
+Defaults to IPC when supported, otherwise an OS-assigned loopback TCP port.
+The resolved endpoint is passed to the backend through its --zmq argument.
 
 Concrete backends (OpenVINS, SVO Pro, DSO) inherit this and provide
 binary_path, config_path, and optional coordinate transforms.
@@ -24,7 +27,7 @@ logger = logging.getLogger(__name__)
 class SubprocessSLAMBridge:
     """Generic subprocess wrapper for C++ SLAM backends.
 
-    Implements frame send/receive over ZMQ IPC. NOT a SLAMProtocol
+    Implements frame send/receive over ZMQ IPC or TCP. NOT a SLAMProtocol
     itself -- concrete backends (OpenVINSBackend, SVOProBackend)
     compose this bridge and implement SLAMProtocol on top.
     """
@@ -41,7 +44,12 @@ class SubprocessSLAMBridge:
         self._binary = binary_path
         self._args = args or []
         # Unique endpoint per instance to avoid collisions
-        self._endpoint = ipc_endpoint or f"ipc:///tmp/slam_bridge_{os.getpid()}_{id(self)}"
+        self._bind_endpoint = ipc_endpoint if ipc_endpoint is not None else (
+            f"ipc:///tmp/slam_bridge_{os.getpid()}_{id(self)}"
+            if zmq.has("ipc") else "tcp://127.0.0.1:*"
+        )
+        self._endpoint = self._bind_endpoint
+        self._bound = False
         self._timeout = hang_timeout_ms or self.HANG_TIMEOUT_MS
         self._process: subprocess.Popen | None = None
         self._ctx: zmq.Context | None = None
@@ -55,24 +63,38 @@ class SubprocessSLAMBridge:
 
     @property
     def endpoint(self) -> str:
-        """ZMQ IPC endpoint string."""
+        """ZMQ endpoint, with a concrete TCP port after start() binds."""
         return self._endpoint
 
     def start(self) -> None:
         """Spawn the C++ subprocess and bind the ZMQ socket."""
-        self._ctx = zmq.Context()
-        self._socket = self._ctx.socket(zmq.PAIR)
-        self._socket.setsockopt(zmq.RCVTIMEO, self._timeout)
-        self._socket.setsockopt(zmq.LINGER, 0)
-        self._socket.bind(self._endpoint)
+        if self._alive:
+            raise RuntimeError("SLAM subprocess bridge is already running")
+        if self._bind_endpoint.startswith("ipc://") and not zmq.has("ipc"):
+            raise ValueError(
+                "This ZeroMQ build does not support IPC; omit ipc_endpoint "
+                "or use ipc_endpoint='tcp://127.0.0.1:*'."
+            )
+        try:
+            self._ctx = zmq.Context()
+            self._socket = self._ctx.socket(zmq.PAIR)
+            self._socket.setsockopt(zmq.RCVTIMEO, self._timeout)
+            self._socket.setsockopt(zmq.SNDTIMEO, self._timeout)
+            self._socket.setsockopt(zmq.LINGER, 0)
+            self._socket.bind(self._bind_endpoint)
+            self._bound = True
+            self._endpoint = self._socket.getsockopt_string(zmq.LAST_ENDPOINT)
 
-        cmd = [self._binary, "--zmq", self._endpoint] + self._args
-        logger.info("Spawning subprocess: %s", " ".join(cmd))
-        self._process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+            cmd = [self._binary, "--zmq", self._endpoint] + self._args
+            logger.info("Spawning subprocess: %s", " ".join(cmd))
+            self._process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except Exception:
+            self._cleanup()
+            raise
         self._alive = True
 
     def send_frame(
@@ -191,10 +213,11 @@ class SubprocessSLAMBridge:
                 pass
             self._ctx = None
         # Remove IPC socket file to prevent "address already in use"
-        if self._endpoint.startswith("ipc://"):
+        if self._bound and self._endpoint.startswith("ipc://"):
             sock_path = self._endpoint.replace("ipc://", "")
             if os.path.exists(sock_path):
                 try:
                     os.unlink(sock_path)
                 except OSError:
                     pass
+        self._bound = False
