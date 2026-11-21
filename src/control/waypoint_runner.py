@@ -44,6 +44,7 @@ class WaypointRunner:
         angular_speed: float = 1.0,
         arrival_threshold: float = 0.5,
         heading_tolerance_rad: float | None = None,
+        reverse: bool = False,
     ) -> None:
         """Initialize the waypoint runner.
 
@@ -55,6 +56,7 @@ class WaypointRunner:
                 considered reached.
             heading_tolerance_rad: If set, turn in place above this heading
                 error before translating. None retains continuous forward turns.
+            reverse: Follow the route backward, aligning the rear with the target.
         """
         if not waypoints:
             raise ValueError("waypoints list must not be empty")
@@ -68,6 +70,7 @@ class WaypointRunner:
         self._angular_speed = angular_speed
         self._arrival_threshold = arrival_threshold
         self._heading_tolerance_rad = heading_tolerance_rad
+        self._reverse = reverse
         self._current_index = 0
 
     def get_velocity(
@@ -129,6 +132,8 @@ class WaypointRunner:
         # Compute heading to lookahead target
         delta = target[:2] - position[:2]
         desired_yaw = math.atan2(delta[1], delta[0])
+        if self._reverse:
+            desired_yaw += math.pi
 
         # Extract current heading from rotation matrix (yaw from forward vector)
         forward = current_pose[:2, 0]  # first column of rotation = local X axis
@@ -149,7 +154,7 @@ class WaypointRunner:
         # Always drive forward while turning -- quadrupeds can walk and
         # turn simultaneously. Scale down speed when far off heading.
         heading_factor = max(0.3, 1.0 - abs(angle_error) / math.pi)
-        linear_vel = np.array([self._linear_speed * heading_factor, 0.0])
+        linear_vel = np.array([self._linear_speed * heading_factor * (-1 if self._reverse else 1), 0.0])
 
         return linear_vel, float(angular_vel)
 

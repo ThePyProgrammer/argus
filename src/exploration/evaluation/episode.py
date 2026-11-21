@@ -167,7 +167,7 @@ class ExplorationEpisode:
             return cls(coordinator, bridge, scene.compiled_reference(),
                        coverage_config=CoverageConfig(horizon_s=horizon_s), collect=collect,
                        provenance={"sample": sample.to_dict(), "method": "legacy_voronoi",
-                                   "recovery_candidates": "deterministic_guarded_primitives_v1",
+                                   "recovery_candidates": "guarded_endpoint_route_ranking_v2",
                                    "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1",
                                    "odometry_rule": "body_origin_surface_svd_v2",
                                    "registration_sampling_rule": "bounded_voxel_refinement_v1",
@@ -187,7 +187,7 @@ class ExplorationEpisode:
                                    "planning_clearance": "body_camera_envelope_single_raster_v3",
                                    "execution_clearance": "observed_pose_swept_stop_settled_idle_v4",
                                    "execution_geometry": "all_joint_rotations_static_calibration_v1",
-                                   "path_following": "align_heading_before_translation_v1",
+                                   "path_following": "guarded_forward_reverse_local_forecast_v2",
                                    "recovery_rule": "bounded_commanded_replanning_v4"})
         except BaseException:
             bridge.stop()

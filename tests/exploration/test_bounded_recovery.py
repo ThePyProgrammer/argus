@@ -55,11 +55,15 @@ def test_true_trap_stays_stopped_and_finishes_with_reason(monkeypatch):
 
 def test_repeated_execution_rejection_has_bounded_planning(monkeypatch):
     loop, _, plan = fixture(monkeypatch, room((0, .95)), goal=(0., 2.))
+    rejected_previews = []
     for i in range(240):
         tick(loop, i)
+        rejected_previews.extend(loop.measurement_state['navigation']['route_checks'])
     diagnostic = loop.measurement_state["navigation"]
     assert diagnostic["state"] == "failed"
-    assert diagnostic["execution_rejections"] > 0
+    # The same geometric routes are now rejected before installation.
+    assert any(row['reason'] == 'obstacle_clearance' for row in rejected_previews)
+    assert diagnostic["execution_rejections"] == 0
     assert plan.call_count <= 6
     assert diagnostic["replan_attempts"] <= 4
 

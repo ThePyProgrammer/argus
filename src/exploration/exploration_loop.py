@@ -47,6 +47,7 @@ from src.exploration.goal_selector import GoalSelector
 from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
 from src.exploration.progress_monitor import ProgressMonitor
+from src.exploration.route_preview import preview_route, preview_recovery_endpoint
 from src.exploration.skills.executor import SkillExecutionResult, SkillExecutor
 from src.exploration.skills.library import create_default_skill_registry
 from src.exploration.skills.recorder import SkillOutcomeRecorder
@@ -171,6 +172,9 @@ class ExplorationLoop:
         self._motion_guard = MotionClearanceGuard(self._config)
         self._blocked = BlockedNavigation(self._config)
         self._recovery_checks = {}
+        self._route_checks = []
+        self._recovery_route_checks = {}
+        self._route_goals = []
         self._last_observation_time = None
         self._navigation_pose = np.eye(4)
         self._execution_radius = self._config.planning_radius(0., self._config.voxel_resolution)
@@ -247,7 +251,9 @@ class ExplorationLoop:
     def measurement_state(self) -> dict:
         """Detached decision diagnostics; no evaluator state enters navigation."""
         return {"recovering": self._blocked.state == "recovering",
-                "navigation": {**self._blocked.snapshot(), "recovery_checks": dict(self._recovery_checks)},
+                "navigation": {**self._blocked.snapshot(), "recovery_checks": dict(self._recovery_checks),
+                               "route_checks": list(self._route_checks),
+                               "recovery_route_checks": dict(self._recovery_route_checks)},
                 "navigation_exhausted": self._navigation_exhausted,
                 "goal_id": self._goal_id if self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete else None,
@@ -423,6 +429,7 @@ class ExplorationLoop:
         current_pos: np.ndarray,
         pose: np.ndarray,
         score_fn: Callable[[np.ndarray], float] | None,
+        guard_state: dict | None = None,
     ) -> tuple[int, bool]:
         """Detect frontiers, select a goal, and plan a path.
 
@@ -436,6 +443,7 @@ class ExplorationLoop:
         self._navigation_exhausted = True
         self._current_waypoint_runner = None
         self._goal_id = None
+        self._route_goals = []
         config = self._config
         occupied = self._octomap.get_occupied_voxels()
 
@@ -501,28 +509,26 @@ class ExplorationLoop:
                 if np.linalg.norm(candidate[:2] - current_pos[:2]) >= config.waypoint_arrival_threshold),
                 config.planning_candidate_limit))
             self._selection_latency_ms.append((time.perf_counter() - selection_start) * 1000)
+            self._route_goals = candidates
             for candidate in candidates:
                 planned_path = self._path_planner.plan(current_pos, candidate, grid_2d)
                 self._planning_sequence += 1
                 self._planning_attempts.append((str(self._planning_sequence), planned_path is not None))
                 if planned_path is not None:
+                    runner = self._executable_runner(planned_path, guard_state)
+                    if runner is None:
+                        continue
                     goal, path = candidate, planned_path
                     break
 
             if goal is None or path is None:
                 reason = ("blocked_start" if self._path_planner.start_is_blocked(current_pos, grid_2d)
-                          else "no_reachable_route")
+                          else "no_executable_route" if self._route_checks else "no_reachable_route")
                 self._blocked.block(reason, self._previous_sim_time or 0.)
             else:
                 self._blocked.installed(pose)
                 self._goal_id = ",".join(format(float(v), ".9g") for v in goal)
-                self._current_waypoint_runner = WaypointRunner(
-                    path,
-                    linear_speed=config.linear_speed,
-                    angular_speed=config.angular_speed,
-                    heading_tolerance_rad=config.forward_heading_tolerance_rad,
-                    arrival_threshold=config.waypoint_arrival_threshold,
-                )
+                self._current_waypoint_runner = runner
 
         self._last_rescan_pos = current_pos.copy()
         self._last_voxel_count = self._octomap.num_occupied
@@ -569,6 +575,28 @@ class ExplorationLoop:
         self._navigation_exhausted = terminated
 
         return frontier_count, terminated
+
+    def _executable_runner(self, path, state, *, guard=None, record=True):
+        """Try both travel directions within the existing candidate budget."""
+        options = []
+        for reverse in (False, True):
+            runner = WaypointRunner(
+                path, linear_speed=(min(self._config.linear_speed, self._config.recovery_reverse_speed_mps)
+                                    if reverse else self._config.linear_speed),
+                angular_speed=self._config.angular_speed,
+                heading_tolerance_rad=self._config.forward_heading_tolerance_rad,
+                arrival_threshold=self._config.waypoint_arrival_threshold, reverse=reverse)
+            if state is None:
+                return runner
+            result = preview_route(self._motion_guard if guard is None else guard, runner, state,
+                                   progress_m=self._config.navigation_resume_distance_m)
+            if record:
+                self._route_checks.append(dict(goal=np.asarray(path[-1]).tolist(), reverse=reverse,
+                    reason=result.reason, admissible=result.admissible,
+                    translation_m=result.translation_m, steps=result.steps))
+            if result.admissible:
+                options.append((result.steps, reverse, runner))
+        return min(options, key=lambda item: item[:2])[2] if options else None
 
     # ------------------------------------------------------------------
     # Main per-step entry point
@@ -619,12 +647,37 @@ class ExplorationLoop:
                 candidates = candidates[1:] + candidates[:1]
             state = self._guard_state(frame)
             self._recovery_checks = {}
+            self._recovery_route_checks = {}
+            admitted = []
             for command in candidates:
                 result = self._motion_guard.preview(np.array(command[:2]), command[2], **state)
                 self._recovery_checks[str(command)] = result.reason
                 if result.scale > 0:
-                    self._blocked.start_recovery(command, self._navigation_pose, frame.sim_time)
+                    admitted.append(command)
+            selected = None
+            for command in admitted:
+                endpoint, reason = preview_recovery_endpoint(self._motion_guard, command, state)
+                self._recovery_route_checks[str(command)] = reason
+                if endpoint is None:
+                    continue
+                forecast_guard, forecast_state = endpoint
+                # Four endpoints, at most four goals each, two travel modes.
+                # The ordinary candidate/retry/deadline limits are unchanged.
+                planner = PathPlanner(allow_unknown=False, clearance_radius=self._execution_radius)
+                self._recovery_route_checks[str(command)] = "no_predicted_route"
+                for goal in self._route_goals[:4]:
+                    path = planner.plan(forecast_state['pose'][:3, 3], goal, state['grid'])
+                    if path is not None and self._executable_runner(
+                            path, forecast_state, guard=forecast_guard, record=False) is not None:
+                        self._recovery_route_checks[str(command)] = "predicted_navigation"
+                        selected = command
+                        break
+                if selected is not None:
                     break
+            if admitted:
+                # A bounded sensing probe can reveal a new route even when the
+                # frozen map cannot predict one. It is not labeled an escape.
+                self._blocked.start_recovery(selected or admitted[0], self._navigation_pose, frame.sim_time)
             else:
                 self._blocked.recovery_outcome = "no_safe_motion"
                 self._blocked.fail("no_safe_recovery")
@@ -652,6 +705,7 @@ class ExplorationLoop:
 
         # a. Update SLAM and OctoMap
         self._planning_attempts = []
+        self._route_checks = []
         self._selection_latency_ms = []
         if not np.isfinite(frame.sim_time):
             raise ValueError("Exploration sensor time must be finite")
@@ -708,7 +762,7 @@ class ExplorationLoop:
 
         if should_rescan:
             frontier_count, terminated = self._evaluate_frontiers(
-                current_pos, pose, score_fn,
+                current_pos, pose, score_fn, guard_state=self._guard_state(frame),
             )
 
         # e. Execute navigation

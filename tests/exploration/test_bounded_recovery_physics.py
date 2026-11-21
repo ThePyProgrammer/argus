@@ -24,7 +24,7 @@ from tests.exploration.test_motion_clearance_integration import frame
 
 
 @pytest.mark.timeout(90)
-@pytest.mark.parametrize("case", ["escape", "trap", "long_turn"])
+@pytest.mark.parametrize("case", ["escape", "trap", "long_turn", "reverse_escape"])
 def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
     monkeypatch.setattr(mujoco, "Renderer", lambda *a, **kw: SimpleNamespace(close=lambda: None))
     monkeypatch.setattr(MultiRobotBridge, "_capture_frame", lambda *a: None)
@@ -44,6 +44,14 @@ def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
         contacts = PhysicsContactCollector(_contacts(bridge), start_sim_time=float(bridge.mj_data.time))
         bridge.add_physics_step_observer(contacts.observe_step)
         loop = ExplorationLoop(bridge, MockSLAM(), MockOctoMap(), ExplorationConfig(ground_filter=False))
+        if case == "long_turn":
+            # Force the old forward-only follower to retain the physical
+            # turning-drift/deadline regression. Normal route selection can
+            # now walk backward to this goal (the reverse_escape case).
+            from src.control.waypoint_runner import WaypointRunner
+            monkeypatch.setattr(loop, '_executable_runner', lambda path, *a, **kw: WaypointRunner(
+                path, linear_speed=loop.config.linear_speed, heading_tolerance_rad=.25,
+                arrival_threshold=loop.config.waypoint_arrival_threshold))
         grid = room((0, wall_distance))
         monkeypatch.setattr(loop, "planning_grid", lambda *a: grid)
         def observe(sensor):
@@ -55,7 +63,7 @@ def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
         def frontiers(*a, **kw):
             # Initially only a frontier across the wall is observed. Retreat
             # exposes a reachable frontier on this side; no obstacles are erased.
-            newly_visible = [-2., 0., 0.] if case == "long_turn" else [0., 2., 0.]
+            newly_visible = [-2., 0., 0.] if case in {"long_turn", "reverse_escape"} else [0., 2., 0.]
             goal = np.array(newly_visible if frontier_revealed else [2., 0., 0.])
             return [FrontierCluster(goal, 1, np.array([grid.world_to_grid(goal[:2])]))]
         monkeypatch.setattr(loop.frontier_detector, "detect", frontiers)
