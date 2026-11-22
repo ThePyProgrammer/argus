@@ -147,6 +147,23 @@ tracking can still produce observation-placement errors beyond the existing
 50 mm planning-margin comparison. That comparison is not a certified uncertainty
 allowance, and the observed navigation failures remain explicit.
 
+The [executable-route follow-up](notes/exploration-executable-routes-validation.md)
+adds bounded forward/backward route previews using the same execution guard
+and shared gait command response. A geometric path alone no longer installs
+a route: its nominal four-second forecast must include 0.15 m of accepted
+translation. Selected frontier targets use an arrival tolerance of at most
+one map cell, so nearby targets do not complete before meaningful travel.
+Recovery prefers a predicted endpoint that enables navigation, within the
+existing retry and time limits. A route replacement preserves uninterrupted
+walking progress; turning, standing, and recovery motion cannot reset the
+blockage budget. Every real command still passes the original clearance guard.
+
+These forecasts rank local proposals on the current observed map; they do not
+certify the whole route, physical motion response, or future sensing. The note
+preserves the initial regressions, their corrections, and paired live evidence.
+Pose/map uncertainty (#9), low-feature representation (#10), and the broader
+sustained-exploration evaluation gate (#11) remain separate scopes.
+
 Runtime uses #3's derivation extended to unrestricted knee rotation. Keep #4's
 checks on every #5 recovery proposal and retain #6's measured limitations. The
 severity thresholds remain development defaults; the contact fixes and geometry
