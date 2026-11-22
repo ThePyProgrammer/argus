@@ -118,3 +118,18 @@ def test_recovery_endpoint_can_enable_checked_navigation():
     # A new obstacle after selection still overrides the forecast.
     state['grid'] = room((0, -.7))
     assert guard.filter(np.array([-.6, 0.]), 0., **state).scale == 0
+
+
+def test_nearby_frontier_requires_translation_before_arrival(monkeypatch):
+    loop, body, _ = fixture(monkeypatch, room())
+    state = settled(loop._motion_guard, room(), body, .4)
+    path = [np.array([0., 0., 0.]), np.array([.35, 0., 0.])]
+    old_runner = WaypointRunner(path, arrival_threshold=.3, heading_tolerance_rad=.25)
+    old = preview_route(loop._motion_guard, old_runner, state)
+    assert not old.admissible and old.reason == 'route_complete'
+    runner = loop._executable_runner(path, state)
+    assert runner is not None
+    assert preview_route(loop._motion_guard, runner, state).admissible
+    assert runner.get_velocity(pose(.15))[0][0] > 0
+    runner.get_velocity(pose(.34))
+    assert runner.is_complete

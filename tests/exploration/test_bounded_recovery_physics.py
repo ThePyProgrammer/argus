@@ -24,7 +24,7 @@ from tests.exploration.test_motion_clearance_integration import frame
 
 
 @pytest.mark.timeout(90)
-@pytest.mark.parametrize("case", ["escape", "trap", "long_turn", "reverse_escape"])
+@pytest.mark.parametrize("case", ["escape", "trap", "long_turn", "reverse_escape", "near_frontier"])
 def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
     monkeypatch.setattr(mujoco, "Renderer", lambda *a, **kw: SimpleNamespace(close=lambda: None))
     monkeypatch.setattr(MultiRobotBridge, "_capture_frame", lambda *a: None)
@@ -64,6 +64,8 @@ def test_physical_blockage_recovery_or_explicit_trap(monkeypatch, case):
             # Initially only a frontier across the wall is observed. Retreat
             # exposes a reachable frontier on this side; no obstacles are erased.
             newly_visible = [-2., 0., 0.] if case in {"long_turn", "reverse_escape"} else [0., 2., 0.]
+            if case == "near_frontier":
+                newly_visible = [-.45, 0., 0.]
             goal = np.array(newly_visible if frontier_revealed else [2., 0., 0.])
             return [FrontierCluster(goal, 1, np.array([grid.world_to_grid(goal[:2])]))]
         monkeypatch.setattr(loop.frontier_detector, "detect", frontiers)

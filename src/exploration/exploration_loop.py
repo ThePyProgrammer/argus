@@ -585,7 +585,13 @@ class ExplorationLoop:
                                     if reverse else self._config.linear_speed),
                 angular_speed=self._config.angular_speed,
                 heading_tolerance_rad=self._config.forward_heading_tolerance_rad,
-                arrival_threshold=self._config.waypoint_arrival_threshold, reverse=reverse)
+                # Frontier members can be only just beyond the rescan exclusion
+                # radius. A full 30 cm arrival ball would finish those paths
+                # before useful walking. Approach to one observed map cell;
+                # this does not alter obstacle inflation or execution clearance.
+                arrival_threshold=(self._config.waypoint_arrival_threshold if state is None else
+                    min(self._config.waypoint_arrival_threshold, state['grid'].resolution)),
+                reverse=reverse)
             if state is None:
                 return runner
             result = preview_route(self._motion_guard if guard is None else guard, runner, state,

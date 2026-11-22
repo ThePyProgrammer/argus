@@ -188,7 +188,7 @@ class ExplorationEpisode:
                                    "execution_clearance": "observed_pose_swept_stop_settled_idle_v4",
                                    "execution_geometry": "all_joint_rotations_static_calibration_v1",
                                    "path_following": "guarded_forward_reverse_local_forecast_v2",
-                                   "recovery_rule": "bounded_commanded_replanning_v4"})
+                                   "recovery_rule": "continuous_navigation_progress_v5"})
         except BaseException:
             bridge.stop()
             for robot in robots.values():

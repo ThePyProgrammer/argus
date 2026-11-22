@@ -229,3 +229,23 @@ def test_turning_drift_cannot_reset_budget_or_count_toward_later_walking():
     state.observe(pose(.36, yaw=.5), 2., navigation_translation=True)
     assert state.since is None and state.replans == 0
     assert state.reason == "navigation_progress"
+
+
+def test_route_replacement_preserves_only_accepted_walking_progress():
+    from src.exploration.blocked_navigation import BlockedNavigation
+    state = BlockedNavigation(ExplorationConfig())
+    state.block('fixture_blocked', 0.)
+    state.replans = 2
+    state.installed(pose())
+    state.observe(pose(.10), 1., navigation_translation=True)
+    state.installed(pose(.10))  # Fresh map/goal; still walking on a checked route.
+    assert state.since == 0. and state.replans == 2
+    state.observe(pose(.16), 1.1, navigation_translation=True)
+    assert state.since is None and state.replans == 0
+
+    state.block('blocked_again', 2.)
+    state.installed(pose(.16))
+    state.observe(pose(.30), 2.1, navigation_translation=False)
+    state.installed(pose(.30))
+    state.observe(pose(.40), 2.2, navigation_translation=True)
+    assert state.since == 2.  # Turning drift is not included after replacement.

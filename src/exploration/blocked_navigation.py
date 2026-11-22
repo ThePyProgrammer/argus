@@ -51,8 +51,13 @@ class BlockedNavigation:
         self.command = None
 
     def installed(self, pose):
+        # A rescan can replace a route during uninterrupted accepted walking.
+        # Preserve that interval's anchor; installing another goal is neither
+        # proof of progress nor a reason to discard observed translation.
+        # observe() still resets the anchor on every idle/turning interval.
+        if self.state != "navigating" or self.navigation_anchor is None:
+            self.navigation_anchor = pose[:2, 3].copy()
         self.state, self.reason = "navigating", "route_installed"
-        self.navigation_anchor = pose[:2, 3].copy()
 
     def observe(self, pose, now, *, navigation_translation=False):
         if self.state == "failed":
