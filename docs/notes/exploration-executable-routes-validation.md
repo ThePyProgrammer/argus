@@ -81,3 +81,44 @@ body-state equality remains required and passes. The final suite ran outside
 the sandbox with a fresh temporary directory. Logs remain in
 `outputs/exploration-planning/executable-routes/`; the unsupported IPC transport
 tests remain skipped, not presented as native IPC validation.
+
+## Initial live failures and corrections
+
+The initial runtime (`15bc2a9`, launched at documentation revision `1d13ef7`)
+regressed against the preserved baselines. All three attempts completed their
+artifact workflow, retained unchanged runtime sources through export, and have
+zero non-foot contacts, non-foot force/impulse, falls, missed diagnostic floor
+samples, and removed samples above 4 cm. Those clean measurements do not make
+the navigation outcomes successful.
+
+| Attempt | Actual/requested time | Initial/final coverage | Outcome | Verified body states |
+| --- | --- | --- | --- | --- |
+| [Clutter 101, initial](../../outputs/exploration-planning/executable-routes/clutter-s101-live-01/top-view.mp4) | 11.22/16 s | 14.6569/23.9706% | `navigation_failed` | 1,123, zero replay error |
+| [Clutter 102, initial](../../outputs/exploration-planning/executable-routes/clutter-s102-live-01/top-view.mp4) | 12.29/16 s | 37.7288/62.4673% | `navigation_failed` | 1,230, zero replay error |
+| [Connected rooms 101, initial](../../outputs/exploration-planning/executable-routes/connected-s101-live-01/top-view.mp4) | 5.00/5 s | 58.2179/60.4154% | Horizon, no accepted navigation translation | 501, zero replay error |
+
+The preserved baselines finish at 31.4379%, 72.5654%, and 77.1523% respectively.
+The new preview frequently reports `route_complete` without 15 cm of predicted
+travel: the follower's 30 cm arrival ball finishes goals only just outside the
+30 cm candidate-exclusion distance. Runtime `e0636d5` approaches selected
+frontier members to within one map cell (capped by the configured arrival
+threshold). This changes goal completion, not obstacle inflation, body geometry,
+the execution guard, or the frozen 15 cm progress requirement.
+
+Clutter-102 B additionally walks backward on navigation commands from 9.66 to
+12.29 s: 0.18390 m net true displacement and 0.18465 m estimated. Replacing
+its route at 11.07 s resets the navigation anchor, so it still expires with
+`blocked_timeout`. The correction preserves an existing walking anchor across
+route replacement. Every turning/idle observation still resets it, and
+blocked/recovery transitions still start a new interval. Merely installing
+another route cannot reset retries or the deadline.
+
+The correction was developed in an isolated checkout while the initial attempts
+kept their original runtime. The checkout's missing unrelated Git LFS office
+assets were excluded; the Go2 assets and frozen terminal fixture were copied
+from the main checkout. One first test invocation encountered an unmaterialized
+LFS pointer; after restoring the fixture, the corrected focused suite passes
+**32 tests in 73.71 seconds**. The added physical nearby-frontier case proves
+actual retreat followed by accepted navigation translation with zero non-foot
+contacts. The corrected implementation was merged only after all initial video
+exports completed.
