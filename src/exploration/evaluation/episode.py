@@ -170,6 +170,7 @@ class ExplorationEpisode:
                                    "recovery_candidates": "guarded_endpoint_route_ranking_v2",
                                    "slam_backend": "icp", "merge_strategy": "icp_union", "cloud_config_key": "1",
                                    "odometry_rule": "body_origin_surface_svd_v2",
+                                   "pose_map_support": "icp_observability_chain_v1",
                                    "registration_sampling_rule": "bounded_voxel_refinement_v1",
                                    "exploration_config": asdict(robots[config.robot_ids[0]].exploration.config),
                                    "navigation_target_rule": "reachable_unreached_frontier_member_v2",

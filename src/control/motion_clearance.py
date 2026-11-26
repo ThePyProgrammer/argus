@@ -113,13 +113,13 @@ class MotionClearanceGuard:
         self._idle_elapsed = self._idle_elapsed + dt if self._active_yaw is None else 0.
 
     def filter(self, linear, angular, *, pose, sim_time, observation_time, grid,
-               radius, calibration_valid, tracking_ok):
+               radius, calibration_valid, tracking_ok, pose_map_error=None):
         linear = np.asarray(linear, dtype=float)
         pose = np.asarray(pose, dtype=float)
         control_dt = .01
         def stop(reason):
             self._remember_command(np.zeros(2), 0., control_dt)
-            if reason in {"invalid_state", "stale_pose", "missing_geometry_calibration",
+            if reason.startswith('pose_') or reason in {"invalid_state", "stale_pose", "missing_geometry_calibration",
                           "tracking_lost", "stale_observation", "motion_model_exceeded",
                           "initial_velocity_observation"}:
                 # Invalid or repeated timestamps cannot establish a physically
@@ -148,6 +148,8 @@ class MotionClearanceGuard:
             return stop("stale_pose")
         if not calibration_valid:
             return stop("missing_geometry_calibration")
+        if pose_map_error is not None:
+            return stop(pose_map_error)
         if not tracking_ok:
             return stop("tracking_lost")
         if abs(linear[1]) > .001:

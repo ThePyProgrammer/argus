@@ -12,6 +12,7 @@ from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.slam.protocol import SLAMResult, TrackingStatus
 from src.slam.registry import slam_backend
 from src.slam.slam_pipeline import SLAMPipeline
+from src.slam.pose_support import SUPPORT_VERSION
 
 
 @slam_backend(name="icp", display="ICP Odometry")
@@ -28,6 +29,7 @@ class ICPBackend:
         "outputs_dense": True,
         "supports_loop_closure": False,
         "supports_stereo": False,
+        "pose_map_support": SUPPORT_VERSION,
     }
 
     PARAMETER_SCHEMA: dict = {
@@ -60,8 +62,10 @@ class ICPBackend:
         pose = self._pipeline.process_frame(frame)
         return SLAMResult(
             pose=pose,
-            points=self._pipeline.last_frame_cloud.copy(),
-            colors=self._pipeline._last_frame_colors.copy(),
+            points=(self._pipeline.last_frame_cloud.copy() if self._pipeline.pose_support.supported
+                    else np.empty((0, 3))),
+            colors=(self._pipeline._last_frame_colors.copy() if self._pipeline.pose_support.supported
+                    else np.empty((0, 3))),
             metrics=dict(self._pipeline.registration_metrics),
             tracking_status=TrackingStatus.OK if self._pipeline.tracking_ok else TrackingStatus.LOST,
         )

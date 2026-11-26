@@ -48,6 +48,7 @@ from src.exploration.occupancy_grid import project_voxels_to_2d
 from src.exploration.path_planner import PathPlanner
 from src.exploration.progress_monitor import ProgressMonitor
 from src.exploration.route_preview import preview_route, preview_recovery_endpoint
+from src.slam.pose_support import SUPPORT_VERSION, navigation_support_error
 from src.exploration.skills.executor import SkillExecutionResult, SkillExecutor
 from src.exploration.skills.library import create_default_skill_registry
 from src.exploration.skills.recorder import SkillOutcomeRecorder
@@ -176,6 +177,9 @@ class ExplorationLoop:
         self._recovery_route_checks = {}
         self._route_goals = []
         self._last_observation_time = None
+        self._pose_map_error = None
+        self._pose_map_support = None
+        self._pose_history_lost = False
         self._navigation_pose = np.eye(4)
         self._execution_radius = self._config.planning_radius(0., self._config.voxel_resolution)
         self._streaming_viz = streaming_viz
@@ -253,7 +257,9 @@ class ExplorationLoop:
         return {"recovering": self._blocked.state == "recovering",
                 "navigation": {**self._blocked.snapshot(), "recovery_checks": dict(self._recovery_checks),
                                "route_checks": list(self._route_checks),
-                               "recovery_route_checks": dict(self._recovery_route_checks)},
+                               "recovery_route_checks": dict(self._recovery_route_checks),
+                               "pose_map_support": self._pose_map_support,
+                               "pose_map_error": self._pose_map_error},
                 "navigation_exhausted": self._navigation_exhausted,
                 "goal_id": self._goal_id if self._current_waypoint_runner is not None
                 and not self._current_waypoint_runner.is_complete else None,
@@ -328,6 +334,15 @@ class ExplorationLoop:
         result = self._slam.process_frame(frame)
         self.last_tracking_status: str = result.tracking_status.value
         self.last_slam_metrics: dict = result.metrics
+        self._pose_map_support = result.metrics.get('pose_map_support')
+        required = getattr(self._slam, 'CAPABILITIES', {}).get('pose_map_support') == SUPPORT_VERSION
+        self._pose_map_error = (navigation_support_error(self._pose_map_support, frame.sim_time,
+            self._config.motion_observation_max_age_s) if required else None)
+        self._pose_history_lost |= self._pose_map_error == 'pose_history_unobservable'
+        if self._pose_history_lost:
+            # Resetting a backend alone does not repair this loop's existing
+            # navigation map. A fresh localization/map lifecycle is required.
+            self._pose_map_error = 'pose_history_unobservable'
 
         # Emit crash_fallback WS message when a subprocess backend returns LOST
         if (result.tracking_status.value == "lost"
@@ -362,7 +377,7 @@ class ExplorationLoop:
         current_pos = pose[:3, 3].copy()
 
         # Insert this frame's cloud directly into OctoMap (not the global accumulator)
-        if len(result.points) > 0:
+        if len(result.points) > 0 and self._pose_map_error is None:
             if self.last_tracking_status == "ok":
                 self._last_observation_time = frame.sim_time
             points = result.points
@@ -639,7 +654,7 @@ class ExplorationLoop:
                     calibration_valid=(frame.body_from_camera is not None
                         and frame.collision_radius_m is not None
                         and np.isfinite(frame.collision_radius_m) and frame.collision_radius_m > 0),
-                    tracking_ok=self.last_tracking_status == "ok")
+                    tracking_ok=self.last_tracking_status == "ok", pose_map_error=self._pose_map_error)
 
     def _blocked_proposal(self, frame):
         """Bounded motion choices; preview does not authorize later execution."""
@@ -737,6 +752,16 @@ class ExplorationLoop:
             camera_offset, config.voxel_resolution, calibrated_radius)
         self._path_planner.set_clearance_radius(self._execution_radius)
 
+        if self._pose_map_error is not None:
+            self._current_waypoint_runner = None
+            self._goal_id = None
+            self._progress.reset()
+            if self._pose_map_error == 'pose_history_unobservable':
+                self._blocked.fail(self._pose_map_error)
+            elif self._blocked.state not in {'blocked', 'failed'}:
+                self._blocked.block(self._pose_map_error, frame.sim_time)
+            return np.zeros(2), 0., StepMetrics(self._last_frontier_count, self._last_coverage,
+                self._blocked.state == 'failed', self._octomap.num_occupied, False)
         self._blocked.observe(pose, frame.sim_time,
                               navigation_translation=np.linalg.norm(self._last_command[0]) > .01)
         if self._blocked.state in {"blocked", "recovering", "failed"}:

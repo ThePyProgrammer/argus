@@ -16,6 +16,7 @@ import open3d as o3d
 from src.bridge.sensor_types import CameraIntrinsics, SensorFrame
 from src.slam.depth_to_cloud import depth_to_pointcloud
 from src.slam.surface_odometry import MIN_CORRESPONDENCES, align_surfaces, registration_cloud
+from src.slam.pose_support import PoseChainSupport
 
 
 MAX_CLOUD_POINTS = 500_000
@@ -46,6 +47,7 @@ class SLAMPipeline:
         self._last_frame_colors: np.ndarray = np.empty((0, 3))
         self.registration_metrics: dict = {}
         self.tracking_ok = True
+        self.pose_support = PoseChainSupport()
 
     def reset(self) -> None:
         """Clear all accumulated state for a fresh start."""
@@ -57,6 +59,7 @@ class SLAMPipeline:
         self._last_frame_colors = np.empty((0, 3))
         self.registration_metrics = {}
         self.tracking_ok = True
+        self.pose_support = PoseChainSupport()
 
     def process_frame(self, frame: SensorFrame) -> np.ndarray:
         """Process one RGB-D frame. Returns ICP-estimated (4,4) pose.
@@ -86,6 +89,7 @@ class SLAMPipeline:
                                      "registration_voxel_m": None, "rejection_reason": "missing_depth"}
         self.tracking_ok = False
         if frame.depth is None:
+            self._update_pose_support(frame)
             self._slam_poses.append(self._current_pose.copy())
             return self._current_pose.copy()
 
@@ -136,6 +140,7 @@ class SLAMPipeline:
             self.registration_metrics["accepted"] = self.tracking_ok
             self.registration_metrics["rejection_reason"] = None if self.tracking_ok else "missing_initial_reference"
 
+        self._update_pose_support(frame)
         if not self.tracking_ok:
             # The previous reference still belongs to the held pose. Do not
             # advance it or insert an unlocalized cloud after a rejected frame.
@@ -154,10 +159,13 @@ class SLAMPipeline:
         self._last_frame_cloud = np.asarray(cloud.points).copy()
         self._last_frame_colors = np.asarray(cloud.colors).copy() if cloud.has_colors() else np.empty((0, 3))
 
-        self._global_cloud += cloud
+        # Keep the diagnostic relative estimate, but do not keep placing new
+        # observations into a global map once the pose chain loses support.
+        if self.pose_support.supported:
+            self._global_cloud += cloud
 
         # Downsample accumulated cloud less aggressively (every 30 frames)
-        if len(self._slam_poses) % 30 == 0:
+        if self.pose_support.supported and len(self._slam_poses) % 30 == 0:
             self._global_cloud = self._global_cloud.voxel_down_sample(
                 self._voxel_size
             )
@@ -172,6 +180,12 @@ class SLAMPipeline:
 
         self._slam_poses.append(self._current_pose.copy())
         return self._current_pose.copy()
+
+    def _update_pose_support(self, frame):
+        self.pose_support.update(frame.sim_time, accepted=self.tracking_ok,
+            rank=self.registration_metrics['observable_rank'],
+            seeded=not self._slam_poses and self.tracking_ok)
+        self.registration_metrics['pose_map_support'] = self.pose_support.snapshot()
 
     @property
     def global_cloud(self) -> o3d.geometry.PointCloud:
