@@ -70,9 +70,23 @@ def test_frontier_route_previews_and_trace_are_observer_invariant():
     assert result["termination_reason"] == "horizon"
     assert result["elapsed_s"] == pytest.approx(.35)
     assert result["reliability"]["allocator_calls"] > 0
+    total_checks = 0
     for rid, reliability in result["reliability"]["per_robot"].items():
         checks = [check for row in observed['commands']
                   for check in row['navigation'][rid]['route_checks']]
+        total_checks += len(checks)
+        if result['navigation'][rid]['reason'] == 'pose_history_unobservable':
+            # The wall-dominated view can lose support before its first route
+            # scan. Recording must preserve that explicit failure too.
+            assert not checks and reliability['goal_assignments'] == 0
+            assert result['navigation'][rid]['state'] == 'failed'
+            stopped = [row for row in observed['commands']
+                       if row['navigation'][rid]['pose_map_error'] == 'pose_history_unobservable']
+            assert stopped
+            for row in stopped:
+                assert not np.any(row['commands'][rid]['linear'])
+                assert row['commands'][rid]['yaw_rate'] == 0
+            continue
         assert checks  # This horizon includes the first actual planning scan.
         if reliability['goal_assignments']:
             assert any(check['admissible'] for check in checks)
@@ -81,6 +95,7 @@ def test_frontier_route_previews_and_trace_are_observer_invariant():
             assert not any(check['admissible'] for check in checks)
             assert result['navigation'][rid]['state'] == 'blocked'
             assert result['navigation'][rid]['reason'] == 'no_executable_route'
+    assert total_checks > 0  # Still exercise real previews for the supported teammate.
     assert sum(r["planning_failures"] for r in result["reliability"]["per_robot"].values()) == 0
     assert result["coverage"]["capped_time_s"] == .35
     assert all(r["recovery_entries"] == 0 for r in result["reliability"]["per_robot"].values())

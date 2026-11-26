@@ -53,6 +53,7 @@ class TestICPBackendProtocol:
             "outputs_dense": True,
             "supports_loop_closure": False,
             "supports_stereo": False,
+            "pose_map_support": "icp_observability_chain_v1",
         }
         assert backend.CAPABILITIES == expected
 
