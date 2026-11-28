@@ -211,7 +211,8 @@ Recovery motion and assigning a goal cannot reset the budget.
 No safe candidate produces `failed: no_safe_recovery`, with each candidate's
 guard reason retained. Retry exhaustion or the deadline also produce explicit
 failures. Failed robots remain stopped and sensing until an explicit target
-resets the policy. This describes infeasibility under the observed map, current
+resets the policy, except for the persistent pose-history failure described
+below. This describes infeasibility under the observed map, current
 clearance model, and finite primitive set, not proof that no physical escape
 exists. No obstacle removal, body-radius reduction, or clearance exception is
 used. A productive teammate continues. If all active robots terminate and any
@@ -225,3 +226,27 @@ The legacy `StuckRecovery` helper remains for compatibility tests but is no
 longer used by the live exploration loop.
 
 These checks use estimated motion, not physical contact or goal progress. Pose drift can hide a blockage; movement without useful exploration can satisfy the mobility threshold. The two-second window is a development default, not a tuned safety guarantee.
+
+## ICP pose-chain support
+
+ICP reports `icp_observability_chain_v1` separately from raw registration
+acceptance. An accepted relative alignment with fewer than six numerically
+supported motion directions invalidates the pose history. Navigation then
+stops with `pose_history_unobservable`, and both the ICP global cloud and the
+exploration occupancy/floor pipeline withhold new scans. Other robots continue
+under their own support checks. A later full-rank relative alignment, a new
+waypoint, or resetting only the backend cannot repair the existing map history;
+localization and the map must restart together.
+
+Required support that is absent, malformed, or older than
+`motion_observation_max_age_s` also prevents motion and map insertion. Rejected
+registration keeps the previous reference, so a later supported match can
+recover without advancing through an unsupported increment. The explicitly
+provided initial pose permits the first seed. Ground truth is never used to
+repair a live estimate.
+
+This is a numerical observability check, not a metric accuracy guarantee.
+Translation, attitude, and historical-map error bounds remain unavailable.
+Full-rank drift still requires an uncertainty budget, and other SLAM backends
+do not yet declare this ICP-specific contract. See the
+[scope and validation evidence](notes/exploration-pose-support-validation.md).
